@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.claude
+.env
+.env.*
+.DS_Store
+*.db
+*.log
+*.pem
+*.key
+test
+LOOP_CHANGELOG.md
+LICENSE
