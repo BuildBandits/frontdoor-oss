@@ -5,6 +5,10 @@ import { ConfidentialClientApplication } from '@azure/msal-node';
 import db from '../db.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
+import { getRequiredEnv } from '../config.js';
+
+const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+const authScopes = ['User.Read', 'openid', 'profile', 'email'];
 
 const router = express.Router();
 
@@ -39,7 +43,7 @@ router.get('/microsoft', async (req, res) => {
     }
 
     const authUrl = await msalClient.getAuthCodeUrl({
-      scopes: ['User.Read', 'openid', 'profile', 'email'],
+      scopes: authScopes,
       redirectUri: process.env.AZURE_REDIRECT_URI,
       state,
     });
@@ -78,7 +82,7 @@ router.get('/microsoft/callback', async (req, res) => {
 
     const tokenResponse = await perUserMsalClient.acquireTokenByCode({
       code,
-      scopes: ['User.Read', 'openid', 'profile', 'email'],
+      scopes: authScopes,
       redirectUri: process.env.AZURE_REDIRECT_URI,
     });
 
@@ -105,18 +109,21 @@ router.get('/microsoft/callback', async (req, res) => {
 
     if (user) {
       // Existing user (either pre-registered or returning) — update profile
+      const shouldPromote = adminEmails.includes(email.toLowerCase()) && user.role !== 'admin';
       db.prepare(
-        'UPDATE users SET microsoft_id = ?, display_name = ?, last_login = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?'
+        `UPDATE users SET microsoft_id = ?, display_name = ?, last_login = datetime('now'), updated_at = datetime('now')${shouldPromote ? ", role = 'admin'" : ''} WHERE id = ?`
       ).run(microsoftId, displayName, user.id);
+      if (shouldPromote) user = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
     } else {
       // Brand new user (not pre-registered) — create and add to default group
       const userId = uuidv4();
       const avatarColor = `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
 
+      const role = adminEmails.includes(email.toLowerCase()) ? 'admin' : 'user';
       db.prepare(`
         INSERT INTO users (id, email, display_name, microsoft_id, role, avatar_color, last_login)
-        VALUES (?, ?, ?, ?, 'user', ?, datetime('now'))
-      `).run(userId, email, displayName, microsoftId, avatarColor);
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+      `).run(userId, email, displayName, microsoftId, role, avatarColor);
 
       user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
 
@@ -125,9 +132,10 @@ router.get('/microsoft/callback', async (req, res) => {
     }
 
     // Generate JWT (role included so proxied apps can verify authorization)
+    const jwtSecret = getRequiredEnv('JWT_SECRET', 'SSO callback');
     const token = jwt.sign(
       { userId: user.id, email: user.email, name: user.display_name, role: user.role },
-      process.env.JWT_SECRET,
+      jwtSecret,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 

@@ -8,3 +8,4 @@ dist/
 *.log
 *.pem
 *.key
+docker-compose.override.yml

@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
 import { authenticate, isAdmin } from '../middleware/auth.js';
+import { getRequiredEnv } from '../config.js';
 
 const router = express.Router();
 
@@ -59,6 +60,7 @@ router.get('/:slug/sso-redirect', authenticate, (req, res) => {
   }
 
   // Generate a short-lived JWT with user info for the target app
+  const jwtSecret = getRequiredEnv('JWT_SECRET', 'SSO redirect');
   const ssoToken = jwt.sign(
     {
       sub: req.user.id,
@@ -68,7 +70,7 @@ router.get('/:slug/sso-redirect', authenticate, (req, res) => {
       iss: 'frontdoor',
       aud: app.slug,
     },
-    process.env.JWT_SECRET,
+    jwtSecret,
     { expiresIn: '5m' }
   );
 

@@ -11,10 +11,29 @@ import appsRoutes from './routes/apps.js';
 import usersRoutes from './routes/users.js';
 import groupsRoutes from './routes/groups.js';
 import logsRoutes from './routes/logs.js';
+import { getStartupConfig, validateStartupEnv } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+const startupConfig = getStartupConfig();
+const { missing, warnings, errors } = validateStartupEnv();
+
+console.log('Frontdoor startup configuration:');
+for (const [key, value] of Object.entries(startupConfig)) {
+  console.log(`  ${key}=${value}`);
+}
+
+for (const warning of warnings) {
+  console.warn(`Frontdoor startup warning: ${warning}`);
+}
+
+const startupErrors = [...missing.map((name) => `${name} is missing`), ...errors];
+if (startupErrors.length > 0) {
+  console.error(`Frontdoor startup error: ${startupErrors.join('; ')}`);
+  process.exit(1);
+}
 
 app.set('trust proxy', 1);
 

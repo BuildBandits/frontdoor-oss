@@ -50,36 +50,36 @@ Each app in the catalog is accessible via its target URL. The gateway handles au
 - Bulk app upsert API (for CI/automation)
 - Pre-register users by email before first login
 
-## Quick Start
+## Quick Start (Node.js)
 
 ```bash
 # 1. Install dependencies
 npm install
 
 # 2. Configure environment
-cp .env.example .env
-# Edit .env with your Azure AD credentials and domain settings
+cp .env.example.node .env
+# Edit .env with your Azure AD credentials
 
-# 3. (Optional) Add to /etc/hosts for local subdomain testing:
-# 127.0.0.1 frontdoor.local demo.frontdoor.local dashboard.frontdoor.local
-
-# 4. Start in dev mode (Vite + Express in parallel)
+# 3. Start in dev mode (Vite + Express in parallel)
 npm run dev
-
-# 5. Manual database seed (optional, server auto-seeds on first run)
-npm run db:seed
 ```
 
-## Docker
+Frontend: http://localhost:5173 | API: http://localhost:3001
+
+## Quick Start (Docker)
 
 ```bash
-# Build and run locally
-docker compose up --build
+# 1. Configure environment
+cp .env.example.docker .env
+# Edit .env with your Azure AD credentials
 
-# Or standalone
-docker build -t frontdoor .
-docker run -p 3001:3001 --env-file .env frontdoor
+# 2. Build and run
+docker compose up --build
 ```
+
+App: http://localhost:3001
+
+> **Dev vs Docker**: In dev mode, Vite serves the frontend on port 5173 and proxies API calls to Express on 3001. In Docker, Express serves both the built frontend and API on port 3001. The two `.env.example.*` files are pre-configured for each mode.
 
 ## Configuration
 
@@ -90,7 +90,7 @@ docker run -p 3001:3001 --env-file .env frontdoor
 | `PORT` | Express server port | `3001` |
 | `DATABASE_PATH` | SQLite file path | `./frontdoor.db` |
 | `BASE_DOMAIN` | Base domain (no protocol) | `frontdoor.local` |
-| `FRONTEND_URL` | Frontend URL with protocol | `http://frontdoor.local:5173` |
+| `FRONTEND_URL` | Frontend URL with protocol (see `.env.example.*`) | - |
 | `AZURE_CLIENT_ID` | Azure AD App Registration Client ID | - |
 | `AZURE_CLIENT_SECRET` | Azure AD Client Secret | - |
 | `AZURE_TENANT_ID` | Azure AD Tenant ID | - |
@@ -99,6 +99,49 @@ docker run -p 3001:3001 --env-file .env frontdoor
 | `JWT_EXPIRES_IN` | JWT token duration | `7d` |
 | `ADMIN_EMAILS` | Comma-separated admin emails (auto-promoted) | - |
 | `ADMIN_API_KEY` | API key for bulk endpoints | - |
+
+#### Production checklist
+
+For a real deployment, set at least:
+
+- `BASE_DOMAIN`
+- `FRONTEND_URL`
+- `AZURE_CLIENT_ID`
+- `AZURE_CLIENT_SECRET`
+- `AZURE_TENANT_ID`
+- `AZURE_REDIRECT_URI`
+- `JWT_SECRET`
+Recommended but optional:
+
+- `ADMIN_EMAILS`
+- `ADMIN_API_KEY`
+- `JWT_EXPIRES_IN`
+
+If one of the required values is missing or malformed, the container now fails fast at startup with a clear log entry instead of surfacing a runtime auth error later.
+
+#### Startup logs
+
+On boot, the server prints a redacted config summary such as:
+
+```text
+Frontdoor startup configuration:
+  NODE_ENV=production
+  PORT=3001
+  DATABASE_PATH=/data/frontdoor.db
+  BASE_DOMAIN=cerbero.cc
+  FRONTEND_URL=https://frontdoor.cerbero.cc
+  AZURE_CLIENT_ID=[set]
+  AZURE_CLIENT_SECRET=[set]
+  AZURE_TENANT_ID=[set]
+  AZURE_REDIRECT_URI=https://frontdoor.cerbero.cc/api/auth/microsoft/callback
+  JWT_SECRET=[set]
+  ADMIN_EMAILS=1 configured
+```
+
+Warnings are emitted for defaults or weak-but-valid settings, for example:
+
+- `BASE_DOMAIN is not set, defaulting to frontdoor.local`
+- `JWT_SECRET is shorter than 32 characters; use a longer random secret in production`
 
 ### Azure Entra ID (formerly Azure AD) Setup
 
@@ -196,7 +239,7 @@ SQLite with 7 tables:
 | `users` | Users (auto-created on first SSO login), admin/user roles |
 | `apps` | App catalog (slug, target_url, icon, description, tags) |
 | `access_logs` | Proxy access logs (user, app, IP, timestamp) |
-| `user_groups` | User groups for RBAC |
+| `user_groups` | User groups for RBAC, including synced Entra groups |
 | `user_group_members` | Group membership |
 | `app_permissions` | Per-group app visibility |
 | `rbac_audit_logs` | Audit trail for RBAC mutations |
