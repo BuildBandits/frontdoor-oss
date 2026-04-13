@@ -30,10 +30,15 @@ router.post('/', authenticate, isAdmin, (req, res) => {
 
   // Validate group IDs if provided
   if (groupIds && Array.isArray(groupIds) && groupIds.length > 0) {
-    const checkGroup = db.prepare('SELECT id FROM user_groups WHERE id = ?');
+    const checkGroup = db.prepare('SELECT id, source FROM user_groups WHERE id = ?');
     const invalid = groupIds.filter(gid => !checkGroup.get(gid));
     if (invalid.length > 0) {
       return res.status(400).json({ error: `Groups not found: ${invalid.join(', ')}` });
+    }
+
+    const entraGroups = groupIds.filter((gid) => checkGroup.get(gid)?.source === 'entra');
+    if (entraGroups.length > 0) {
+      return res.status(400).json({ error: `Entra-synced groups cannot be assigned manually: ${entraGroups.join(', ')}` });
     }
   }
 
@@ -83,10 +88,34 @@ router.get('/:id', authenticate, isAdmin, (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   const groups = db.prepare(`
-    SELECT g.id, g.name, g.description
+    SELECT g.id, g.name, g.description, g.source, g.entra_display_name
     FROM user_groups g JOIN user_group_members m ON g.id = m.group_id
     WHERE m.user_id = ? ORDER BY g.name
   `).all(req.params.id);
+
+  const entraGroups = db.prepare(`
+    SELECT
+      m.entra_group_id,
+      COALESCE(c.display_name, m.entra_group_id) AS display_name,
+      c.first_seen_at,
+      c.last_seen_at,
+      g.id AS local_group_id,
+      g.name AS local_name,
+      g.source AS local_source,
+      g.entra_synced_at AS local_synced_at
+    FROM entra_user_group_memberships m
+    LEFT JOIN entra_group_cache c
+      ON c.entra_group_id = m.entra_group_id
+    LEFT JOIN user_groups g
+      ON g.entra_group_id = m.entra_group_id
+     AND g.source = 'entra'
+    WHERE m.user_id = ?
+    GROUP BY m.entra_group_id
+    ORDER BY display_name
+  `).all(req.params.id).map((row) => ({
+    ...row,
+    is_imported: Boolean(row.local_group_id),
+  }));
 
   // Count visible apps (distinct apps from all user's groups)
   const visibleApps = db.prepare(`
@@ -96,7 +125,7 @@ router.get('/:id', authenticate, isAdmin, (req, res) => {
     WHERE m.user_id = ?
   `).get(req.params.id);
 
-  res.json({ user, groups, visibleAppCount: visibleApps.count });
+  res.json({ user, groups, entraGroups, visibleAppCount: visibleApps.count });
 });
 
 // Update user role (admin only)

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import BrandMark from '../components/BrandMark';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -48,8 +49,8 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-accent rounded-2xl mb-6">
-            <span className="text-3xl">🚪</span>
+          <div className="inline-flex mb-6">
+            <BrandMark size="lg" />
           </div>
           <h1 className="text-4xl font-extrabold text-dark tracking-tight">
             Frontdoor

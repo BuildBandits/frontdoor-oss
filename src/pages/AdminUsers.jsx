@@ -104,6 +104,13 @@ export default function AdminUsers() {
 
   const deleteUser = async (user) => {
     const name = user.display_name || user.email;
+    const visibleApps = userDetail?.visibleAppCount || 0;
+    if (visibleApps > 0) {
+      const appAwareConfirm = confirm(
+        `ATTENZIONE: l'utente ${name} rende visibili ${visibleApps} app.\n\nEliminandolo perderai anche queste assegnazioni. Vuoi continuare?`
+      );
+      if (!appAwareConfirm) return;
+    }
     if (!confirm(`ATTENZIONE: Vuoi eliminare DEFINITIVAMENTE l'utente ${name}?\n\nQuesta azione non è reversibile. Verranno rimossi anche tutti i log di accesso e le appartenenze ai gruppi.`)) return;
     if (!confirm(`Conferma finale: eliminare ${name}?`)) return;
 
@@ -122,7 +129,7 @@ export default function AdminUsers() {
   const openInvite = async () => {
     try {
       const res = await api.get('/groups');
-      setAllGroups(res.data.groups);
+      setAllGroups(res.data.groups.filter((g) => g.source !== 'entra'));
     } catch {
       // groups not critical for opening modal
     }
@@ -175,6 +182,11 @@ export default function AdminUsers() {
       .join('')
       .toUpperCase()
       .slice(0, 2);
+
+  const groupLabel = (group) => group.entra_display_name || group.name;
+  const localGroups = userDetail?.groups?.filter((g) => g.source !== 'entra') || [];
+  const entraGroups = userDetail?.groups?.filter((g) => g.source === 'entra') || [];
+  const detectedEntraGroups = userDetail?.entraGroups || [];
 
   const formatDate = (iso) => {
     if (!iso) return 'Mai';
@@ -348,23 +360,91 @@ export default function AdminUsers() {
                       {/* Groups */}
                       <div>
                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                          Gruppi ({userDetail.groups.length})
+                          Gruppi Frontdoor ({userDetail.groups.length})
                         </h3>
-                        {userDetail.groups.length === 0 ? (
-                          <p className="text-sm text-gray-300 italic">Nessun gruppo</p>
+
+                        <div className="space-y-4 max-h-48 overflow-y-auto pr-1">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                              Gruppi locali ({localGroups.length})
+                            </p>
+                            {localGroups.length === 0 ? (
+                              <p className="text-sm text-gray-300 italic">Nessun gruppo locale</p>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {localGroups.map((g) => (
+                                  <div key={g.id} className="flex items-center gap-2 py-1">
+                                    <Users className="w-3.5 h-3.5 text-gray-400" />
+                                    <span className="text-sm text-dark">{g.name}</span>
+                                    {g.description && (
+                                      <span className="text-xs text-gray-400 truncate max-w-[150px]">{g.description}</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                              Gruppi Frontdoor importati da Entra ({entraGroups.length})
+                            </p>
+                            {entraGroups.length === 0 ? (
+                              <p className="text-sm text-gray-300 italic">Nessun gruppo Entra importato in Frontdoor</p>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {entraGroups.map((g) => (
+                                  <div key={g.id} className="flex items-center gap-2 py-1">
+                                    <Users className="w-3.5 h-3.5 text-gray-400" />
+                                    <span className="text-sm text-dark">{groupLabel(g)}</span>
+                                    <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">
+                                      Entra
+                                    </span>
+                                    {g.description && (
+                                      <span className="text-xs text-gray-400 truncate max-w-[150px]">{g.description}</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <p className="mt-2 text-xs text-sky-600">
+                              I gruppi Entra vengono rilevati al login o con Force Sync, poi importati manualmente da Gestione Gruppi.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                          Gruppi Entra rilevati ({detectedEntraGroups.length})
+                        </h3>
+                        {detectedEntraGroups.length === 0 ? (
+                          <p className="text-sm text-gray-300 italic">Nessun gruppo Entra rilevato</p>
                         ) : (
-                          <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                            {userDetail.groups.map((g) => (
-                              <div key={g.id} className="flex items-center gap-2 py-1">
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                            {detectedEntraGroups.map((group) => (
+                              <div key={group.entra_group_id} className="flex items-center gap-2 py-1">
                                 <Users className="w-3.5 h-3.5 text-gray-400" />
-                                <span className="text-sm text-dark">{g.name}</span>
-                                {g.description && (
-                                  <span className="text-xs text-gray-400 truncate max-w-[150px]">{g.description}</span>
+                                <span className="text-sm text-dark">{group.display_name}</span>
+                                {group.is_imported ? (
+                                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
+                                    Importato in Frontdoor
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                                    Solo rilevato in Entra
+                                  </span>
                                 )}
+                                <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">
+                                  Entra
+                                </span>
                               </div>
                             ))}
                           </div>
                         )}
+                        <p className="mt-2 text-xs text-sky-600">
+                          Questi gruppi vengono letti direttamente dal tenant Entra, anche se non sono ancora importati in Frontdoor.
+                        </p>
                       </div>
 
                       {/* Actions */}
@@ -456,7 +536,7 @@ export default function AdminUsers() {
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Gruppi</label>
                 {allGroups.length === 0 ? (
-                  <p className="text-sm text-gray-400 italic">Nessun gruppo disponibile</p>
+                  <p className="text-sm text-gray-400 italic">Nessun gruppo locale disponibile</p>
                 ) : (
                   <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-200 rounded-xl p-2">
                     {allGroups.map((g) => (
@@ -467,13 +547,16 @@ export default function AdminUsers() {
                           onChange={() => toggleInviteGroup(g.id)}
                           className="rounded border-gray-300 text-dark focus:ring-accent"
                         />
-                        <span className="text-sm text-dark">{g.name}</span>
+                        <span className="text-sm text-dark">{groupLabel(g)}</span>
+                        {g.source === 'entra' && (
+                          <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Entra</span>
+                        )}
                         <span className="text-xs text-gray-400 ml-auto">{g.member_count} membri</span>
                       </label>
                     ))}
                   </div>
                 )}
-                <p className="text-xs text-gray-400 mt-1">L'utente vedrà solo le app dei gruppi selezionati</p>
+                <p className="text-xs text-gray-400 mt-1">Qui selezioni solo gruppi locali; i gruppi Entra vengono sincronizzati al login.</p>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-100">

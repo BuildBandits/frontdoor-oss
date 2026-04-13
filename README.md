@@ -41,6 +41,7 @@ Each app in the catalog is accessible via its target URL. The gateway handles au
 - App catalog with search, tags, favorites
 - Group-by-tag view
 - RBAC: groups, per-group app visibility
+- RBAC discovery from Microsoft Entra groups at login, with admin import/force-sync flows
 - Admin panel: manage apps, users, groups
 - Access logs with analytics
 - Audit trail for RBAC changes
@@ -96,6 +97,7 @@ App: http://localhost:3001
 | `AZURE_TENANT_ID` | Azure AD Tenant ID | - |
 | `AZURE_REDIRECT_URI` | SSO callback redirect URI | - |
 | `JWT_SECRET` | JWT signing secret | - |
+| `ENTRA_GROUP_SYNC` | Discover Entra group memberships at login and enable admin import/force-sync flows | `false` |
 | `JWT_EXPIRES_IN` | JWT token duration | `7d` |
 | `ADMIN_EMAILS` | Comma-separated admin emails (auto-promoted) | - |
 | `ADMIN_API_KEY` | API key for bulk endpoints | - |
@@ -111,6 +113,7 @@ For a real deployment, set at least:
 - `AZURE_TENANT_ID`
 - `AZURE_REDIRECT_URI`
 - `JWT_SECRET`
+- `ENTRA_GROUP_SYNC` if you want Entra group sync enabled
 Recommended but optional:
 
 - `ADMIN_EMAILS`
@@ -136,12 +139,16 @@ Frontdoor startup configuration:
   AZURE_REDIRECT_URI=https://frontdoor.cerbero.cc/api/auth/microsoft/callback
   JWT_SECRET=[set]
   ADMIN_EMAILS=1 configured
+  ENTRA_GROUP_SYNC=true
 ```
 
 Warnings are emitted for defaults or weak-but-valid settings, for example:
 
 - `BASE_DOMAIN is not set, defaulting to frontdoor.local`
 - `JWT_SECRET is shorter than 32 characters; use a longer random secret in production`
+If `ENTRA_GROUP_SYNC=true`, Frontdoor discovers the signed-in user's Microsoft Entra group memberships at login, stores them in a discovery cache, and lets admins import only the groups they actually want to use in Frontdoor. In most tenants the standard login scopes are enough for discovery; the admin Force Sync flow uses an app-only Microsoft Graph token, so your app registration must also have the Graph application permissions required to read other users' memberships in your directory.
+
+Important: discovery and import are separate steps. If you delete imported Entra groups from Frontdoor's local database, they will not be recreated automatically as active RBAC groups on the next login. They must first be rediscovered by a successful login or Force Sync, then imported again from the Entra import modal.
 
 ### Azure Entra ID (formerly Azure AD) Setup
 
@@ -181,6 +188,8 @@ From the **Overview** page of your new app registration, copy:
    - `User.Read` — Read signed-in user's basic profile
 3. Click **Grant admin consent** (if you're a tenant admin) — otherwise ask your admin
 
+If you want to use **Force Sync Groups**, also add the Microsoft Graph **application permission** that allows the app to read other users' group memberships in your tenant, at minimum `User.Read.All`, and grant admin consent. The app uses an app-only token for that action.
+
 #### Step 5: Set environment variables
 
 ```bash
@@ -219,6 +228,10 @@ AZURE_REDIRECT_URI=https://your-domain.com/api/auth/microsoft/callback
 | PUT | `/api/users/:id/active` | Admin | Activate/deactivate user |
 | DELETE | `/api/users/:id` | Admin | Delete user |
 | GET | `/api/groups` | Admin | List groups |
+| GET | `/api/groups/entra/candidates` | Admin | List discovered Entra groups available for import |
+| POST | `/api/groups/entra/import` | Admin | Import selected discovered Entra groups |
+| POST | `/api/groups/entra/force-sync` | Admin | Force sync Entra memberships for all linked users |
+| POST | `/api/groups/bulk-delete` | Admin | Delete multiple groups at once |
 | POST | `/api/groups` | Admin | Create group |
 | PUT | `/api/groups/:id` | Admin | Update group |
 | DELETE | `/api/groups/:id` | Admin | Delete group |
@@ -232,16 +245,18 @@ AZURE_REDIRECT_URI=https://your-domain.com/api/auth/microsoft/callback
 
 ## Database
 
-SQLite with 7 tables:
+SQLite with 9 tables:
 
 | Table | Description |
 |-------|-------------|
 | `users` | Users (auto-created on first SSO login), admin/user roles |
 | `apps` | App catalog (slug, target_url, icon, description, tags) |
 | `access_logs` | Proxy access logs (user, app, IP, timestamp) |
-| `user_groups` | User groups for RBAC, including synced Entra groups |
+| `user_groups` | User groups for RBAC, including imported Entra groups |
 | `user_group_members` | Group membership |
 | `app_permissions` | Per-group app visibility |
+| `entra_group_cache` | Discovered Entra groups available for admin import |
+| `entra_user_group_memberships` | Cached Entra memberships per user |
 | `rbac_audit_logs` | Audit trail for RBAC mutations |
 
 On first startup with an empty DB, example apps are seeded automatically.

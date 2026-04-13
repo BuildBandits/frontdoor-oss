@@ -6,9 +6,10 @@ import db from '../db.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { getRequiredEnv } from '../config.js';
+import { fetchUserEntraGroups, getAuthScopes, isEntraGroupSyncEnabled, syncUserEntraGroups } from '../services/entraGroups.js';
 
 const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-const authScopes = ['User.Read', 'openid', 'profile', 'email'];
+const authScopes = getAuthScopes();
 
 const router = express.Router();
 
@@ -99,6 +100,16 @@ router.get('/microsoft/callback', async (req, res) => {
     const email = (profile.mail || profile.userPrincipalName).toLowerCase();
     const displayName = profile.displayName || email.split('@')[0];
     const microsoftId = profile.id;
+    let entraGroups = null;
+    if (isEntraGroupSyncEnabled()) {
+      try {
+        entraGroups = await fetchUserEntraGroups(tokenResponse.accessToken);
+        console.log(`Entra group discovery for ${email}: ${entraGroups.length} groups`);
+      } catch (error) {
+        const hint = error.hint ? ` Hint: ${error.hint}` : '';
+        console.warn(`Entra group sync skipped for ${email}: ${error.message}.${hint}`);
+      }
+    }
 
     // Find or create user
     let user = db.prepare('SELECT * FROM users WHERE microsoft_id = ? AND is_active = 1').get(microsoftId);
@@ -129,6 +140,15 @@ router.get('/microsoft/callback', async (req, res) => {
 
       // Auto-add to "default" group only for brand new users (not pre-registered)
       db.prepare('INSERT OR IGNORE INTO user_group_members (user_id, group_id) VALUES (?, ?)').run(userId, DEFAULT_GROUP_ID);
+    }
+
+    if (entraGroups) {
+      const entraSync = syncUserEntraGroups(user.id, entraGroups);
+      if (entraSync.discoveredGroups === 0) {
+        console.log(`No Entra groups discovered for ${email}; nothing to import yet.`);
+      } else {
+        console.log(`Discovered ${entraSync.discoveredGroups} Entra groups for ${email}; imported memberships added=${entraSync.membershipsAdded}, removed=${entraSync.membershipsRemoved}.`);
+      }
     }
 
     // Generate JWT (role included so proxied apps can verify authorization)

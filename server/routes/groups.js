@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { DEFAULT_GROUP_ID, logRbacAudit } from '../db.js';
 import { authenticate, isAdmin } from '../middleware/auth.js';
+import { forceSyncAllEntraUsers, importEntraGroups, listDiscoveredEntraGroups } from '../services/entraGroups.js';
 
 const router = express.Router();
 
@@ -30,6 +31,83 @@ router.get('/', authenticate, isAdmin, (req, res) => {
     FROM user_groups g ORDER BY g.name
   `).all();
   res.json({ groups });
+});
+
+router.get('/entra/candidates', authenticate, isAdmin, (req, res) => {
+  const groups = listDiscoveredEntraGroups();
+  res.json({ groups });
+});
+
+router.post('/entra/import', authenticate, isAdmin, (req, res) => {
+  const { groupIds } = req.body;
+  if (!Array.isArray(groupIds) || groupIds.length === 0) {
+    return res.status(400).json({ error: 'groupIds must be a non-empty array' });
+  }
+
+  try {
+    const result = importEntraGroups(groupIds);
+    res.json({
+      message: `${result.importedGroups} Entra groups imported`,
+      ...result,
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post('/entra/force-sync', authenticate, isAdmin, async (req, res) => {
+  try {
+    const result = await forceSyncAllEntraUsers();
+    res.json({
+      message: `Synced ${result.usersSynced} users from Microsoft Entra`,
+      ...result,
+    });
+  } catch (error) {
+    res.status(400).json({
+      error: error.message,
+      ...(error.hint ? { hint: error.hint } : {}),
+    });
+  }
+});
+
+router.post('/bulk-delete', authenticate, isAdmin, (req, res) => {
+  const { groupIds } = req.body;
+  if (!Array.isArray(groupIds) || groupIds.length === 0) {
+    return res.status(400).json({ error: 'groupIds must be a non-empty array' });
+  }
+
+  if (groupIds.includes(DEFAULT_GROUP_ID)) {
+    return res.status(400).json({ error: 'Cannot delete the default group' });
+  }
+
+  const uniqueGroupIds = [...new Set(groupIds.filter(Boolean))];
+  const placeholders = uniqueGroupIds.map(() => '?').join(', ');
+  const groups = db.prepare(`SELECT id, name FROM user_groups WHERE id IN (${placeholders})`).all(...uniqueGroupIds);
+
+  if (groups.length !== uniqueGroupIds.length) {
+    return res.status(404).json({ error: 'One or more groups were not found' });
+  }
+
+  const deletedGroups = groups.map((group) => ({
+    id: group.id,
+    name: group.name,
+    source: group.source || 'local',
+  }));
+  const deleteAll = db.transaction(() => {
+    for (const group of groups) {
+      db.prepare('DELETE FROM user_group_members WHERE group_id = ?').run(group.id);
+      db.prepare('DELETE FROM app_permissions WHERE group_id = ?').run(group.id);
+      db.prepare('DELETE FROM user_groups WHERE id = ?').run(group.id);
+      logRbacAudit(req.user.id, 'delete', 'group', group.id, { name: group.name, bulk: true });
+    }
+  });
+  deleteAll();
+
+  res.json({
+    message: `${groups.length} groups deleted`,
+    deletedCount: groups.length,
+    deletedGroups,
+  });
 });
 
 // Get single group with members and apps (admin only)
@@ -76,6 +154,9 @@ router.post('/', authenticate, isAdmin, (req, res) => {
 router.put('/:id', authenticate, isAdmin, (req, res) => {
   const group = db.prepare('SELECT * FROM user_groups WHERE id = ?').get(req.params.id);
   if (!group) return res.status(404).json({ error: 'Group not found' });
+  if (group.source === 'entra') {
+    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally' });
+  }
 
   const { name, description } = req.body;
 
@@ -130,6 +211,10 @@ router.delete('/:id', authenticate, isAdmin, (req, res) => {
 router.post('/:id/members', authenticate, isAdmin, (req, res) => {
   const group = db.prepare('SELECT id FROM user_groups WHERE id = ?').get(req.params.id);
   if (!group) return res.status(404).json({ error: 'Group not found' });
+  const fullGroup = db.prepare('SELECT source FROM user_groups WHERE id = ?').get(req.params.id);
+  if (fullGroup?.source === 'entra') {
+    return res.status(400).json({ error: 'Entra-synced group memberships are managed in Microsoft Entra' });
+  }
 
   const { userIds, emails } = req.body;
   const hasUserIds = Array.isArray(userIds) && userIds.length > 0;
@@ -197,6 +282,10 @@ router.post('/:id/members', authenticate, isAdmin, (req, res) => {
 router.delete('/:id/members/:userId', authenticate, isAdmin, (req, res) => {
   const group = db.prepare('SELECT id FROM user_groups WHERE id = ?').get(req.params.id);
   if (!group) return res.status(404).json({ error: 'Group not found' });
+  const fullGroup = db.prepare('SELECT source FROM user_groups WHERE id = ?').get(req.params.id);
+  if (fullGroup?.source === 'entra') {
+    return res.status(400).json({ error: 'Entra-synced group memberships are managed in Microsoft Entra' });
+  }
 
   const result = db.prepare('DELETE FROM user_group_members WHERE group_id = ? AND user_id = ?')
     .run(req.params.id, req.params.userId);

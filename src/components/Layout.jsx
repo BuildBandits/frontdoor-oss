@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { LogOut, Settings, Home, Users, UserCog, Activity } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import BrandMark from './BrandMark';
 
 export default function Layout({ children }) {
   const { user, logout } = useAuthStore();
@@ -28,9 +29,7 @@ export default function Layout({ children }) {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
-                <span className="text-lg">🚪</span>
-              </div>
+              <BrandMark />
               <span className="font-bold text-lg text-dark">Frontdoor</span>
             </Link>
 

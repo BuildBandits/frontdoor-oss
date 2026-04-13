@@ -59,6 +59,10 @@ db.exec(`
     id TEXT PRIMARY KEY,
     name TEXT UNIQUE NOT NULL,
     description TEXT,
+    source TEXT DEFAULT 'local' CHECK(source IN ('local', 'entra')),
+    entra_group_id TEXT UNIQUE,
+    entra_display_name TEXT,
+    entra_synced_at TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
 
@@ -72,6 +76,20 @@ db.exec(`
     app_id TEXT REFERENCES apps(id),
     group_id TEXT REFERENCES user_groups(id),
     PRIMARY KEY (app_id, group_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS entra_group_cache (
+    entra_group_id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    first_seen_at TEXT DEFAULT (datetime('now')),
+    last_seen_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS entra_user_group_memberships (
+    user_id TEXT REFERENCES users(id),
+    entra_group_id TEXT NOT NULL,
+    synced_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (user_id, entra_group_id)
   );
 
   CREATE TABLE IF NOT EXISTS rbac_audit_logs (
@@ -92,6 +110,37 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_access_logs_user ON access_logs(user_id);
   CREATE INDEX IF NOT EXISTS idx_rbac_audit_actor ON rbac_audit_logs(actor_id);
   CREATE INDEX IF NOT EXISTS idx_rbac_audit_target ON rbac_audit_logs(target_type, target_id);
+  CREATE INDEX IF NOT EXISTS idx_entra_group_cache_last_seen ON entra_group_cache(last_seen_at);
+  CREATE INDEX IF NOT EXISTS idx_entra_user_group_memberships_group ON entra_user_group_memberships(entra_group_id);
+`);
+
+function ensureColumn(tableName, columnName, columnDefinition) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
+  if (!columns.some((column) => column.name === columnName)) {
+    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition};`);
+  }
+}
+
+ensureColumn('user_groups', 'source', "source TEXT DEFAULT 'local' CHECK(source IN ('local', 'entra'))");
+ensureColumn('user_groups', 'entra_group_id', 'entra_group_id TEXT');
+ensureColumn('user_groups', 'entra_display_name', 'entra_display_name TEXT');
+ensureColumn('user_groups', 'entra_synced_at', 'entra_synced_at TEXT');
+
+db.exec("UPDATE user_groups SET source = 'local' WHERE source IS NULL OR source NOT IN ('local', 'entra');");
+db.exec("CREATE INDEX IF NOT EXISTS idx_user_groups_source ON user_groups(source);");
+db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_groups_entra_group_id ON user_groups(entra_group_id) WHERE entra_group_id IS NOT NULL;");
+db.exec(`
+  INSERT OR IGNORE INTO entra_group_cache (entra_group_id, display_name, first_seen_at, last_seen_at)
+  SELECT entra_group_id, COALESCE(entra_display_name, name), COALESCE(created_at, datetime('now')), COALESCE(entra_synced_at, created_at, datetime('now'))
+  FROM user_groups
+  WHERE source = 'entra' AND entra_group_id IS NOT NULL;
+`);
+db.exec(`
+  INSERT OR IGNORE INTO entra_user_group_memberships (user_id, entra_group_id, synced_at)
+  SELECT m.user_id, g.entra_group_id, COALESCE(g.entra_synced_at, datetime('now'))
+  FROM user_group_members m
+  JOIN user_groups g ON g.id = m.group_id
+  WHERE g.source = 'entra' AND g.entra_group_id IS NOT NULL;
 `);
 
 // --- RBAC Bootstrap: "default" group + backfill ---
