@@ -31,11 +31,13 @@ export function getStartupConfig() {
   const azureRedirectUri = process.env.AZURE_REDIRECT_URI || 'https://frontdoor.local/api/auth/microsoft/callback';
   const jwtSecret = process.env.JWT_SECRET || '';
   const adminEmails = process.env.ADMIN_EMAILS || '';
+  const brandingAssetDir = process.env.BRANDING_ASSET_DIR || './data/branding';
 
   return {
     NODE_ENV: process.env.NODE_ENV || 'development',
     PORT: process.env.PORT || '3001',
     DATABASE_PATH: process.env.DATABASE_PATH || './frontdoor.db',
+    BRANDING_ASSET_DIR: brandingAssetDir,
     BASE_DOMAIN: baseDomain,
     FRONTEND_URL: frontendUrl,
     AZURE_CLIENT_ID: isSet(azureClientId) ? REDACTED : '[missing]',
@@ -64,6 +66,9 @@ export function validateStartupEnv() {
   }
   if (!isSet(process.env.FRONTEND_URL)) {
     warnings.push('FRONTEND_URL is not set, defaulting to https://frontdoor.local');
+  }
+  if (!isSet(process.env.BRANDING_ASSET_DIR)) {
+    warnings.push('BRANDING_ASSET_DIR is not set, defaulting to ./data/branding');
   }
   if (isSet(process.env.FRONTEND_URL) && !isValidHttpUrl(process.env.FRONTEND_URL)) {
     errors.push('FRONTEND_URL must be a valid http or https URL');

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import BrandMark from '../components/BrandMark';
+import api from '../services/api';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -15,14 +16,13 @@ export default function Login() {
       return;
     }
 
-    // Handle SSO callback params (token is in httpOnly cookie, only user profile in URL)
+    // Handle SSO callback: token is in httpOnly cookie, fetch profile via /api/auth/me
+    // to avoid passing PII (email, role) through the URL.
     const ssoOk = searchParams.get('sso');
-    const userParam = searchParams.get('user');
 
-    if (ssoOk === 'ok' && userParam) {
-      try {
-        const user = JSON.parse(decodeURIComponent(userParam));
-        loginWithToken(null, user);
+    if (ssoOk === 'ok') {
+      api.get('/auth/me').then((res) => {
+        loginWithToken(null, res.data.user);
 
         // Check for redirect to a specific app subdomain (validated: only alphanumeric slugs)
         const redirect = searchParams.get('redirect');
@@ -32,9 +32,9 @@ export default function Login() {
         } else {
           navigate('/', { replace: true });
         }
-      } catch (e) {
-        console.error('Failed to parse SSO callback:', e);
-      }
+      }).catch(() => {
+        // /api/auth/me failed — cookie may not have been set correctly, stay on login page
+      });
     }
   }, [searchParams, isAuthenticated, loginWithToken, navigate]);
 
@@ -55,9 +55,10 @@ export default function Login() {
           <h1 className="text-4xl font-extrabold text-dark tracking-tight">
             Frontdoor
           </h1>
-          <p className="mt-3 text-gray-500 text-lg">
-            Accedi alle tue applicazioni
-          </p>
+          {/*
+            Sottotitolo temporaneamente rimosso.
+            Valutiamo in seguito se reintrodurre un testo descrittivo più mirato.
+          */}
         </div>
 
         {/* Error message */}
@@ -83,12 +84,8 @@ export default function Login() {
             <rect y="11" width="10" height="10" fill="#00A4EF" />
             <rect x="11" y="11" width="10" height="10" fill="#FFB900" />
           </svg>
-          Accedi con Microsoft 365
+          Accedi
         </button>
-
-        <p className="mt-8 text-center text-sm text-gray-400">
-          Accesso riservato agli utenti autorizzati
-        </p>
       </div>
     </div>
   );

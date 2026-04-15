@@ -7,6 +7,7 @@ import { DEFAULT_GROUP_ID } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { getRequiredEnv } from '../config.js';
 import { fetchUserEntraGroups, getAuthScopes, isEntraGroupSyncEnabled, syncUserEntraGroups } from '../services/entraGroups.js';
+import { ensureAvatarCached } from '../services/avatars.js';
 
 const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 const authScopes = getAuthScopes();
@@ -25,7 +26,8 @@ const msalClient = process.env.AZURE_CLIENT_ID
   ? new ConfidentialClientApplication(msalConfig)
   : null;
 
-// CSRF state store
+// CSRF state store — in-memory, suitable for single-instance deployments only.
+// For multi-replica/horizontal-scaling deployments, replace with a shared store (e.g. Redis).
 const pendingAuthStates = new Map();
 
 // Initiate SSO login
@@ -104,10 +106,10 @@ router.get('/microsoft/callback', async (req, res) => {
     if (isEntraGroupSyncEnabled()) {
       try {
         entraGroups = await fetchUserEntraGroups(tokenResponse.accessToken);
-        console.log(`Entra group discovery for ${email}: ${entraGroups.length} groups`);
+        console.log(`Entra group discovery [${microsoftId}]: ${entraGroups.length} groups`);
       } catch (error) {
         const hint = error.hint ? ` Hint: ${error.hint}` : '';
-        console.warn(`Entra group sync skipped for ${email}: ${error.message}.${hint}`);
+        console.warn(`Entra group sync skipped [${microsoftId}]: ${error.message}.${hint}`);
       }
     }
 
@@ -122,9 +124,12 @@ router.get('/microsoft/callback', async (req, res) => {
       // Existing user (either pre-registered or returning) — update profile
       const shouldPromote = adminEmails.includes(email.toLowerCase()) && user.role !== 'admin';
       db.prepare(
-        `UPDATE users SET microsoft_id = ?, display_name = ?, last_login = datetime('now'), updated_at = datetime('now')${shouldPromote ? ", role = 'admin'" : ''} WHERE id = ?`
+        `UPDATE users SET microsoft_id = ?, display_name = ?, last_login = datetime('now'), updated_at = datetime('now') WHERE id = ?`
       ).run(microsoftId, displayName, user.id);
-      if (shouldPromote) user = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+      if (shouldPromote) {
+        db.prepare(`UPDATE users SET role = 'admin', updated_at = datetime('now') WHERE id = ?`).run(user.id);
+        user = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+      }
     } else {
       // Brand new user (not pre-registered) — create and add to default group
       const userId = uuidv4();
@@ -145,11 +150,16 @@ router.get('/microsoft/callback', async (req, res) => {
     if (entraGroups) {
       const entraSync = syncUserEntraGroups(user.id, entraGroups);
       if (entraSync.discoveredGroups === 0) {
-        console.log(`No Entra groups discovered for ${email}; nothing to import yet.`);
+        console.log(`No Entra groups discovered [${user.id}]; nothing to import yet.`);
       } else {
-        console.log(`Discovered ${entraSync.discoveredGroups} Entra groups for ${email}; imported memberships added=${entraSync.membershipsAdded}, removed=${entraSync.membershipsRemoved}.`);
+        console.log(`Discovered ${entraSync.discoveredGroups} Entra groups [${user.id}]; memberships added=${entraSync.membershipsAdded}, removed=${entraSync.membershipsRemoved}.`);
       }
     }
+
+    await ensureAvatarCached(
+      { id: user.id, email: user.email, microsoftId: user.microsoft_id },
+      tokenResponse.accessToken
+    );
 
     // Generate JWT (role included so proxied apps can verify authorization)
     const jwtSecret = getRequiredEnv('JWT_SECRET', 'SSO callback');
@@ -169,18 +179,11 @@ router.get('/microsoft/callback', async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    const userData = encodeURIComponent(
-      JSON.stringify({
-        id: user.id,
-        email: user.email,
-        displayName: user.display_name,
-        role: user.role,
-        avatarColor: user.avatar_color,
-      })
-    );
-
-    // Token is already set as httpOnly cookie above — only pass user profile data in URL
-    res.redirect(`${frontendUrl}/login?sso=ok&user=${userData}`);
+    // Token is in httpOnly cookie — no user data in the URL to avoid leaking PII via
+    // browser history, server access logs, or Referer headers. The frontend will call
+    // /api/auth/me to retrieve the user profile after the redirect.
+    const redirectParam = req.query.redirect ? `&redirect=${encodeURIComponent(req.query.redirect)}` : '';
+    res.redirect(`${frontendUrl}/login?sso=ok${redirectParam}`);
   } catch (error) {
     console.error('SSO callback error:', error.message);
     res.redirect(`${frontendUrl}/login?error=sso_failed`);

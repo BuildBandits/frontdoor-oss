@@ -4,6 +4,7 @@ import db from '../db.js';
 import { DEFAULT_GROUP_ID, logRbacAudit } from '../db.js';
 import { authenticate, isAdmin } from '../middleware/auth.js';
 import { forceSyncAllEntraUsers, importEntraGroups, listDiscoveredEntraGroups } from '../services/entraGroups.js';
+import { iconUrlForApp } from '../services/appIcons.js';
 
 const router = express.Router();
 
@@ -122,10 +123,13 @@ router.get('/:id', authenticate, isAdmin, (req, res) => {
   `).all(req.params.id);
 
   const apps = db.prepare(`
-    SELECT a.id, a.name, a.slug, a.icon
+    SELECT a.id, a.name, a.slug, a.icon, a.icon_file_name, a.updated_at
     FROM apps a JOIN app_permissions p ON a.id = p.app_id
     WHERE p.group_id = ? ORDER BY a.name
-  `).all(req.params.id);
+  `).all(req.params.id).map((app) => ({
+    ...app,
+    iconUrl: iconUrlForApp(app),
+  }));
 
   res.json({ group, members, apps });
 });

@@ -9,6 +9,9 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - DATABASE_PATH=/data/frontdoor.db
+      - AVATAR_CACHE_DIR=/data/avatar-cache
+      - APP_ICON_CACHE_DIR=/data/app-icon-cache
+      - BRANDING_ASSET_DIR=/data/branding
       - BASE_DOMAIN=${BASE_DOMAIN:-frontdoor.local}
       - FRONTEND_URL=${FRONTEND_URL:-https://frontdoor.local}
       - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
@@ -20,6 +23,13 @@ services:
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
       - ADMIN_EMAILS=${ADMIN_EMAILS:-}
       - ADMIN_API_KEY=${ADMIN_API_KEY:-}
+      # Rate limit tuning (optional, see server/index.js for defaults)
+      - AUTH_RATE_LIMIT_MAX=${AUTH_RATE_LIMIT_MAX:-}
+      - AUTH_RATE_LIMIT_WINDOW_MS=${AUTH_RATE_LIMIT_WINDOW_MS:-}
+      - RBAC_RATE_LIMIT_MAX=${RBAC_RATE_LIMIT_MAX:-}
+      - RBAC_RATE_LIMIT_WINDOW_MS=${RBAC_RATE_LIMIT_WINDOW_MS:-}
+      - API_RATE_LIMIT_MAX=${API_RATE_LIMIT_MAX:-}
+      - API_RATE_LIMIT_WINDOW_MS=${API_RATE_LIMIT_WINDOW_MS:-}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3001/api/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]

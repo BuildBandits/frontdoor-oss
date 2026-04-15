@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import db from './db.js';
 import authRoutes from './routes/auth.js';
+import brandingRoutes from './routes/branding.js';
 import appsRoutes from './routes/apps.js';
 import usersRoutes from './routes/users.js';
 import groupsRoutes from './routes/groups.js';
@@ -50,26 +51,49 @@ app.use(helmet({
   },
 }));
 app.use(cookieParser());
-app.use(express.json({ limit: '1mb' }));
-// Strict rate limit on auth endpoints (10 requests per 15 min)
+
+// Keep a slightly larger body limit because branding/image uploads are sent as data URLs.
+app.use(express.json({ limit: '5mb' }));
+
+// Rate limits are tunable via env so ops can raise/lower them without a code change.
+// Defaults assume a shared-NAT corporate deployment (hundreds of users behind a
+// single public IP), where a low per-IP limit would lock everyone out on a burst.
+function parsePositiveInt(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === '') return fallback;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+// Auth: SSO init + callback. Defaults: 5000 req / 15 min per IP.
+// Microsoft already rate-limits the upstream OAuth flow; this limiter's only job is cheap DoS mitigation.
 app.use('/api/auth/microsoft', rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
+  windowMs: parsePositiveInt('AUTH_RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000),
+  max: parsePositiveInt('AUTH_RATE_LIMIT_MAX', 5000),
   message: { error: 'Too many login attempts, try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
 }));
-// Rate limit on RBAC mutation endpoints (POST/PUT/DELETE only, 120 req / 1 min)
+
+// RBAC mutation endpoints (POST/PUT/DELETE on groups/users).
+// Defaults: 500 write ops / min per IP, reads always allowed.
 const rbacMutationLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
+  windowMs: parsePositiveInt('RBAC_RATE_LIMIT_WINDOW_MS', 60 * 1000),
+  max: parsePositiveInt('RBAC_RATE_LIMIT_MAX', 500),
   message: { error: 'Too many RBAC operations, try again later' },
   skip: (req) => req.method === 'GET',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use('/api/groups', rbacMutationLimiter);
 app.use('/api/users', rbacMutationLimiter);
-// General API rate limit
+
+// General API rate limit. Defaults: 6000 req / min per IP (100 req/s).
 app.use('/api/', rateLimit({
-  windowMs: 60 * 1000,
-  max: 100,
+  windowMs: parsePositiveInt('API_RATE_LIMIT_WINDOW_MS', 60 * 1000),
+  max: parsePositiveInt('API_RATE_LIMIT_MAX', 6000),
+  standardHeaders: true,
+  legacyHeaders: false,
 }));
 
 // Health check
@@ -79,6 +103,7 @@ app.get('/api/health', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/branding', brandingRoutes);
 app.use('/api/apps', appsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/groups', groupsRoutes);

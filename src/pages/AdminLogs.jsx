@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Activity, ChevronLeft, ChevronRight, BarChart3, Users, AppWindow, AlertCircle } from 'lucide-react';
 import api from '../services/api';
+import UserAvatar from '../components/UserAvatar';
+import AppIcon from '../components/AppIcon';
 
 export default function AdminLogs() {
   const [logs, setLogs] = useState([]);
@@ -44,9 +46,6 @@ export default function AdminLogs() {
       });
     } catch { return iso; }
   };
-
-  const initials = (name) =>
-    (name || '?').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <div>
@@ -106,7 +105,7 @@ export default function AdminLogs() {
               return (
                 <div key={app.slug} className="flex items-center gap-3">
                   <span className="text-xs text-gray-400 w-5 text-right">{i + 1}.</span>
-                  <span className="text-lg flex-shrink-0">{app.icon}</span>
+                  <AppIcon app={app} className="w-7 h-7" textClassName="text-lg" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
                       <span className="text-sm font-medium text-dark truncate">{app.name}</span>
@@ -160,12 +159,14 @@ export default function AdminLogs() {
                       <td className="px-5 py-3 text-xs text-gray-500 whitespace-nowrap">{formatDate(log.created_at)}</td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
-                          <div
-                            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                            style={{ backgroundColor: log.avatar_color || '#999' }}
-                          >
-                            {initials(log.user_name)}
-                          </div>
+                          <UserAvatar
+                            userId={log.user_id}
+                            displayName={log.user_name}
+                            email={log.user_email}
+                            avatarColor={log.avatar_color}
+                            className="w-6 h-6"
+                            initialsClassName="text-[10px]"
+                          />
                           <div className="min-w-0">
                             <p className="text-dark font-medium truncate text-xs">{log.user_name || 'Utente rimosso'}</p>
                             <p className="text-gray-400 truncate text-[11px]">{log.user_email || '-'}</p>
@@ -174,7 +175,11 @@ export default function AdminLogs() {
                       </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-base flex-shrink-0">{log.app_icon || '📦'}</span>
+                          <AppIcon
+                            app={{ icon: log.app_icon, iconUrl: log.app_icon_url }}
+                            className="w-6 h-6"
+                            textClassName="text-base"
+                          />
                           <span className="text-dark text-xs font-medium truncate">{log.app_name || 'App rimossa'}</span>
                         </div>
                       </td>

@@ -5,14 +5,17 @@ import db from '../db.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
 import { authenticate, isAdmin } from '../middleware/auth.js';
 import { getRequiredEnv } from '../config.js';
+import { restoreDefaultDemoApps } from '../services/demoApps.js';
+import { iconUrlForApp, parseAppIconPayload, removeAppIconAsset, saveAppIconAsset, serveAppIconForApp } from '../services/appIcons.js';
+import { getBrandingSettings } from '../services/branding.js';
 
 const router = express.Router();
 
 // List active apps visible to current user (RBAC applies to all, including admins)
 router.get('/', authenticate, (req, res) => {
   const apps = db.prepare(`
-    SELECT DISTINCT a.id, a.name, a.slug, a.description, a.long_description, a.icon, a.target_url,
-      a.is_active, a.sort_order, a.mode, a.sso_endpoint, a.sso_method, a.tags
+    SELECT DISTINCT a.id, a.name, a.slug, a.description, a.long_description, a.icon, a.icon_file_name, a.target_url,
+      a.is_active, a.sort_order, a.mode, a.sso_endpoint, a.sso_method, a.tags, a.updated_at
     FROM apps a
     JOIN app_permissions p ON a.id = p.app_id
     JOIN user_group_members m ON p.group_id = m.group_id
@@ -23,10 +26,11 @@ router.get('/', authenticate, (req, res) => {
   const appsWithUrls = apps.map((app) => {
     const url = app.mode === 'redirect'
       ? `/api/apps/${app.slug}/sso-redirect`
+      : app.mode === 'entra-app'
+      ? `/api/apps/${app.slug}/entra-redirect`
       : app.target_url; // redirect-plain and shared-cookie both link directly
-    let tags = [];
-    try { tags = JSON.parse(app.tags || '[]'); } catch { /* ignore */ }
-    return { ...app, url, tags };
+    const tags = parseTags(app.tags);
+    return { ...app, url, tags, iconUrl: iconUrlForApp(app) };
   });
 
   res.json({ apps: appsWithUrls });
@@ -98,12 +102,66 @@ router.get('/:slug/sso-redirect', authenticate, (req, res) => {
   res.redirect(`${targetUrl}${separator}token=${ssoToken}`);
 });
 
+// Entra App redirect endpoint: redirects to Microsoft MyApps launcher
+router.get('/:slug/entra-redirect', authenticate, (req, res) => {
+  const app = db
+    .prepare('SELECT * FROM apps WHERE slug = ? AND is_active = 1')
+    .get(req.params.slug);
+
+  if (!app || app.mode !== 'entra-app') {
+    return res.status(404).json({ error: 'Entra app not found' });
+  }
+
+  // RBAC check: user must have group permission
+  const hasAccess = db.prepare(`
+    SELECT 1 FROM app_permissions p
+    JOIN user_group_members m ON p.group_id = m.group_id
+    WHERE p.app_id = ? AND m.user_id = ?
+  `).get(app.id, req.user.id);
+  if (!hasAccess) return res.status(403).json({ error: 'Access denied' });
+
+  // Log access
+  try {
+    db.prepare(
+      'INSERT INTO access_logs (user_id, app_id, ip_address, user_agent) VALUES (?, ?, ?, ?)'
+    ).run(req.user.id, app.id, req.ip, req.get('user-agent'));
+  } catch (e) {
+    console.error('Access log write failed:', e.message);
+  }
+
+  const launcherUrl = `https://launcher.myapps.microsoft.com/api/signin/${app.sso_endpoint}?tenantId=${process.env.AZURE_TENANT_ID}`;
+  res.redirect(launcherUrl);
+});
+
+// Serve app icon asset (public)
+router.get('/:id/icon', (req, res) => {
+  const app = db.prepare('SELECT id, icon_file_name FROM apps WHERE id = ?').get(req.params.id);
+  if (!app) {
+    return res.status(404).end();
+  }
+  return serveAppIconForApp(app, res);
+});
+
 // List ALL apps including inactive (admin only)
 router.get('/all', authenticate, isAdmin, (req, res) => {
   const apps = db
     .prepare('SELECT * FROM apps ORDER BY sort_order, name')
     .all();
-  res.json({ apps });
+  res.json({ apps: apps.map((app) => ({ ...app, tags: parseTags(app.tags), iconUrl: iconUrlForApp(app) })) });
+});
+
+// Restore the default demo apps (admin only)
+router.post('/restore-defaults', authenticate, isAdmin, (req, res) => {
+  try {
+    const result = restoreDefaultDemoApps(db, DEFAULT_GROUP_ID);
+    res.json({
+      message: 'Default demo apps restored',
+      ...result,
+    });
+  } catch (error) {
+    console.error('Restore default demo apps failed:', error.message);
+    res.status(500).json({ error: 'Failed to restore default demo apps' });
+  }
 });
 
 // Validate target_url helper
@@ -122,95 +180,200 @@ function validateTargetUrl(target_url) {
   }
 }
 
+function normalizeTag(tag) {
+  return (tag ?? '').toString().trim().toLowerCase();
+}
+
+function normalizeTagList(tags) {
+  const list = Array.isArray(tags) ? tags : [];
+  const seen = new Set();
+  const normalized = [];
+  for (const tag of list) {
+    const value = normalizeTag(tag);
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    normalized.push(value);
+  }
+  return normalized;
+}
+
+function parseTags(rawTags) {
+  try {
+    return normalizeTagList(JSON.parse(rawTags || '[]'));
+  } catch {
+    return [];
+  }
+}
+
+function isAppModeEnabled(mode, branding = getBrandingSettings()) {
+  if (mode === 'redirect-plain') return true;
+  if (mode === 'shared-cookie') return branding.showSharedCookieMode !== false;
+  if (mode === 'redirect') return branding.showRedirectSsoMode !== false;
+  if (mode === 'entra-app') return branding.showEntraAppMode !== false;
+  return false;
+}
+
+async function applyAppIconChange(appId, existingApp, { icon, iconDataUrl, iconSvgText, removeIconAsset }) {
+  const payload = parseAppIconPayload({ iconDataUrl, iconSvgText });
+
+  if (removeIconAsset) {
+    await removeAppIconAsset(appId);
+    return {
+      icon: icon || existingApp?.icon || '📦',
+      icon_file_name: null,
+    };
+  }
+
+  if (payload) {
+    const saved = await saveAppIconAsset(appId, payload);
+    return {
+      icon: icon || existingApp?.icon || '📦',
+      icon_file_name: saved.fileName,
+    };
+  }
+
+  return {
+    icon: icon !== undefined ? icon : existingApp?.icon || '📦',
+    icon_file_name: existingApp?.icon_file_name || null,
+  };
+}
+
 // Create app (admin only)
-router.post('/', authenticate, isAdmin, (req, res) => {
-  const { name, slug, description, long_description, icon, target_url, sort_order, mode, sso_endpoint, sso_method, tags } = req.body;
+router.post('/', authenticate, isAdmin, async (req, res) => {
+  let createdAppId = null;
+  try {
+    const { name, slug, description, long_description, icon, iconDataUrl, iconSvgText, target_url, sort_order, mode, sso_endpoint, sso_method, tags, removeIconAsset, groupIds } = req.body;
+    const normalizedGroupIds = Array.isArray(groupIds)
+      ? [...new Set(groupIds.filter((groupId) => typeof groupId === 'string' && groupId.trim()))]
+      : [];
 
-  if (!name || !slug || !target_url) {
-    return res.status(400).json({ error: 'name, slug, and target_url are required' });
+    if (!name || !slug || !target_url) {
+      return res.status(400).json({ error: 'name, slug, and target_url are required' });
+    }
+
+    if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(slug)) {
+      return res.status(400).json({ error: 'slug must be lowercase alphanumeric with hyphens, 1-63 chars' });
+    }
+
+    const urlError = validateTargetUrl(target_url);
+    if (urlError) return res.status(400).json({ error: urlError });
+
+    if (mode && !['redirect', 'redirect-plain', 'shared-cookie', 'entra-app'].includes(mode)) {
+      return res.status(400).json({ error: 'mode must be redirect, redirect-plain, shared-cookie, or entra-app' });
+    }
+    if (sso_method && !['GET', 'POST'].includes(sso_method)) {
+      return res.status(400).json({ error: 'sso_method must be GET or POST' });
+    }
+
+    const requestedMode = mode || 'redirect-plain';
+    if (!isAppModeEnabled(requestedMode)) {
+      return res.status(400).json({ error: 'Selected app mode is disabled by personalization settings' });
+    }
+
+    if (normalizedGroupIds.length > 0) {
+      const placeholders = normalizedGroupIds.map(() => '?').join(', ');
+      const existingGroups = db.prepare(`SELECT id FROM user_groups WHERE id IN (${placeholders})`).all(...normalizedGroupIds);
+      if (existingGroups.length !== normalizedGroupIds.length) {
+        return res.status(400).json({ error: 'One or more selected groups were not found' });
+      }
+    }
+
+    const existing = db.prepare('SELECT id FROM apps WHERE slug = ?').get(slug);
+    if (existing) {
+      return res.status(409).json({ error: 'An app with this slug already exists' });
+    }
+
+    const id = uuidv4();
+    createdAppId = id;
+    const iconChange = await applyAppIconChange(id, null, { icon, iconDataUrl, iconSvgText, removeIconAsset });
+    const normalizedTags = normalizeTagList(tags);
+    const insertApp = db.prepare(`
+      INSERT INTO apps (id, name, slug, description, long_description, icon, icon_file_name, target_url, sort_order, mode, sso_endpoint, sso_method, tags)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const insertPermission = db.prepare('INSERT OR IGNORE INTO app_permissions (app_id, group_id) VALUES (?, ?)');
+    const createApp = db.transaction(() => {
+      insertApp.run(id, name, slug, description || '', long_description || '', iconChange.icon || '📦', iconChange.icon_file_name, target_url, sort_order || 0, requestedMode, sso_endpoint || '/sso', sso_method || 'GET', JSON.stringify(normalizedTags));
+      for (const groupId of normalizedGroupIds) {
+        insertPermission.run(id, groupId);
+      }
+    });
+
+    createApp();
+
+    const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
+    res.status(201).json({ app });
+  } catch (error) {
+    console.error('Create app failed:', error.message);
+    if (createdAppId) {
+      removeAppIconAsset(createdAppId).catch(() => {});
+    }
+    res.status(500).json({ error: 'Failed to create app' });
   }
-
-  if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(slug)) {
-    return res.status(400).json({ error: 'slug must be lowercase alphanumeric with hyphens, 1-63 chars' });
-  }
-
-  const urlError = validateTargetUrl(target_url);
-  if (urlError) return res.status(400).json({ error: urlError });
-
-  if (mode && !['redirect', 'redirect-plain', 'shared-cookie'].includes(mode)) {
-    return res.status(400).json({ error: 'mode must be redirect, redirect-plain, or shared-cookie' });
-  }
-  if (sso_method && !['GET', 'POST'].includes(sso_method)) {
-    return res.status(400).json({ error: 'sso_method must be GET or POST' });
-  }
-
-  const existing = db.prepare('SELECT id FROM apps WHERE slug = ?').get(slug);
-  if (existing) {
-    return res.status(409).json({ error: 'An app with this slug already exists' });
-  }
-
-  const id = uuidv4();
-  db.prepare(`
-    INSERT INTO apps (id, name, slug, description, long_description, icon, target_url, sort_order, mode, sso_endpoint, sso_method, tags)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, name, slug, description || '', long_description || '', icon || '📦', target_url, sort_order || 0, mode || 'redirect-plain', sso_endpoint || '/sso', sso_method || 'GET', JSON.stringify(tags || []));
-
-  // Auto-assign to "default" group
-  db.prepare('INSERT OR IGNORE INTO app_permissions (app_id, group_id) VALUES (?, ?)').run(id, DEFAULT_GROUP_ID);
-
-  const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
-  res.status(201).json({ app });
 });
 
 // Update app (admin only)
-router.put('/:id', authenticate, isAdmin, (req, res) => {
-  const { id } = req.params;
-  const { name, slug, description, long_description, icon, target_url, is_active, sort_order, mode, sso_endpoint, sso_method, tags } = req.body;
+router.put('/:id', authenticate, isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, slug, description, long_description, icon, iconDataUrl, iconSvgText, removeIconAsset, target_url, is_active, sort_order, mode, sso_endpoint, sso_method, tags } = req.body;
 
-  const existing = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
-  if (!existing) {
-    return res.status(404).json({ error: 'App not found' });
-  }
-
-  if (slug && slug !== existing.slug) {
-    const slugConflict = db.prepare('SELECT id FROM apps WHERE slug = ? AND id != ?').get(slug, id);
-    if (slugConflict) {
-      return res.status(409).json({ error: 'An app with this slug already exists' });
+    const existing = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'App not found' });
     }
-  }
 
-  if (target_url) {
-    const urlError = validateTargetUrl(target_url);
-    if (urlError) return res.status(400).json({ error: urlError });
-  }
+    if (slug && slug !== existing.slug) {
+      const slugConflict = db.prepare('SELECT id FROM apps WHERE slug = ? AND id != ?').get(slug, id);
+      if (slugConflict) {
+        return res.status(409).json({ error: 'An app with this slug already exists' });
+      }
+    }
 
-  if (mode !== undefined && !['redirect', 'redirect-plain', 'shared-cookie'].includes(mode)) {
-    return res.status(400).json({ error: 'mode must be redirect, redirect-plain, or shared-cookie' });
-  }
-  if (sso_method !== undefined && !['GET', 'POST'].includes(sso_method)) {
-    return res.status(400).json({ error: 'sso_method must be GET or POST' });
-  }
+    if (target_url) {
+      const urlError = validateTargetUrl(target_url);
+      if (urlError) return res.status(400).json({ error: urlError });
+    }
 
-  db.prepare(`
-    UPDATE apps SET
-      name = COALESCE(?, name),
-      slug = COALESCE(?, slug),
-      description = COALESCE(?, description),
-      icon = COALESCE(?, icon),
-      target_url = COALESCE(?, target_url),
-      is_active = COALESCE(?, is_active),
-      sort_order = COALESCE(?, sort_order),
-      mode = COALESCE(?, mode),
-      sso_endpoint = COALESCE(?, sso_endpoint),
-      sso_method = COALESCE(?, sso_method),
-      long_description = COALESCE(?, long_description),
-      tags = COALESCE(?, tags),
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(name, slug, description, icon, target_url, is_active, sort_order, mode, sso_endpoint, sso_method, long_description, tags !== undefined ? JSON.stringify(tags) : null, id);
+    if (mode !== undefined && !['redirect', 'redirect-plain', 'shared-cookie', 'entra-app'].includes(mode)) {
+      return res.status(400).json({ error: 'mode must be redirect, redirect-plain, shared-cookie, or entra-app' });
+    }
+    if (sso_method !== undefined && !['GET', 'POST'].includes(sso_method)) {
+      return res.status(400).json({ error: 'sso_method must be GET or POST' });
+    }
 
-  const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
-  res.json({ app });
+    if (mode !== undefined && mode !== existing.mode && !isAppModeEnabled(mode)) {
+      return res.status(400).json({ error: 'Selected app mode is disabled by personalization settings' });
+    }
+
+    const iconChange = await applyAppIconChange(id, existing, { icon, iconDataUrl, iconSvgText, removeIconAsset });
+    const normalizedTags = tags !== undefined ? normalizeTagList(tags) : undefined;
+
+    db.prepare(`
+      UPDATE apps SET
+        name = COALESCE(?, name),
+        slug = COALESCE(?, slug),
+        description = COALESCE(?, description),
+        icon = COALESCE(?, icon),
+        icon_file_name = ?,
+        target_url = COALESCE(?, target_url),
+        is_active = COALESCE(?, is_active),
+        sort_order = COALESCE(?, sort_order),
+        mode = COALESCE(?, mode),
+        sso_endpoint = COALESCE(?, sso_endpoint),
+        sso_method = COALESCE(?, sso_method),
+        long_description = COALESCE(?, long_description),
+        tags = COALESCE(?, tags),
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(name, slug, description, iconChange.icon, iconChange.icon_file_name, target_url, is_active, sort_order, mode, sso_endpoint, sso_method, long_description, normalizedTags !== undefined ? JSON.stringify(normalizedTags) : null, id);
+
+    const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
+    res.json({ app });
+  } catch (error) {
+    console.error('Update app failed:', error.message);
+    res.status(500).json({ error: 'Failed to update app' });
+  }
 });
 
 // Delete app (admin only)
@@ -227,6 +390,7 @@ router.delete('/:id', authenticate, isAdmin, (req, res) => {
     db.prepare('DELETE FROM apps WHERE id = ?').run(id);
   });
   deleteAll();
+  removeAppIconAsset(id).catch((error) => console.error('App icon cleanup failed:', error.message));
   res.json({ message: 'App deleted' });
 });
 
@@ -256,7 +420,7 @@ router.post('/bulk', (req, res) => {
         results.push({ slug: app.slug, status: 'skipped', reason: urlError });
         continue;
       }
-      if (app.mode && !['redirect', 'redirect-plain', 'shared-cookie'].includes(app.mode)) {
+      if (app.mode && !['redirect', 'redirect-plain', 'shared-cookie', 'entra-app'].includes(app.mode)) {
         results.push({ slug: app.slug, status: 'skipped', reason: 'invalid mode' });
         continue;
       }
@@ -265,17 +429,20 @@ router.post('/bulk', (req, res) => {
         continue;
       }
 
-      const existing = db.prepare('SELECT id FROM apps WHERE slug = ?').get(app.slug);
+      const existing = db.prepare('SELECT * FROM apps WHERE slug = ?').get(app.slug);
+      const requestedMode = app.mode || existing?.mode || 'redirect-plain';
+      if (!isAppModeEnabled(requestedMode)) {
+        results.push({ slug: app.slug, status: 'skipped', reason: 'selected mode is disabled by personalization settings' });
+        continue;
+      }
 
       if (existing) {
         // Merge tags: combine existing + new, deduplicate
         let mergedTags = null;
         if (app.tags) {
           const existingRow = db.prepare('SELECT tags FROM apps WHERE id = ?').get(existing.id);
-          let existingTags = [];
-          try { existingTags = JSON.parse(existingRow?.tags || '[]'); } catch { /* ignore */ }
-          const combined = [...new Set([...existingTags, ...app.tags])];
-          mergedTags = JSON.stringify(combined);
+          const existingTags = parseTags(existingRow?.tags || '[]');
+          mergedTags = JSON.stringify(normalizeTagList([...existingTags, ...app.tags]));
         }
 
         db.prepare(`
@@ -284,6 +451,7 @@ router.post('/bulk', (req, res) => {
             description = COALESCE(?, description),
             long_description = COALESCE(?, long_description),
             icon = COALESCE(?, icon),
+            icon_file_name = COALESCE(?, icon_file_name),
             target_url = COALESCE(?, target_url),
             mode = COALESCE(?, mode),
             sso_endpoint = COALESCE(?, sso_endpoint),
@@ -292,7 +460,7 @@ router.post('/bulk', (req, res) => {
             updated_at = datetime('now')
           WHERE id = ?
         `).run(
-          app.name, app.description, app.long_description, app.icon, app.target_url,
+          app.name, app.description, app.long_description, app.icon, null, app.target_url,
           app.mode, app.sso_endpoint, app.sso_method,
           mergedTags,
           existing.id
@@ -300,18 +468,31 @@ router.post('/bulk', (req, res) => {
         results.push({ slug: app.slug, status: 'updated' });
       } else {
         const id = uuidv4();
+        const normalizedGroupIds = Array.isArray(app.groupIds)
+          ? [...new Set(app.groupIds.filter((groupId) => typeof groupId === 'string' && groupId.trim()))]
+          : [];
+        if (normalizedGroupIds.length > 0) {
+          const placeholders = normalizedGroupIds.map(() => '?').join(', ');
+          const existingGroups = db.prepare(`SELECT id FROM user_groups WHERE id IN (${placeholders})`).all(...normalizedGroupIds);
+          if (existingGroups.length !== normalizedGroupIds.length) {
+            results.push({ slug: app.slug, status: 'skipped', reason: 'one or more selected groups were not found' });
+            continue;
+          }
+        }
         db.prepare(`
-          INSERT INTO apps (id, name, slug, description, long_description, icon, target_url, sort_order, mode, sso_endpoint, sso_method, tags)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO apps (id, name, slug, description, long_description, icon, icon_file_name, target_url, sort_order, mode, sso_endpoint, sso_method, tags)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           id, app.name, app.slug, app.description || '', app.long_description || '',
-          app.icon || '📦', app.target_url,
+          app.icon || '📦', null, app.target_url,
           app.sort_order || 99, app.mode || 'redirect-plain',
           app.sso_endpoint || '/sso', app.sso_method || 'GET',
-          JSON.stringify(app.tags || [])
+          JSON.stringify(normalizeTagList(app.tags))
         );
-        // Auto-assign to "default" group
-        db.prepare('INSERT OR IGNORE INTO app_permissions (app_id, group_id) VALUES (?, ?)').run(id, DEFAULT_GROUP_ID);
+        const insertPermission = db.prepare('INSERT OR IGNORE INTO app_permissions (app_id, group_id) VALUES (?, ?)');
+        for (const groupId of normalizedGroupIds) {
+          insertPermission.run(id, groupId);
+        }
         results.push({ slug: app.slug, status: 'created' });
       }
     }

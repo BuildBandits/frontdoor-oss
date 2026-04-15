@@ -3,6 +3,7 @@ import { useAuthStore } from './stores/authStore';
 import Login from './pages/Login';
 import Home from './pages/Home';
 import Admin from './pages/Admin';
+import Personalizza from './pages/Personalizza';
 import AdminGroups from './pages/AdminGroups';
 import AdminUsers from './pages/AdminUsers';
 import AdminLogs from './pages/AdminLogs';
@@ -35,6 +36,16 @@ export default function App() {
           <ProtectedRoute adminOnly>
             <Layout>
               <Admin />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/personalizza"
+        element={
+          <ProtectedRoute adminOnly>
+            <Layout>
+              <Personalizza />
             </Layout>
           </ProtectedRoute>
         }

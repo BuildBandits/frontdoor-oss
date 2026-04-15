@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, AlertCircle, Check, Search, Trash2, UserPlus, X, Clock } from 'lucide-react';
+import { Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, AlertCircle, Check, Search, Trash2, Clock } from 'lucide-react';
 import api from '../services/api';
+import UserAvatar from '../components/UserAvatar';
 
 function Toast({ message, type = 'success', onClose }) {
   useEffect(() => {
@@ -29,20 +30,12 @@ export default function AdminUsers() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Invite user modal
-  const [showInvite, setShowInvite] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('user');
-  const [inviteGroups, setInviteGroups] = useState([]);
-  const [allGroups, setAllGroups] = useState([]);
-  const [inviteSaving, setInviteSaving] = useState(false);
-
   const showToast = (message, type = 'success') => setToast({ message, type });
 
   const loadUsers = useCallback(async () => {
     try {
       const res = await api.get('/users');
-      setUsers(res.data.users);
+      setUsers(Array.isArray(res.data.users) ? res.data.users : []);
     } catch {
       showToast('Errore nel caricamento utenti', 'error');
     }
@@ -55,7 +48,7 @@ export default function AdminUsers() {
     setDetailLoading(true);
     try {
       const res = await api.get(`/users/${userId}`);
-      setUserDetail(res.data);
+      setUserDetail(res.data && typeof res.data === 'object' ? res.data : null);
     } catch {
       showToast('Errore nel caricamento dettaglio utente', 'error');
     }
@@ -125,44 +118,6 @@ export default function AdminUsers() {
     }
   };
 
-  // Invite user
-  const openInvite = async () => {
-    try {
-      const res = await api.get('/groups');
-      setAllGroups(res.data.groups.filter((g) => g.source !== 'entra'));
-    } catch {
-      // groups not critical for opening modal
-    }
-    setInviteEmail('');
-    setInviteRole('user');
-    setInviteGroups([]);
-    setShowInvite(true);
-  };
-
-  const handleInvite = async () => {
-    if (!inviteEmail.trim()) return;
-    setInviteSaving(true);
-    try {
-      await api.post('/users', {
-        email: inviteEmail.trim(),
-        role: inviteRole,
-        groupIds: inviteGroups,
-      });
-      setShowInvite(false);
-      showToast('Utente pre-registrato con successo');
-      await loadUsers();
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Errore nella pre-registrazione', 'error');
-    }
-    setInviteSaving(false);
-  };
-
-  const toggleInviteGroup = (groupId) => {
-    setInviteGroups((prev) =>
-      prev.includes(groupId) ? prev.filter((g) => g !== groupId) : [...prev, groupId]
-    );
-  };
-
   // Filtering
   const filtered = users.filter((u) => {
     if (filterRole !== 'all' && u.role !== filterRole) return false;
@@ -175,18 +130,11 @@ export default function AdminUsers() {
     return true;
   });
 
-  const initials = (name) =>
-    (name || '?')
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-
   const groupLabel = (group) => group.entra_display_name || group.name;
   const localGroups = userDetail?.groups?.filter((g) => g.source !== 'entra') || [];
   const entraGroups = userDetail?.groups?.filter((g) => g.source === 'entra') || [];
   const detectedEntraGroups = userDetail?.entraGroups || [];
+  const isComposeLockedAdmin = (user) => Boolean(user?.is_compose_locked_admin);
 
   const formatDate = (iso) => {
     if (!iso) return 'Mai';
@@ -202,24 +150,17 @@ export default function AdminUsers() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-extrabold text-dark">Gestione Utenti</h1>
           <p className="text-gray-500 mt-1">
             {users.length} utenti totali &middot; {activeCount} attivi &middot; {adminCount} admin
           </p>
         </div>
-        <button
-          onClick={openInvite}
-          className="flex items-center gap-2 px-4 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors"
-        >
-          <UserPlus className="w-4 h-4" />
-          Invita Utente
-        </button>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-8">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -277,14 +218,14 @@ export default function AdminUsers() {
                   {expandedUser === user.id
                     ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
                     : <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />}
-                  <div
-                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${
-                      !user.is_active ? 'opacity-40' : ''
-                    }`}
-                    style={{ backgroundColor: user.avatar_color || '#666' }}
-                  >
-                    {initials(user.display_name)}
-                  </div>
+                  <UserAvatar
+                    userId={user.id}
+                    displayName={user.display_name}
+                    email={user.email}
+                    avatarColor={user.avatar_color}
+                    className={`w-9 h-9 ${!user.is_active ? 'opacity-40' : ''}`}
+                    initialsClassName="text-xs"
+                  />
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`font-semibold text-sm ${user.is_active ? 'text-dark' : 'text-gray-400 line-through'}`}>
@@ -292,6 +233,9 @@ export default function AdminUsers() {
                       </span>
                       {user.role === 'admin' && (
                         <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">admin</span>
+                      )}
+                      {isComposeLockedAdmin(user) && (
+                        <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">compose</span>
                       )}
                       {!user.last_login && (
                         <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5">
@@ -323,7 +267,7 @@ export default function AdminUsers() {
                       <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-dark rounded-full" />
                     </div>
                   ) : userDetail ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.3fr)_minmax(0,0.88fr)] gap-6 lg:min-h-[460px]">
                       {/* Info */}
                       <div>
                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Informazioni</h3>
@@ -363,10 +307,13 @@ export default function AdminUsers() {
                           Gruppi Frontdoor ({userDetail.groups.length})
                         </h3>
 
-                        <div className="space-y-4 max-h-48 overflow-y-auto pr-1">
+                        <div className="space-y-5 h-full overflow-y-auto pr-1 lg:max-h-[390px]">
                           <div>
                             <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
                               Gruppi locali ({localGroups.length})
+                            </p>
+                            <p className="mb-2 text-xs text-sky-600">
+                              Sono gruppi creati e gestiti direttamente in Frontdoor, indipendenti dal tenant Entra.
                             </p>
                             {localGroups.length === 0 ? (
                               <p className="text-sm text-gray-300 italic">Nessun gruppo locale</p>
@@ -389,6 +336,9 @@ export default function AdminUsers() {
                             <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
                               Gruppi Frontdoor importati da Entra ({entraGroups.length})
                             </p>
+                            <p className="mb-2 text-xs text-sky-600">
+                              I gruppi Entra vengono rilevati al login o con Force Sync, poi importati manualmente da Gestione Gruppi.
+                            </p>
                             {entraGroups.length === 0 ? (
                               <p className="text-sm text-gray-300 italic">Nessun gruppo Entra importato in Frontdoor</p>
                             ) : (
@@ -407,9 +357,6 @@ export default function AdminUsers() {
                                 ))}
                               </div>
                             )}
-                            <p className="mt-2 text-xs text-sky-600">
-                              I gruppi Entra vengono rilevati al login o con Force Sync, poi importati manualmente da Gestione Gruppi.
-                            </p>
                           </div>
                         </div>
                       </div>
@@ -418,10 +365,13 @@ export default function AdminUsers() {
                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
                           Gruppi Entra rilevati ({detectedEntraGroups.length})
                         </h3>
+                        <p className="mb-2 text-xs text-sky-600">
+                          Questi gruppi vengono letti direttamente dal tenant Entra, anche se non sono ancora importati in Frontdoor.
+                        </p>
                         {detectedEntraGroups.length === 0 ? (
                           <p className="text-sm text-gray-300 italic">Nessun gruppo Entra rilevato</p>
                         ) : (
-                          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          <div className="space-y-1.5 h-full overflow-y-auto pr-1 lg:max-h-[390px]">
                             {detectedEntraGroups.map((group) => (
                               <div key={group.entra_group_id} className="flex items-center gap-2 py-1">
                                 <Users className="w-3.5 h-3.5 text-gray-400" />
@@ -442,38 +392,45 @@ export default function AdminUsers() {
                             ))}
                           </div>
                         )}
-                        <p className="mt-2 text-xs text-sky-600">
-                          Questi gruppi vengono letti direttamente dal tenant Entra, anche se non sono ancora importati in Frontdoor.
-                        </p>
                       </div>
 
                       {/* Actions */}
                       <div>
                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Azioni</h3>
-                        <div className="space-y-2">
+                        <div className="space-y-2 lg:sticky lg:top-4">
                           <button
-                            onClick={() => toggleRole(user)}
+                            onClick={isComposeLockedAdmin(user) && user.role === 'admin' ? undefined : () => toggleRole(user)}
+                            disabled={isComposeLockedAdmin(user) && user.role === 'admin'}
                             className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                              user.role === 'admin'
-                                ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                              isComposeLockedAdmin(user) && user.role === 'admin'
+                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                : user.role === 'admin'
+                                  ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
                                 : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
                             }`}
                           >
-                            {user.role === 'admin' ? (
+                            {isComposeLockedAdmin(user) && user.role === 'admin' ? (
+                              <><ShieldOff className="w-4 h-4" /> Admin definito da compose</>
+                            ) : user.role === 'admin' ? (
                               <><ShieldOff className="w-4 h-4" /> Rimuovi admin</>
                             ) : (
                               <><Shield className="w-4 h-4" /> Promuovi ad admin</>
                             )}
                           </button>
                           <button
-                            onClick={() => toggleActive(user)}
+                            onClick={isComposeLockedAdmin(user) && user.role === 'admin' ? undefined : () => toggleActive(user)}
+                            disabled={isComposeLockedAdmin(user) && user.role === 'admin'}
                             className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                              user.is_active
-                                ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                              isComposeLockedAdmin(user) && user.role === 'admin'
+                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                : user.is_active
+                                  ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                             }`}
                           >
-                            {user.is_active ? (
+                            {isComposeLockedAdmin(user) && user.role === 'admin' ? (
+                              <><UserX className="w-4 h-4" /> Disattivazione bloccata</>
+                            ) : user.is_active ? (
                               <><UserX className="w-4 h-4" /> Disattiva utente</>
                             ) : (
                               <><UserCheck className="w-4 h-4" /> Riattiva utente</>
@@ -481,12 +438,22 @@ export default function AdminUsers() {
                           </button>
                           <div className="border-t border-gray-100 pt-2 mt-1">
                             <button
-                              onClick={() => deleteUser(user)}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-red-50 text-red-700 hover:bg-red-200 transition-colors"
+                              onClick={isComposeLockedAdmin(user) ? undefined : () => deleteUser(user)}
+                              disabled={isComposeLockedAdmin(user)}
+                              className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                                isComposeLockedAdmin(user)
+                                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                  : 'bg-red-50 text-red-700 hover:bg-red-200'
+                              }`}
                             >
-                              <Trash2 className="w-4 h-4" /> Elimina definitivamente
+                              <Trash2 className="w-4 h-4" /> {isComposeLockedAdmin(user) ? 'Eliminazione bloccata' : 'Elimina definitivamente'}
                             </button>
                             <p className="text-[11px] text-gray-400 mt-1 px-1">Rimuove utente, gruppi e log di accesso</p>
+                            {isComposeLockedAdmin(user) && (
+                              <p className="text-[11px] text-slate-400 mt-2 px-1">
+                                Questo admin è definito in `ADMIN_EMAILS` nel compose: va prima rimosso da lì.
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -496,83 +463,6 @@ export default function AdminUsers() {
               )}
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Invite user modal */}
-      {showInvite && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setShowInvite(false)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-dark">Invita Utente</h2>
-              <button onClick={() => setShowInvite(false)} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
-                  placeholder="utente@azienda.com"
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Ruolo</label>
-                <select
-                  value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-                >
-                  <option value="user">Utente</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Gruppi</label>
-                {allGroups.length === 0 ? (
-                  <p className="text-sm text-gray-400 italic">Nessun gruppo locale disponibile</p>
-                ) : (
-                  <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-200 rounded-xl p-2">
-                    {allGroups.map((g) => (
-                      <label key={g.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={inviteGroups.includes(g.id)}
-                          onChange={() => toggleInviteGroup(g.id)}
-                          className="rounded border-gray-300 text-dark focus:ring-accent"
-                        />
-                        <span className="text-sm text-dark">{groupLabel(g)}</span>
-                        {g.source === 'entra' && (
-                          <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">Entra</span>
-                        )}
-                        <span className="text-xs text-gray-400 ml-auto">{g.member_count} membri</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-                <p className="text-xs text-gray-400 mt-1">Qui selezioni solo gruppi locali; i gruppi Entra vengono sincronizzati al login.</p>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-100">
-              <button onClick={() => setShowInvite(false)} className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-dark hover:bg-gray-100 rounded-xl transition-colors">
-                Annulla
-              </button>
-              <button
-                onClick={handleInvite}
-                disabled={inviteSaving || !inviteEmail.trim()}
-                className="flex items-center gap-2 px-5 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40"
-              >
-                <UserPlus className="w-4 h-4" />
-                {inviteSaving ? 'Invio...' : 'Invita'}
-              </button>
-            </div>
-          </div>
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import db from '../db.js';
 import { authenticate, isAdmin } from '../middleware/auth.js';
+import { iconUrlForApp } from '../services/appIcons.js';
 
 const router = express.Router();
 
@@ -39,15 +40,22 @@ router.get('/', authenticate, isAdmin, (req, res) => {
 
   const logs = db.prepare(`
     SELECT l.id, l.created_at, l.ip_address,
-      u.display_name AS user_name, u.email AS user_email, u.avatar_color,
-      a.name AS app_name, a.slug AS app_slug, a.icon AS app_icon
+      l.user_id, u.display_name AS user_name, u.email AS user_email, u.avatar_color,
+      a.id AS app_id, a.name AS app_name, a.slug AS app_slug, a.icon AS app_icon, a.icon_file_name, a.updated_at
     FROM access_logs l
     LEFT JOIN users u ON l.user_id = u.id
     LEFT JOIN apps a ON l.app_id = a.id
     WHERE ${where}
     ORDER BY l.created_at DESC
     LIMIT ? OFFSET ?
-  `).all(...params, limit, offset);
+  `).all(...params, limit, offset).map((log) => ({
+    ...log,
+    app_icon_url: iconUrlForApp({
+      id: log.app_id,
+      icon_file_name: log.icon_file_name,
+      updated_at: log.updated_at,
+    }),
+  }));
 
   // Summary stats
   const stats = db.prepare(`
@@ -71,7 +79,7 @@ router.get('/top-apps', authenticate, isAdmin, (req, res) => {
   const cutoff = new Date(Date.now() - days * 86400000).toISOString();
 
   const topApps = db.prepare(`
-    SELECT a.name, a.slug, a.icon, COUNT(*) AS access_count,
+    SELECT a.id, a.name, a.slug, a.icon, a.icon_file_name, a.updated_at, COUNT(*) AS access_count,
       COUNT(DISTINCT l.user_id) AS unique_users
     FROM access_logs l
     JOIN apps a ON l.app_id = a.id
@@ -79,7 +87,10 @@ router.get('/top-apps', authenticate, isAdmin, (req, res) => {
     GROUP BY l.app_id
     ORDER BY access_count DESC
     LIMIT 10
-  `).all(cutoff);
+  `).all(cutoff).map((app) => ({
+    ...app,
+    iconUrl: iconUrlForApp(app),
+  }));
 
   res.json({ topApps, days });
 });
@@ -131,10 +142,13 @@ router.get('/rbac-audit', authenticate, isAdmin, (req, res) => {
   `).all(...params, limit, offset);
 
   // Parse details JSON for convenience
-  const parsed = logs.map(l => ({
-    ...l,
-    details: l.details ? JSON.parse(l.details) : null,
-  }));
+  const parsed = logs.map(l => {
+    let details = null;
+    if (l.details) {
+      try { details = JSON.parse(l.details); } catch { details = l.details; }
+    }
+    return { ...l, details };
+  });
 
   res.json({
     logs: parsed,

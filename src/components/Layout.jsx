@@ -1,7 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LogOut, Settings, Home, Users, UserCog, Activity } from 'lucide-react';
+import { LogOut, Settings, Home, Users, UserCog, Activity, Palette } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import BrandMark from './BrandMark';
+import UserAvatar from './UserAvatar';
 
 export default function Layout({ children }) {
   const { user, logout } = useAuthStore();
@@ -11,15 +12,6 @@ export default function Layout({ children }) {
     logout();
     window.location.href = '/login';
   };
-
-  const initials = user?.displayName
-    ? user.displayName
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : '?';
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
@@ -93,17 +85,30 @@ export default function Layout({ children }) {
                     <Activity className="w-4 h-4" />
                     Log
                   </Link>
+                  <Link
+                    to="/admin/personalizza"
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      location.pathname === '/admin/personalizza'
+                        ? 'bg-accent/20 text-dark'
+                        : 'text-gray-500 hover:text-dark hover:bg-gray-50'
+                    }`}
+                  >
+                    <Palette className="w-4 h-4" />
+                    Personalizza
+                  </Link>
                 </>
               )}
 
               {/* User avatar + logout */}
               <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-100">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                  style={{ backgroundColor: user?.avatarColor || '#666' }}
-                >
-                  {initials}
-                </div>
+                <UserAvatar
+                  userId={user?.id}
+                  displayName={user?.displayName}
+                  email={user?.email}
+                  avatarColor={user?.avatarColor}
+                  className="w-8 h-8"
+                  initialsClassName="text-[10px]"
+                />
                 <span className="text-sm text-gray-600 hidden sm:block max-w-[120px] truncate">
                   {user?.displayName}
                 </span>

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, X, Save, Users, ChevronDown, ChevronRight, AppWindow, Pencil, AlertCircle, Check, Clock, Mail, RefreshCw } from 'lucide-react';
 import api from '../services/api';
+import UserAvatar from '../components/UserAvatar';
+import AppIcon from '../components/AppIcon';
 
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -473,7 +475,7 @@ export default function AdminGroups() {
             className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-dark rounded-xl font-semibold text-sm hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${forceSyncing ? 'animate-spin' : ''}`} />
-            Force Sync Groups
+            Sincronizza gruppi
           </button>
         </div>
       </div>
@@ -675,12 +677,14 @@ export default function AdminGroups() {
                               {groupDetail.members.map((m) => (
                                 <div key={m.id} className="flex items-center justify-between py-1.5">
                                   <div className="flex items-center gap-2">
-                                    <div
-                                      className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-                                      style={{ backgroundColor: m.avatar_color || '#666' }}
-                                    >
-                                      {(m.display_name || '?').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
-                                    </div>
+                                    <UserAvatar
+                                      userId={m.id}
+                                      displayName={m.display_name}
+                                      email={m.email}
+                                      avatarColor={m.avatar_color}
+                                      className="w-7 h-7"
+                                      initialsClassName="text-[10px]"
+                                    />
                                     <div>
                                       <span className="text-sm text-dark">{m.display_name || m.email}</span>
                                       {m.role === 'admin' && (
@@ -737,7 +741,7 @@ export default function AdminGroups() {
                               {groupDetail.apps.map((a) => (
                                 <div key={a.id} className="flex items-center justify-between py-1.5">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-lg">{a.icon}</span>
+                                    <AppIcon app={a} className="w-6 h-6" textClassName="text-lg" />
                                     <span className="text-sm text-dark">{a.name}</span>
                                   </div>
                                   <button
@@ -977,12 +981,14 @@ export default function AdminGroups() {
                     onClick={() => addMember(u.id)}
                     className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 text-left transition-colors"
                   >
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                      style={{ backgroundColor: u.avatar_color || '#666' }}
-                    >
-                      {(u.display_name || '?').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
-                    </div>
+                    <UserAvatar
+                      userId={u.id}
+                      displayName={u.display_name}
+                      email={u.email}
+                      avatarColor={u.avatar_color}
+                      className="w-7 h-7"
+                      initialsClassName="text-[10px]"
+                    />
                     <div>
                       <div className="text-sm font-medium text-dark">{u.display_name || u.email}</div>
                       <div className="text-xs text-gray-400">{u.email}</div>
@@ -1023,7 +1029,7 @@ export default function AdminGroups() {
                     onClick={() => addApp(a.id)}
                     className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 text-left transition-colors"
                   >
-                    <span className="text-lg">{a.icon}</span>
+                    <AppIcon app={a} className="w-6 h-6" textClassName="text-lg" />
                     <div>
                       <div className="text-sm font-medium text-dark">{a.name}</div>
                       <div className="text-xs text-gray-400 font-mono">{a.slug}</div>

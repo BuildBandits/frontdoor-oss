@@ -1,71 +1,17 @@
 import express from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
-import { DEFAULT_GROUP_ID, logRbacAudit } from '../db.js';
 import { authenticate, isAdmin } from '../middleware/auth.js';
+import { ensureAvatarCached, serveAvatarForUser } from '../services/avatars.js';
 
 const router = express.Router();
+const composeAdminEmails = new Set(
+  (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean)
+);
 
-// Create pre-registered user by email (admin only)
-router.post('/', authenticate, isAdmin, (req, res) => {
-  const { email, role, groupIds } = req.body;
-
-  if (!email || typeof email !== 'string') {
-    return res.status(400).json({ error: 'email is required' });
-  }
-
-  const cleanEmail = email.toLowerCase().trim();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-    return res.status(400).json({ error: 'Invalid email format' });
-  }
-
-  if (role && !['admin', 'user'].includes(role)) {
-    return res.status(400).json({ error: 'role must be admin or user' });
-  }
-
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(cleanEmail);
-  if (existing) {
-    return res.status(409).json({ error: 'A user with this email already exists' });
-  }
-
-  // Validate group IDs if provided
-  if (groupIds && Array.isArray(groupIds) && groupIds.length > 0) {
-    const checkGroup = db.prepare('SELECT id, source FROM user_groups WHERE id = ?');
-    const invalid = groupIds.filter(gid => !checkGroup.get(gid));
-    if (invalid.length > 0) {
-      return res.status(400).json({ error: `Groups not found: ${invalid.join(', ')}` });
-    }
-
-    const entraGroups = groupIds.filter((gid) => checkGroup.get(gid)?.source === 'entra');
-    if (entraGroups.length > 0) {
-      return res.status(400).json({ error: `Entra-synced groups cannot be assigned manually: ${entraGroups.join(', ')}` });
-    }
-  }
-
-  const userId = uuidv4();
-  const avatarColor = `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
-
-  const createUser = db.transaction(() => {
-    db.prepare(`
-      INSERT INTO users (id, email, display_name, microsoft_id, role, avatar_color, last_login)
-      VALUES (?, ?, NULL, NULL, ?, ?, NULL)
-    `).run(userId, cleanEmail, role || 'user', avatarColor);
-
-    // Add to specified groups only (NOT default)
-    if (groupIds && Array.isArray(groupIds)) {
-      const insert = db.prepare('INSERT OR IGNORE INTO user_group_members (user_id, group_id) VALUES (?, ?)');
-      for (const gid of groupIds) {
-        insert.run(userId, gid);
-      }
-    }
-  });
-  createUser();
-
-  logRbacAudit(req.user.id, 'create', 'user_status', userId, { email: cleanEmail, role: role || 'user', groupIds: groupIds || [] });
-
-  const user = db.prepare('SELECT id, email, display_name, role, avatar_color, is_active, last_login, created_at FROM users WHERE id = ?').get(userId);
-  res.status(201).json({ user });
-});
+const isComposeLockedAdmin = (email) => composeAdminEmails.has((email || '').trim().toLowerCase());
 
 // List users with group membership counts (admin only)
 router.get('/', authenticate, isAdmin, (req, res) => {
@@ -75,8 +21,29 @@ router.get('/', authenticate, isAdmin, (req, res) => {
         (SELECT COUNT(*) FROM user_group_members WHERE user_id = u.id) AS group_count
       FROM users u ORDER BY u.display_name
     `)
-    .all();
+    .all()
+    .map((user) => ({
+      ...user,
+      is_compose_locked_admin: isComposeLockedAdmin(user.email),
+    }));
   res.json({ users });
+});
+
+// Serve cached user avatar or discover it on demand (authenticated)
+router.get('/:id/avatar', authenticate, async (req, res) => {
+  const user = db.prepare('SELECT id, email, microsoft_id, display_name FROM users WHERE id = ?').get(req.params.id);
+
+  if (!user) {
+    return res.status(404).end();
+  }
+
+  try {
+    await ensureAvatarCached(user);
+    await serveAvatarForUser(user, res);
+  } catch (error) {
+    console.error(`Avatar serve failed for ${user.email}:`, error.message);
+    res.status(404).end();
+  }
 });
 
 // Get single user with group memberships (admin only)
@@ -125,7 +92,15 @@ router.get('/:id', authenticate, isAdmin, (req, res) => {
     WHERE m.user_id = ?
   `).get(req.params.id);
 
-  res.json({ user, groups, entraGroups, visibleAppCount: visibleApps.count });
+  res.json({
+    user: {
+      ...user,
+      is_compose_locked_admin: isComposeLockedAdmin(user.email),
+    },
+    groups,
+    entraGroups,
+    visibleAppCount: visibleApps.count,
+  });
 });
 
 // Update user role (admin only)
@@ -142,6 +117,10 @@ router.put('/:id/role', authenticate, isAdmin, (req, res) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
+  if (user.role === 'admin' && isComposeLockedAdmin(user.email) && role !== 'admin') {
+    return res.status(400).json({ error: 'Compose admin cannot be demoted from the webapp' });
+  }
+
   // Prevent last admin from demoting themselves
   if (role === 'user' && user.role === 'admin' && id === req.user.id) {
     const adminCount = db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND is_active = 1").get().count;
@@ -151,7 +130,6 @@ router.put('/:id/role', authenticate, isAdmin, (req, res) => {
   }
 
   db.prepare('UPDATE users SET role = ?, updated_at = datetime(\'now\') WHERE id = ?').run(role, id);
-  logRbacAudit(req.user.id, 'change_role', 'role', id, { from: user.role, to: role });
   res.json({ message: 'Role updated' });
 });
 
@@ -169,13 +147,18 @@ router.put('/:id/active', authenticate, isAdmin, (req, res) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
+  const activeValue = is_active ? 1 : 0;
+
+  if (isComposeLockedAdmin(user.email) && !activeValue) {
+    return res.status(400).json({ error: 'Compose admin cannot be deactivated from the webapp' });
+  }
+
   // Prevent deactivating yourself
   if (id === req.user.id && !is_active) {
     return res.status(400).json({ error: 'Cannot deactivate yourself' });
   }
 
   // Prevent deactivating last admin
-  const activeValue = is_active ? 1 : 0;
   if (!activeValue && user.role === 'admin') {
     const adminCount = db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND is_active = 1").get().count;
     if (adminCount <= 1) {
@@ -184,7 +167,6 @@ router.put('/:id/active', authenticate, isAdmin, (req, res) => {
   }
 
   db.prepare('UPDATE users SET is_active = ?, updated_at = datetime(\'now\') WHERE id = ?').run(activeValue, id);
-  logRbacAudit(req.user.id, activeValue ? 'activate' : 'deactivate', 'user_status', id, {});
   res.json({ message: is_active ? 'User activated' : 'User deactivated' });
 });
 
@@ -202,6 +184,10 @@ router.delete('/:id', authenticate, isAdmin, (req, res) => {
     return res.status(400).json({ error: 'Cannot delete yourself' });
   }
 
+  if (isComposeLockedAdmin(user.email)) {
+    return res.status(400).json({ error: 'Compose admin cannot be deleted from the webapp' });
+  }
+
   // Prevent deleting last admin
   if (user.role === 'admin') {
     const adminCount = db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND is_active = 1").get().count;
@@ -216,7 +202,6 @@ router.delete('/:id', authenticate, isAdmin, (req, res) => {
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
   });
   deleteAll();
-  logRbacAudit(req.user.id, 'delete', 'user_status', id, { email: user.email });
 
   res.json({ message: 'User deleted' });
 });
