@@ -1,36 +1,52 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, AlertCircle, Check, Search, Trash2, Clock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X } from 'lucide-react';
 import api from '../services/api';
+import { useAuthStore } from '../stores/authStore';
 import UserAvatar from '../components/UserAvatar';
-
-function Toast({ message, type = 'success', onClose }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 3000);
-    return () => clearTimeout(t);
-  }, [onClose]);
-
-  return (
-    <div className={`fixed bottom-6 right-6 z-[60] flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all ${
-      type === 'error' ? 'bg-red-600 text-white' : 'bg-dark text-white'
-    }`}>
-      {type === 'error' ? <AlertCircle className="w-4 h-4" /> : <Check className="w-4 h-4" />}
-      {message}
-    </div>
-  );
-}
+import AppIcon from '../components/AppIcon';
+import PageNotice from '../components/PageNotice';
+import ConfirmDialog from '../components/ConfirmDialog';
+import ClearableSearchField from '../components/ClearableSearchField';
 
 export default function AdminUsers() {
+  const { user: currentUser } = useAuthStore();
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filterRole, setFilterRole] = useState('all'); // all | admin | user
+  const [filterRole, setFilterRole] = useState('all'); // all | superadmin | admin | admin_readonly | user
   const [filterActive, setFilterActive] = useState('all'); // all | active | inactive
   const [expandedUser, setExpandedUser] = useState(null);
   const [userDetail, setUserDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [toast, setToast] = useState(null);
+  const [pageNotice, setPageNotice] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [showVisibleApps, setShowVisibleApps] = useState(false);
 
-  const showToast = (message, type = 'success') => setToast({ message, type });
+  useEffect(() => {
+    if (!pageNotice) return undefined;
+    const timer = setTimeout(() => setPageNotice(null), 5000);
+    return () => clearTimeout(timer);
+  }, [pageNotice]);
+
+  const showToast = (message, type = 'success') => setPageNotice({ message, type });
+  const openConfirm = (dialog) => setConfirmDialog(dialog);
+  const closeConfirm = () => {
+    if (confirmBusy) return;
+    setConfirmDialog(null);
+  };
+  const runConfirm = async () => {
+    if (!confirmDialog?.onConfirm) return;
+    setConfirmBusy(true);
+    try {
+      await confirmDialog.onConfirm();
+    } finally {
+      setConfirmBusy(false);
+      setConfirmDialog(null);
+    }
+  };
 
   const loadUsers = useCallback(async () => {
     try {
@@ -59,63 +75,96 @@ export default function AdminUsers() {
     if (expandedUser === userId) {
       setExpandedUser(null);
       setUserDetail(null);
+      setShowVisibleApps(false);
     } else {
       setExpandedUser(userId);
+      setShowVisibleApps(false);
       await loadUserDetail(userId);
     }
   };
 
-  const toggleRole = async (user) => {
-    const newRole = user.role === 'admin' ? 'user' : 'admin';
-    const action = newRole === 'admin' ? 'promuovere ad admin' : 'rimuovere i privilegi admin di';
-    if (!confirm(`Vuoi ${action} ${user.display_name || user.email}?`)) return;
-
-    try {
-      await api.put(`/users/${user.id}/role`, { role: newRole });
-      showToast(newRole === 'admin' ? 'Utente promosso ad admin' : 'Privilegi admin rimossi');
-      await loadUsers();
-      if (expandedUser === user.id) await loadUserDetail(user.id);
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Errore nel cambio ruolo', 'error');
-    }
+  const canEditUsers = currentUser?.role !== 'admin_readonly';
+  const isComposeLockedAdmin = (user) => Boolean(user?.is_compose_locked_admin);
+  const roleLabel = (role) => {
+    if (role === 'superadmin') return 'superadmin';
+    if (role === 'admin_readonly') return 'sola lettura';
+    if (role === 'admin') return 'admin';
+    return 'utente';
+  };
+  const roleBadgeClass = (role) => {
+    if (role === 'superadmin') return 'bg-rose-100 text-rose-700';
+    if (role === 'admin') return 'bg-amber-100 text-amber-700';
+    if (role === 'admin_readonly') return 'bg-slate-100 text-slate-700';
+    return 'bg-gray-100 text-gray-600';
+  };
+  const updateRole = async (user, newRole) => {
+    const action = roleLabel(newRole);
+    openConfirm({
+      title: `Impostare il ruolo "${action}" per ${user.display_name || user.email}?`,
+      message: newRole === 'user'
+        ? 'L’utente tornerà a un profilo standard.'
+        : newRole === 'admin_readonly'
+          ? 'L’utente vedrà le pagine amministrative ma non potrà modificarle.'
+          : 'L’utente otterrà i privilegi amministrativi della web app.',
+      confirmLabel: 'Conferma',
+      onConfirm: async () => {
+        try {
+          await api.put(`/users/${user.id}/role`, { role: newRole });
+          showToast(`Ruolo impostato su ${action}`);
+          await loadUsers();
+          if (expandedUser === user.id) await loadUserDetail(user.id);
+        } catch (err) {
+          showToast(err.response?.data?.error || 'Errore nel cambio ruolo', 'error');
+        }
+      },
+    });
   };
 
   const toggleActive = async (user) => {
     const newActive = !user.is_active;
     const action = newActive ? 'riattivare' : 'disattivare';
-    if (!confirm(`Vuoi ${action} ${user.display_name || user.email}?`)) return;
-
-    try {
-      await api.put(`/users/${user.id}/active`, { is_active: newActive });
-      showToast(newActive ? 'Utente riattivato' : 'Utente disattivato');
-      await loadUsers();
-      if (expandedUser === user.id) await loadUserDetail(user.id);
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Errore', 'error');
-    }
+    openConfirm({
+      title: `Vuoi ${action} ${user.display_name || user.email}?`,
+      message: newActive
+        ? 'L’utente tornerà attivo e potrà accedere nuovamente.'
+        : 'L’utente verrà disattivato e non potrà più accedere.',
+      confirmLabel: newActive ? 'Riattiva' : 'Disattiva',
+      onConfirm: async () => {
+        try {
+          await api.put(`/users/${user.id}/active`, { is_active: newActive });
+          showToast(newActive ? 'Utente riattivato' : 'Utente disattivato');
+          await loadUsers();
+          if (expandedUser === user.id) await loadUserDetail(user.id);
+        } catch (err) {
+          showToast(err.response?.data?.error || 'Errore', 'error');
+        }
+      },
+    });
   };
 
   const deleteUser = async (user) => {
     const name = user.display_name || user.email;
     const visibleApps = userDetail?.visibleAppCount || 0;
-    if (visibleApps > 0) {
-      const appAwareConfirm = confirm(
-        `ATTENZIONE: l'utente ${name} rende visibili ${visibleApps} app.\n\nEliminandolo perderai anche queste assegnazioni. Vuoi continuare?`
-      );
-      if (!appAwareConfirm) return;
-    }
-    if (!confirm(`ATTENZIONE: Vuoi eliminare DEFINITIVAMENTE l'utente ${name}?\n\nQuesta azione non è reversibile. Verranno rimossi anche tutti i log di accesso e le appartenenze ai gruppi.`)) return;
-    if (!confirm(`Conferma finale: eliminare ${name}?`)) return;
-
-    try {
-      await api.delete(`/users/${user.id}`);
-      showToast('Utente eliminato definitivamente');
-      setExpandedUser(null);
-      setUserDetail(null);
-      await loadUsers();
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Errore nell\'eliminazione', 'error');
-    }
+    const message = visibleApps > 0
+      ? `L’utente ${name} rende visibili ${visibleApps} app.\n\nEliminandolo perderai anche queste assegnazioni.`
+      : 'Questa azione non è reversibile. Verranno rimossi anche tutti i log di accesso e le appartenenze ai gruppi.';
+    openConfirm({
+      title: `Eliminare definitivamente l'utente ${name}?`,
+      message,
+      confirmLabel: 'Elimina utente',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/users/${user.id}`);
+          showToast('Utente eliminato definitivamente');
+          setExpandedUser(null);
+          setUserDetail(null);
+          setShowVisibleApps(false);
+          await loadUsers();
+        } catch (err) {
+          showToast(err.response?.data?.error || 'Errore nell\'eliminazione', 'error');
+        }
+      },
+    });
   };
 
   // Filtering
@@ -134,8 +183,7 @@ export default function AdminUsers() {
   const localGroups = userDetail?.groups?.filter((g) => g.source !== 'entra') || [];
   const entraGroups = userDetail?.groups?.filter((g) => g.source === 'entra') || [];
   const detectedEntraGroups = userDetail?.entraGroups || [];
-  const isComposeLockedAdmin = (user) => Boolean(user?.is_compose_locked_admin);
-
+  const visibleApps = userDetail?.visibleApps || [];
   const formatDate = (iso) => {
     if (!iso) return 'Mai';
     try {
@@ -145,7 +193,91 @@ export default function AdminUsers() {
     }
   };
 
-  const adminCount = users.filter((u) => u.role === 'admin' && u.is_active).length;
+  const getRoleActions = (targetUser) => {
+    if (!canEditUsers || isComposeLockedAdmin(targetUser)) return [];
+
+    const actions = [];
+    if (targetUser.role === 'user') {
+      actions.push(
+        {
+          role: 'admin',
+          label: 'Assegna ruolo Admin (accesso completo)',
+          icon: Shield,
+          className: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
+          confirmText: 'L’utente potrà gestire app, gruppi e utenti.',
+        },
+        {
+          role: 'admin_readonly',
+          label: 'Assegna ruolo Admin (sola lettura)',
+          icon: ShieldOff,
+          className: 'bg-slate-50 text-slate-700 hover:bg-slate-100',
+          confirmText: 'L’utente vedrà le pagine amministrative ma non potrà modificarle.',
+        }
+      );
+    } else if (targetUser.role === 'admin_readonly') {
+      actions.push(
+        {
+          role: 'admin',
+          label: 'Assegna ruolo Admin (accesso completo)',
+          icon: Shield,
+          className: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
+          confirmText: 'L’utente potrà gestire app, gruppi e utenti.',
+        },
+        {
+          role: 'user',
+          label: 'Rimuovi ruolo Admin',
+          icon: ShieldOff,
+          className: 'bg-blue-50 text-blue-700 hover:bg-blue-100',
+          confirmText: 'L’utente tornerà a un profilo standard.',
+        }
+      );
+    } else if (targetUser.role === 'admin') {
+      actions.push(
+        {
+          role: 'admin_readonly',
+          label: 'Assegna ruolo Admin (sola lettura)',
+          icon: ShieldOff,
+          className: 'bg-slate-50 text-slate-700 hover:bg-slate-100',
+          confirmText: 'L’utente perderà la possibilità di operare modifiche.',
+        },
+        {
+          role: 'user',
+          label: 'Rimuovi ruolo Admin',
+          icon: ShieldOff,
+          className: 'bg-blue-50 text-blue-700 hover:bg-blue-100',
+          confirmText: 'L’utente tornerà a un profilo standard.',
+        }
+      );
+    } else if (targetUser.role === 'superadmin') {
+      actions.push(
+        {
+          role: 'admin',
+          label: 'Assegna ruolo Admin (accesso completo)',
+          icon: ShieldOff,
+          className: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
+          confirmText: 'L’utente potrà gestire app, gruppi e utenti.',
+        },
+        {
+          role: 'admin_readonly',
+          label: 'Assegna ruolo Admin (sola lettura)',
+          icon: ShieldOff,
+          className: 'bg-slate-50 text-slate-700 hover:bg-slate-100',
+          confirmText: 'L’utente perderà la possibilità di operare modifiche.',
+        },
+        {
+          role: 'user',
+          label: 'Rimuovi ruolo Admin',
+          icon: ShieldOff,
+          className: 'bg-blue-50 text-blue-700 hover:bg-blue-100',
+          confirmText: 'L’utente tornerà a un profilo standard.',
+        }
+      );
+    }
+
+    return actions;
+  };
+
+  const adminCount = users.filter((u) => ['superadmin', 'admin'].includes(u.role) && u.is_active).length;
   const activeCount = users.filter((u) => u.is_active).length;
 
   return (
@@ -154,21 +286,34 @@ export default function AdminUsers() {
         <div>
           <h1 className="text-2xl font-extrabold text-dark">Gestione Utenti</h1>
           <p className="text-gray-500 mt-1">
-            {users.length} utenti totali &middot; {activeCount} attivi &middot; {adminCount} admin
+            {users.length} utenti totali &middot; {activeCount} attivi &middot; {adminCount} con privilegi elevati
           </p>
         </div>
       </div>
 
+      {!canEditUsers && (
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          Modalità sola lettura: puoi consultare gli utenti, ma non modificarne ruolo o stato.
+        </div>
+      )}
+
+      {pageNotice && (
+        <div className="mb-6">
+          <PageNotice
+            type={pageNotice.type}
+            message={pageNotice.message}
+            onClose={() => setPageNotice(null)}
+          />
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-8">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
+        <div className="flex-1 min-w-[200px]">
+          <ClearableSearchField
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={setSearch}
             placeholder="Cerca per nome o email..."
-            className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
         <select
@@ -177,7 +322,9 @@ export default function AdminUsers() {
           className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
         >
           <option value="all">Tutti i ruoli</option>
+          <option value="superadmin">Solo superadmin</option>
           <option value="admin">Solo admin</option>
+          <option value="admin_readonly">Solo lettura</option>
           <option value="user">Solo utenti</option>
         </select>
         <select
@@ -231,9 +378,9 @@ export default function AdminUsers() {
                       <span className={`font-semibold text-sm ${user.is_active ? 'text-dark' : 'text-gray-400 line-through'}`}>
                         {user.display_name || user.email}
                       </span>
-                      {user.role === 'admin' && (
-                        <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">admin</span>
-                      )}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${roleBadgeClass(user.role)}`}>
+                        {roleLabel(user.role)}
+                      </span>
                       {isComposeLockedAdmin(user) && (
                         <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">compose</span>
                       )}
@@ -278,7 +425,7 @@ export default function AdminUsers() {
                           </div>
                           <div>
                             <dt className="text-gray-400">Ruolo</dt>
-                            <dd className="text-dark font-medium capitalize">{userDetail.user.role}</dd>
+                            <dd className="text-dark font-medium">{roleLabel(userDetail.user.role)}</dd>
                           </div>
                           <div>
                             <dt className="text-gray-400">Stato</dt>
@@ -296,7 +443,19 @@ export default function AdminUsers() {
                           </div>
                           <div>
                             <dt className="text-gray-400">App visibili</dt>
-                            <dd className="text-dark font-medium">{userDetail.visibleAppCount}</dd>
+                            <dd>
+                              {userDetail.visibleAppCount > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowVisibleApps(true)}
+                                  className="text-dark font-medium hover:text-accent-dark hover:underline"
+                                >
+                                  {userDetail.visibleAppCount}
+                                </button>
+                              ) : (
+                                <span className="text-dark font-medium">0</span>
+                              )}
+                            </dd>
                           </div>
                         </dl>
                       </div>
@@ -373,22 +532,35 @@ export default function AdminUsers() {
                         ) : (
                           <div className="space-y-1.5 h-full overflow-y-auto pr-1 lg:max-h-[390px]">
                             {detectedEntraGroups.map((group) => (
-                              <div key={group.entra_group_id} className="flex items-center gap-2 py-1">
-                                <Users className="w-3.5 h-3.5 text-gray-400" />
+                              <button
+                                key={group.entra_group_id}
+                                type="button"
+                                disabled={group.is_imported}
+                                onClick={() => {
+                                  if (group.is_imported) return;
+                                  navigate('/admin/groups', {
+                                    state: {
+                                      openEntraImport: group.entra_group_id,
+                                      entraSearch: group.display_name,
+                                    },
+                                  });
+                                }}
+                                className={`w-full flex items-center gap-2 py-1 text-left ${
+                                  group.is_imported ? 'cursor-default opacity-80' : 'rounded-lg px-2 -mx-2 hover:bg-sky-50 transition-colors'
+                                }`}
+                              >
+                                <Users className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                                 <span className="text-sm text-dark">{group.display_name}</span>
                                 {group.is_imported ? (
                                   <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
-                                    Importato in Frontdoor
+                                    Entra (importato)
                                   </span>
                                 ) : (
                                   <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-                                    Solo rilevato in Entra
+                                    Entra (rilevato)
                                   </span>
                                 )}
-                                <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">
-                                  Entra
-                                </span>
-                              </div>
+                              </button>
                             ))}
                           </div>
                         )}
@@ -398,37 +570,38 @@ export default function AdminUsers() {
                       <div>
                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Azioni</h3>
                         <div className="space-y-2 lg:sticky lg:top-4">
+                          {!canEditUsers && (
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                              Ruolo attuale in sola lettura: le modifiche non sono consentite per questo account.
+                            </div>
+                          )}
+
+                          {getRoleActions(user).map((action) => {
+                            const Icon = action.icon;
+                            return (
+                              <button
+                                key={action.role}
+                                onClick={() => updateRole(user, action.role)}
+                                className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${action.className}`}
+                              >
+                                <Icon className="w-4 h-4" />
+                                {action.label}
+                              </button>
+                            );
+                          })}
+
                           <button
-                            onClick={isComposeLockedAdmin(user) && user.role === 'admin' ? undefined : () => toggleRole(user)}
-                            disabled={isComposeLockedAdmin(user) && user.role === 'admin'}
+                            onClick={!canEditUsers || isComposeLockedAdmin(user) ? undefined : () => toggleActive(user)}
+                            disabled={!canEditUsers || isComposeLockedAdmin(user)}
                             className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                              isComposeLockedAdmin(user) && user.role === 'admin'
-                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                : user.role === 'admin'
-                                  ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                                : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                            }`}
-                          >
-                            {isComposeLockedAdmin(user) && user.role === 'admin' ? (
-                              <><ShieldOff className="w-4 h-4" /> Admin definito da compose</>
-                            ) : user.role === 'admin' ? (
-                              <><ShieldOff className="w-4 h-4" /> Rimuovi admin</>
-                            ) : (
-                              <><Shield className="w-4 h-4" /> Promuovi ad admin</>
-                            )}
-                          </button>
-                          <button
-                            onClick={isComposeLockedAdmin(user) && user.role === 'admin' ? undefined : () => toggleActive(user)}
-                            disabled={isComposeLockedAdmin(user) && user.role === 'admin'}
-                            className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                              isComposeLockedAdmin(user) && user.role === 'admin'
+                              !canEditUsers || isComposeLockedAdmin(user)
                                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                 : user.is_active
                                   ? 'bg-red-50 text-red-600 hover:bg-red-100'
                                   : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                             }`}
                           >
-                            {isComposeLockedAdmin(user) && user.role === 'admin' ? (
+                            {!canEditUsers || isComposeLockedAdmin(user) ? (
                               <><UserX className="w-4 h-4" /> Disattivazione bloccata</>
                             ) : user.is_active ? (
                               <><UserX className="w-4 h-4" /> Disattiva utente</>
@@ -438,20 +611,20 @@ export default function AdminUsers() {
                           </button>
                           <div className="border-t border-gray-100 pt-2 mt-1">
                             <button
-                              onClick={isComposeLockedAdmin(user) ? undefined : () => deleteUser(user)}
-                              disabled={isComposeLockedAdmin(user)}
+                              onClick={!canEditUsers || isComposeLockedAdmin(user) ? undefined : () => deleteUser(user)}
+                              disabled={!canEditUsers || isComposeLockedAdmin(user)}
                               className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                                isComposeLockedAdmin(user)
+                                !canEditUsers || isComposeLockedAdmin(user)
                                   ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                   : 'bg-red-50 text-red-700 hover:bg-red-200'
                               }`}
                             >
-                              <Trash2 className="w-4 h-4" /> {isComposeLockedAdmin(user) ? 'Eliminazione bloccata' : 'Elimina definitivamente'}
+                              <Trash2 className="w-4 h-4" /> {!canEditUsers || isComposeLockedAdmin(user) ? 'Eliminazione bloccata' : 'Elimina definitivamente'}
                             </button>
                             <p className="text-[11px] text-gray-400 mt-1 px-1">Rimuove utente, gruppi e log di accesso</p>
                             {isComposeLockedAdmin(user) && (
                               <p className="text-[11px] text-slate-400 mt-2 px-1">
-                                Questo admin è definito in `ADMIN_EMAILS` nel compose: va prima rimosso da lì.
+                                Questo superadmin è definito in `ADMIN_EMAILS` nel compose: va prima rimosso da lì.
                               </p>
                             )}
                           </div>
@@ -466,7 +639,60 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {showVisibleApps && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setShowVisibleApps(false)}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-dark">App visibili</h2>
+                <p className="text-sm text-gray-500 mt-1">{visibleApps.length} applicazioni disponibili per questo utente</p>
+              </div>
+              <button onClick={() => setShowVisibleApps(false)} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {visibleApps.length === 0 ? (
+              <div className="text-center py-10 text-gray-400">
+                <Users className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                <p className="text-sm font-medium">Nessuna app visibile</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {visibleApps.map((app) => (
+                  <button
+                    key={app.id}
+                    type="button"
+                    onClick={() => window.open(app.url, '_blank', 'noopener')}
+                    className="w-full flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left hover:border-accent hover:bg-accent/5 transition-colors"
+                  >
+                    <AppIcon app={app} className="w-8 h-8" textClassName="text-xl" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-dark truncate">{app.name}</span>
+                        <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">
+                          {app.mode}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400 truncate">{app.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={Boolean(confirmDialog)}
+        title={confirmDialog?.title || ''}
+        message={confirmDialog?.message || ''}
+        confirmLabel={confirmDialog?.confirmLabel || 'Conferma'}
+        busy={confirmBusy}
+        onConfirm={runConfirm}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 }

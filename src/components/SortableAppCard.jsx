@@ -2,7 +2,14 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import AppCard from './AppCard';
 
-export default function SortableAppCard({ app, isFavorite, onToggleFavorite, disabled }) {
+export default function SortableAppCard({
+  app,
+  isFavorite,
+  onToggleFavorite,
+  disabled,
+  showModeBadges,
+  compact,
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: app.id,
     disabled,
@@ -19,6 +26,8 @@ export default function SortableAppCard({ app, isFavorite, onToggleFavorite, dis
       app={app}
       isFavorite={isFavorite}
       onToggleFavorite={onToggleFavorite}
+      showModeBadges={showModeBadges}
+      compact={compact}
       dragHandleProps={disabled ? null : { ...attributes, ...listeners }}
       dragging={isDragging}
       style={style}

@@ -3,10 +3,11 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
-import { authenticate, isAdmin } from '../middleware/auth.js';
+import { logRbacAudit } from '../db.js';
+import { authenticate, isAdminViewer, isAdminEditor } from '../middleware/auth.js';
 import { getRequiredEnv } from '../config.js';
 import { restoreDefaultDemoApps } from '../services/demoApps.js';
-import { iconUrlForApp, parseAppIconPayload, removeAppIconAsset, saveAppIconAsset, serveAppIconForApp } from '../services/appIcons.js';
+import { iconUrlForApp, parseAppIconPayload, readAppIconAssetDataUrl, removeAppIconAsset, saveAppIconAsset, serveAppIconForApp } from '../services/appIcons.js';
 import { getBrandingSettings } from '../services/branding.js';
 
 const router = express.Router();
@@ -133,6 +134,63 @@ router.get('/:slug/entra-redirect', authenticate, (req, res) => {
   res.redirect(launcherUrl);
 });
 
+// Track an access to an app. Frontend fires this fire-and-forget before opening
+// the target URL in a new tab, so we can record access events for apps that
+// don't go through the /sso-redirect (or /entra-redirect) server round-trip
+// (i.e. redirect-plain and shared-cookie modes, which link directly to
+// target_url from the browser).
+router.post('/:slug/track-access', authenticate, (req, res) => {
+  const app = db
+    .prepare('SELECT id FROM apps WHERE slug = ? AND is_active = 1')
+    .get(req.params.slug);
+
+  if (!app) return res.status(404).json({ error: 'App not found' });
+
+  // RBAC check: user must have group permission on this app
+  const hasAccess = db.prepare(`
+    SELECT 1 FROM app_permissions p
+    JOIN user_group_members m ON p.group_id = m.group_id
+    WHERE p.app_id = ? AND m.user_id = ?
+  `).get(app.id, req.user.id);
+  if (!hasAccess) return res.status(403).json({ error: 'Access denied' });
+
+  try {
+    db.prepare(
+      'INSERT INTO access_logs (user_id, app_id, ip_address, user_agent) VALUES (?, ?, ?, ?)'
+    ).run(req.user.id, app.id, req.ip, req.get('user-agent'));
+  } catch (e) {
+    console.error('Access log write failed:', e.message);
+    return res.status(500).json({ error: 'Access log write failed' });
+  }
+
+  res.status(204).end();
+});
+
+router.post('/:id/clone', authenticate, isAdminEditor, async (req, res) => {
+  const existing = db.prepare('SELECT * FROM apps WHERE id = ?').get(req.params.id);
+  if (!existing) {
+    return res.status(404).json({ error: 'App not found' });
+  }
+
+  const groupIds = db.prepare('SELECT group_id FROM app_permissions WHERE app_id = ? ORDER BY group_id')
+    .all(req.params.id)
+    .map((row) => row.group_id);
+  const iconDataUrl = await readAppIconAssetDataUrl(existing);
+
+  res.json({
+    app: {
+      ...existing,
+      id: null,
+      name: buildCloneName(existing.name),
+      slug: buildCloneSlug(existing.slug),
+      iconDataUrl,
+      groupIds,
+      iconUrl: iconUrlForApp(existing),
+      tags: parseTags(existing.tags),
+    },
+  });
+});
+
 // Serve app icon asset (public)
 router.get('/:id/icon', (req, res) => {
   const app = db.prepare('SELECT id, icon_file_name FROM apps WHERE id = ?').get(req.params.id);
@@ -142,18 +200,19 @@ router.get('/:id/icon', (req, res) => {
   return serveAppIconForApp(app, res);
 });
 
-// List ALL apps including inactive (admin only)
-router.get('/all', authenticate, isAdmin, (req, res) => {
+// List ALL apps including inactive (viewer roles only)
+router.get('/all', authenticate, isAdminViewer, (req, res) => {
   const apps = db
     .prepare('SELECT * FROM apps ORDER BY sort_order, name')
     .all();
   res.json({ apps: apps.map((app) => ({ ...app, tags: parseTags(app.tags), iconUrl: iconUrlForApp(app) })) });
 });
 
-// Restore the default demo apps (admin only)
-router.post('/restore-defaults', authenticate, isAdmin, (req, res) => {
+// Restore the default demo apps (editor roles only)
+router.post('/restore-defaults', authenticate, isAdminEditor, (req, res) => {
   try {
     const result = restoreDefaultDemoApps(db, DEFAULT_GROUP_ID);
+    logRbacAudit(req.user.id, 'restore', 'app', null, result);
     res.json({
       message: 'Default demo apps restored',
       ...result,
@@ -238,8 +297,44 @@ async function applyAppIconChange(appId, existingApp, { icon, iconDataUrl, iconS
   };
 }
 
-// Create app (admin only)
-router.post('/', authenticate, isAdmin, async (req, res) => {
+function buildCloneName(originalName) {
+  const base = (originalName || 'App').trim() || 'App';
+  let candidate = `${base} (copia)`;
+  let suffix = 2;
+  while (db.prepare('SELECT id FROM apps WHERE name = ?').get(candidate)) {
+    candidate = `${base} (copia ${suffix})`;
+    suffix += 1;
+  }
+  return candidate;
+}
+
+function buildCloneSlug(originalSlug) {
+  const base = (originalSlug || 'app')
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'app';
+
+  const candidates = [`${base}-copy`, `${base}-copia`];
+  for (const candidate of candidates) {
+    if (!db.prepare('SELECT id FROM apps WHERE slug = ?').get(candidate)) {
+      return candidate;
+    }
+  }
+
+  let suffix = 2;
+  let candidate = `${base}-copy-${suffix}`;
+  while (db.prepare('SELECT id FROM apps WHERE slug = ?').get(candidate)) {
+    suffix += 1;
+    candidate = `${base}-copy-${suffix}`;
+  }
+  return candidate;
+}
+
+// Create app (editor roles only)
+router.post('/', authenticate, isAdminEditor, async (req, res) => {
   let createdAppId = null;
   try {
     const { name, slug, description, long_description, icon, iconDataUrl, iconSvgText, target_url, sort_order, mode, sso_endpoint, sso_method, tags, removeIconAsset, groupIds } = req.body;
@@ -302,6 +397,7 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
     createApp();
 
     const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
+    logRbacAudit(req.user.id, 'create', 'app', id, { name, slug, mode: requestedMode, groupIds: normalizedGroupIds });
     res.status(201).json({ app });
   } catch (error) {
     console.error('Create app failed:', error.message);
@@ -312,8 +408,8 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
   }
 });
 
-// Update app (admin only)
-router.put('/:id', authenticate, isAdmin, async (req, res) => {
+// Update app (editor roles only)
+router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, slug, description, long_description, icon, iconDataUrl, iconSvgText, removeIconAsset, target_url, is_active, sort_order, mode, sso_endpoint, sso_method, tags } = req.body;
@@ -369,6 +465,15 @@ router.put('/:id', authenticate, isAdmin, async (req, res) => {
     `).run(name, slug, description, iconChange.icon, iconChange.icon_file_name, target_url, is_active, sort_order, mode, sso_endpoint, sso_method, long_description, normalizedTags !== undefined ? JSON.stringify(normalizedTags) : null, id);
 
     const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
+    logRbacAudit(req.user.id, 'update', 'app', id, {
+      name,
+      slug,
+      is_active,
+      mode,
+      target_url,
+      sort_order,
+      tags: normalizedTags,
+    });
     res.json({ app });
   } catch (error) {
     console.error('Update app failed:', error.message);
@@ -376,8 +481,50 @@ router.put('/:id', authenticate, isAdmin, async (req, res) => {
   }
 });
 
+// Assign an existing app to one or more groups (admin only)
+router.post('/:id/groups', authenticate, isAdminEditor, (req, res) => {
+  const { id } = req.params;
+  const { groupIds } = req.body;
+
+  const app = db.prepare('SELECT id FROM apps WHERE id = ?').get(id);
+  if (!app) {
+    return res.status(404).json({ error: 'App not found' });
+  }
+
+  const normalizedGroupIds = Array.isArray(groupIds)
+    ? [...new Set(groupIds.filter((groupId) => typeof groupId === 'string' && groupId.trim()))]
+    : [];
+
+  if (normalizedGroupIds.length === 0) {
+    return res.json({ message: 'No groups selected', added: 0 });
+  }
+
+  const placeholders = normalizedGroupIds.map(() => '?').join(', ');
+  const existingGroups = db.prepare(`SELECT id FROM user_groups WHERE id IN (${placeholders})`).all(...normalizedGroupIds);
+  if (existingGroups.length !== normalizedGroupIds.length) {
+    return res.status(400).json({ error: 'One or more selected groups were not found' });
+  }
+
+  const insertPermission = db.prepare('INSERT OR IGNORE INTO app_permissions (app_id, group_id) VALUES (?, ?)');
+  let added = 0;
+  const addAppToGroups = db.transaction(() => {
+    for (const groupId of normalizedGroupIds) {
+      const result = insertPermission.run(id, groupId);
+      added += result.changes || 0;
+    }
+  });
+
+  addAppToGroups();
+
+  if (added > 0) {
+    logRbacAudit(req.user.id, 'add_apps', 'permission', id, { groupIds: normalizedGroupIds, appIds: [id], added });
+  }
+
+  res.json({ message: `${added} group permissions added`, added });
+});
+
 // Delete app (admin only)
-router.delete('/:id', authenticate, isAdmin, (req, res) => {
+router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   const { id } = req.params;
   const existing = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
   if (!existing) {
@@ -391,16 +538,52 @@ router.delete('/:id', authenticate, isAdmin, (req, res) => {
   });
   deleteAll();
   removeAppIconAsset(id).catch((error) => console.error('App icon cleanup failed:', error.message));
+  logRbacAudit(req.user.id, 'delete', 'app', id, { name: existing.name, slug: existing.slug, mode: existing.mode });
   res.json({ message: 'App deleted' });
+});
+
+// Shared API-key guard for bulk endpoints (CLI/automation/server-to-server sync)
+function requireBulkApiKey(req, res) {
+  const expected = process.env.ADMIN_API_KEY;
+  if (!expected) {
+    res.status(503).json({ error: 'ADMIN_API_KEY not configured on server' });
+    return false;
+  }
+  const apiKey = req.headers['x-api-key'];
+  if (!apiKey || apiKey !== expected) {
+    res.status(401).json({ error: 'Invalid or missing API key' });
+    return false;
+  }
+  return true;
+}
+
+// Bulk export apps — authenticated via API key. Returns full metadata for all
+// apps (active + inactive), including description, tags, target_url, mode.
+// Intended for server-to-server sync with external catalogs/audit systems.
+router.get('/bulk', (req, res) => {
+  if (!requireBulkApiKey(req, res)) return;
+
+  const rows = db.prepare(`
+    SELECT id, name, slug, description, long_description, icon, target_url,
+           is_active, sort_order, mode, sso_endpoint, sso_method, tags,
+           created_at, updated_at
+    FROM apps
+    ORDER BY sort_order, name
+  `).all();
+
+  const apps = rows.map((a) => {
+    let tags = [];
+    try { tags = JSON.parse(a.tags || '[]'); } catch { /* ignore */ }
+    return { ...a, tags, is_active: !!a.is_active };
+  });
+
+  res.json({ apps, count: apps.length });
 });
 
 // Bulk upsert apps — authenticated via API key (for CLI/automation)
 // Upserts by slug: creates if not exists, updates if exists
 router.post('/bulk', (req, res) => {
-  const apiKey = req.headers['x-api-key'];
-  if (!apiKey || apiKey !== process.env.ADMIN_API_KEY) {
-    return res.status(401).json({ error: 'Invalid or missing API key' });
-  }
+  if (!requireBulkApiKey(req, res)) return;
 
   const { apps: appList } = req.body;
   if (!Array.isArray(appList)) {

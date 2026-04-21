@@ -1,21 +1,33 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Activity, ChevronLeft, ChevronRight, BarChart3, Users, AppWindow, AlertCircle } from 'lucide-react';
+import { Activity, ChevronLeft, ChevronRight, BarChart3, Users, AppWindow, AlertCircle, Filter } from 'lucide-react';
 import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
 import AppIcon from '../components/AppIcon';
+import ClearableSearchField from '../components/ClearableSearchField';
 
 export default function AdminLogs() {
+  const periodOptions = [1, 7, 14, 30, 60, 90];
   const [logs, setLogs] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [stats, setStats] = useState(null);
   const [topApps, setTopApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [retentionDays, setRetentionDays] = useState(30);
+  const [pageSize, setPageSize] = useState(50);
 
   const loadLogs = useCallback(async (p = 1) => {
     setLoading(true);
     try {
-      const res = await api.get('/logs', { params: { page: p, limit: 50 } });
+      const res = await api.get('/logs', {
+        params: {
+          page: p,
+          limit: pageSize,
+          retention_days: retentionDays,
+          q: search,
+        },
+      });
       setLogs(res.data.logs);
       setPagination(res.data.pagination);
       setStats(res.data.stats);
@@ -23,18 +35,22 @@ export default function AdminLogs() {
       // silently fail
     }
     setLoading(false);
-  }, []);
+  }, [pageSize, retentionDays, search]);
 
   const loadTopApps = useCallback(async () => {
     try {
-      const res = await api.get('/logs/top-apps', { params: { days: 30 } });
+      const res = await api.get('/logs/top-apps', { params: { days: retentionDays } });
       setTopApps(res.data.topApps);
     } catch {
       // silently fail
     }
-  }, []);
+  }, [retentionDays]);
 
-  useEffect(() => { loadLogs(page); }, [loadLogs, page]);
+  useEffect(() => {
+    setPage(1);
+  }, [search, retentionDays, pageSize]);
+
+  useEffect(() => { loadLogs(page); }, [loadLogs, page, search, retentionDays, pageSize]);
   useEffect(() => { loadTopApps(); }, [loadTopApps]);
 
   const formatDate = (iso) => {
@@ -52,6 +68,47 @@ export default function AdminLogs() {
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold text-dark">Log di Accesso</h1>
         <p className="text-gray-500 mt-1">Registro degli accessi SSO alle applicazioni</p>
+      </div>
+
+      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[240px]">
+            <ClearableSearchField
+              value={search}
+              onChange={setSearch}
+              placeholder="Cerca utente, app o IP..."
+            />
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+            <Filter className="w-4 h-4 text-gray-400" />
+            <span>Periodo</span>
+            <select
+              value={retentionDays}
+              onChange={(e) => setRetentionDays(parseInt(e.target.value, 10))}
+              className="bg-transparent text-sm font-medium text-dark focus:outline-none"
+            >
+              {periodOptions.map((days) => (
+                <option key={days} value={days}>
+                  {days === 1 ? '1 giorno' : `${days} giorni`}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+            <span className="text-gray-400">Righe</span>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
+              className="bg-transparent text-sm font-medium text-dark focus:outline-none"
+            >
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={150}>150</option>
+              <option value={200}>200</option>
+              <option value={250}>250</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* Stats cards */}
@@ -97,7 +154,7 @@ export default function AdminLogs() {
       {topApps.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-            <BarChart3 className="w-4 h-4" /> Top App (ultimi 30 giorni)
+            <BarChart3 className="w-4 h-4" /> Top App (ultimi {retentionDays} giorni)
           </h2>
           <div className="space-y-2">
             {topApps.map((app, i) => {
@@ -156,7 +213,7 @@ export default function AdminLogs() {
                 <tbody>
                   {logs.map((log) => (
                     <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="px-5 py-3 text-xs text-gray-500 whitespace-nowrap">{formatDate(log.created_at)}</td>
+                      <td className="px-5 py-3 text-xs text-gray-500 whitespace-nowrap">{log.created_at_local || formatDate(log.created_at)}</td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
                           <UserAvatar

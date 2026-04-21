@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react';
 
+const AVATAR_CACHE_VERSION_KEY = 'frontdoor_avatar_cache_version';
+
+function getAvatarCacheVersion() {
+  try {
+    return window.localStorage.getItem(AVATAR_CACHE_VERSION_KEY) || '0';
+  } catch {
+    return '0';
+  }
+}
+
 function getInitials(name) {
   return (name || '?')
     .split(/\s+/)
@@ -19,12 +29,23 @@ export default function UserAvatar({
   initialsClassName = 'text-xs',
 }) {
   const [loadFailed, setLoadFailed] = useState(false);
-  const avatarSrc = userId ? `/api/users/${encodeURIComponent(userId)}/avatar` : null;
+  const [cacheVersion, setCacheVersion] = useState(getAvatarCacheVersion());
+  const avatarSrc = userId ? `/api/users/${encodeURIComponent(userId)}/avatar?v=${encodeURIComponent(cacheVersion)}` : null;
   const showImage = Boolean(avatarSrc) && !loadFailed;
 
   useEffect(() => {
     setLoadFailed(false);
   }, [avatarSrc]);
+
+  useEffect(() => {
+    const refreshCacheVersion = () => setCacheVersion(getAvatarCacheVersion());
+    window.addEventListener('frontdoor:avatar-cache-refresh', refreshCacheVersion);
+    window.addEventListener('storage', refreshCacheVersion);
+    return () => {
+      window.removeEventListener('frontdoor:avatar-cache-refresh', refreshCacheVersion);
+      window.removeEventListener('storage', refreshCacheVersion);
+    };
+  }, []);
 
   return (
     <div

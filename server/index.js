@@ -11,8 +11,9 @@ import brandingRoutes from './routes/branding.js';
 import appsRoutes from './routes/apps.js';
 import usersRoutes from './routes/users.js';
 import groupsRoutes from './routes/groups.js';
-import logsRoutes from './routes/logs.js';
+import logsRoutes, { purgeLogsOlderThan } from './routes/logs.js';
 import { getStartupConfig, validateStartupEnv } from './config.js';
+import { getBrandingSettings } from './services/branding.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -34,6 +35,18 @@ const startupErrors = [...missing.map((name) => `${name} is missing`), ...errors
 if (startupErrors.length > 0) {
   console.error(`Frontdoor startup error: ${startupErrors.join('; ')}`);
   process.exit(1);
+}
+
+function runLogRetentionPurge() {
+  try {
+    const retentionDays = getBrandingSettings().logRetentionDays ?? 90;
+    const { accessRemoved, auditRemoved } = purgeLogsOlderThan(retentionDays);
+    if (accessRemoved > 0 || auditRemoved > 0) {
+      console.log(`Frontdoor log retention purge: removed ${accessRemoved} access logs and ${auditRemoved} audit logs older than ${retentionDays} days`);
+    }
+  } catch (error) {
+    console.error(`Frontdoor log retention purge failed: ${error.message}`);
+  }
 }
 
 app.set('trust proxy', 1);
@@ -118,4 +131,7 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Frontdoor running on port ${PORT}`);
+  runLogRetentionPurge();
+  const dailyRetentionTimer = setInterval(runLogRetentionPurge, 24 * 60 * 60 * 1000);
+  dailyRetentionTimer.unref?.();
 });

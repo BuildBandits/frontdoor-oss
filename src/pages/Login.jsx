@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import BrandMark from '../components/BrandMark';
@@ -8,6 +8,16 @@ export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { isAuthenticated, loginWithToken } = useAuthStore();
+  const [branding, setBranding] = useState(null);
+  const [brandingLoading, setBrandingLoading] = useState(true);
+  const error = searchParams.get('error');
+
+  useEffect(() => {
+    api.get('/branding')
+      .then((res) => setBranding(res.data.branding || null))
+      .catch(() => setBranding(null))
+      .finally(() => setBrandingLoading(false));
+  }, []);
 
   useEffect(() => {
     // If already authenticated, redirect to home
@@ -19,7 +29,6 @@ export default function Login() {
     // Handle SSO callback: token is in httpOnly cookie, fetch profile via /api/auth/me
     // to avoid passing PII (email, role) through the URL.
     const ssoOk = searchParams.get('sso');
-
     if (ssoOk === 'ok') {
       api.get('/auth/me').then((res) => {
         loginWithToken(null, res.data.user);
@@ -35,10 +44,13 @@ export default function Login() {
       }).catch(() => {
         // /api/auth/me failed — cookie may not have been set correctly, stay on login page
       });
+      return;
     }
-  }, [searchParams, isAuthenticated, loginWithToken, navigate]);
 
-  const error = searchParams.get('error');
+    if (!brandingLoading && branding?.hideLoginPage && !error && !ssoOk) {
+      window.location.href = '/api/auth/microsoft';
+    }
+  }, [searchParams, error, isAuthenticated, loginWithToken, navigate, branding, brandingLoading]);
 
   const handleSSOLogin = () => {
     window.location.href = '/api/auth/microsoft';
@@ -61,6 +73,12 @@ export default function Login() {
           */}
         </div>
 
+        {brandingLoading && (
+          <div className="mb-6 p-4 bg-white border border-gray-200 rounded-xl text-gray-500 text-sm text-center">
+            Caricamento autenticazione...
+          </div>
+        )}
+
         {/* Error message */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm text-center">
@@ -73,19 +91,20 @@ export default function Login() {
           </div>
         )}
 
-        {/* SSO Button */}
-        <button
-          onClick={handleSSOLogin}
-          className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-dark text-white rounded-xl font-semibold text-lg hover:bg-gray-800 transition-colors cursor-pointer"
-        >
-          <svg width="21" height="21" viewBox="0 0 21 21" fill="none">
-            <rect width="10" height="10" fill="#F25022" />
-            <rect x="11" width="10" height="10" fill="#7FBA00" />
-            <rect y="11" width="10" height="10" fill="#00A4EF" />
-            <rect x="11" y="11" width="10" height="10" fill="#FFB900" />
-          </svg>
-          Accedi
-        </button>
+        {!branding?.hideLoginPage && (
+          <button
+            onClick={handleSSOLogin}
+            className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-dark text-white rounded-xl font-semibold text-lg hover:bg-gray-800 transition-colors cursor-pointer"
+          >
+            <svg width="21" height="21" viewBox="0 0 21 21" fill="none">
+              <rect width="10" height="10" fill="#F25022" />
+              <rect x="11" width="10" height="10" fill="#7FBA00" />
+              <rect y="11" width="10" height="10" fill="#00A4EF" />
+              <rect x="11" y="11" width="10" height="10" fill="#FFB900" />
+            </svg>
+            Accedi
+          </button>
+        )}
       </div>
     </div>
   );

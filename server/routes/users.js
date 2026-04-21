@@ -1,7 +1,9 @@
 import express from 'express';
 import db from '../db.js';
-import { authenticate, isAdmin } from '../middleware/auth.js';
+import { logRbacAudit } from '../db.js';
+import { authenticate, isAdminViewer, isAdminEditor, ROLE_SUPERADMIN } from '../middleware/auth.js';
 import { ensureAvatarCached, serveAvatarForUser } from '../services/avatars.js';
+import { iconUrlForApp } from '../services/appIcons.js';
 
 const router = express.Router();
 const composeAdminEmails = new Set(
@@ -12,9 +14,19 @@ const composeAdminEmails = new Set(
 );
 
 const isComposeLockedAdmin = (email) => composeAdminEmails.has((email || '').trim().toLowerCase());
+const isEditorRole = (role) => ['superadmin', 'admin'].includes(role);
+const resolveAppUrl = (app) => (app.mode === 'redirect'
+  ? `/api/apps/${app.slug}/sso-redirect`
+  : app.mode === 'entra-app'
+    ? `/api/apps/${app.slug}/entra-redirect`
+    : app.target_url);
 
-// List users with group membership counts (admin only)
-router.get('/', authenticate, isAdmin, (req, res) => {
+const remainingEditorCountExcluding = (userId) => db
+  .prepare("SELECT COUNT(*) AS count FROM users WHERE role IN ('superadmin', 'admin') AND is_active = 1 AND id != ?")
+  .get(userId).count;
+
+// List users with group membership counts (viewer roles only)
+router.get('/', authenticate, isAdminViewer, (req, res) => {
   const users = db
     .prepare(`
       SELECT u.id, u.email, u.display_name, u.role, u.avatar_color, u.is_active, u.last_login, u.created_at,
@@ -46,8 +58,8 @@ router.get('/:id/avatar', authenticate, async (req, res) => {
   }
 });
 
-// Get single user with group memberships (admin only)
-router.get('/:id', authenticate, isAdmin, (req, res) => {
+// Get single user with group memberships (viewer roles only)
+router.get('/:id', authenticate, isAdminViewer, (req, res) => {
   const user = db
     .prepare('SELECT id, email, display_name, role, avatar_color, is_active, last_login, created_at FROM users WHERE id = ?')
     .get(req.params.id);
@@ -84,13 +96,20 @@ router.get('/:id', authenticate, isAdmin, (req, res) => {
     is_imported: Boolean(row.local_group_id),
   }));
 
-  // Count visible apps (distinct apps from all user's groups)
   const visibleApps = db.prepare(`
-    SELECT COUNT(DISTINCT p.app_id) AS count
-    FROM app_permissions p
+    SELECT DISTINCT a.id, a.name, a.slug, a.description, a.long_description, a.icon, a.icon_file_name, a.target_url, a.mode, a.sso_endpoint, a.sso_method, a.tags, a.updated_at
+    FROM apps a
+    JOIN app_permissions p ON a.id = p.app_id
     JOIN user_group_members m ON p.group_id = m.group_id
     WHERE m.user_id = ?
-  `).get(req.params.id);
+    ORDER BY a.sort_order, a.name
+  `).all(req.params.id);
+
+  const visibleAppsWithUrls = visibleApps.map((app) => ({
+    ...app,
+    url: resolveAppUrl(app),
+    iconUrl: iconUrlForApp(app),
+  }));
 
   res.json({
     user: {
@@ -99,17 +118,18 @@ router.get('/:id', authenticate, isAdmin, (req, res) => {
     },
     groups,
     entraGroups,
-    visibleAppCount: visibleApps.count,
+    visibleAppCount: visibleAppsWithUrls.length,
+    visibleApps: visibleAppsWithUrls,
   });
 });
 
-// Update user role (admin only)
-router.put('/:id/role', authenticate, isAdmin, (req, res) => {
+// Update user role (editor roles only)
+router.put('/:id/role', authenticate, isAdminEditor, (req, res) => {
   const { id } = req.params;
   const { role } = req.body;
 
-  if (!['admin', 'user'].includes(role)) {
-    return res.status(400).json({ error: 'role must be admin or user' });
+  if (!['superadmin', 'admin', 'admin_readonly', 'user'].includes(role)) {
+    return res.status(400).json({ error: 'role must be superadmin, admin, admin_readonly or user' });
   }
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
@@ -117,24 +137,25 @@ router.put('/:id/role', authenticate, isAdmin, (req, res) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  if (user.role === 'admin' && isComposeLockedAdmin(user.email) && role !== 'admin') {
-    return res.status(400).json({ error: 'Compose admin cannot be demoted from the webapp' });
+  if (isComposeLockedAdmin(user.email) && role !== ROLE_SUPERADMIN) {
+    return res.status(400).json({ error: 'Compose superadmin cannot be changed from the webapp' });
   }
 
-  // Prevent last admin from demoting themselves
-  if (role === 'user' && user.role === 'admin' && id === req.user.id) {
-    const adminCount = db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND is_active = 1").get().count;
-    if (adminCount <= 1) {
-      return res.status(400).json({ error: 'Cannot demote the last active admin' });
-    }
+  if (role === ROLE_SUPERADMIN && !isComposeLockedAdmin(user.email)) {
+    return res.status(400).json({ error: 'Superadmin can only be assigned from compose/run' });
+  }
+
+  if (isEditorRole(user.role) && !isEditorRole(role) && remainingEditorCountExcluding(id) === 0) {
+    return res.status(400).json({ error: 'Cannot remove the last active admin editor' });
   }
 
   db.prepare('UPDATE users SET role = ?, updated_at = datetime(\'now\') WHERE id = ?').run(role, id);
+  logRbacAudit(req.user.id, 'update', 'role', id, { email: user.email, from: user.role, to: role });
   res.json({ message: 'Role updated' });
 });
 
-// Activate/deactivate user (admin only)
-router.put('/:id/active', authenticate, isAdmin, (req, res) => {
+// Activate/deactivate user (editor roles only)
+router.put('/:id/active', authenticate, isAdminEditor, (req, res) => {
   const { id } = req.params;
   const { is_active } = req.body;
 
@@ -150,7 +171,7 @@ router.put('/:id/active', authenticate, isAdmin, (req, res) => {
   const activeValue = is_active ? 1 : 0;
 
   if (isComposeLockedAdmin(user.email) && !activeValue) {
-    return res.status(400).json({ error: 'Compose admin cannot be deactivated from the webapp' });
+    return res.status(400).json({ error: 'Compose superadmin cannot be deactivated from the webapp' });
   }
 
   // Prevent deactivating yourself
@@ -158,20 +179,18 @@ router.put('/:id/active', authenticate, isAdmin, (req, res) => {
     return res.status(400).json({ error: 'Cannot deactivate yourself' });
   }
 
-  // Prevent deactivating last admin
-  if (!activeValue && user.role === 'admin') {
-    const adminCount = db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND is_active = 1").get().count;
-    if (adminCount <= 1) {
-      return res.status(400).json({ error: 'Cannot deactivate the last active admin' });
-    }
+  // Prevent deactivating the last active admin editor
+  if (!activeValue && isEditorRole(user.role) && remainingEditorCountExcluding(id) === 0) {
+    return res.status(400).json({ error: 'Cannot deactivate the last active admin editor' });
   }
 
   db.prepare('UPDATE users SET is_active = ?, updated_at = datetime(\'now\') WHERE id = ?').run(activeValue, id);
+  logRbacAudit(req.user.id, activeValue ? 'activate' : 'deactivate', 'user_status', id, { email: user.email, role: user.role });
   res.json({ message: is_active ? 'User activated' : 'User deactivated' });
 });
 
-// Delete user permanently (admin only) — cascades membership and access logs
-router.delete('/:id', authenticate, isAdmin, (req, res) => {
+// Delete user permanently (editor roles only) — cascades membership and access logs
+router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   const { id } = req.params;
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
@@ -185,15 +204,12 @@ router.delete('/:id', authenticate, isAdmin, (req, res) => {
   }
 
   if (isComposeLockedAdmin(user.email)) {
-    return res.status(400).json({ error: 'Compose admin cannot be deleted from the webapp' });
+    return res.status(400).json({ error: 'Compose superadmin cannot be deleted from the webapp' });
   }
 
-  // Prevent deleting last admin
-  if (user.role === 'admin') {
-    const adminCount = db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND is_active = 1").get().count;
-    if (adminCount <= 1) {
-      return res.status(400).json({ error: 'Cannot delete the last active admin' });
-    }
+  // Prevent deleting the last active admin editor
+  if (isEditorRole(user.role) && remainingEditorCountExcluding(id) === 0) {
+    return res.status(400).json({ error: 'Cannot delete the last active admin editor' });
   }
 
   const deleteAll = db.transaction(() => {
@@ -202,6 +218,7 @@ router.delete('/:id', authenticate, isAdmin, (req, res) => {
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
   });
   deleteAll();
+  logRbacAudit(req.user.id, 'delete', 'user_status', id, { email: user.email, role: user.role });
 
   res.json({ message: 'User deleted' });
 });

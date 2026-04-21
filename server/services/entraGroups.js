@@ -24,6 +24,10 @@ function sanitizeGroupName(name) {
   return clean || 'Entra group';
 }
 
+function sanitizeOptionalText(value) {
+  return (value || '').toString().replace(/<[^>]*>/g, '').trim().replace(/\s+/g, ' ') || null;
+}
+
 function resolveUniqueEntraGroupName(displayName, entraGroupId, reservedNames = new Set(), currentGroupName = null) {
   const baseName = sanitizeGroupName(displayName);
   const candidates = [
@@ -106,6 +110,7 @@ function normalizeGraphGroups(groups) {
     seen.set(group.id, {
       id: group.id,
       displayName: sanitizeGroupName(group.displayName || group.id),
+      description: sanitizeOptionalText(group.description),
     });
   }
   return [...seen.values()];
@@ -115,7 +120,11 @@ function formatGraphAccessHint(error, context) {
   if (!error || (error.status !== 401 && error.status !== 403)) return null;
 
   if (context === 'force-sync') {
-    return 'Check Microsoft Graph application permission User.Read.All and grant admin consent for app-only membership reads.';
+    return 'Check Microsoft Graph application permission GroupMember.Read.All and grant admin consent for app-only group membership reads.';
+  }
+
+  if (context === 'login-discovery') {
+    return 'Check Microsoft Graph application permission GroupMember.Read.All and grant admin consent so the app can read the signed-in user\'s group memberships via an app-only token.';
   }
 
   return 'Check Microsoft Graph delegated permissions for /me/transitiveMemberOf and grant admin consent if your tenant requires it.';
@@ -123,15 +132,16 @@ function formatGraphAccessHint(error, context) {
 
 function upsertDiscoveredGroups(groups, seenAt) {
   const stmt = db.prepare(`
-    INSERT INTO entra_group_cache (entra_group_id, display_name, first_seen_at, last_seen_at)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO entra_group_cache (entra_group_id, display_name, description, first_seen_at, last_seen_at)
+    VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(entra_group_id) DO UPDATE SET
       display_name = excluded.display_name,
+      description = excluded.description,
       last_seen_at = excluded.last_seen_at
   `);
 
   for (const group of groups) {
-    stmt.run(group.id, group.displayName, seenAt, seenAt);
+    stmt.run(group.id, group.displayName, group.description || null, seenAt, seenAt);
   }
 
   return groups.length;
@@ -176,7 +186,7 @@ function syncImportedMemberships(userId, groups, syncedAt) {
       const resolvedName = resolveUniqueEntraGroupName(group.displayName, group.id, reservedNames, importedGroup.name);
       importedGroupUpdate.run(
         resolvedName,
-        'Imported from Microsoft Entra',
+        group.description || 'No description available on Entra',
         group.displayName,
         syncedAt,
         importedGroup.id
@@ -193,7 +203,7 @@ export async function fetchUserEntraGroups(accessToken) {
   if (!isEntraGroupSyncEnabled()) return [];
 
   const groups = [];
-  let nextUrl = `${GRAPH_BASE_URL}/me/transitiveMemberOf/microsoft.graph.group?$select=id,displayName`;
+  let nextUrl = `${GRAPH_BASE_URL}/me/transitiveMemberOf/microsoft.graph.group?$select=id,displayName,description`;
 
   while (nextUrl) {
     const payload = await fetchGraphPage(nextUrl, accessToken);
@@ -202,6 +212,7 @@ export async function fetchUserEntraGroups(accessToken) {
         groups.push({
           id: group.id,
           displayName: group.displayName || group.id,
+          description: group.description || null,
         });
       }
     }
@@ -215,7 +226,7 @@ export async function fetchEntraGroupsForUserId(graphUserId, accessToken) {
   if (!isEntraGroupSyncEnabled()) return [];
 
   const groups = [];
-  let nextUrl = `${GRAPH_BASE_URL}/users/${encodeURIComponent(graphUserId)}/transitiveMemberOf/microsoft.graph.group?$select=id,displayName`;
+  let nextUrl = `${GRAPH_BASE_URL}/users/${encodeURIComponent(graphUserId)}/transitiveMemberOf/microsoft.graph.group?$select=id,displayName,description`;
 
   while (nextUrl) {
     const payload = await fetchGraphPage(nextUrl, accessToken);
@@ -224,6 +235,7 @@ export async function fetchEntraGroupsForUserId(graphUserId, accessToken) {
         groups.push({
           id: group.id,
           displayName: group.displayName || group.id,
+          description: group.description || null,
         });
       }
     }
@@ -231,6 +243,70 @@ export async function fetchEntraGroupsForUserId(graphUserId, accessToken) {
   }
 
   return normalizeGraphGroups(groups);
+}
+
+export async function discoverEntraGroupsForUser(graphUserId) {
+  if (!isEntraGroupSyncEnabled()) return [];
+  if (!graphUserId) return [];
+  const appToken = await acquireGraphAppToken();
+  return fetchEntraGroupsForUserId(graphUserId, appToken);
+}
+
+export async function fetchAllTenantGroups(accessToken) {
+  if (!isEntraGroupSyncEnabled()) return [];
+
+  const groups = [];
+  let nextUrl = `${GRAPH_BASE_URL}/groups?$select=id,displayName,description&$top=999`;
+
+  while (nextUrl) {
+    const payload = await fetchGraphPage(nextUrl, accessToken);
+    for (const group of payload.value || []) {
+      if (group?.id) {
+        groups.push({
+          id: group.id,
+          displayName: group.displayName || group.id,
+          description: group.description || null,
+        });
+      }
+    }
+    nextUrl = payload['@odata.nextLink'] || null;
+  }
+
+  return normalizeGraphGroups(groups);
+}
+
+export async function refreshGroupCacheFromTenant() {
+  if (!isEntraGroupSyncEnabled()) {
+    return { discoveredGroups: 0 };
+  }
+  const appToken = await acquireGraphAppToken();
+  const groups = await fetchAllTenantGroups(appToken);
+  const syncAt = new Date().toISOString();
+  const syncTransaction = db.transaction(() => upsertDiscoveredGroups(groups, syncAt));
+  const discoveredGroups = syncTransaction();
+  return { discoveredGroups };
+}
+
+export async function fetchTransitiveMembersForGroupId(graphGroupId, accessToken) {
+  if (!isEntraGroupSyncEnabled()) return [];
+
+  const users = [];
+  let nextUrl = `${GRAPH_BASE_URL}/groups/${encodeURIComponent(graphGroupId)}/transitiveMembers/microsoft.graph.user?$select=id,displayName,mail,userPrincipalName`;
+
+  while (nextUrl) {
+    const payload = await fetchGraphPage(nextUrl, accessToken);
+    for (const user of payload.value || []) {
+      if (user?.id) {
+        users.push({
+          id: user.id,
+          displayName: user.displayName || user.mail || user.userPrincipalName || user.id,
+        });
+      }
+    }
+    nextUrl = payload['@odata.nextLink'] || null;
+  }
+
+  return [...new Map(users.map((user) => [user.id, user])).values()];
 }
 
 export function syncUserEntraGroups(userId, entraGroups) {
@@ -256,6 +332,7 @@ export function listDiscoveredEntraGroups() {
     SELECT
       c.entra_group_id,
       c.display_name,
+      c.description,
       c.first_seen_at,
       c.last_seen_at,
       g.id AS local_group_id,
@@ -278,6 +355,7 @@ export function listDiscoveredEntraGroups() {
     ORDER BY c.display_name
   `).all().map((row) => ({
     ...row,
+    description: row.description || null,
     is_imported: Boolean(row.is_imported),
     synced_member_count: Number(row.synced_member_count || 0),
   }));
@@ -294,7 +372,7 @@ export function importEntraGroups(groupIds) {
   }
 
   const now = new Date().toISOString();
-  const cacheLookup = db.prepare('SELECT entra_group_id, display_name FROM entra_group_cache WHERE entra_group_id = ?');
+  const cacheLookup = db.prepare('SELECT entra_group_id, display_name, description FROM entra_group_cache WHERE entra_group_id = ?');
   const existingGroups = db.prepare("SELECT id, name, entra_group_id FROM user_groups WHERE source = 'entra'").all();
   const reservedNames = new Set(db.prepare('SELECT name FROM user_groups').all().map((row) => row.name));
   const membershipBackfill = db.prepare(`
@@ -333,7 +411,7 @@ export function importEntraGroups(groupIds) {
       importedGroupUpsert.run(
         entraGroupId,
         name,
-        'Imported from Microsoft Entra',
+        cacheRow.description || 'No description available on Entra',
         entraGroupId,
         cacheRow.display_name,
         now
@@ -362,7 +440,6 @@ export async function forceSyncAllEntraUsers() {
     };
   }
 
-  const accessToken = await acquireGraphAppToken();
   const users = db.prepare(`
     SELECT id, email, microsoft_id
     FROM users
@@ -370,31 +447,44 @@ export async function forceSyncAllEntraUsers() {
     ORDER BY email
   `).all();
 
+  const errors = [];
+  const accessToken = await acquireGraphAppToken();
+
+  let tenantGroupsDiscovered = 0;
+  try {
+    const tenantGroups = await fetchAllTenantGroups(accessToken);
+    const syncAt = new Date().toISOString();
+    const tx = db.transaction(() => upsertDiscoveredGroups(tenantGroups, syncAt));
+    tenantGroupsDiscovered = tx();
+  } catch (error) {
+    const hint = formatGraphAccessHint(error, 'force-sync');
+    errors.push({
+      scope: 'tenant-groups',
+      message: error.message,
+      ...(hint ? { hint } : {}),
+    });
+  }
+
   if (users.length === 0) {
     return {
       usersConsidered: 0,
       usersSynced: 0,
-      discoveredGroups: 0,
+      discoveredGroups: tenantGroupsDiscovered,
       membershipsAdded: 0,
       membershipsRemoved: 0,
-      errors: [{
+      errors: errors.length > 0 ? errors : [{
         message: 'No users are linked to Microsoft Entra yet. Ask users to log in once first.',
       }],
     };
   }
 
   let usersSynced = 0;
-  const discoveredGroupIds = new Set();
   let membershipsAdded = 0;
   let membershipsRemoved = 0;
-  const errors = [];
 
   for (const user of users) {
     try {
       const groups = await fetchEntraGroupsForUserId(user.microsoft_id, accessToken);
-      for (const group of groups) {
-        discoveredGroupIds.add(group.id);
-      }
       const result = syncUserEntraGroups(user.id, groups);
       usersSynced += 1;
       membershipsAdded += result.membershipsAdded;
@@ -403,7 +493,7 @@ export async function forceSyncAllEntraUsers() {
       const hint = formatGraphAccessHint(error, 'force-sync');
       errors.push({
         userId: user.id,
-        email: user.email,
+        microsoftId: user.microsoft_id,
         message: error.message,
         ...(hint ? { hint } : {}),
       });
@@ -413,7 +503,7 @@ export async function forceSyncAllEntraUsers() {
   return {
     usersConsidered: users.length,
     usersSynced,
-    discoveredGroups: discoveredGroupIds.size,
+    discoveredGroups: tenantGroupsDiscovered,
     membershipsAdded,
     membershipsRemoved,
     errors,

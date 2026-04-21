@@ -204,6 +204,7 @@ export default function Home() {
 
   const showModeBadges = branding?.showAppModeBadges !== false;
   const compactView = compactViewOverride ?? branding?.defaultCompactView ?? false;
+  const showHero = branding?.showHomeHero !== false;
 
   const filtersActive = search.trim().length > 0 || selectedTags.length > 0;
   const dragEnabled = !groupByTag && !filtersActive && !compactView;
@@ -279,6 +280,7 @@ export default function Home() {
                 app={app}
                 isFavorite={favoritesSet.has(app.id)}
                 onToggleFavorite={toggleFavorite}
+                showModeBadges={showModeBadges}
               />
             ))}
           </div>
@@ -292,46 +294,45 @@ export default function Home() {
   return (
     <div>
       {/* Hero section */}
-      <div className="bg-gradient-to-br from-accent/30 via-accent/10 to-transparent rounded-3xl p-8 md:p-12 mb-10 overflow-hidden">
-        <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-          <div>
-            <h1 className="text-3xl md:text-5xl font-extrabold text-dark leading-tight mb-4">
-              {brandingLoading || !branding ? (
-                <>
-                  Le tue applicazioni,<br />
-                  <span className="text-dark/70">tutte in un unico posto.</span>
-                </>
-              ) : (
-                <>
-                  {branding.heroTitleLine1}<br />
-                  <span className="text-dark/70">{branding.heroTitleLine2}</span>
-                </>
-              )}
-            </h1>
-            {/*
-              Sottotitolo temporaneamente lasciato come branding amministrabile.
-              Se in futuro vogliamo semplificarlo ulteriormente, lo possiamo riattivare da Personalizza.
-            */}
-            <p className="text-gray-600 text-lg max-w-xl">
-              {brandingLoading || !branding ? (
-                'Accedi rapidamente a tutti gli strumenti e le piattaforme del tuo workspace.'
-              ) : (
-                branding.heroSubtitle
-              )}
-            </p>
-          </div>
-
-          {branding?.logoUrl && (
-            <div className="hidden md:flex items-center justify-center px-2 py-2 min-h-[160px] min-w-[240px]">
-              <img
-                src={branding.logoUrl}
-                alt="Company logo"
-                className="max-h-24 max-w-[240px] object-contain"
-              />
+      {showHero && (
+        <div className="bg-gradient-to-br from-accent/30 via-accent/10 to-transparent rounded-3xl p-6 md:p-8 mb-8 overflow-hidden">
+          <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+            <div>
+              <h1 className="text-2xl md:text-4xl font-extrabold text-dark leading-tight mb-3">
+                {brandingLoading || !branding ? (
+                  <>
+                    Le tue applicazioni,<br />
+                    <span className="text-dark/70">tutte in un unico posto.</span>
+                  </>
+                ) : (
+                  <>
+                    {branding.heroTitleLine1}<br />
+                    <span className="text-dark/70">{branding.heroTitleLine2}</span>
+                  </>
+                )}
+              </h1>
+              {/* Sottotitolo temporaneamente lasciato come branding amministrabile. */}
+              <p className="text-gray-600 text-base md:text-lg max-w-xl">
+                {brandingLoading || !branding ? (
+                  'Accedi rapidamente a tutti gli strumenti e le piattaforme del tuo workspace.'
+                ) : (
+                  branding.heroSubtitle
+                )}
+              </p>
             </div>
-          )}
+
+            {branding?.logoUrl && (
+              <div className="hidden md:flex items-center justify-center px-2 py-2 min-h-[120px] min-w-[200px]">
+                <img
+                  src={branding.logoUrl}
+                  alt="Company logo"
+                  className="max-h-20 max-w-[220px] object-contain"
+                />
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Search + toggles + tag filters */}
       <div className="mb-8 space-y-3">

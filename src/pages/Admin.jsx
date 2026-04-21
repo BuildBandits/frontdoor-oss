@@ -1,12 +1,20 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Pencil, Trash2, X, RefreshCw, Save } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, RefreshCw, Save, Copy, Users, ChevronDown, ChevronUp, Check, SlidersHorizontal } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useAuthStore } from '../stores/authStore';
 import TagInput from '../components/TagInput';
 import AppIcon from '../components/AppIcon';
+import PageNotice from '../components/PageNotice';
+import ConfirmDialog from '../components/ConfirmDialog';
+import ClearableSearchField from '../components/ClearableSearchField';
 
-const emptyApp = { name: '', slug: '', description: '', long_description: '', icon: '📦', target_url: '', sort_order: 0, mode: 'redirect-plain', sso_endpoint: '/sso', sso_method: 'GET', tags: [] };
+const emptyApp = { name: '', slug: '', description: '', long_description: '', icon: '📦', target_url: '', sort_order: 0, mode: 'redirect-plain', sso_endpoint: '', sso_method: 'GET', tags: [] };
+const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
 
 export default function Admin() {
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
   const [apps, setApps] = useState([]);
   const [groups, setGroups] = useState([]);
   const [branding, setBranding] = useState(null);
@@ -21,9 +29,57 @@ export default function Admin() {
   const [iconAssetPreview, setIconAssetPreview] = useState('');
   const [iconSvgText, setIconSvgText] = useState('');
   const [removeIconAsset, setRemoveIconAsset] = useState(false);
-  const [selectedGroupIds, setSelectedGroupIds] = useState([]);
-  const [groupSearch, setGroupSearch] = useState('');
+  const [includeDefaultGroup, setIncludeDefaultGroup] = useState(true);
+  const [clonedGroupIds, setClonedGroupIds] = useState([]);
+  const [pendingGroupAssignApp, setPendingGroupAssignApp] = useState(null);
+  const [groupAssignSearch, setGroupAssignSearch] = useState('');
+  const [groupAssignSelection, setGroupAssignSelection] = useState([]);
+  const [assigningGroups, setAssigningGroups] = useState(false);
+  const [appSearch, setAppSearch] = useState('');
+  const [appModeFilter, setAppModeFilter] = useState('all');
+  const [modeFilterOpen, setModeFilterOpen] = useState(false);
+  const [appSort, setAppSort] = useState({ key: 'sort_order', direction: 'asc' });
+  const [pageNotice, setPageNotice] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [cloning, setCloning] = useState(false);
   const iconFileInputRef = useRef(null);
+  const modeFilterRef = useRef(null);
+  const canEdit = user?.role !== 'admin_readonly';
+
+  useEffect(() => {
+    if (!pageNotice) return undefined;
+    const timer = setTimeout(() => setPageNotice(null), 5000);
+    return () => clearTimeout(timer);
+  }, [pageNotice]);
+
+  useEffect(() => {
+    if (!modeFilterOpen) return undefined;
+    const onMouseDown = (event) => {
+      if (modeFilterRef.current && !modeFilterRef.current.contains(event.target)) {
+        setModeFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [modeFilterOpen]);
+
+  const pushNotice = (type, message) => setPageNotice({ type, message });
+  const openConfirm = (dialog) => setConfirmDialog(dialog);
+  const closeConfirm = () => {
+    if (confirmBusy) return;
+    setConfirmDialog(null);
+  };
+  const runConfirm = async () => {
+    if (!confirmDialog?.onConfirm) return;
+    setConfirmBusy(true);
+    try {
+      await confirmDialog.onConfirm();
+    } finally {
+      setConfirmBusy(false);
+      setConfirmDialog(null);
+    }
+  };
 
   const loadApps = () => {
     api.get('/apps/all').then((res) => {
@@ -55,18 +111,26 @@ export default function Admin() {
   }, []);
 
   const openNew = () => {
+    if (!canEdit) {
+      pushNotice('error', 'Questa pagina è in sola lettura.');
+      return;
+    }
     setForm(emptyApp);
     setIconMode('emoji');
     setIconAssetDataUrl('');
     setIconAssetPreview('');
     setIconSvgText('');
     setRemoveIconAsset(false);
-    setSelectedGroupIds([]);
-    setGroupSearch('');
+    setIncludeDefaultGroup(true);
+    setClonedGroupIds([]);
     setEditing('new');
   };
 
   const openEdit = (app) => {
+    if (!canEdit) {
+      pushNotice('error', 'Questa pagina è in sola lettura.');
+      return;
+    }
     setForm({
       name: app.name,
       slug: app.slug,
@@ -75,7 +139,7 @@ export default function Admin() {
       target_url: app.target_url,
       sort_order: app.sort_order || 0,
       mode: app.mode || 'redirect-plain',
-      sso_endpoint: app.sso_endpoint || '/sso',
+      sso_endpoint: app.mode === 'entra-app' ? (app.sso_endpoint && app.sso_endpoint !== '/sso' ? app.sso_endpoint : '') : (app.sso_endpoint || '/sso'),
       sso_method: app.sso_method || 'GET',
       long_description: app.long_description || '',
       tags: Array.isArray(app.tags) ? app.tags : (typeof app.tags === 'string' ? JSON.parse(app.tags || '[]') : []),
@@ -85,9 +149,48 @@ export default function Admin() {
     setIconAssetDataUrl('');
     setIconSvgText('');
     setRemoveIconAsset(false);
-    setSelectedGroupIds([]);
-    setGroupSearch('');
+    setIncludeDefaultGroup(true);
+    setClonedGroupIds([]);
     setEditing(app);
+  };
+
+  const openClone = async () => {
+    if (!canEdit || editing === 'new' || !editing?.id) return;
+
+    setCloning(true);
+    try {
+      const res = await api.post(`/apps/${editing.id}/clone`);
+      const cloned = res.data?.app;
+      if (!cloned) throw new Error('Clone app data missing');
+
+      setEditing('new');
+      setForm({
+        name: cloned.name || '',
+        slug: cloned.slug || '',
+        description: cloned.description || '',
+        icon: cloned.icon || '📦',
+        target_url: cloned.target_url || '',
+        sort_order: cloned.sort_order || 0,
+        mode: cloned.mode || 'redirect-plain',
+        sso_endpoint: cloned.mode === 'entra-app'
+          ? (cloned.sso_endpoint && cloned.sso_endpoint !== '/sso' ? cloned.sso_endpoint : '')
+          : (cloned.sso_endpoint || '/sso'),
+        sso_method: cloned.sso_method || 'GET',
+        long_description: cloned.long_description || '',
+        tags: Array.isArray(cloned.tags) ? cloned.tags : [],
+      });
+      setIconMode(cloned.iconDataUrl ? 'asset' : 'emoji');
+      setIconAssetDataUrl(cloned.iconDataUrl || '');
+      setIconAssetPreview(cloned.iconDataUrl || cloned.iconUrl || '');
+      setIconSvgText(cloned.iconSvgText || '');
+      setRemoveIconAsset(false);
+      setIncludeDefaultGroup(true);
+      setClonedGroupIds(Array.isArray(cloned.groupIds) ? cloned.groupIds : []);
+      pushNotice('success', 'App duplicata: modifica solo i campi necessari');
+    } catch (err) {
+      pushNotice('error', err.response?.data?.error || err.message || 'Errore nella clonazione');
+    }
+    setCloning(false);
   };
 
   const close = () => {
@@ -98,9 +201,98 @@ export default function Admin() {
     setIconAssetPreview('');
     setIconSvgText('');
     setRemoveIconAsset(false);
-    setSelectedGroupIds([]);
-    setGroupSearch('');
+    setIncludeDefaultGroup(true);
+    setClonedGroupIds([]);
   };
+
+  const appModalDirty = useMemo(() => {
+    if (editing === null) return false;
+    const isNew = editing === 'new';
+    const existingIconUrl = !isNew && editing?.iconUrl ? editing.iconUrl : '';
+    const baseApp = isNew ? emptyApp : {
+      name: editing.name || '',
+      slug: editing.slug || '',
+      description: editing.description || '',
+      long_description: editing.long_description || '',
+      icon: editing.icon || '📦',
+      target_url: editing.target_url || '',
+      sort_order: editing.sort_order || 0,
+      mode: editing.mode || 'redirect-plain',
+      sso_endpoint: editing.mode === 'entra-app' ? (editing.sso_endpoint && editing.sso_endpoint !== '/sso' ? editing.sso_endpoint : '') : (editing.sso_endpoint || '/sso'),
+      sso_method: editing.sso_method || 'GET',
+      tags: Array.isArray(editing.tags) ? editing.tags : [],
+    };
+
+    const formTags = Array.isArray(form.tags) ? form.tags : [];
+    const baseTags = Array.isArray(baseApp.tags) ? baseApp.tags : [];
+    const equalTags = formTags.length === baseTags.length
+      && formTags.every((tag, index) => tag === baseTags[index]);
+
+    const iconDirty = isNew
+      ? (
+          (iconMode === 'asset' && Boolean(iconAssetDataUrl || iconSvgText || iconAssetPreview || removeIconAsset)) ||
+          (iconMode === 'emoji' && form.icon !== emptyApp.icon)
+        )
+      : (
+          (iconMode === 'emoji' && Boolean(existingIconUrl)) ||
+          (iconMode === 'asset' && Boolean(iconAssetDataUrl || iconSvgText || removeIconAsset || (iconAssetPreview && iconAssetPreview !== existingIconUrl)))
+        );
+
+    return (
+      form.name !== baseApp.name ||
+      form.slug !== baseApp.slug ||
+      form.description !== baseApp.description ||
+      form.long_description !== baseApp.long_description ||
+      form.icon !== baseApp.icon ||
+      form.target_url !== baseApp.target_url ||
+      form.sort_order !== baseApp.sort_order ||
+      form.mode !== baseApp.mode ||
+      form.sso_endpoint !== baseApp.sso_endpoint ||
+      form.sso_method !== baseApp.sso_method ||
+      !equalTags ||
+      iconDirty
+    );
+  }, [editing, form, iconMode, iconAssetDataUrl, iconSvgText, iconAssetPreview, removeIconAsset]);
+
+  useEffect(() => {
+    if (editing === null || confirmDialog) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      if (appModalDirty) {
+        openConfirm({
+          title: 'Chiudere senza salvare?',
+          message: 'Hai modifiche non salvate nella scheda app. Vuoi chiudere comunque?',
+          confirmLabel: 'Chiudi',
+          onConfirm: async () => close(),
+        });
+        return;
+      }
+      close();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [editing, appModalDirty, confirmDialog]);
+
+  useEffect(() => {
+    if (!pendingGroupAssignApp || confirmDialog) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      if (groupAssignSelection.length > 0) {
+        openConfirm({
+          title: 'Chiudere senza salvare?',
+          message: 'Hai selezionato dei gruppi non ancora salvati. Vuoi chiudere comunque?',
+          confirmLabel: 'Chiudi',
+          onConfirm: async () => closeGroupAssignmentModal(),
+        });
+        return;
+      }
+      closeGroupAssignmentModal();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [pendingGroupAssignApp, groupAssignSelection.length, confirmDialog]);
 
   const applyIconAssetFile = (file) => {
     if (!file) return;
@@ -147,10 +339,17 @@ export default function Admin() {
   };
 
   const handleSave = async () => {
+    if (!canEdit) {
+      pushNotice('error', 'Questa pagina è in sola lettura.');
+      return;
+    }
     setSaving(true);
     try {
       if (iconMode === 'asset' && !iconAssetDataUrl && !iconSvgText && !iconAssetPreview && editing === 'new') {
         throw new Error('Carica o incolla un\'immagine/SVG per l\'icona, oppure torna alla modalità emoji');
+      }
+      if (form.mode === 'entra-app' && !form.sso_endpoint.trim()) {
+        throw new Error('Inserisci l\'Application ID Entra');
       }
 
       const iconPayload = iconMode === 'asset'
@@ -164,66 +363,101 @@ export default function Admin() {
           };
 
       if (editing === 'new') {
-        await api.post('/apps', {
+        const res = await api.post('/apps', {
           ...form,
           ...iconPayload,
           icon: iconMode === 'emoji' ? form.icon : form.icon || '🖼️',
-          groupIds: selectedGroupIds,
+          groupIds: includeDefaultGroup
+            ? [DEFAULT_GROUP_ID, ...clonedGroupIds]
+            : clonedGroupIds,
         });
+        loadApps();
+        close();
+        pushNotice('success', 'App creata');
+        if (!includeDefaultGroup) {
+          openGroupAssignmentModal({
+            ...res.data?.app,
+            defaultIncluded: false,
+          }, clonedGroupIds);
+        }
       } else {
         await api.put(`/apps/${editing.id}`, {
           ...form,
           ...iconPayload,
           icon: iconMode === 'emoji' ? form.icon : form.icon || '🖼️',
         });
+        loadApps();
+        close();
+        pushNotice('success', 'App aggiornata');
       }
-      loadApps();
-      close();
     } catch (err) {
-      alert(err.response?.data?.error || err.message || 'Errore nel salvataggio');
+      pushNotice('error', err.response?.data?.error || err.message || 'Errore nel salvataggio');
     }
     setSaving(false);
   };
 
   const handleDelete = async (app) => {
-    if (!confirm(`Eliminare "${app.name}"? Questa azione non è reversibile.`)) return;
-    try {
-      await api.delete(`/apps/${app.id}`);
-      loadApps();
-    } catch (err) {
-      alert(err.response?.data?.error || 'Errore nella cancellazione');
+    if (!canEdit) {
+      pushNotice('error', 'Questa pagina è in sola lettura.');
+      return;
     }
+    openConfirm({
+      title: `Eliminare "${app.name}"?`,
+      message: 'Questa azione non è reversibile.',
+      confirmLabel: 'Elimina',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/apps/${app.id}`);
+          loadApps();
+          pushNotice('success', `App "${app.name}" eliminata`);
+        } catch (err) {
+          pushNotice('error', err.response?.data?.error || 'Errore nella cancellazione');
+        }
+      },
+    });
   };
 
   const handleToggle = async (app) => {
+    if (!canEdit) {
+      pushNotice('error', 'Questa pagina è in sola lettura.');
+      return;
+    }
     try {
       await api.put(`/apps/${app.id}`, { is_active: app.is_active ? 0 : 1 });
       loadApps();
     } catch (err) {
-      alert(err.response?.data?.error || 'Errore');
+      pushNotice('error', err.response?.data?.error || 'Errore');
     }
   };
 
   const handleRestoreDefaults = async () => {
-    if (!confirm('Ripristinare le demo app di default? Le app con gli stessi slug verranno riportate ai valori base.')) {
+    if (!canEdit) {
+      pushNotice('error', 'Questa pagina è in sola lettura.');
       return;
     }
-
-    setRestoringDefaults(true);
-    try {
-      const res = await api.post('/apps/restore-defaults');
-      loadApps();
-      alert(`${res.data.message}. Create: ${res.data.created}, aggiornate: ${res.data.updated}.`);
-    } catch (err) {
-      alert(err.response?.data?.error || 'Errore nel ripristino delle demo app');
-    }
-    setRestoringDefaults(false);
+    openConfirm({
+      title: 'Ripristinare le applicazioni dimostrative?',
+      message: 'Le app demo mancanti verranno aggiunte di nuovo. Quelle già presenti con lo stesso slug verranno aggiornate senza essere sostituite.',
+      confirmLabel: 'Ripristina',
+      onConfirm: async () => {
+        setRestoringDefaults(true);
+        try {
+          const res = await api.post('/apps/restore-defaults');
+          loadApps();
+          pushNotice('success', `${res.data.message}. Create: ${res.data.created}, aggiornate: ${res.data.updated}.`);
+        } catch (err) {
+          pushNotice('error', err.response?.data?.error || 'Errore nel ripristino delle demo app');
+        } finally {
+          setRestoringDefaults(false);
+        }
+      },
+    });
   };
 
   const groupLabel = (group) => group.entra_display_name || group.name;
   const groupMatchesSearch = (group) => {
-    if (!groupSearch.trim()) return true;
-    const q = groupSearch.toLowerCase();
+    if (!groupAssignSearch.trim()) return true;
+    const q = groupAssignSearch.toLowerCase();
     return groupLabel(group).toLowerCase().includes(q) || (group.description || '').toLowerCase().includes(q) || (group.source || '').toLowerCase().includes(q);
   };
   const filteredGroups = groups.filter(groupMatchesSearch);
@@ -237,8 +471,8 @@ export default function Admin() {
     });
     return [...tagSet].sort();
   }, [apps]);
-  const toggleGroupSelection = (groupId) => {
-    setSelectedGroupIds((prev) => (
+  const toggleGroupAssignment = (groupId) => {
+    setGroupAssignSelection((prev) => (
       prev.includes(groupId)
         ? prev.filter((id) => id !== groupId)
         : [...prev, groupId]
@@ -256,22 +490,231 @@ export default function Admin() {
     { value: 'entra-app', label: 'Entra App', active: 'bg-violet-600 text-white border-violet-600', visible: modeVisibility.showEntraAppMode !== false },
   ];
   const visibleModeOptions = modeOptions.filter((opt) => opt.alwaysVisible || opt.visible);
+  const visibleModeFilterOptions = [
+    { value: 'all', label: 'Tutti i collegamenti', active: 'bg-gray-900 text-white border-gray-900' },
+    ...visibleModeOptions,
+  ];
+  const currentModeFilterOption = visibleModeFilterOptions.find((opt) => opt.value === appModeFilter) || visibleModeFilterOptions[0];
   const currentModeOption = modeOptions.find((opt) => opt.value === form.mode);
+  const handleModeChange = (nextMode) => {
+    if (nextMode === 'entra-app') {
+      setForm((prev) => ({
+        ...prev,
+        mode: nextMode,
+        sso_endpoint: prev.sso_endpoint && prev.sso_endpoint !== '/sso' ? prev.sso_endpoint : '',
+      }));
+      return;
+    }
+    if (nextMode === 'redirect' && !form.sso_endpoint) {
+      setForm((prev) => ({ ...prev, mode: nextMode, sso_endpoint: '/sso' }));
+      return;
+    }
+    setForm((prev) => ({ ...prev, mode: nextMode }));
+  };
+  const filteredApps = useMemo(() => {
+    const q = appSearch.toLowerCase().trim();
+    const filtered = apps.filter((app) => {
+      if (appModeFilter !== 'all' && app.mode !== appModeFilter) return false;
+      if (!q) return true;
+      const tags = Array.isArray(app.tags) ? app.tags : [];
+      return (
+        app.name?.toLowerCase().includes(q) ||
+        app.slug?.toLowerCase().includes(q) ||
+        app.description?.toLowerCase().includes(q) ||
+        app.target_url?.toLowerCase().includes(q) ||
+        app.mode?.toLowerCase().includes(q) ||
+        tags.some((tag) => (tag || '').toString().toLowerCase().includes(q))
+      );
+    });
+
+    const compareText = (a, b, key) => (a?.[key] || '').toString().localeCompare((b?.[key] || '').toString(), 'it', { sensitivity: 'base' });
+    const compareNumber = (a, b, key) => (Number(a?.[key] || 0) - Number(b?.[key] || 0));
+    const direction = appSort.direction === 'asc' ? 1 : -1;
+
+    return [...filtered].sort((a, b) => {
+      let result = 0;
+      switch (appSort.key) {
+        case 'name':
+          result = compareText(a, b, 'name');
+          break;
+        case 'slug':
+          result = compareText(a, b, 'slug');
+          break;
+        case 'target_url':
+          result = compareText(a, b, 'target_url');
+          break;
+        case 'mode':
+          result = compareText(a, b, 'mode');
+          break;
+        case 'is_active':
+          result = Number(Boolean(a.is_active)) - Number(Boolean(b.is_active));
+          break;
+        case 'sort_order':
+        default:
+          result = compareNumber(a, b, 'sort_order') || compareText(a, b, 'name');
+          break;
+      }
+
+      if (result === 0 && appSort.key !== 'name') {
+        result = compareText(a, b, 'name');
+      }
+      return result * direction;
+    });
+  }, [apps, appSearch, appModeFilter, appSort]);
+
+  const openGroupAssignmentModal = (app, selectedIds = []) => {
+    setPendingGroupAssignApp(app);
+    setGroupAssignSelection(selectedIds);
+    setGroupAssignSearch('');
+  };
+
+  const jumpToGroupsForApp = (app) => {
+    const query = [app.name, app.slug].filter(Boolean).join(' ');
+    navigate('/admin/groups', {
+      state: {
+        groupSearch: query,
+      },
+    });
+  };
+
+  const toggleSort = (key) => {
+    setAppSort((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const sortIndicator = (key) => {
+    if (appSort.key !== key) return null;
+    return appSort.direction === 'asc'
+      ? <ChevronUp className="w-3.5 h-3.5" />
+      : <ChevronDown className="w-3.5 h-3.5" />;
+  };
+
+  const closeGroupAssignmentModal = () => {
+    setPendingGroupAssignApp(null);
+    setGroupAssignSelection([]);
+    setGroupAssignSearch('');
+    setAssigningGroups(false);
+  };
+
+  const saveGroupAssignment = async () => {
+    if (!canEdit) {
+      pushNotice('error', 'Questa pagina è in sola lettura.');
+      return;
+    }
+    if (!pendingGroupAssignApp || groupAssignSelection.length === 0) {
+      closeGroupAssignmentModal();
+      return;
+    }
+
+    setAssigningGroups(true);
+    try {
+      const res = await api.post(`/apps/${pendingGroupAssignApp.id}/groups`, { groupIds: groupAssignSelection });
+      loadApps();
+      closeGroupAssignmentModal();
+      pushNotice(
+        'success',
+        res.data?.message || `${pendingGroupAssignApp.name} aggiunta a ${groupAssignSelection.length} gruppi`
+      );
+    } catch (err) {
+      pushNotice('error', err.response?.data?.error || 'Errore nell\'assegnazione ai gruppi');
+    } finally {
+      setAssigningGroups(false);
+    }
+  };
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between gap-4 mb-4">
         <div>
           <h1 className="text-2xl font-extrabold text-dark">Gestione App</h1>
           <p className="text-gray-500 mt-1">Aggiungi, modifica o rimuovi applicazioni dal catalogo</p>
         </div>
         <button
           onClick={openNew}
-          className="flex items-center gap-2 px-4 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors"
+          disabled={!canEdit}
+          className="flex items-center gap-2 px-4 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Plus className="w-4 h-4" />
           Nuova app
         </button>
+      </div>
+
+      {!canEdit && (
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          Modalità sola lettura: puoi consultare il catalogo app, ma non modificarlo.
+        </div>
+      )}
+
+      {pageNotice && (
+        <div className="mb-6">
+          <PageNotice
+            type={pageNotice.type}
+            message={pageNotice.message}
+            onClose={() => setPageNotice(null)}
+          />
+        </div>
+      )}
+
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[220px]">
+          <ClearableSearchField
+            value={appSearch}
+            onChange={setAppSearch}
+            placeholder="Cerca app per nome, slug, descrizione, URL o tag..."
+          />
+        </div>
+            <div className="relative" ref={modeFilterRef}>
+              <button
+                type="button"
+                onClick={() => setModeFilterOpen((prev) => !prev)}
+                className="relative inline-flex min-w-[220px] items-center w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm text-left text-gray-600 focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <span className="truncate">{currentModeFilterOption.label}</span>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              </button>
+
+            {modeFilterOpen && (
+              <div className="absolute right-0 z-20 mt-2 min-w-[260px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+                <div className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 border-b border-gray-100">
+                  Filtro collegamento
+                </div>
+                <div className="py-1">
+                  {visibleModeFilterOptions.map((opt) => {
+                    const selected = appModeFilter === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          setAppModeFilter(opt.value);
+                          setModeFilterOpen(false);
+                        }}
+                        className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                          selected ? 'bg-gray-50 text-dark' : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span
+                          className={`flex h-4 w-4 items-center justify-center rounded border ${
+                            selected ? 'border-dark bg-dark text-white' : 'border-gray-300 bg-white text-transparent'
+                          }`}
+                          aria-hidden="true"
+                        >
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <span className="flex-1">{opt.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        <div className="text-xs text-gray-400">
+          {filteredApps.length} app su {apps.length}
+        </div>
       </div>
 
       {/* App table */}
@@ -286,16 +729,36 @@ export default function Admin() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">App</th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Slug</th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Target URL</th>
-                <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Modo</th>
-                <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Attiva</th>
-                <th className="text-right px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Azioni</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    <button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
+                      <span>App</span> {sortIndicator('name')}
+                    </button>
+                  </th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    <button type="button" onClick={() => toggleSort('slug')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
+                      <span>Slug</span> {sortIndicator('slug')}
+                    </button>
+                  </th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    <button type="button" onClick={() => toggleSort('target_url')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
+                      <span>Target URL</span> {sortIndicator('target_url')}
+                    </button>
+                  </th>
+                  <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    <button type="button" onClick={() => toggleSort('mode')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
+                      <span>Modo</span> {sortIndicator('mode')}
+                    </button>
+                  </th>
+                  <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    <button type="button" onClick={() => toggleSort('is_active')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
+                      <span>Attiva</span> {sortIndicator('is_active')}
+                    </button>
+                  </th>
+                <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Azioni</th>
               </tr>
             </thead>
             <tbody>
-              {apps.map((app) => (
+              {filteredApps.map((app) => (
                 <tr key={app.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -318,9 +781,10 @@ export default function Admin() {
                   <td className="px-6 py-4 text-center">
                     <button
                       onClick={() => handleToggle(app)}
+                      disabled={!canEdit}
                       className={`w-10 h-6 rounded-full transition-colors relative inline-flex items-center ${
                         app.is_active ? 'bg-accent' : 'bg-gray-200'
-                      }`}
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       <span
                         className={`absolute w-4 h-4 bg-white rounded-full shadow transition-transform ${
@@ -329,17 +793,27 @@ export default function Admin() {
                       />
                     </button>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => jumpToGroupsForApp(app)}
+                        disabled={!canEdit}
+                        className="p-2 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Vai a Gestione Gruppi con ricerca precompilata"
+                      >
+                        <Users className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => openEdit(app)}
-                        className="p-2 text-gray-400 hover:text-dark hover:bg-gray-100 rounded-lg transition-colors"
+                        disabled={!canEdit}
+                        className="p-2 text-gray-400 hover:text-dark hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(app)}
-                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        disabled={!canEdit}
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -352,8 +826,8 @@ export default function Admin() {
           <div className="flex justify-end px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50/60">
             <button
               onClick={handleRestoreDefaults}
-              disabled={restoringDefaults}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-gray-200 bg-white text-gray-600 text-xs font-semibold hover:bg-gray-50 transition-colors disabled:opacity-60"
+              disabled={restoringDefaults || !canEdit}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-gray-200 bg-white text-gray-600 text-xs font-semibold hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${restoringDefaults ? 'animate-spin' : ''}`} />
               Ripristina applicazioni dimostrative
@@ -561,86 +1035,36 @@ export default function Admin() {
 
                 {editing === 'new' && (
                   <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-1">Gruppi di visibilità</label>
-                      <p className="text-xs text-gray-400">
-                        Seleziona uno o pi&ugrave; gruppi di Frontdoor. L&apos;app non viene più assegnata automaticamente a <span className="font-semibold">default</span>.
-                      </p>
-                    </div>
-                    <span className="text-xs text-gray-400">
-                      {selectedGroupIds.length} selezionati
-                    </span>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={includeDefaultGroup}
+                        onChange={(e) => setIncludeDefaultGroup(e.target.checked)}
+                        className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-dark">Aggiungi al gruppo default</span>
+                          <span className="text-[10px] bg-accent/20 text-dark px-1.5 py-0.5 rounded font-medium">
+                            consigliato
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">
+                          L&apos;app verrà creata nel gruppo default. Dopo il salvataggio potrai aggiungerla a uno o pi&ugrave; gruppi Frontdoor con una ricerca dedicata.
+                        </p>
+                      </div>
+                    </label>
                   </div>
-
-                  <input
-                    type="text"
-                    value={groupSearch}
-                    onChange={(e) => setGroupSearch(e.target.value)}
-                    placeholder="Cerca gruppo..."
-                    className="w-full px-3 py-2.5 mb-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
-
-                    {groupsLoading ? (
-                      <div className="animate-pulse grid gap-2 sm:grid-cols-2">
-                        {[...Array(4)].map((_, i) => (
-                          <div key={i} className="h-16 rounded-xl bg-white border border-gray-100" />
-                        ))}
-                      </div>
-                    ) : filteredGroups.length === 0 ? (
-                      <div className="text-sm text-gray-400 bg-white rounded-xl border border-dashed border-gray-200 px-3 py-4">
-                        Nessun gruppo trovato.
-                      </div>
-                    ) : (
-                      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 max-h-[520px] overflow-y-auto pr-1">
-                        {filteredGroups.map((group) => {
-                        const selected = selectedGroupIds.includes(group.id);
-                        const groupSourceLabel = group.source === 'entra' ? 'Entra' : 'Locale';
-                        return (
-                          <label
-                            key={group.id}
-                            className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${
-                              selected ? 'border-accent bg-accent/5' : 'border-gray-200 bg-white hover:border-gray-300'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={() => toggleGroupSelection(group.id)}
-                              className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-medium text-dark truncate">{groupLabel(group)}</span>
-                                <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">
-                                  {groupSourceLabel}
-                                </span>
-                                {group.id === '00000000-0000-0000-0000-000000000001' && (
-                                  <span className="text-[10px] bg-accent/30 text-dark px-1.5 py-0.5 rounded font-medium">
-                                    default
-                                  </span>
-                                )}
-                              </div>
-                              {group.description && (
-                                <p className="text-xs text-gray-400 mt-0.5 truncate">{group.description}</p>
-                              )}
-                            </div>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Modalita'</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">Collegamento</label>
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                   {visibleModeOptions.map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => setForm({ ...form, mode: opt.value })}
+                      onClick={() => handleModeChange(opt.value)}
                       className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
                         form.mode === opt.value ? opt.active : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                       }`}
@@ -651,7 +1075,7 @@ export default function Admin() {
                 </div>
                 {currentModeOption && !visibleModeOptions.some((opt) => opt.value === form.mode) && (
                   <p className="text-xs text-gray-400 mt-2">
-                    Modalita attuale: <span className="font-semibold text-gray-500">{currentModeOption.label}</span>. È nascosta dalle impostazioni globali, ma resta mantenuta su questa app finché non la cambi.
+                    Modalità attuale: <span className="font-semibold text-gray-500">{currentModeOption.label}</span>. È nascosta dalle impostazioni globali, ma resta mantenuta su questa app finché non la cambi.
                   </p>
                 )}
               </div>
@@ -663,7 +1087,7 @@ export default function Admin() {
                     type="text"
                     value={form.sso_endpoint}
                     onChange={(e) => setForm({ ...form, sso_endpoint: e.target.value })}
-                    placeholder="094e5413-db00-4adc-a790-7971fef8c104"
+                    placeholder="Inserisci l'Application ID"
                     className="w-full px-3 py-2 border border-violet-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                   />
                   <p className="text-xs text-violet-500 mt-1">
@@ -735,6 +1159,16 @@ export default function Admin() {
             </div>
 
             <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-100">
+              {editing !== 'new' && (
+                <button
+                  onClick={openClone}
+                  disabled={cloning || !canEdit}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-violet-700 hover:text-violet-800 hover:bg-violet-50 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Copy className="w-4 h-4" />
+                  {cloning ? 'Duplicazione...' : 'Duplica'}
+                </button>
+              )}
               <button
                 onClick={close}
                 className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-dark hover:bg-gray-100 rounded-xl transition-colors"
@@ -753,6 +1187,141 @@ export default function Admin() {
           </div>
         </div>
       )}
+
+      {pendingGroupAssignApp && (
+        <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/40 px-4 py-4">
+          <div className="relative w-full max-w-3xl max-h-[88vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-gray-100">
+            <button
+              type="button"
+              onClick={() => {
+                if (groupAssignSelection.length > 0) {
+                  openConfirm({
+                    title: 'Chiudere senza salvare?',
+                    message: 'Hai selezionato dei gruppi non ancora salvati. Vuoi chiudere comunque?',
+                    confirmLabel: 'Chiudi',
+                    onConfirm: async () => closeGroupAssignmentModal(),
+                  });
+                  return;
+                }
+                closeGroupAssignmentModal();
+              }}
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-dark hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Chiudi selezione gruppi"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="p-6 sm:p-8">
+              <div className="mb-6">
+                <h2 className="text-2xl font-extrabold text-dark">Aggiungi ai gruppi</h2>
+                <p className="text-gray-500 mt-1">
+                  Seleziona uno o pi&ugrave; gruppi Frontdoor per rendere l&apos;app disponibile anche lì.
+                </p>
+                {pendingGroupAssignApp?.defaultIncluded ? (
+                  <p className="text-xs text-gray-400 mt-2">
+                    L&apos;app è già stata creata nel gruppo <span className="font-semibold">default</span>.
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Questa app non è stata aggiunta al gruppo default, quindi devi scegliere almeno un gruppo per renderla visibile.
+                  </p>
+                )}
+              </div>
+
+              <div className="mb-4">
+                <ClearableSearchField
+                  value={groupAssignSearch}
+                  onChange={setGroupAssignSearch}
+                  placeholder="Cerca gruppo per nome, descrizione o origine..."
+                />
+                <div className="mt-2 text-xs text-gray-400 flex items-center justify-between gap-3">
+                  <span>{groupAssignSelection.length} selezionati</span>
+                  <span>{filteredGroups.length} gruppi</span>
+                </div>
+              </div>
+
+              {groupsLoading ? (
+                <div className="animate-pulse grid gap-2 sm:grid-cols-2">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="h-16 rounded-xl bg-white border border-gray-100" />
+                  ))}
+                </div>
+              ) : filteredGroups.length === 0 ? (
+                <div className="text-sm text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200 px-3 py-4">
+                  Nessun gruppo trovato.
+                </div>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2 max-h-[52vh] overflow-y-auto pr-1">
+                  {filteredGroups.map((group) => {
+                    const selected = groupAssignSelection.includes(group.id);
+                    const groupSourceLabel = group.source === 'entra' ? 'Entra' : 'Locale';
+                    return (
+                      <label
+                        key={group.id}
+                        className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${
+                          selected ? 'border-accent bg-accent/5' : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleGroupAssignment(group.id)}
+                          className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-dark truncate">{groupLabel(group)}</span>
+                            <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">
+                              {groupSourceLabel}
+                            </span>
+                            {group.id === DEFAULT_GROUP_ID && (
+                              <span className="text-[10px] bg-accent/30 text-dark px-1.5 py-0.5 rounded font-medium">
+                                default
+                              </span>
+                            )}
+                          </div>
+                          {group.description && (
+                            <p className="text-xs text-gray-400 mt-0.5 truncate">{group.description}</p>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3 mt-6 pt-6 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={closeGroupAssignmentModal}
+                  className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-dark hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  Salta
+                </button>
+                <button
+                  type="button"
+                  onClick={saveGroupAssignment}
+                  disabled={assigningGroups || groupAssignSelection.length === 0}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Save className="w-4 h-4" />
+                  {assigningGroups ? 'Salvataggio...' : 'Aggiungi gruppi selezionati'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={Boolean(confirmDialog)}
+        title={confirmDialog?.title || ''}
+        message={confirmDialog?.message || ''}
+        confirmLabel={confirmDialog?.confirmLabel || 'Conferma'}
+        busy={confirmBusy}
+        onConfirm={runConfirm}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 }

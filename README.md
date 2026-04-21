@@ -40,18 +40,18 @@ Each app in the catalog is accessible via its target URL. The gateway handles au
 - Microsoft SSO authentication
 - App catalog with search, tags, favorites
 - Group-by-tag view
-- RBAC: groups, per-group app visibility
+- RBAC: groups, per-group app visibility, and role tiers (`superadmin`, `admin`, `admin_readonly`)
 - RBAC discovery from Microsoft Entra groups at login, with admin import/force-sync flows
-- Admin panel: manage apps, users, groups
-- Access logs with analytics
-- Audit trail for RBAC changes
+- Admin panel: manage apps, users, groups, logs, audit, and branding
+- Access logs with analytics, period filters, page size selection, and search
+- Dedicated audit trail for privileged actions with actor filtering and pagination
 - App icons support emojis, pasted images, and pasted SVG assets with disk cache
 - SSO redirect mode (JWT forwarding to target apps)
 - Shared-cookie mode (wildcard domain cookie)
 - Plain link mode (simple external redirect)
 - Bulk app upsert API (for CI/automation)
 - Demo apps are optional and can be restored from the admin panel or with `npm run db:seed`
-- Home hero text, company logo, and app visibility badges can be customized from the **Personalizza** admin page
+- Home hero text, company logo, homepage/login behavior, and app visibility toggles can be customized from the **Personalizza** admin page
 
 ## Quick Start (Node.js)
 
@@ -99,6 +99,7 @@ App: http://localhost:3001
 | `AVATAR_CACHE_MISS_TTL_DAYS` | Retry interval when no avatar was found | `30` |
 | `BASE_DOMAIN` | Base domain (no protocol) | `frontdoor.local` |
 | `FRONTEND_URL` | Frontend URL with protocol (see `.env.example.*`) | - |
+| `TZ` | Timezone used to render Log/Audit timestamps | `Europe/Rome` |
 | `AZURE_CLIENT_ID` | Azure AD App Registration Client ID | - |
 | `AZURE_CLIENT_SECRET` | Azure AD Client Secret | - |
 | `AZURE_TENANT_ID` | Azure AD Tenant ID | - |
@@ -106,7 +107,7 @@ App: http://localhost:3001
 | `JWT_SECRET` | JWT signing secret | - |
 | `ENTRA_GROUP_SYNC` | Discover Entra group memberships at login and enable admin import/force-sync flows | `false` |
 | `JWT_EXPIRES_IN` | JWT token duration | `7d` |
-| `ADMIN_EMAILS` | Comma-separated admin emails (auto-promoted) | - |
+| `ADMIN_EMAILS` | Comma-separated superadmin emails (auto-promoted) | - |
 | `ADMIN_API_KEY` | API key for bulk endpoints | - |
 
 #### Production checklist
@@ -115,6 +116,7 @@ For a real deployment, set at least:
 
 - `BASE_DOMAIN`
 - `FRONTEND_URL`
+- `TZ`
 - `AZURE_CLIENT_ID`
 - `AZURE_CLIENT_SECRET`
 - `AZURE_TENANT_ID`
@@ -126,16 +128,35 @@ Recommended but optional:
 - `ADMIN_EMAILS`
 - `ADMIN_API_KEY`
 - `JWT_EXPIRES_IN`
+- `TZ` to align server-rendered timestamps with your local tenant timezone
 
 If one of the required values is missing or malformed, the container now fails fast at startup with a clear log entry instead of surfacing a runtime auth error later.
 
-#### Avatar cache
+#### Roles and access tiers
+
+Frontdoor supports four role values:
+
+- `superadmin` - full access, including Log, Audit, and Personalizza
+- `admin` - full admin access except Log and Personalizza
+- `admin_readonly` - can view admin pages but cannot modify data
+- `user` - standard app-catalog user
+
+Users listed in `ADMIN_EMAILS` are auto-promoted to `superadmin` and remain protected from web UI changes while they stay in the compose/run list.
+
+Only `superadmin` can access Log, Audit, and Personalizza. `admin` and `admin_readonly` can access Gestione App, Gruppi, and Utenti; the latter is read-only.
+
+#### Criteri di conservazione
 
 Frontdoor keeps user avatars on disk inside `AVATAR_CACHE_DIR`. In Docker the recommended target is the shared `/data` volume so cached images survive container restarts.
 
-- Microsoft 365 photos are fetched from Microsoft Graph when users sign in, and can also be prewarmed with the dedicated utility.
+- Microsoft 365 photos are fetched from Microsoft Graph when users sign in, and can also be prewarmed with the dedicated utility or refreshed from `Personalizza`.
 - If Microsoft does not expose a photo, Frontdoor falls back to Gravatar and then to the text avatar.
 - Cached avatars are refreshed only after the TTL expires, so the UI does not hit Graph on every page load.
+- The **Personalizza** page includes a maintenance action to refresh the avatar cache when Microsoft 365 profile photos change.
+- The same **Personalizza** page also includes a log retention selector from 0 to 90 days.
+- `0` means logless: at the next scheduled cleanup cycle Frontdoor purges both access logs and audit logs from the database.
+- The purge is not immediate when you save the setting, so an admin can still revert the change before the next cleanup runs.
+- The default retention stays at 90 days.
 
 To prewarm the avatar cache for existing users, run:
 
@@ -143,16 +164,27 @@ To prewarm the avatar cache for existing users, run:
 npm run avatars:prewarm
 ```
 
-If you want the utility to fetch Microsoft 365 photos for existing users, grant the app the Microsoft Graph application permission `ProfilePhoto.Read.All` and admin consent.
+If you want the utility or the `Personalizza` refresh action to fetch Microsoft 365 photos for existing users, grant the app the Microsoft Graph application permission `ProfilePhoto.Read.All` and admin consent.
 
 #### Home branding
 
-The home hero text, optional company logo, and app badge visibility are managed from the **Personalizza** page in the admin panel.
+The home hero text, optional company logo, homepage/login behavior, and app badge visibility are managed from the **Personalizza** page in the admin panel.
 
 - The text fields update the hero copy shown on the home page.
 - The logo is uploaded to `BRANDING_ASSET_DIR` and served back from the app.
 - If no logo is configured, the home page keeps the current text-only layout.
+- The `Mostra banner hero in Home` option hides the big landing banner.
+- The `Home compatta di default` option defines the tenant-wide compact/default home view, but users can still override it locally in their browser.
+- The `Vai subito alla Login SSO` option skips the login page and redirects directly to Microsoft sign-in.
 - The `Mostra badge ext / SSO sulle app` option controls whether app cards show mode badges.
+- The `Mostra Shared Cookie`, `Mostra Redirect SSO`, and `Mostra Entra App` options hide those app-mode buttons in the admin app editor.
+- The `Criteri di conservazione` section lets a superadmin invalidate the cached avatars and tune log retention so Microsoft/Gravatar changes and retention policy updates are picked up on the next cycle.
+
+#### Audit and retention
+
+- Log and Audit timestamps are rendered with the container `TZ` setting, while the database continues to store UTC values.
+- Audit includes a superadmin-only admin filter so you can narrow the view to a single privileged account.
+- Frontdoor automatically purges `access_logs` and `rbac_audit_logs` entries older than 90 days at startup and then once per day.
 
 #### App icons
 
@@ -183,7 +215,7 @@ Frontdoor startup configuration:
   AZURE_TENANT_ID=[set]
   AZURE_REDIRECT_URI=https://frontdoor.cerbero.cc/api/auth/microsoft/callback
   JWT_SECRET=[set]
-  ADMIN_EMAILS=1 configured
+  ADMIN_EMAILS=1 superadmin configured
   ENTRA_GROUP_SYNC=true
 ```
 
@@ -191,7 +223,9 @@ Warnings are emitted for defaults or weak-but-valid settings, for example:
 
 - `BASE_DOMAIN is not set, defaulting to frontdoor.local`
 - `JWT_SECRET is shorter than 32 characters; use a longer random secret in production`
-If `ENTRA_GROUP_SYNC=true`, Frontdoor discovers the signed-in user's Microsoft Entra group memberships at login, stores them in a discovery cache, and lets admins import only the groups they actually want to use in Frontdoor. In most tenants the standard login scopes are enough for discovery; the admin Force Sync flow uses an app-only Microsoft Graph token, so your app registration must also have the Graph application permissions required to read other users' memberships in your directory.
+If `ENTRA_GROUP_SYNC=true`, Frontdoor discovers Microsoft Entra groups at login (a tenant-wide refresh of the group catalog via `/groups`, followed by a per-user membership fetch via `/users/{id}/transitiveMemberOf`), stores them in a discovery cache, and lets admins import only the groups they actually want to use in Frontdoor. Both calls are made with an **app-only** Microsoft Graph token, so the user's login token is never asked for any group-read scope — the login consent screen stays on the minimal `openid / profile / email / User.Read` delegated set. The admin Force Sync flow uses the same app-only path to refresh the tenant-wide group catalog plus every user's memberships in one shot.
+
+Because of the app-only calls, your app registration must have the Microsoft Graph **application** permissions listed in Step 4 (`User.Read.All`, `GroupMember.Read.All`, optionally `Group.Read.All`), all with admin consent. The first time you enable `ENTRA_GROUP_SYNC=true`, add the permissions in Azure, grant consent, then trigger a fresh login or Force Sync to populate the cache.
 
 Important: discovery and import are separate steps. If you delete imported Entra groups from Frontdoor's local database, they will not be recreated automatically as active RBAC groups on the next login. They must first be rediscovered by a successful login or Force Sync, then imported again from the Entra import modal.
 
@@ -233,7 +267,13 @@ From the **Overview** page of your new app registration, copy:
    - `User.Read` — Read signed-in user's basic profile
 3. Click **Grant admin consent** (if you're a tenant admin) — otherwise ask your admin
 
-If you want to use **Sincronizza gruppi**, also add the Microsoft Graph **application permission** that allows the app to read other users' group memberships in your tenant, at minimum `User.Read.All`, and grant admin consent. The app uses an app-only token for that action.
+If you want to use **Sincronizza gruppi** (or enable `ENTRA_GROUP_SYNC=true` for login-time discovery), also add the following Microsoft Graph **application** permissions and grant admin consent:
+
+- `User.Read.All` — required by `/users/{id}/transitiveMemberOf` to fetch each user's group memberships app-only
+- `GroupMember.Read.All` — required by `/groups/{id}/transitiveMembers` to fetch imported group members app-only
+- `Group.Read.All` *(optional)* — grants broader group object reads (description, visibility, ...); harmless if not needed today but useful for future group metadata features
+
+Both the login flow and the Force Sync action call Graph app-only, so without these application permissions the group features will return 403 errors even if the user is a global admin.
 
 #### Step 5: Set environment variables
 
@@ -262,35 +302,35 @@ AZURE_REDIRECT_URI=https://your-domain.com/api/auth/microsoft/callback
 | GET | `/api/auth/me` | Bearer | Current user profile |
 | POST | `/api/auth/logout` | No | Logout (clear cookie) |
 | GET | `/api/branding` | Bearer | Read home branding settings |
-| PUT | `/api/branding` | Admin | Update home branding settings |
+| PUT | `/api/branding` | Superadmin | Update home branding settings |
 | GET | `/api/branding/logo` | No | Serve optional company logo |
 | GET | `/api/apps` | Bearer | List active apps (RBAC filtered) |
-| GET | `/api/apps/all` | Admin | List all apps (including inactive) |
+| GET | `/api/apps/all` | Admin viewer | List all apps (including inactive) |
 | GET | `/api/apps/:id/icon` | Bearer | Serve a custom app icon asset |
-| POST | `/api/apps` | Admin | Create app |
-| POST | `/api/apps/restore-defaults` | Admin | Restore the default demo apps |
-| PUT | `/api/apps/:id` | Admin | Update app |
-| DELETE | `/api/apps/:id` | Admin | Delete app |
+| POST | `/api/apps` | Admin editor | Create app |
+| POST | `/api/apps/restore-defaults` | Admin editor | Restore the default demo apps |
+| PUT | `/api/apps/:id` | Admin editor | Update app |
+| DELETE | `/api/apps/:id` | Admin editor | Delete app |
 | POST | `/api/apps/bulk` | API Key | Bulk upsert apps |
-| GET | `/api/users` | Admin | List users |
-| PUT | `/api/users/:id/role` | Admin | Change user role |
-| PUT | `/api/users/:id/active` | Admin | Activate/deactivate user |
-| DELETE | `/api/users/:id` | Admin | Delete user |
-| GET | `/api/groups` | Admin | List groups |
-| GET | `/api/groups/entra/candidates` | Admin | List discovered Entra groups available for import |
-| POST | `/api/groups/entra/import` | Admin | Import selected discovered Entra groups |
-| POST | `/api/groups/entra/force-sync` | Admin | Force sync Entra memberships for all linked users |
-| POST | `/api/groups/bulk-delete` | Admin | Delete multiple groups at once |
-| POST | `/api/groups` | Admin | Create group |
-| PUT | `/api/groups/:id` | Admin | Update group |
-| DELETE | `/api/groups/:id` | Admin | Delete group |
-| POST | `/api/groups/:id/members` | Admin | Add members |
-| DELETE | `/api/groups/:id/members/:userId` | Admin | Remove member |
-| POST | `/api/groups/:id/apps` | Admin | Assign apps |
-| DELETE | `/api/groups/:id/apps/:appId` | Admin | Remove app |
-| GET | `/api/logs` | Admin | Access logs (paginated) |
-| GET | `/api/logs/top-apps` | Admin | Top apps analytics |
-| GET | `/api/logs/rbac-audit` | Admin | RBAC audit logs |
+| GET | `/api/users` | Admin viewer | List users |
+| PUT | `/api/users/:id/role` | Admin editor | Change user role |
+| PUT | `/api/users/:id/active` | Admin editor | Activate/deactivate user |
+| DELETE | `/api/users/:id` | Admin editor | Delete user |
+| GET | `/api/groups` | Admin viewer | List groups |
+| GET | `/api/groups/entra/candidates` | Admin viewer | List discovered Entra groups available for import |
+| POST | `/api/groups/entra/import` | Admin editor | Import selected discovered Entra groups |
+| POST | `/api/groups/entra/force-sync` | Admin editor | Force sync Entra memberships for all linked users |
+| POST | `/api/groups/bulk-delete` | Admin editor | Delete multiple groups at once |
+| POST | `/api/groups` | Admin editor | Create group |
+| PUT | `/api/groups/:id` | Admin editor | Update group |
+| DELETE | `/api/groups/:id` | Admin editor | Delete group |
+| POST | `/api/groups/:id/members` | Admin editor | Add members |
+| DELETE | `/api/groups/:id/members/:userId` | Admin editor | Remove member |
+| POST | `/api/groups/:id/apps` | Admin editor | Assign apps |
+| DELETE | `/api/groups/:id/apps/:appId` | Admin editor | Remove app |
+| GET | `/api/logs` | Superadmin | Access logs (paginated) |
+| GET | `/api/logs/top-apps` | Superadmin | Top apps analytics |
+| GET | `/api/logs/audit` | Superadmin | Audit logs (paginated) |
 
 ## Database
 
@@ -298,7 +338,7 @@ SQLite with 9 tables:
 
 | Table | Description |
 |-------|-------------|
-| `users` | Users (auto-created on first SSO login), admin/user roles |
+| `users` | Users (auto-created on first SSO login), superadmin/admin/admin_readonly/user roles |
 | `apps` | App catalog (slug, target_url, icon, icon_file_name, description, tags) |
 | `access_logs` | Proxy access logs (user, app, IP, timestamp) |
 | `user_groups` | User groups for RBAC, including imported Entra groups |
@@ -306,7 +346,7 @@ SQLite with 9 tables:
 | `app_permissions` | Per-group app visibility |
 | `entra_group_cache` | Discovered Entra groups available for admin import |
 | `entra_user_group_memberships` | Cached Entra memberships per user |
-| `rbac_audit_logs` | Audit trail for RBAC mutations |
+| `rbac_audit_logs` | Audit trail for RBAC and privileged platform actions |
 
 On first startup with an empty DB, example apps are seeded automatically.
 

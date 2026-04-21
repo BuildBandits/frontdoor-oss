@@ -53,4 +53,15 @@ export const authorize = (...roles) => {
   };
 };
 
-export const isAdmin = authorize('admin');
+export const ROLE_SUPERADMIN = 'superadmin';
+export const ROLE_ADMIN = 'admin';
+export const ROLE_ADMIN_READONLY = 'admin_readonly';
+export const ROLE_USER = 'user';
+
+export const ADMIN_VIEWER_ROLES = [ROLE_SUPERADMIN, ROLE_ADMIN, ROLE_ADMIN_READONLY];
+export const ADMIN_EDITOR_ROLES = [ROLE_SUPERADMIN, ROLE_ADMIN];
+
+export const isSuperAdmin = authorize(ROLE_SUPERADMIN);
+export const isAdminViewer = authorize(...ADMIN_VIEWER_ROLES);
+export const isAdminEditor = authorize(...ADMIN_EDITOR_ROLES);
+export const isAdmin = isAdminEditor;

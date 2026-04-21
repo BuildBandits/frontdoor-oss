@@ -25,6 +25,7 @@ export function getRequiredEnv(name, context = 'startup') {
 export function getStartupConfig() {
   const baseDomain = process.env.BASE_DOMAIN || 'frontdoor.local';
   const frontendUrl = process.env.FRONTEND_URL || 'https://frontdoor.local';
+  const timezone = process.env.TZ || 'Europe/Rome';
   const azureClientId = process.env.AZURE_CLIENT_ID || '';
   const azureClientSecret = process.env.AZURE_CLIENT_SECRET || '';
   const azureTenantId = process.env.AZURE_TENANT_ID || '';
@@ -40,12 +41,13 @@ export function getStartupConfig() {
     BRANDING_ASSET_DIR: brandingAssetDir,
     BASE_DOMAIN: baseDomain,
     FRONTEND_URL: frontendUrl,
+    TIMEZONE: timezone,
     AZURE_CLIENT_ID: isSet(azureClientId) ? REDACTED : '[missing]',
     AZURE_CLIENT_SECRET: isSet(azureClientSecret) ? REDACTED : '[missing]',
     AZURE_TENANT_ID: isSet(azureTenantId) ? REDACTED : '[missing]',
     AZURE_REDIRECT_URI: azureRedirectUri,
     JWT_SECRET: isSet(jwtSecret) ? REDACTED : '[missing]',
-    ADMIN_EMAILS: adminEmails ? `${adminEmails.split(',').filter(Boolean).length} configured` : '[empty]',
+    ADMIN_EMAILS: adminEmails ? `${adminEmails.split(',').filter(Boolean).length} superadmin configured` : '[empty]',
   };
 }
 
@@ -67,6 +69,9 @@ export function validateStartupEnv() {
   if (!isSet(process.env.FRONTEND_URL)) {
     warnings.push('FRONTEND_URL is not set, defaulting to https://frontdoor.local');
   }
+  if (!isSet(process.env.TZ)) {
+    warnings.push('TZ is not set, defaulting to Europe/Rome');
+  }
   if (!isSet(process.env.BRANDING_ASSET_DIR)) {
     warnings.push('BRANDING_ASSET_DIR is not set, defaulting to ./data/branding');
   }
@@ -80,7 +85,7 @@ export function validateStartupEnv() {
     warnings.push('JWT_SECRET is shorter than 32 characters; use a longer random secret in production');
   }
   if (!isSet(process.env.ADMIN_EMAILS)) {
-    warnings.push('ADMIN_EMAILS is empty; no user will be auto-promoted on first login');
+    warnings.push('ADMIN_EMAILS is empty; no user will be auto-promoted to superadmin on first login');
   }
 
   return { missing, warnings, errors };

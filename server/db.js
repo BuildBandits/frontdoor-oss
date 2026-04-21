@@ -19,7 +19,7 @@ db.exec(`
     email TEXT UNIQUE NOT NULL,
     display_name TEXT,
     microsoft_id TEXT UNIQUE,
-    role TEXT DEFAULT 'user' CHECK(role IN ('admin', 'user')),
+    role TEXT DEFAULT 'user' CHECK(role IN ('superadmin', 'admin', 'admin_readonly', 'user')),
     avatar_color TEXT,
     is_active INTEGER DEFAULT 1,
     last_login TEXT,
@@ -50,8 +50,11 @@ db.exec(`
     hero_title_line1 TEXT NOT NULL,
     hero_title_line2 TEXT NOT NULL,
     hero_subtitle TEXT NOT NULL,
+    show_home_hero INTEGER DEFAULT 1,
     show_app_mode_badges INTEGER DEFAULT 1,
     default_compact_view INTEGER DEFAULT 0,
+    log_retention_days INTEGER DEFAULT 90,
+    hide_login_page INTEGER DEFAULT 0,
     show_shared_cookie_mode INTEGER DEFAULT 1,
     show_redirect_sso_mode INTEGER DEFAULT 1,
     show_entra_app_mode INTEGER DEFAULT 1,
@@ -96,6 +99,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS entra_group_cache (
     entra_group_id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
+    description TEXT,
     first_seen_at TEXT DEFAULT (datetime('now')),
     last_seen_at TEXT DEFAULT (datetime('now'))
   );
@@ -111,7 +115,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     actor_id TEXT NOT NULL,
     action TEXT NOT NULL,
-    target_type TEXT NOT NULL CHECK(target_type IN ('group', 'membership', 'permission', 'role', 'user_status')),
+    target_type TEXT NOT NULL CHECK(target_type IN ('group', 'membership', 'permission', 'role', 'user_status', 'app', 'branding', 'auth')),
     target_id TEXT,
     details TEXT,
     created_at TEXT DEFAULT (datetime('now'))
@@ -143,9 +147,70 @@ ensureColumn('user_groups', 'entra_synced_at', 'entra_synced_at TEXT');
 ensureColumn('apps', 'icon_file_name', 'icon_file_name TEXT');
 ensureColumn('branding_settings', 'show_app_mode_badges', 'show_app_mode_badges INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'default_compact_view', 'default_compact_view INTEGER DEFAULT 0');
+ensureColumn('branding_settings', 'log_retention_days', 'log_retention_days INTEGER DEFAULT 90');
+ensureColumn('branding_settings', 'show_home_hero', 'show_home_hero INTEGER DEFAULT 1');
+ensureColumn('branding_settings', 'hide_login_page', 'hide_login_page INTEGER DEFAULT 0');
 ensureColumn('branding_settings', 'show_shared_cookie_mode', 'show_shared_cookie_mode INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'show_redirect_sso_mode', 'show_redirect_sso_mode INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'show_entra_app_mode', 'show_entra_app_mode INTEGER DEFAULT 1');
+ensureColumn('entra_group_cache', 'description', 'description TEXT');
+
+// Migration: expand user roles for superadmin/admin/admin_readonly on existing databases.
+{
+  const usersSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
+  if (usersSchema && (!usersSchema.sql.includes('superadmin') || !usersSchema.sql.includes('admin_readonly'))) {
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      CREATE TABLE users_new (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        display_name TEXT,
+        microsoft_id TEXT UNIQUE,
+        role TEXT DEFAULT 'user' CHECK(role IN ('superadmin', 'admin', 'admin_readonly', 'user')),
+        avatar_color TEXT,
+        is_active INTEGER DEFAULT 1,
+        last_login TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, is_active, last_login, created_at, updated_at)
+      SELECT id, email, display_name, microsoft_id,
+        CASE WHEN role = 'admin' THEN 'superadmin' ELSE COALESCE(role, 'user') END,
+        avatar_color, is_active, last_login, created_at, updated_at
+      FROM users;
+      DROP TABLE users;
+      ALTER TABLE users_new RENAME TO users;
+    `);
+    db.pragma('foreign_keys = ON');
+  }
+}
+
+// Migration: expand RBAC audit target types on existing databases.
+{
+  const auditSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='rbac_audit_logs'").get();
+  if (auditSchema && (!auditSchema.sql.includes("'app'") || !auditSchema.sql.includes("'branding'") || !auditSchema.sql.includes("'auth'"))) {
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      CREATE TABLE rbac_audit_logs_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        actor_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        target_type TEXT NOT NULL CHECK(target_type IN ('group', 'membership', 'permission', 'role', 'user_status', 'app', 'branding', 'auth')),
+        target_id TEXT,
+        details TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      INSERT INTO rbac_audit_logs_new (id, actor_id, action, target_type, target_id, details, created_at)
+      SELECT id, actor_id, action, target_type, target_id, details, created_at
+      FROM rbac_audit_logs;
+      DROP TABLE rbac_audit_logs;
+      ALTER TABLE rbac_audit_logs_new RENAME TO rbac_audit_logs;
+      CREATE INDEX IF NOT EXISTS idx_rbac_audit_actor ON rbac_audit_logs(actor_id);
+      CREATE INDEX IF NOT EXISTS idx_rbac_audit_target ON rbac_audit_logs(target_type, target_id);
+    `);
+    db.pragma('foreign_keys = ON');
+  }
+}
 
 // Migration: add 'entra-app' to apps.mode CHECK constraint (existing databases only)
 {
@@ -180,6 +245,9 @@ ensureColumn('branding_settings', 'show_entra_app_mode', 'show_entra_app_mode IN
 }
 db.exec('UPDATE branding_settings SET show_app_mode_badges = COALESCE(show_app_mode_badges, 1)');
 db.exec('UPDATE branding_settings SET default_compact_view = COALESCE(default_compact_view, 0)');
+db.exec('UPDATE branding_settings SET log_retention_days = COALESCE(log_retention_days, 90)');
+db.exec('UPDATE branding_settings SET show_home_hero = COALESCE(show_home_hero, 1)');
+db.exec('UPDATE branding_settings SET hide_login_page = COALESCE(hide_login_page, 0)');
 db.exec('UPDATE branding_settings SET show_shared_cookie_mode = COALESCE(show_shared_cookie_mode, 1)');
 db.exec('UPDATE branding_settings SET show_redirect_sso_mode = COALESCE(show_redirect_sso_mode, 1)');
 db.exec('UPDATE branding_settings SET show_entra_app_mode = COALESCE(show_entra_app_mode, 1)');
@@ -203,9 +271,9 @@ db.exec(`
 
 db.prepare(`
   INSERT OR IGNORE INTO branding_settings (
-    id, hero_title_line1, hero_title_line2, hero_subtitle, show_app_mode_badges, default_compact_view, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type
+    id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, show_app_mode_badges, default_compact_view, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type
   )
-  VALUES (?, ?, ?, ?, 1, 0, 1, 1, 1, NULL, NULL)
+  VALUES (?, ?, ?, ?, 1, 1, 0, 90, 0, 1, 1, 1, NULL, NULL)
 `).run(
   'default',
   'Le tue applicazioni,',
@@ -226,8 +294,8 @@ db.prepare(`INSERT OR IGNORE INTO user_groups (id, name, description) VALUES (?,
 // Ensure default admins (from env var, comma-separated)
 const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
 for (const email of adminEmails) {
-  const result = db.prepare("UPDATE users SET role = 'admin', updated_at = datetime('now') WHERE email = ? AND role != 'admin'").run(email);
-  if (result.changes > 0) console.log('Promoted user to admin.');
+  const result = db.prepare("UPDATE users SET role = 'superadmin', updated_at = datetime('now') WHERE email = ? AND role != 'superadmin'").run(email);
+  if (result.changes > 0) console.log('Promoted user to superadmin.');
 }
 
 // Backfill: add users to "default" only if they are not in ANY group yet

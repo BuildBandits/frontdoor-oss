@@ -1,28 +1,20 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, X, Save, Users, ChevronDown, ChevronRight, AppWindow, Pencil, AlertCircle, Check, Clock, Mail, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Plus, Trash2, X, Save, Users, ChevronDown, ChevronRight, AppWindow, Pencil, Clock, Mail, RefreshCw } from 'lucide-react';
 import api from '../services/api';
+import { useAuthStore } from '../stores/authStore';
 import UserAvatar from '../components/UserAvatar';
 import AppIcon from '../components/AppIcon';
+import PageNotice from '../components/PageNotice';
+import ConfirmDialog from '../components/ConfirmDialog';
+import ClearableSearchField from '../components/ClearableSearchField';
 
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
 
-function Toast({ message, type = 'success', onClose }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 3000);
-    return () => clearTimeout(t);
-  }, [onClose]);
-
-  return (
-    <div className={`fixed bottom-6 right-6 z-[60] flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all ${
-      type === 'error' ? 'bg-red-600 text-white' : 'bg-dark text-white'
-    }`}>
-      {type === 'error' ? <AlertCircle className="w-4 h-4" /> : <Check className="w-4 h-4" />}
-      {message}
-    </div>
-  );
-}
-
 export default function AdminGroups() {
+  const { user } = useAuthStore();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedGroup, setExpandedGroup] = useState(null);
@@ -30,9 +22,33 @@ export default function AdminGroups() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
 
-  // Toast
-  const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'success') => setToast({ message, type });
+  const [pageNotice, setPageNotice] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [groupSearch, setGroupSearch] = useState('');
+
+  useEffect(() => {
+    if (!pageNotice) return undefined;
+    const timer = setTimeout(() => setPageNotice(null), 6000);
+    return () => clearTimeout(timer);
+  }, [pageNotice]);
+
+  const showToast = (message, type = 'success') => setPageNotice({ message, type });
+  const openConfirm = (dialog) => setConfirmDialog(dialog);
+  const closeConfirm = () => {
+    if (confirmBusy) return;
+    setConfirmDialog(null);
+  };
+  const runConfirm = async () => {
+    if (!confirmDialog?.onConfirm) return;
+    setConfirmBusy(true);
+    try {
+      await confirmDialog.onConfirm();
+    } finally {
+      setConfirmBusy(false);
+      setConfirmDialog(null);
+    }
+  };
 
   // Create group modal
   const [showCreate, setShowCreate] = useState(false);
@@ -68,6 +84,7 @@ export default function AdminGroups() {
   const [selectedEntraGroups, setSelectedEntraGroups] = useState([]);
   const [importingEntra, setImportingEntra] = useState(false);
   const [forceSyncing, setForceSyncing] = useState(false);
+  const canEdit = user?.role !== 'admin_readonly';
 
   const groupLabel = (group) => group.entra_display_name || group.name;
   const isEntraGroup = (group) => group.source === 'entra';
@@ -95,11 +112,87 @@ export default function AdminGroups() {
 
   useEffect(() => { loadGroups(); }, [loadGroups]);
   useEffect(() => {
+    const incomingSearch = location.state?.groupSearch;
+    if (!incomingSearch) return;
+    setGroupSearch(incomingSearch);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate]);
+  useEffect(() => {
     if (!showCreateMenu) return undefined;
     const closeMenu = () => setShowCreateMenu(false);
     document.addEventListener('click', closeMenu);
     return () => document.removeEventListener('click', closeMenu);
   }, [showCreateMenu]);
+
+  const closeCurrentModal = () => {
+    if (showCreate) {
+      setShowCreate(false);
+      setNewName('');
+      setNewDesc('');
+      setSaving(false);
+      return;
+    }
+    if (showEntraImport) {
+      setShowEntraImport(false);
+      setSelectedEntraGroups([]);
+      setEntraSearch('');
+      setImportingEntra(false);
+      return;
+    }
+    if (showAddMembers) {
+      setShowAddMembers(false);
+      setAllUsers([]);
+      setMemberSearch('');
+      setInviteEmail('');
+      setInvitingEmail(false);
+      return;
+    }
+    if (showAddApps) {
+      setShowAddApps(false);
+      setAllApps([]);
+      setAppSearch('');
+    }
+  };
+
+  const activeModal = showCreate
+    ? 'create'
+    : showEntraImport
+      ? 'entraImport'
+      : showAddMembers
+        ? 'addMembers'
+        : showAddApps
+          ? 'addApps'
+          : null;
+
+  const activeModalDirty = activeModal === 'create'
+    ? Boolean(newName.trim() || newDesc.trim())
+    : activeModal === 'entraImport'
+      ? selectedEntraGroups.length > 0
+      : activeModal === 'addMembers'
+        ? Boolean(inviteEmail.trim())
+        : false;
+
+  useEffect(() => {
+    if (!activeModal || confirmDialog) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      if (activeModalDirty) {
+        openConfirm({
+          title: 'Chiudere senza salvare?',
+          message: 'Hai modifiche non salvate nel modale aperto. Vuoi chiuderlo comunque?',
+          confirmLabel: 'Chiudi',
+          onConfirm: async () => {
+            closeCurrentModal();
+          },
+        });
+        return;
+      }
+      closeCurrentModal();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [activeModal, activeModalDirty, confirmDialog, showCreate, showEntraImport, showAddMembers, showAddApps, newName, newDesc, inviteEmail, selectedEntraGroups.length]);
 
   const loadGroupDetail = async (groupId) => {
     setDetailLoading(true);
@@ -125,6 +218,10 @@ export default function AdminGroups() {
   };
 
   const handleCreate = async () => {
+    if (!canEdit) {
+      showToast('Questa pagina è in sola lettura', 'error');
+      return;
+    }
     if (!newName.trim()) return;
     setSaving(true);
     try {
@@ -141,6 +238,10 @@ export default function AdminGroups() {
   };
 
   const handleForceSyncGroups = async () => {
+    if (!canEdit) {
+      showToast('Questa pagina è in sola lettura', 'error');
+      return;
+    }
     setForceSyncing(true);
     try {
       const res = await api.post('/groups/entra/force-sync');
@@ -150,7 +251,7 @@ export default function AdminGroups() {
       const baseMessage = `Sync completata: ${summary.usersSynced}/${summary.usersConsidered} utenti, ${summary.discoveredGroups} gruppi`;
       showToast(
         errorCount > 0
-          ? `${baseMessage}. ${errorCount} errori${firstError?.email ? `, primo su ${firstError.email}` : ''}${firstError?.message ? `: ${firstError.message}` : ''}${firstError?.hint ? ` (${firstError.hint})` : ''}`
+          ? `${baseMessage}. ${errorCount} errori${firstError?.name ? `, primo gruppo ${firstError.name}` : ''}${firstError?.message ? `: ${firstError.message}` : ''}${firstError?.hint ? ` (${firstError.hint})` : ''}`
           : baseMessage,
         errorCount > 0 ? 'error' : 'success',
       );
@@ -163,13 +264,24 @@ export default function AdminGroups() {
     setForceSyncing(false);
   };
 
-  const openEntraImport = async () => {
+  const openEntraImport = async (prefillGroupIds = [], prefillSearch = '') => {
+    if (!canEdit) {
+      showToast('Questa pagina è in sola lettura', 'error');
+      return;
+    }
     setShowCreateMenu(false);
-    setEntraSearch('');
-    setSelectedEntraGroups([]);
+    setEntraSearch(prefillSearch);
+    setSelectedEntraGroups(prefillGroupIds);
     setShowEntraImport(true);
     await loadEntraCandidates();
   };
+
+  useEffect(() => {
+    const incomingGroupId = location.state?.openEntraImport;
+    if (!incomingGroupId) return;
+    openEntraImport([incomingGroupId], location.state?.entraSearch || '');
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate]);
 
   const toggleEntraGroupSelection = (groupId) => {
     setSelectedEntraGroups((prev) =>
@@ -201,21 +313,31 @@ export default function AdminGroups() {
   };
 
   const handleDelete = async (group) => {
+    if (!canEdit) {
+      showToast('Questa pagina è in sola lettura', 'error');
+      return;
+    }
     const groupName = groupLabel(group);
     const sourceLabel = group.source === 'entra' ? 'importato da Entra' : 'locale';
-    if (!confirm(`Eliminare il gruppo ${sourceLabel} "${groupName}"? I membri non saranno eliminati, ma perderanno la visibilità delle app assegnate solo a questo gruppo.`)) return;
-    try {
-      await api.delete(`/groups/${group.id}`);
-      if (expandedGroup === group.id) {
-        setExpandedGroup(null);
-        setGroupDetail(null);
-      }
-      setSelectedGroupIds((prev) => prev.filter((id) => id !== group.id));
-      showToast(`Gruppo "${groupName}" eliminato`);
-      await loadGroups();
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Errore', 'error');
-    }
+    openConfirm({
+      title: `Eliminare il gruppo ${sourceLabel} "${groupName}"?`,
+      message: 'I membri non saranno eliminati, ma perderanno la visibilità delle app assegnate solo a questo gruppo.',
+      confirmLabel: 'Elimina gruppo',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/groups/${group.id}`);
+          if (expandedGroup === group.id) {
+            setExpandedGroup(null);
+            setGroupDetail(null);
+          }
+          setSelectedGroupIds((prev) => prev.filter((id) => id !== group.id));
+          showToast(`Gruppo "${groupName}" eliminato`);
+          await loadGroups();
+        } catch (err) {
+          showToast(err.response?.data?.error || 'Errore', 'error');
+        }
+      },
+    });
   };
 
   const toggleGroupSelection = (groupId) => {
@@ -249,23 +371,26 @@ export default function AdminGroups() {
       groupsWithApps > 0 ? `${groupsWithApps} gruppi selezionati hanno app assegnate.` : null,
       'I membri non saranno eliminati, ma perderanno la visibilità delle app assegnate a questi gruppi.',
     ].filter(Boolean).join('\n\n');
-    if (!confirm(confirmMessage)) return;
-
-    try {
-      const res = await api.post('/groups/bulk-delete', { groupIds: selectedGroupIds });
-      const deletedGroups = res.data.deletedGroups || [];
-      const localDeleted = deletedGroups.filter((group) => group.source !== 'entra').length;
-      const entraDeleted = deletedGroups.filter((group) => group.source === 'entra').length;
-      clearSelection();
-      setExpandedGroup(null);
-      setGroupDetail(null);
-      showToast(
-        `${selectedCount} gruppi eliminati (${localDeleted} locali, ${entraDeleted} Entra)`
-      );
-      await loadGroups();
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Errore nella cancellazione multipla', 'error');
-    }
+    openConfirm({
+      title: `Eliminare definitivamente ${selectedCount} gruppi selezionati?`,
+      message: confirmMessage,
+      confirmLabel: 'Elimina selezionati',
+      onConfirm: async () => {
+        try {
+          const res = await api.post('/groups/bulk-delete', { groupIds: selectedGroupIds });
+          const deletedGroups = res.data.deletedGroups || [];
+          const localDeleted = deletedGroups.filter((group) => group.source !== 'entra').length;
+          const entraDeleted = deletedGroups.filter((group) => group.source === 'entra').length;
+          clearSelection();
+          setExpandedGroup(null);
+          setGroupDetail(null);
+          showToast(`${selectedCount} gruppi eliminati (${localDeleted} locali, ${entraDeleted} Entra)`);
+          await loadGroups();
+        } catch (err) {
+          showToast(err.response?.data?.error || 'Errore nella cancellazione multipla', 'error');
+        }
+      },
+    });
   };
 
   const selectedCount = selectedGroupIds.length;
@@ -282,6 +407,10 @@ export default function AdminGroups() {
   };
 
   const saveEdit = async () => {
+    if (!canEdit) {
+      showToast('Questa pagina è in sola lettura', 'error');
+      return;
+    }
     if (!editName.trim()) return;
     try {
       await api.put(`/groups/${editingGroup}`, { name: editName.trim(), description: editDesc.trim() });
@@ -296,6 +425,10 @@ export default function AdminGroups() {
 
   // --- Members ---
   const openAddMembers = async () => {
+    if (!canEdit) {
+      showToast('Questa pagina è in sola lettura', 'error');
+      return;
+    }
     try {
       const res = await api.get('/users');
       setAllUsers(res.data.users);
@@ -308,6 +441,10 @@ export default function AdminGroups() {
   };
 
   const addMember = async (userId) => {
+    if (!canEdit) {
+      showToast('Questa pagina è in sola lettura', 'error');
+      return;
+    }
     try {
       await api.post(`/groups/${expandedGroup}/members`, { userIds: [userId] });
       await loadGroupDetail(expandedGroup);
@@ -318,6 +455,10 @@ export default function AdminGroups() {
   };
 
   const addMemberByEmail = async () => {
+    if (!canEdit) {
+      showToast('Questa pagina è in sola lettura', 'error');
+      return;
+    }
     if (!inviteEmail.trim()) return;
     setInvitingEmail(true);
     try {
@@ -333,18 +474,32 @@ export default function AdminGroups() {
   };
 
   const removeMember = async (userId, displayName) => {
-    if (!confirm(`Rimuovere ${displayName || 'questo utente'} dal gruppo?`)) return;
-    try {
-      await api.delete(`/groups/${expandedGroup}/members/${userId}`);
-      await loadGroupDetail(expandedGroup);
-      await loadGroups();
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Errore', 'error');
+    if (!canEdit) {
+      showToast('Questa pagina è in sola lettura', 'error');
+      return;
     }
+    openConfirm({
+      title: `Rimuovere ${displayName || 'questo utente'} dal gruppo?`,
+      message: 'L’utente perderà la visibilità delle app assegnate solo a questo gruppo.',
+      confirmLabel: 'Rimuovi membro',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/groups/${expandedGroup}/members/${userId}`);
+          await loadGroupDetail(expandedGroup);
+          await loadGroups();
+        } catch (err) {
+          showToast(err.response?.data?.error || 'Errore', 'error');
+        }
+      },
+    });
   };
 
   // --- Apps ---
   const openAddApps = async () => {
+    if (!canEdit) {
+      showToast('Questa pagina è in sola lettura', 'error');
+      return;
+    }
     try {
       const res = await api.get('/apps/all');
       setAllApps(res.data.apps);
@@ -356,6 +511,10 @@ export default function AdminGroups() {
   };
 
   const addApp = async (appId) => {
+    if (!canEdit) {
+      showToast('Questa pagina è in sola lettura', 'error');
+      return;
+    }
     try {
       await api.post(`/groups/${expandedGroup}/apps`, { appIds: [appId] });
       await loadGroupDetail(expandedGroup);
@@ -366,14 +525,24 @@ export default function AdminGroups() {
   };
 
   const removeApp = async (appId, appName) => {
-    if (!confirm(`Rimuovere "${appName || 'questa app'}" dal gruppo?`)) return;
-    try {
-      await api.delete(`/groups/${expandedGroup}/apps/${appId}`);
-      await loadGroupDetail(expandedGroup);
-      await loadGroups();
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Errore', 'error');
+    if (!canEdit) {
+      showToast('Questa pagina è in sola lettura', 'error');
+      return;
     }
+    openConfirm({
+      title: `Rimuovere "${appName || 'questa app'}" dal gruppo?`,
+      message: 'L’app non sarà più visibile agli utenti di questo gruppo.',
+      confirmLabel: 'Rimuovi app',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/groups/${expandedGroup}/apps/${appId}`);
+          await loadGroupDetail(expandedGroup);
+          await loadGroups();
+        } catch (err) {
+          showToast(err.response?.data?.error || 'Errore', 'error');
+        }
+      },
+    });
   };
 
   // Filter for add-members modal: exclude already-in-group
@@ -403,6 +572,20 @@ export default function AdminGroups() {
     );
   });
 
+  const filteredGroups = useMemo(() => {
+    if (!groupSearch.trim()) return groups;
+    const q = groupSearch.toLowerCase();
+    return groups.filter((group) => {
+      const searchable = [
+        groupLabel(group),
+        group.description || '',
+        group.source || '',
+        group.app_search_text || '',
+      ].join(' ').toLowerCase();
+      return searchable.includes(q);
+    });
+  }, [groups, groupSearch]);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -421,23 +604,26 @@ export default function AdminGroups() {
               </span>
               <button
                 onClick={clearSelection}
-                className="text-red-600 hover:underline font-medium"
+                disabled={!canEdit}
+                className="text-red-600 hover:underline font-medium disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Annulla
               </button>
               <button
                 onClick={deleteSelectedGroups}
-                className="px-3 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors"
+                disabled={!canEdit}
+                className="px-3 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Elimina selezionati
               </button>
             </div>
           )}
           <div className="relative">
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowCreateMenu((value) => !value); }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors"
-            >
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowCreateMenu((value) => !value); }}
+                disabled={!canEdit}
+                className="flex items-center gap-2 px-4 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
               <Plus className="w-4 h-4" />
               Nuovo Gruppo
               <ChevronDown className="w-4 h-4" />
@@ -453,14 +639,16 @@ export default function AdminGroups() {
                     setShowCreateMenu(false);
                     setShowCreate(true);
                   }}
-                  className="w-full px-4 py-3 text-left text-sm text-dark hover:bg-gray-50 flex items-center gap-2"
+                  disabled={!canEdit}
+                  className="w-full px-4 py-3 text-left text-sm text-dark hover:bg-gray-50 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-4 h-4" />
                   Nuovo gruppo locale
                 </button>
                 <button
                   onClick={openEntraImport}
-                  className="w-full px-4 py-3 text-left text-sm text-dark hover:bg-gray-50 flex items-center gap-2 border-t border-gray-100"
+                  disabled={!canEdit}
+                  className="w-full px-4 py-3 text-left text-sm text-dark hover:bg-gray-50 flex items-center gap-2 border-t border-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Users className="w-4 h-4" />
                   Nuovo gruppo da Entra
@@ -469,14 +657,43 @@ export default function AdminGroups() {
             )}
           </div>
 
-          <button
-            onClick={handleForceSyncGroups}
-            disabled={forceSyncing}
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-dark rounded-xl font-semibold text-sm hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
+            <button
+              onClick={handleForceSyncGroups}
+              disabled={forceSyncing || !canEdit}
+              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-dark rounded-xl font-semibold text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
             <RefreshCw className={`w-4 h-4 ${forceSyncing ? 'animate-spin' : ''}`} />
             Sincronizza gruppi
           </button>
+        </div>
+      </div>
+
+      {!canEdit && (
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          Modalità sola lettura: puoi consultare gruppi, membri e app visibili, ma non modificarli.
+        </div>
+      )}
+
+      {pageNotice && (
+        <div className="mb-6">
+          <PageNotice
+            type={pageNotice.type}
+            message={pageNotice.message}
+            onClose={() => setPageNotice(null)}
+          />
+        </div>
+      )}
+
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[240px]">
+          <ClearableSearchField
+            value={groupSearch}
+            onChange={setGroupSearch}
+            placeholder="Cerca gruppi o app associate..."
+          />
+        </div>
+        <div className="text-xs text-gray-400">
+          {filteredGroups.length} gruppi su {groups.length}
         </div>
       </div>
 
@@ -499,6 +716,7 @@ export default function AdminGroups() {
               <input
                 type="checkbox"
                 checked={allDeletableSelected}
+                disabled={!canEdit}
                 onChange={() => {
                   if (allDeletableSelected) {
                     clearSelection();
@@ -506,7 +724,7 @@ export default function AdminGroups() {
                     selectAllDeletableGroups();
                   }
                 }}
-                className="rounded border-gray-300 text-dark focus:ring-accent"
+                className="rounded border-gray-300 text-dark focus:ring-accent disabled:opacity-40 disabled:cursor-not-allowed"
               />
               <span>Seleziona tutti i gruppi eliminabili</span>
             </label>
@@ -515,28 +733,31 @@ export default function AdminGroups() {
               <button
                 type="button"
                 onClick={selectAllDeletableGroups}
-                className="font-medium text-accent hover:underline"
+                disabled={!canEdit}
+                className="font-medium text-accent hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Seleziona tutti
               </button>
               <button
                 type="button"
                 onClick={clearSelection}
-                className="font-medium text-gray-500 hover:underline"
+                disabled={!canEdit}
+                className="font-medium text-gray-500 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Deseleziona tutto
               </button>
               <button
                 type="button"
                 onClick={invertSelection}
-                className="font-medium text-gray-500 hover:underline"
+                disabled={!canEdit}
+                className="font-medium text-gray-500 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Inverti selezione
               </button>
             </div>
           </div>
 
-          {groups.map((group) => (
+          {filteredGroups.map((group) => (
             <div key={group.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
               {/* Group row */}
               <div
@@ -548,6 +769,7 @@ export default function AdminGroups() {
                     <input
                       type="checkbox"
                       checked={selectedGroupIds.includes(group.id)}
+                      disabled={!canEdit}
                       onChange={(e) => {
                         e.stopPropagation();
                         toggleGroupSelection(group.id);
@@ -582,7 +804,8 @@ export default function AdminGroups() {
                   {group.id !== DEFAULT_GROUP_ID && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(group); }}
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      disabled={!canEdit}
+                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       title="Elimina gruppo"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -641,8 +864,12 @@ export default function AdminGroups() {
                             </div>
                             <button
                               onClick={(e) => { e.stopPropagation(); startEdit(group); }}
-                              disabled={isEntraGroup(group)}
-                              className="flex items-center gap-1 text-xs text-gray-400 hover:text-dark transition-colors"
+                              disabled={!canEdit || isEntraGroup(group)}
+                              className={`flex items-center gap-1 text-xs transition-colors ${
+                                !canEdit || isEntraGroup(group)
+                                  ? 'text-gray-300 cursor-not-allowed'
+                                  : 'text-gray-400 hover:text-dark'
+                              }`}
                             >
                               <Pencil className="w-3 h-3" />
                               Modifica
@@ -660,8 +887,12 @@ export default function AdminGroups() {
                             </h3>
                             <button
                               onClick={openAddMembers}
-                              disabled={isEntraGroup(group)}
-                              className="text-xs font-medium text-accent hover:underline"
+                              disabled={!canEdit || isEntraGroup(group)}
+                              className={`text-xs font-medium transition-colors ${
+                                !canEdit || isEntraGroup(group)
+                                  ? 'text-gray-300 cursor-not-allowed'
+                                  : 'text-accent hover:underline'
+                              }`}
                             >
                               + Aggiungi
                             </button>
@@ -687,8 +918,14 @@ export default function AdminGroups() {
                                     />
                                     <div>
                                       <span className="text-sm text-dark">{m.display_name || m.email}</span>
+                                      {m.role === 'superadmin' && (
+                                        <span className="ml-1.5 text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-medium">superadmin</span>
+                                      )}
                                       {m.role === 'admin' && (
                                         <span className="ml-1.5 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">admin</span>
+                                      )}
+                                      {m.role === 'admin_readonly' && (
+                                        <span className="ml-1.5 text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-medium">sola lettura</span>
                                       )}
                                       {!m.last_login && (
                                         <span className="ml-1.5 text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium inline-flex items-center gap-0.5">
@@ -700,7 +937,8 @@ export default function AdminGroups() {
                                   {!isEntraGroup(group) && (
                                     <button
                                       onClick={() => removeMember(m.id, m.display_name)}
-                                      className="text-gray-300 hover:text-red-500 transition-colors"
+                                      disabled={!canEdit}
+                                      className="text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                       title="Rimuovi dal gruppo"
                                     >
                                       <X className="w-4 h-4" />
@@ -725,7 +963,8 @@ export default function AdminGroups() {
                             </h3>
                             <button
                               onClick={openAddApps}
-                              className="text-xs font-medium text-accent hover:underline"
+                              disabled={!canEdit}
+                              className="text-xs font-medium text-accent hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               + Aggiungi
                             </button>
@@ -746,7 +985,8 @@ export default function AdminGroups() {
                                   </div>
                                   <button
                                     onClick={() => removeApp(a.id, a.name)}
-                                    className="text-gray-300 hover:text-red-500 transition-colors"
+                                    disabled={!canEdit}
+                                    className="text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                     title="Rimuovi dal gruppo"
                                   >
                                     <X className="w-4 h-4" />
@@ -836,12 +1076,10 @@ export default function AdminGroups() {
 
             <div className="space-y-4">
               <div className="relative">
-                <input
-                  type="text"
+                <ClearableSearchField
                   value={entraSearch}
-                  onChange={(e) => setEntraSearch(e.target.value)}
+                  onChange={setEntraSearch}
                   placeholder="Cerca per nome o ID Entra..."
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
 
@@ -964,12 +1202,11 @@ export default function AdminGroups() {
             <div className="border-t border-gray-100 pt-3">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Oppure seleziona utente esistente</p>
             </div>
-            <input
-              type="text"
+            <ClearableSearchField
               value={memberSearch}
-              onChange={(e) => setMemberSearch(e.target.value)}
+              onChange={setMemberSearch}
               placeholder="Cerca utente..."
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl mb-3 focus:outline-none focus:ring-2 focus:ring-accent"
+              className="mb-3"
             />
             <div className="max-h-72 overflow-y-auto space-y-1">
               {filteredUsers.length === 0 ? (
@@ -1011,12 +1248,11 @@ export default function AdminGroups() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <input
-              type="text"
+            <ClearableSearchField
               value={appSearch}
-              onChange={(e) => setAppSearch(e.target.value)}
+              onChange={setAppSearch}
               placeholder="Cerca app..."
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl mb-3 focus:outline-none focus:ring-2 focus:ring-accent"
+              className="mb-3"
               autoFocus
             />
             <div className="max-h-72 overflow-y-auto space-y-1">
@@ -1042,8 +1278,15 @@ export default function AdminGroups() {
         </div>
       )}
 
-      {/* Toast */}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmDialog
+        open={Boolean(confirmDialog)}
+        title={confirmDialog?.title || ''}
+        message={confirmDialog?.message || ''}
+        confirmLabel={confirmDialog?.confirmLabel || 'Conferma'}
+        busy={confirmBusy}
+        onConfirm={runConfirm}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 }

@@ -9,8 +9,11 @@ const DEFAULT_BRANDING = {
   heroTitleLine1: 'Le tue applicazioni,',
   heroTitleLine2: 'tutte in un unico posto.',
   heroSubtitle: 'Accedi rapidamente a tutti gli strumenti e le piattaforme del tuo workspace.',
+  showHomeHero: true,
   showAppModeBadges: true,
   defaultCompactView: false,
+  logRetentionDays: 90,
+  hideLoginPage: false,
   showSharedCookieMode: true,
   showRedirectSsoMode: true,
   showEntraAppMode: true,
@@ -30,6 +33,13 @@ function normalizeText(value, fallback) {
   return text || fallback;
 }
 
+function normalizeRetentionDays(value, fallback = 90) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const days = Number.parseInt(value, 10);
+  if (!Number.isFinite(days)) return fallback;
+  return Math.min(90, Math.max(0, days));
+}
+
 function getStoredBrandingRow() {
   return db.prepare('SELECT * FROM branding_settings WHERE id = ?').get(BRANDING_ID);
 }
@@ -40,8 +50,11 @@ function toPublicBranding(row) {
     heroTitleLine1: normalizeText(row?.hero_title_line1, DEFAULT_BRANDING.heroTitleLine1),
     heroTitleLine2: normalizeText(row?.hero_title_line2, DEFAULT_BRANDING.heroTitleLine2),
     heroSubtitle: normalizeText(row?.hero_subtitle, DEFAULT_BRANDING.heroSubtitle),
+    showHomeHero: row?.show_home_hero !== 0,
     showAppModeBadges: row?.show_app_mode_badges !== 0,
     defaultCompactView: row?.default_compact_view !== 0,
+    logRetentionDays: normalizeRetentionDays(row?.log_retention_days, DEFAULT_BRANDING.logRetentionDays),
+    hideLoginPage: row?.hide_login_page !== 0,
     showSharedCookieMode: row?.show_shared_cookie_mode !== 0,
     showRedirectSsoMode: row?.show_redirect_sso_mode !== 0,
     showEntraAppMode: row?.show_entra_app_mode !== 0,
@@ -113,12 +126,21 @@ export async function updateBrandingSettings(input = {}) {
   const heroTitleLine1 = normalizeText(input.heroTitleLine1, current?.hero_title_line1 || DEFAULT_BRANDING.heroTitleLine1);
   const heroTitleLine2 = normalizeText(input.heroTitleLine2, current?.hero_title_line2 || DEFAULT_BRANDING.heroTitleLine2);
   const heroSubtitle = normalizeText(input.heroSubtitle, current?.hero_subtitle || DEFAULT_BRANDING.heroSubtitle);
+  const showHomeHero = input.showHomeHero === undefined
+    ? (current?.show_home_hero ?? 1)
+    : (input.showHomeHero ? 1 : 0);
   const showAppModeBadges = input.showAppModeBadges === undefined
     ? (current?.show_app_mode_badges ?? 1)
     : (input.showAppModeBadges ? 1 : 0);
   const defaultCompactView = input.defaultCompactView === undefined
     ? (current?.default_compact_view ?? 0)
     : (input.defaultCompactView ? 1 : 0);
+  const logRetentionDays = input.logRetentionDays === undefined
+    ? (current?.log_retention_days ?? DEFAULT_BRANDING.logRetentionDays)
+    : normalizeRetentionDays(input.logRetentionDays, DEFAULT_BRANDING.logRetentionDays);
+  const hideLoginPage = input.hideLoginPage === undefined
+    ? (current?.hide_login_page ?? 0)
+    : (input.hideLoginPage ? 1 : 0);
   const showSharedCookieMode = input.showSharedCookieMode === undefined
     ? (current?.show_shared_cookie_mode ?? 1)
     : (input.showSharedCookieMode ? 1 : 0);
@@ -144,15 +166,18 @@ export async function updateBrandingSettings(input = {}) {
 
   db.prepare(`
     INSERT INTO branding_settings (
-      id, hero_title_line1, hero_title_line2, hero_subtitle, show_app_mode_badges, default_compact_view, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type, updated_at
+      id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, show_app_mode_badges, default_compact_view, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       hero_title_line1 = excluded.hero_title_line1,
       hero_title_line2 = excluded.hero_title_line2,
       hero_subtitle = excluded.hero_subtitle,
+      show_home_hero = excluded.show_home_hero,
       show_app_mode_badges = excluded.show_app_mode_badges,
       default_compact_view = excluded.default_compact_view,
+      log_retention_days = excluded.log_retention_days,
+      hide_login_page = excluded.hide_login_page,
       show_shared_cookie_mode = excluded.show_shared_cookie_mode,
       show_redirect_sso_mode = excluded.show_redirect_sso_mode,
       show_entra_app_mode = excluded.show_entra_app_mode,
@@ -164,8 +189,11 @@ export async function updateBrandingSettings(input = {}) {
     heroTitleLine1,
     heroTitleLine2,
     heroSubtitle,
+    showHomeHero,
     showAppModeBadges,
     defaultCompactView,
+    logRetentionDays,
+    hideLoginPage,
     showSharedCookieMode,
     showRedirectSsoMode,
     showEntraAppMode,

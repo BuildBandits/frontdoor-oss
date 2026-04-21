@@ -54,18 +54,22 @@ export default function TagInput({ value = [], onChange, placeholder = 'Aggiungi
   const normalizedSuggestions = useMemo(() => {
     const currentTags = new Set(normalizeValue(value));
     const query = normalizeTag(input);
-    if (!query) return [];
-
     const seen = new Set();
-    return suggestions
+    const baseSuggestions = suggestions
       .map(normalizeTag)
       .filter((tag) => tag && !currentTags.has(tag))
-      .filter((tag) => tag.includes(query))
       .filter((tag) => {
         if (seen.has(tag)) return false;
         seen.add(tag);
         return true;
-      })
+      });
+
+    if (!query) {
+      return baseSuggestions.slice(0, 8);
+    }
+
+    return baseSuggestions
+      .filter((tag) => tag.includes(query))
       .slice(0, 6);
   }, [suggestions, input, value]);
 
@@ -106,10 +110,10 @@ export default function TagInput({ value = [], onChange, placeholder = 'Aggiungi
         />
       </div>
 
-      {showSuggestions && input.trim() && normalizedSuggestions.length > 0 && (
+      {showSuggestions && normalizedSuggestions.length > 0 && (
         <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
           <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 border-b border-gray-100">
-            Suggerimenti
+            {input.trim() ? 'Suggerimenti' : 'Etichette disponibili'}
           </div>
           <div className="max-h-48 overflow-y-auto py-1">
             {normalizedSuggestions.map((tag) => (

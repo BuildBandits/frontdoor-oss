@@ -7,12 +7,16 @@ import Personalizza from './pages/Personalizza';
 import AdminGroups from './pages/AdminGroups';
 import AdminUsers from './pages/AdminUsers';
 import AdminLogs from './pages/AdminLogs';
+import AdminAudit from './pages/AdminAudit';
 import Layout from './components/Layout';
 
-function ProtectedRoute({ children, adminOnly = false }) {
+const ADMIN_VIEWER_ROLES = ['superadmin', 'admin', 'admin_readonly'];
+
+function ProtectedRoute({ children, adminOnly = false, superAdminOnly = false }) {
   const { isAuthenticated, user } = useAuthStore();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (adminOnly && user?.role !== 'admin') return <Navigate to="/" replace />;
+  if (superAdminOnly && user?.role !== 'superadmin') return <Navigate to="/" replace />;
+  if (adminOnly && !ADMIN_VIEWER_ROLES.includes(user?.role)) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -43,7 +47,7 @@ export default function App() {
       <Route
         path="/admin/personalizza"
         element={
-          <ProtectedRoute adminOnly>
+          <ProtectedRoute superAdminOnly>
             <Layout>
               <Personalizza />
             </Layout>
@@ -73,9 +77,19 @@ export default function App() {
       <Route
         path="/admin/logs"
         element={
-          <ProtectedRoute adminOnly>
+          <ProtectedRoute superAdminOnly>
             <Layout>
               <AdminLogs />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/audit"
+        element={
+          <ProtectedRoute superAdminOnly>
+            <Layout>
+              <AdminAudit />
             </Layout>
           </ProtectedRoute>
         }

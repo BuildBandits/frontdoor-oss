@@ -2,10 +2,16 @@ import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
+import { ConfidentialClientApplication } from '@azure/msal-node';
 
 const DEFAULT_CACHE_DIR = process.env.AVATAR_CACHE_DIR || path.join(process.cwd(), 'data', 'avatar-cache');
 const DEFAULT_TTL_DAYS = Number(process.env.AVATAR_CACHE_TTL_DAYS || 14);
 const NONE_TTL_DAYS = Number(process.env.AVATAR_CACHE_MISS_TTL_DAYS || 30);
+const GRAPH_APP_SCOPES = ['https://graph.microsoft.com/.default'];
+
+let cachedGraphAppClient = null;
+let cachedGraphAppToken = null;
+let cachedGraphAppTokenExpiresAt = 0;
 
 function ensureCacheDir() {
   if (!fs.existsSync(DEFAULT_CACHE_DIR)) {
@@ -49,6 +55,43 @@ function extensionFromContentType(contentType) {
   return 'jpg';
 }
 
+function getGraphAppClient() {
+  if (cachedGraphAppClient) return cachedGraphAppClient;
+  if (!process.env.AZURE_CLIENT_ID || !process.env.AZURE_CLIENT_SECRET || !process.env.AZURE_TENANT_ID) {
+    return null;
+  }
+
+  cachedGraphAppClient = new ConfidentialClientApplication({
+    auth: {
+      clientId: process.env.AZURE_CLIENT_ID,
+      clientSecret: process.env.AZURE_CLIENT_SECRET,
+      authority: `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}`,
+    },
+  });
+
+  return cachedGraphAppClient;
+}
+
+async function acquireGraphAppToken() {
+  if (cachedGraphAppToken && Date.now() < cachedGraphAppTokenExpiresAt) {
+    return cachedGraphAppToken;
+  }
+
+  const client = getGraphAppClient();
+  if (!client) return null;
+
+  const response = await client.acquireTokenByClientCredential({ scopes: GRAPH_APP_SCOPES });
+  const accessToken = response?.accessToken || null;
+  const expiresIn = Number(response?.expiresIn || 0);
+
+  if (accessToken) {
+    cachedGraphAppToken = accessToken;
+    cachedGraphAppTokenExpiresAt = Date.now() + Math.max(60_000, (expiresIn || 0) * 1000 - 60_000);
+  }
+
+  return accessToken;
+}
+
 async function readMeta(userId) {
   try {
     const raw = await fsp.readFile(metaPath(userId), 'utf8');
@@ -72,6 +115,15 @@ async function removeOldAvatarFiles(userId, keepFileName) {
       .filter((entry) => entry.startsWith(userPrefix) && entry !== keepBaseName && !entry.endsWith('.json'))
       .map((entry) => fsp.rm(path.join(DEFAULT_CACHE_DIR, entry), { force: true }))
   );
+}
+
+async function clearAvatarCache() {
+  const entries = await fsp.readdir(DEFAULT_CACHE_DIR).catch(() => []);
+  const removed = entries.length;
+
+  await Promise.all(entries.map((entry) => fsp.rm(path.join(DEFAULT_CACHE_DIR, entry), { force: true })));
+
+  return { removed };
 }
 
 async function saveAvatarBuffer(userId, buffer, contentType, source) {
@@ -177,9 +229,10 @@ export async function ensureAvatarCached(user, accessToken = null) {
   if (!user?.id) return null;
 
   const { meta, fileExists } = await getAvatarFileInfo(user.id);
+  const graphUserKey = user.microsoft_id || user.email;
   if (meta) {
     if (!fileExists) {
-      if (meta.source === 'm365' && !accessToken) {
+      if (meta.source === 'm365' && !accessToken && !graphUserKey) {
         return null;
       }
       if (meta.source === 'none' && isMetaFresh(meta)) {
@@ -201,12 +254,27 @@ export async function ensureAvatarCached(user, accessToken = null) {
         return meta;
       }
       if (meta.source === 'gravatar' && isMetaFresh(meta)) {
+        if (accessToken || graphUserKey) {
+          const graphToken = accessToken || await acquireGraphAppToken().catch(() => null);
+          if (graphToken && graphUserKey) {
+            const microsoftPhoto = await fetchGraphUserPhoto(graphUserKey, graphToken);
+            if (microsoftPhoto?.buffer) {
+              return saveAvatarBuffer(user.id, microsoftPhoto.buffer, microsoftPhoto.contentType, 'm365');
+            }
+          }
+        }
         return meta;
       }
     }
   }
 
-  if (accessToken) {
+  const graphToken = accessToken || await acquireGraphAppToken().catch(() => null);
+  if (graphToken && graphUserKey) {
+    const microsoftPhoto = await fetchGraphUserPhoto(graphUserKey, graphToken);
+    if (microsoftPhoto?.buffer) {
+      return saveAvatarBuffer(user.id, microsoftPhoto.buffer, microsoftPhoto.contentType, 'm365');
+    }
+  } else if (accessToken) {
     const microsoftPhoto = await fetchGraphPhoto(accessToken);
     if (microsoftPhoto?.buffer) {
       return saveAvatarBuffer(user.id, microsoftPhoto.buffer, microsoftPhoto.contentType, 'm365');
@@ -234,13 +302,12 @@ export async function prewarmAvatarCacheForUser(user, accessToken = null) {
     return meta.source === 'none' ? null : meta;
   }
 
-  if (accessToken) {
-    const userKey = user.microsoft_id || user.email;
-    if (userKey) {
-      const microsoftPhoto = await fetchGraphUserPhoto(userKey, accessToken);
-      if (microsoftPhoto?.buffer) {
-        return saveAvatarBuffer(user.id, microsoftPhoto.buffer, microsoftPhoto.contentType, 'm365');
-      }
+  const userKey = user.microsoft_id || user.email;
+  const graphToken = accessToken || await acquireGraphAppToken().catch(() => null);
+  if (graphToken && userKey) {
+    const microsoftPhoto = await fetchGraphUserPhoto(userKey, graphToken);
+    if (microsoftPhoto?.buffer) {
+      return saveAvatarBuffer(user.id, microsoftPhoto.buffer, microsoftPhoto.contentType, 'm365');
     }
   }
 
@@ -270,3 +337,4 @@ export async function serveAvatarForUser(user, res) {
 }
 
 export { DEFAULT_CACHE_DIR as AVATAR_CACHE_DIR };
+export { clearAvatarCache };

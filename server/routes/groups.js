@@ -2,7 +2,7 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { DEFAULT_GROUP_ID, logRbacAudit } from '../db.js';
-import { authenticate, isAdmin } from '../middleware/auth.js';
+import { authenticate, isAdminViewer, isAdminEditor } from '../middleware/auth.js';
 import { forceSyncAllEntraUsers, importEntraGroups, listDiscoveredEntraGroups } from '../services/entraGroups.js';
 import { iconUrlForApp } from '../services/appIcons.js';
 
@@ -23,23 +23,29 @@ function validateGroupName(name) {
   return null;
 }
 
-// List all groups (admin only)
-router.get('/', authenticate, isAdmin, (req, res) => {
+// List all groups (viewer roles only)
+router.get('/', authenticate, isAdminViewer, (req, res) => {
   const groups = db.prepare(`
     SELECT g.*,
       (SELECT COUNT(*) FROM user_group_members WHERE group_id = g.id) AS member_count,
-      (SELECT COUNT(*) FROM app_permissions WHERE group_id = g.id) AS app_count
+      (SELECT COUNT(*) FROM app_permissions WHERE group_id = g.id) AS app_count,
+      (
+        SELECT GROUP_CONCAT(a.name || ' ' || a.slug, ' ')
+        FROM app_permissions p
+        JOIN apps a ON a.id = p.app_id
+        WHERE p.group_id = g.id
+      ) AS app_search_text
     FROM user_groups g ORDER BY g.name
   `).all();
   res.json({ groups });
 });
 
-router.get('/entra/candidates', authenticate, isAdmin, (req, res) => {
+router.get('/entra/candidates', authenticate, isAdminViewer, (req, res) => {
   const groups = listDiscoveredEntraGroups();
   res.json({ groups });
 });
 
-router.post('/entra/import', authenticate, isAdmin, (req, res) => {
+router.post('/entra/import', authenticate, isAdminEditor, (req, res) => {
   const { groupIds } = req.body;
   if (!Array.isArray(groupIds) || groupIds.length === 0) {
     return res.status(400).json({ error: 'groupIds must be a non-empty array' });
@@ -47,6 +53,11 @@ router.post('/entra/import', authenticate, isAdmin, (req, res) => {
 
   try {
     const result = importEntraGroups(groupIds);
+    logRbacAudit(req.user.id, 'import', 'group', null, {
+      groupIds,
+      importedGroups: result.importedGroups,
+      skippedGroups: result.skippedGroups,
+    });
     res.json({
       message: `${result.importedGroups} Entra groups imported`,
       ...result,
@@ -56,9 +67,15 @@ router.post('/entra/import', authenticate, isAdmin, (req, res) => {
   }
 });
 
-router.post('/entra/force-sync', authenticate, isAdmin, async (req, res) => {
+router.post('/entra/force-sync', authenticate, isAdminEditor, async (req, res) => {
   try {
     const result = await forceSyncAllEntraUsers();
+    logRbacAudit(req.user.id, 'sync', 'group', null, {
+      usersSynced: result.usersSynced,
+      usersConsidered: result.usersConsidered,
+      discoveredGroups: result.discoveredGroups,
+      errors: result.errors,
+    });
     res.json({
       message: `Synced ${result.usersSynced} users from Microsoft Entra`,
       ...result,
@@ -71,7 +88,7 @@ router.post('/entra/force-sync', authenticate, isAdmin, async (req, res) => {
   }
 });
 
-router.post('/bulk-delete', authenticate, isAdmin, (req, res) => {
+router.post('/bulk-delete', authenticate, isAdminEditor, (req, res) => {
   const { groupIds } = req.body;
   if (!Array.isArray(groupIds) || groupIds.length === 0) {
     return res.status(400).json({ error: 'groupIds must be a non-empty array' });
@@ -111,8 +128,8 @@ router.post('/bulk-delete', authenticate, isAdmin, (req, res) => {
   });
 });
 
-// Get single group with members and apps (admin only)
-router.get('/:id', authenticate, isAdmin, (req, res) => {
+// Get single group with members and apps (viewer roles only)
+router.get('/:id', authenticate, isAdminViewer, (req, res) => {
   const group = db.prepare('SELECT * FROM user_groups WHERE id = ?').get(req.params.id);
   if (!group) return res.status(404).json({ error: 'Group not found' });
 
@@ -134,8 +151,8 @@ router.get('/:id', authenticate, isAdmin, (req, res) => {
   res.json({ group, members, apps });
 });
 
-// Create group (admin only)
-router.post('/', authenticate, isAdmin, (req, res) => {
+// Create group (editor roles only)
+router.post('/', authenticate, isAdminEditor, (req, res) => {
   const { name, description } = req.body;
   const nameError = validateGroupName(name);
   if (nameError) return res.status(400).json({ error: nameError });
@@ -154,8 +171,8 @@ router.post('/', authenticate, isAdmin, (req, res) => {
   res.status(201).json({ group });
 });
 
-// Update group (admin only, cannot rename "default")
-router.put('/:id', authenticate, isAdmin, (req, res) => {
+// Update group (editor roles only, cannot rename "default")
+router.put('/:id', authenticate, isAdminEditor, (req, res) => {
   const group = db.prepare('SELECT * FROM user_groups WHERE id = ?').get(req.params.id);
   if (!group) return res.status(404).json({ error: 'Group not found' });
   if (group.source === 'entra') {
@@ -189,8 +206,8 @@ router.put('/:id', authenticate, isAdmin, (req, res) => {
   res.json({ group: updated });
 });
 
-// Delete group (admin only, cannot delete "default")
-router.delete('/:id', authenticate, isAdmin, (req, res) => {
+// Delete group (editor roles only, cannot delete "default")
+router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   if (req.params.id === DEFAULT_GROUP_ID) {
     return res.status(400).json({ error: 'Cannot delete the default group' });
   }
@@ -212,7 +229,7 @@ router.delete('/:id', authenticate, isAdmin, (req, res) => {
 // --- Membership ---
 
 // Add members to group (by userIds and/or emails)
-router.post('/:id/members', authenticate, isAdmin, (req, res) => {
+router.post('/:id/members', authenticate, isAdminEditor, (req, res) => {
   const group = db.prepare('SELECT id FROM user_groups WHERE id = ?').get(req.params.id);
   if (!group) return res.status(404).json({ error: 'Group not found' });
   const fullGroup = db.prepare('SELECT source FROM user_groups WHERE id = ?').get(req.params.id);
@@ -283,7 +300,7 @@ router.post('/:id/members', authenticate, isAdmin, (req, res) => {
 });
 
 // Remove member from group
-router.delete('/:id/members/:userId', authenticate, isAdmin, (req, res) => {
+router.delete('/:id/members/:userId', authenticate, isAdminEditor, (req, res) => {
   const group = db.prepare('SELECT id FROM user_groups WHERE id = ?').get(req.params.id);
   if (!group) return res.status(404).json({ error: 'Group not found' });
   const fullGroup = db.prepare('SELECT source FROM user_groups WHERE id = ?').get(req.params.id);
@@ -302,7 +319,7 @@ router.delete('/:id/members/:userId', authenticate, isAdmin, (req, res) => {
 // --- App permissions ---
 
 // Assign apps to group
-router.post('/:id/apps', authenticate, isAdmin, (req, res) => {
+router.post('/:id/apps', authenticate, isAdminEditor, (req, res) => {
   const group = db.prepare('SELECT id FROM user_groups WHERE id = ?').get(req.params.id);
   if (!group) return res.status(404).json({ error: 'Group not found' });
 
@@ -334,7 +351,7 @@ router.post('/:id/apps', authenticate, isAdmin, (req, res) => {
 });
 
 // Remove app from group
-router.delete('/:id/apps/:appId', authenticate, isAdmin, (req, res) => {
+router.delete('/:id/apps/:appId', authenticate, isAdminEditor, (req, res) => {
   const group = db.prepare('SELECT id FROM user_groups WHERE id = ?').get(req.params.id);
   if (!group) return res.status(404).json({ error: 'Group not found' });
 

@@ -6,8 +6,9 @@ import db from '../db.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { getRequiredEnv } from '../config.js';
-import { fetchUserEntraGroups, getAuthScopes, isEntraGroupSyncEnabled, syncUserEntraGroups } from '../services/entraGroups.js';
+import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, refreshGroupCacheFromTenant, syncUserEntraGroups } from '../services/entraGroups.js';
 import { ensureAvatarCached } from '../services/avatars.js';
+import { logRbacAudit } from '../db.js';
 
 const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 const authScopes = getAuthScopes();
@@ -105,7 +106,14 @@ router.get('/microsoft/callback', async (req, res) => {
     let entraGroups = null;
     if (isEntraGroupSyncEnabled()) {
       try {
-        entraGroups = await fetchUserEntraGroups(tokenResponse.accessToken);
+        const refresh = await refreshGroupCacheFromTenant();
+        console.log(`Entra tenant group refresh [${microsoftId}]: ${refresh.discoveredGroups} groups`);
+      } catch (error) {
+        const hint = error.hint ? ` Hint: ${error.hint}` : '';
+        console.warn(`Entra tenant group refresh skipped [${microsoftId}]: ${error.message}.${hint}`);
+      }
+      try {
+        entraGroups = await discoverEntraGroupsForUser(microsoftId);
         console.log(`Entra group discovery [${microsoftId}]: ${entraGroups.length} groups`);
       } catch (error) {
         const hint = error.hint ? ` Hint: ${error.hint}` : '';
@@ -122,12 +130,12 @@ router.get('/microsoft/callback', async (req, res) => {
 
     if (user) {
       // Existing user (either pre-registered or returning) — update profile
-      const shouldPromote = adminEmails.includes(email.toLowerCase()) && user.role !== 'admin';
+      const shouldPromote = adminEmails.includes(email.toLowerCase()) && user.role !== 'superadmin';
       db.prepare(
         `UPDATE users SET microsoft_id = ?, display_name = ?, last_login = datetime('now'), updated_at = datetime('now') WHERE id = ?`
       ).run(microsoftId, displayName, user.id);
       if (shouldPromote) {
-        db.prepare(`UPDATE users SET role = 'admin', updated_at = datetime('now') WHERE id = ?`).run(user.id);
+        db.prepare(`UPDATE users SET role = 'superadmin', updated_at = datetime('now') WHERE id = ?`).run(user.id);
         user = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
       }
     } else {
@@ -135,7 +143,7 @@ router.get('/microsoft/callback', async (req, res) => {
       const userId = uuidv4();
       const avatarColor = `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
 
-      const role = adminEmails.includes(email.toLowerCase()) ? 'admin' : 'user';
+      const role = adminEmails.includes(email.toLowerCase()) ? 'superadmin' : 'user';
       db.prepare(`
         INSERT INTO users (id, email, display_name, microsoft_id, role, avatar_color, last_login)
         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
@@ -154,6 +162,14 @@ router.get('/microsoft/callback', async (req, res) => {
       } else {
         console.log(`Discovered ${entraSync.discoveredGroups} Entra groups [${user.id}]; memberships added=${entraSync.membershipsAdded}, removed=${entraSync.membershipsRemoved}.`);
       }
+    }
+
+    if (['superadmin', 'admin', 'admin_readonly'].includes(user.role)) {
+      logRbacAudit(user.id, 'login', 'auth', user.id, {
+        role: user.role,
+        microsoftId: user.microsoft_id,
+        email: user.email,
+      });
     }
 
     await ensureAvatarCached(

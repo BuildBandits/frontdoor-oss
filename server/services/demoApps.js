@@ -1,3 +1,5 @@
+import { v4 as uuidv4 } from 'uuid';
+
 export const DEFAULT_DEMO_APPS = [
   {
     name: 'Demo App',
@@ -57,7 +59,7 @@ export function restoreDefaultDemoApps(database, defaultGroupId) {
 
     DEFAULT_DEMO_APPS.forEach((app, sortOrder) => {
       const existing = existingBySlug.get(app.slug);
-      const appId = existing?.id || app.slug;
+      const appId = existing?.id || uuidv4();
 
       upsertApp.run(
         appId,

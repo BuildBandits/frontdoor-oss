@@ -104,6 +104,34 @@ export async function removeAppIconAsset(appId) {
   );
 }
 
+export async function duplicateAppIconAsset(sourceAppId, targetAppId) {
+  if (!sourceAppId || !targetAppId) return null;
+
+  const entries = await fsp.readdir(DEFAULT_CACHE_DIR).catch(() => []);
+  const sourceEntry = entries.find((entry) => entry.startsWith(`${sourceAppId}.`));
+  if (!sourceEntry) return null;
+
+  const sourcePath = path.join(DEFAULT_CACHE_DIR, sourceEntry);
+  const targetFileName = `${targetAppId}${path.extname(sourceEntry)}`;
+  const targetPath = path.join(DEFAULT_CACHE_DIR, targetFileName);
+
+  await fsp.copyFile(sourcePath, targetPath);
+  return { fileName: targetFileName };
+}
+
+export async function readAppIconAssetDataUrl(app) {
+  if (!app?.icon_file_name || !app?.id) return '';
+
+  const absolutePath = path.join(DEFAULT_CACHE_DIR, app.icon_file_name);
+  if (!fs.existsSync(absolutePath)) return '';
+
+  const buffer = await fsp.readFile(absolutePath);
+  const extension = path.extname(app.icon_file_name).slice(1).toLowerCase();
+  const contentType = contentTypeFromExtension(extension);
+  const base64 = buffer.toString('base64');
+  return `data:${contentType};base64,${base64}`;
+}
+
 export function parseAppIconPayload({ iconDataUrl, iconSvgText }) {
   const svgText = typeof iconSvgText === 'string' ? iconSvgText.trim() : '';
   if (/<svg[\s>]/i.test(svgText)) {
