@@ -9,6 +9,7 @@ export default function SortableAppCard({
   disabled,
   showModeBadges,
   compact,
+  labels,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: app.id,
@@ -28,6 +29,7 @@ export default function SortableAppCard({
       onToggleFavorite={onToggleFavorite}
       showModeBadges={showModeBadges}
       compact={compact}
+      labels={labels}
       dragHandleProps={disabled ? null : { ...attributes, ...listeners }}
       dragging={isDragging}
       style={style}

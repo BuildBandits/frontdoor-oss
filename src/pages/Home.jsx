@@ -18,13 +18,12 @@ import api from '../services/api';
 import AppCard from '../components/AppCard';
 import SortableAppCard from '../components/SortableAppCard';
 import TagGroupCard from '../components/TagGroupCard';
+import { useAuthStore } from '../stores/authStore';
+import { getUiStrings, resolveAppLanguage } from '../i18n';
 
 const LS_FAVORITES = 'frontdoor_favorites';
 const LS_SHOW_FAVORITES = 'frontdoor_show_favorites';
 const LS_GROUP_BY_TAG = 'frontdoor_group_by_tag';
-const LS_COMPACT_VIEW = 'frontdoor_compact_view';
-const LS_COMPACT_VIEW_VERSION = 'frontdoor_compact_view_version';
-const LS_APP_ORDER = 'frontdoor_app_order';
 
 function readJson(key, fallback) {
   try {
@@ -39,24 +38,8 @@ function normalizeTag(tag) {
   return (tag ?? '').toString().trim().toLowerCase();
 }
 
-function readNullableJson(key) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw === null ? null : JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-function readString(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
 export default function Home() {
+  const { user, updateHomeDesktopView, updateAppOrder } = useAuthStore();
   const [apps, setApps] = useState([]);
   const [branding, setBranding] = useState(null);
   const [search, setSearch] = useState('');
@@ -68,11 +51,14 @@ export default function Home() {
   const [favorites, setFavorites] = useState(() => readJson(LS_FAVORITES, []));
   const [showFavorites, setShowFavorites] = useState(() => readJson(LS_SHOW_FAVORITES, false));
   const [groupByTag, setGroupByTag] = useState(() => readJson(LS_GROUP_BY_TAG, false));
-  const [compactViewOverride, setCompactViewOverride] = useState(() => readNullableJson(LS_COMPACT_VIEW));
-  const [appOrder, setAppOrder] = useState(() => readJson(LS_APP_ORDER, []));
+  const [isMobileViewport, setIsMobileViewport] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  ));
 
   // Tag groups open/close state
   const [openGroups, setOpenGroups] = useState({});
+  const language = resolveAppLanguage(user?.preferredLanguage, branding?.defaultLanguage);
+  const ui = getUiStrings(language);
 
   useEffect(() => {
     api.get('/apps').then((res) => {
@@ -89,28 +75,33 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!branding?.updatedAt) return;
-    const savedVersion = readString(LS_COMPACT_VIEW_VERSION);
-    if (savedVersion && savedVersion !== branding.updatedAt) {
-      setCompactViewOverride(null);
-      localStorage.removeItem(LS_COMPACT_VIEW);
-      localStorage.removeItem(LS_COMPACT_VIEW_VERSION);
+    const onBrandingUpdated = (event) => {
+      if (event.detail) {
+        setBranding(event.detail);
+      }
+    };
+    window.addEventListener('frontdoor:branding-updated', onBrandingUpdated);
+    return () => window.removeEventListener('frontdoor:branding-updated', onBrandingUpdated);
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const updateViewport = () => setIsMobileViewport(mediaQuery.matches);
+    updateViewport();
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', updateViewport);
+      return () => mediaQuery.removeEventListener('change', updateViewport);
     }
-  }, [branding?.updatedAt]);
+
+    mediaQuery.addListener(updateViewport);
+    return () => mediaQuery.removeListener(updateViewport);
+  }, []);
 
   // Persist to localStorage
   useEffect(() => { localStorage.setItem(LS_FAVORITES, JSON.stringify(favorites)); }, [favorites]);
   useEffect(() => { localStorage.setItem(LS_SHOW_FAVORITES, JSON.stringify(showFavorites)); }, [showFavorites]);
   useEffect(() => { localStorage.setItem(LS_GROUP_BY_TAG, JSON.stringify(groupByTag)); }, [groupByTag]);
-  useEffect(() => { localStorage.setItem(LS_APP_ORDER, JSON.stringify(appOrder)); }, [appOrder]);
-  useEffect(() => {
-    if (compactViewOverride !== null) {
-      localStorage.setItem(LS_COMPACT_VIEW, JSON.stringify(compactViewOverride));
-      if (branding?.updatedAt) {
-        localStorage.setItem(LS_COMPACT_VIEW_VERSION, branding.updatedAt);
-      }
-    }
-  }, [compactViewOverride, branding?.updatedAt]);
 
   const toggleFavorite = useCallback((appId) => {
     setFavorites((prev) =>
@@ -119,9 +110,21 @@ export default function Home() {
   }, []);
 
   const favoritesSet = useMemo(() => new Set(favorites), [favorites]);
+  const appOrder = Array.isArray(user?.appOrder) && user.appOrder.length > 0 ? user.appOrder : null;
 
   const sortedApps = useMemo(() => {
     if (apps.length === 0) return apps;
+    if (!appOrder) {
+        return [...apps].sort((a, b) => {
+        const aFav = favoritesSet.has(a.id) ? 0 : 1;
+        const bFav = favoritesSet.has(b.id) ? 0 : 1;
+        if (aFav !== bFav) return aFav - bFav;
+        const aSort = Number.isFinite(a.sort_order) ? a.sort_order : 0;
+        const bSort = Number.isFinite(b.sort_order) ? b.sort_order : 0;
+        if (aSort !== bSort) return aSort - bSort;
+        return a.name.localeCompare(b.name, language === 'it' ? 'it' : 'en', { sensitivity: 'base' });
+      });
+    }
     const orderIndex = new Map(appOrder.map((id, i) => [id, i]));
     const fallbackBase = appOrder.length;
     return [...apps].sort((a, b) => {
@@ -131,9 +134,12 @@ export default function Home() {
       const aIdx = orderIndex.has(a.id) ? orderIndex.get(a.id) : fallbackBase;
       const bIdx = orderIndex.has(b.id) ? orderIndex.get(b.id) : fallbackBase;
       if (aIdx !== bIdx) return aIdx - bIdx;
-      return 0;
+      const aSort = Number.isFinite(a.sort_order) ? a.sort_order : 0;
+      const bSort = Number.isFinite(b.sort_order) ? b.sort_order : 0;
+      if (aSort !== bSort) return aSort - bSort;
+      return a.name.localeCompare(b.name, language === 'it' ? 'it' : 'en', { sensitivity: 'base' });
     });
-  }, [apps, favoritesSet, appOrder]);
+  }, [apps, favoritesSet, appOrder, language]);
 
   const allTags = useMemo(() => {
     const tagSet = new Set();
@@ -193,18 +199,31 @@ export default function Home() {
       apps: groups[tag],
     }));
     if (noTag.length > 0) {
-      sorted.push({ tag: 'Altro', apps: noTag });
+      sorted.push({ tag: ui.home.otherTagGroup, apps: noTag });
     }
     return sorted;
-  }, [filtered, groupByTag]);
+  }, [filtered, groupByTag, ui.home.otherTagGroup]);
 
   const toggleGroup = (tag) => {
     setOpenGroups((prev) => ({ ...prev, [tag]: !prev[tag] }));
   };
 
   const showModeBadges = branding?.showAppModeBadges !== false;
-  const compactView = compactViewOverride ?? branding?.defaultCompactView ?? false;
-  const showHero = branding?.showHomeHero !== false;
+  const mobileCompactViewForced = isMobileViewport && branding?.defaultCompactView === true;
+  const desktopCompactViewPreferred = user?.homeDesktopView ?? (branding?.defaultHomeDesktopView === 'compact' ? 'compact' : 'cards');
+  const compactView = mobileCompactViewForced ? true : desktopCompactViewPreferred === 'compact';
+  const hideHeroOnMobile = isMobileViewport && branding?.hideHomeHeroOnMobile === true;
+  const showHero = branding?.showHomeHero !== false && !hideHeroOnMobile;
+  const appCardLabels = useMemo(() => ({
+    openAppNamed: (name) => ui.home.openAppNamed.replace('{name}', name),
+    appInfo: ui.home.appInfo,
+    addFavorite: ui.home.addFavorite,
+    removeFavorite: ui.home.removeFavorite,
+    dragToReorder: ui.home.dragToReorder,
+    closeDialog: ui.common.closeDialog,
+    entraBadgeShort: ui.home.entraBadgeShort,
+    externalBadgeShort: ui.home.externalBadgeShort,
+  }), [ui]);
 
   const filtersActive = search.trim().length > 0 || selectedTags.length > 0;
   const dragEnabled = !groupByTag && !filtersActive && !compactView;
@@ -223,17 +242,16 @@ export default function Home() {
       const overIsFav = favoritesSet.has(over.id);
       if (activeIsFav !== overIsFav) return;
 
-      setAppOrder((prev) => {
-        const base = prev.length > 0 ? prev.slice() : sortedApps.map((a) => a.id);
-        for (const id of [active.id, over.id]) {
-          if (!base.includes(id)) base.push(id);
-        }
-        const oldIndex = base.indexOf(active.id);
-        const newIndex = base.indexOf(over.id);
-        return arrayMove(base, oldIndex, newIndex);
-      });
+      const base = appOrder ? appOrder.slice() : sortedApps.map((a) => a.id);
+      for (const id of [active.id, over.id]) {
+        if (!base.includes(id)) base.push(id);
+      }
+      const oldIndex = base.indexOf(active.id);
+      const newIndex = base.indexOf(over.id);
+      const next = arrayMove(base, oldIndex, newIndex);
+      void updateAppOrder(next);
     },
-    [favoritesSet, sortedApps]
+    [appOrder, favoritesSet, sortedApps, updateAppOrder]
   );
 
   const renderAppGrid = (appList) => {
@@ -248,6 +266,7 @@ export default function Home() {
               onToggleFavorite={toggleFavorite}
               showModeBadges={showModeBadges}
               compact
+              labels={appCardLabels}
             />
           ))}
         </div>
@@ -264,6 +283,7 @@ export default function Home() {
               isFavorite={favoritesSet.has(app.id)}
               onToggleFavorite={toggleFavorite}
               showModeBadges={showModeBadges}
+              labels={appCardLabels}
             />
           ))}
         </div>
@@ -281,6 +301,7 @@ export default function Home() {
                 isFavorite={favoritesSet.has(app.id)}
                 onToggleFavorite={toggleFavorite}
                 showModeBadges={showModeBadges}
+                labels={appCardLabels}
               />
             ))}
           </div>
@@ -288,8 +309,6 @@ export default function Home() {
       </DndContext>
     );
   };
-
-  const commitSha = typeof __COMMIT_SHA__ !== 'undefined' ? __COMMIT_SHA__ : 'dev';
 
   return (
     <div>
@@ -301,8 +320,8 @@ export default function Home() {
               <h1 className="text-2xl md:text-4xl font-extrabold text-dark leading-tight mb-3">
                 {brandingLoading || !branding ? (
                   <>
-                    Le tue applicazioni,<br />
-                    <span className="text-dark/70">tutte in un unico posto.</span>
+                    {ui.home.heroTitleLine1}<br />
+                    <span className="text-dark/70">{ui.home.heroTitleLine2}</span>
                   </>
                 ) : (
                   <>
@@ -314,7 +333,7 @@ export default function Home() {
               {/* Sottotitolo temporaneamente lasciato come branding amministrabile. */}
               <p className="text-gray-600 text-base md:text-lg max-w-xl">
                 {brandingLoading || !branding ? (
-                  'Accedi rapidamente a tutti gli strumenti e le piattaforme del tuo workspace.'
+                  ui.home.heroSubtitle
                 ) : (
                   branding.heroSubtitle
                 )}
@@ -325,7 +344,7 @@ export default function Home() {
               <div className="hidden md:flex items-center justify-center px-2 py-2 min-h-[120px] min-w-[200px]">
                 <img
                   src={branding.logoUrl}
-                  alt="Company logo"
+                  alt={ui.home.companyLogoAlt}
                   className="max-h-20 max-w-[220px] object-contain"
                 />
               </div>
@@ -336,62 +355,67 @@ export default function Home() {
 
       {/* Search + toggles + tag filters */}
       <div className="mb-8 space-y-3">
-        <div className="flex gap-3 items-center">
-          <div className="relative flex-1">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1 min-w-0">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Cerca un'applicazione..."
+              placeholder={ui.home.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition"
             />
           </div>
 
+            <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-nowrap sm:gap-3 sm:shrink-0">
           <button
             onClick={() => setShowFavorites((v) => !v)}
-            className={`flex items-center gap-1.5 px-4 py-3.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-3.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap sm:flex-none ${
               showFavorites
                 ? 'bg-yellow-50 border-yellow-300 text-yellow-700'
                 : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
             }`}
-            title={showFavorites ? 'Mostra tutte' : 'Solo preferiti'}
+            title={showFavorites ? ui.home.showAll : ui.home.favoritesTitle}
           >
             <Star className="w-4 h-4" fill={showFavorites ? 'currentColor' : 'none'} />
-            <span className="hidden sm:inline">Preferiti</span>
+            <span className="hidden sm:inline">{ui.home.favorites}</span>
           </button>
 
           <button
             onClick={() => setGroupByTag((v) => !v)}
-            className={`flex items-center gap-1.5 px-4 py-3.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-3.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap sm:flex-none ${
               groupByTag
                 ? 'bg-purple-50 border-purple-300 text-purple-700'
                 : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
             }`}
-            title={groupByTag ? 'Vista griglia' : 'Raggruppa per tag'}
+            title={groupByTag ? ui.home.gridViewTitle : ui.home.groupByTitle}
           >
             {groupByTag ? <LayoutGrid className="w-4 h-4" /> : <List className="w-4 h-4" />}
-            <span className="hidden sm:inline">Raggruppa</span>
+            <span className="hidden sm:inline">{ui.home.groupBy}</span>
           </button>
 
           <button
-            onClick={() => {
-              const next = !(compactViewOverride ?? (branding?.defaultCompactView ?? false));
-              setCompactViewOverride(next);
-              if (branding?.updatedAt) {
-                localStorage.setItem(LS_COMPACT_VIEW_VERSION, branding.updatedAt);
+            onClick={async () => {
+              if (mobileCompactViewForced) return;
+              const next = compactView ? 'cards' : 'compact';
+              try {
+                await updateHomeDesktopView(next);
+              } catch {
+                // Leave the current view unchanged if the save fails.
               }
             }}
-            className={`flex items-center gap-1.5 px-4 py-3.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap ${
+            disabled={mobileCompactViewForced}
+            className={`flex items-center justify-center gap-1.5 px-3 py-3.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap sm:flex-none ${
               compactView
                 ? 'bg-gray-900 border-gray-900 text-white'
                 : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
-            }`}
-            title={compactView ? 'Vista card' : 'Vista compatta'}
+            } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
+            title={mobileCompactViewForced ? ui.home.compactViewForcedTitle : (compactView ? ui.home.cardsLabel : ui.home.compactViewTitle)}
           >
             <AlignJustify className="w-4 h-4" />
-            <span className="hidden sm:inline">Compatta</span>
+            <span className="hidden sm:inline">{mobileCompactViewForced ? ui.home.compactMobileLabel : ui.home.compactLabel}</span>
           </button>
+          </div>
         </div>
 
         {allTags.length > 0 && (
@@ -418,7 +442,7 @@ export default function Home() {
                 onClick={() => setSelectedTags([])}
                 className="px-3 py-1.5 rounded-full text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
               >
-                Tutti
+                {ui.home.allTags}
               </button>
             )}
           </div>
@@ -440,15 +464,15 @@ export default function Home() {
             ))}
           </div>
         )
-      ) : filtered.length === 0 ? (
+          ) : filtered.length === 0 ? (
         <div className="text-center py-20 text-gray-400">
           <p className="text-xl font-semibold mb-2">
-            {showFavorites ? 'Nessun preferito trovato' : 'Nessuna app trovata'}
+            {showFavorites ? ui.home.favoritesEmptyTitle : ui.home.appsEmptyTitle}
           </p>
           <p>
             {showFavorites
-              ? 'Aggiungi app ai preferiti cliccando la stellina'
-              : 'Prova a cercare con un altro termine'}
+              ? ui.home.favoritesEmptyBody
+              : ui.home.appsEmptyBody}
           </p>
         </div>
       ) : groupByTag && groupedByTag ? (
@@ -482,10 +506,6 @@ export default function Home() {
       ) : (
         renderAppGrid(filtered)
       )}
-
-      <div className="mt-16 text-center text-xs text-gray-400 font-mono select-all">
-        v{commitSha}
-      </div>
     </div>
   );
 }

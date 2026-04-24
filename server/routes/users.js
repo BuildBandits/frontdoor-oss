@@ -1,7 +1,7 @@
 import express from 'express';
 import db from '../db.js';
 import { logRbacAudit } from '../db.js';
-import { authenticate, isAdminViewer, isAdminEditor, ROLE_SUPERADMIN } from '../middleware/auth.js';
+import { authenticate, isAdminViewer, isAdminEditor, ROLE_OWNER } from '../middleware/auth.js';
 import { ensureAvatarCached, serveAvatarForUser } from '../services/avatars.js';
 import { iconUrlForApp } from '../services/appIcons.js';
 
@@ -14,7 +14,7 @@ const composeAdminEmails = new Set(
 );
 
 const isComposeLockedAdmin = (email) => composeAdminEmails.has((email || '').trim().toLowerCase());
-const isEditorRole = (role) => ['superadmin', 'admin'].includes(role);
+const isEditorRole = (role) => ['owner', 'admin'].includes(role);
 const resolveAppUrl = (app) => (app.mode === 'redirect'
   ? `/api/apps/${app.slug}/sso-redirect`
   : app.mode === 'entra-app'
@@ -22,7 +22,7 @@ const resolveAppUrl = (app) => (app.mode === 'redirect'
     : app.target_url);
 
 const remainingEditorCountExcluding = (userId) => db
-  .prepare("SELECT COUNT(*) AS count FROM users WHERE role IN ('superadmin', 'admin') AND is_active = 1 AND id != ?")
+  .prepare("SELECT COUNT(*) AS count FROM users WHERE role IN ('owner', 'admin') AND is_active = 1 AND id != ?")
   .get(userId).count;
 
 // List users with group membership counts (viewer roles only)
@@ -128,8 +128,10 @@ router.put('/:id/role', authenticate, isAdminEditor, (req, res) => {
   const { id } = req.params;
   const { role } = req.body;
 
-  if (!['superadmin', 'admin', 'admin_readonly', 'user'].includes(role)) {
-    return res.status(400).json({ error: 'role must be superadmin, admin, admin_readonly or user' });
+  const normalizedRole = role === 'superadmin' ? 'owner' : role;
+
+  if (!['owner', 'admin', 'admin_readonly', 'user'].includes(normalizedRole)) {
+    return res.status(400).json({ error: 'role must be owner, admin, admin_readonly or user' });
   }
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
@@ -137,20 +139,20 @@ router.put('/:id/role', authenticate, isAdminEditor, (req, res) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  if (isComposeLockedAdmin(user.email) && role !== ROLE_SUPERADMIN) {
-    return res.status(400).json({ error: 'Compose superadmin cannot be changed from the webapp' });
+  if (isComposeLockedAdmin(user.email) && normalizedRole !== ROLE_OWNER) {
+    return res.status(400).json({ error: 'Compose owner cannot be changed from the webapp' });
   }
 
-  if (role === ROLE_SUPERADMIN && !isComposeLockedAdmin(user.email)) {
-    return res.status(400).json({ error: 'Superadmin can only be assigned from compose/run' });
+  if (normalizedRole === ROLE_OWNER && !isComposeLockedAdmin(user.email)) {
+    return res.status(400).json({ error: 'Owner can only be assigned from compose/run' });
   }
 
-  if (isEditorRole(user.role) && !isEditorRole(role) && remainingEditorCountExcluding(id) === 0) {
+  if (isEditorRole(user.role) && !isEditorRole(normalizedRole) && remainingEditorCountExcluding(id) === 0) {
     return res.status(400).json({ error: 'Cannot remove the last active admin editor' });
   }
 
-  db.prepare('UPDATE users SET role = ?, updated_at = datetime(\'now\') WHERE id = ?').run(role, id);
-  logRbacAudit(req.user.id, 'update', 'role', id, { email: user.email, from: user.role, to: role });
+  db.prepare('UPDATE users SET role = ?, updated_at = datetime(\'now\') WHERE id = ?').run(normalizedRole, id);
+  logRbacAudit(req.user.id, 'update', 'role', id, { email: user.email, from: user.role, to: normalizedRole });
   res.json({ message: 'Role updated' });
 });
 
@@ -171,7 +173,7 @@ router.put('/:id/active', authenticate, isAdminEditor, (req, res) => {
   const activeValue = is_active ? 1 : 0;
 
   if (isComposeLockedAdmin(user.email) && !activeValue) {
-    return res.status(400).json({ error: 'Compose superadmin cannot be deactivated from the webapp' });
+    return res.status(400).json({ error: 'Compose owner cannot be deactivated from the webapp' });
   }
 
   // Prevent deactivating yourself
@@ -204,7 +206,7 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   }
 
   if (isComposeLockedAdmin(user.email)) {
-    return res.status(400).json({ error: 'Compose superadmin cannot be deleted from the webapp' });
+    return res.status(400).json({ error: 'Compose owner cannot be deleted from the webapp' });
   }
 
   // Prevent deleting the last active admin editor

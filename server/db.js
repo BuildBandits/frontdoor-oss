@@ -1,6 +1,8 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { restoreDefaultDemoApps } from './services/demoApps.js';
+import { DEFAULT_LANGUAGE } from '../shared/languages.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'frontdoor.db');
@@ -19,8 +21,12 @@ db.exec(`
     email TEXT UNIQUE NOT NULL,
     display_name TEXT,
     microsoft_id TEXT UNIQUE,
-    role TEXT DEFAULT 'user' CHECK(role IN ('superadmin', 'admin', 'admin_readonly', 'user')),
+    role TEXT DEFAULT 'user' CHECK(role IN ('owner', 'admin', 'admin_readonly', 'user')),
     avatar_color TEXT,
+    home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact')),
+    preferred_language TEXT,
+    app_order TEXT,
+    app_order_updated_at TEXT,
     is_active INTEGER DEFAULT 1,
     last_login TEXT,
     created_at TEXT DEFAULT (datetime('now')),
@@ -51,8 +57,12 @@ db.exec(`
     hero_title_line2 TEXT NOT NULL,
     hero_subtitle TEXT NOT NULL,
     show_home_hero INTEGER DEFAULT 1,
+    hide_home_hero_on_mobile INTEGER DEFAULT 0,
     show_app_mode_badges INTEGER DEFAULT 1,
+    default_home_desktop_view TEXT DEFAULT 'cards' CHECK(default_home_desktop_view IN ('cards', 'compact')),
     default_compact_view INTEGER DEFAULT 0,
+    default_language TEXT DEFAULT 'en',
+    use_european_date_format INTEGER DEFAULT 0,
     log_retention_days INTEGER DEFAULT 90,
     hide_login_page INTEGER DEFAULT 0,
     show_shared_cookie_mode INTEGER DEFAULT 1,
@@ -145,20 +155,56 @@ ensureColumn('user_groups', 'entra_group_id', 'entra_group_id TEXT');
 ensureColumn('user_groups', 'entra_display_name', 'entra_display_name TEXT');
 ensureColumn('user_groups', 'entra_synced_at', 'entra_synced_at TEXT');
 ensureColumn('apps', 'icon_file_name', 'icon_file_name TEXT');
+ensureColumn('users', 'home_desktop_view', "home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact'))");
+ensureColumn('users', 'preferred_language', 'preferred_language TEXT');
+ensureColumn('users', 'app_order', 'app_order TEXT');
+ensureColumn('users', 'app_order_updated_at', 'app_order_updated_at TEXT');
 ensureColumn('branding_settings', 'show_app_mode_badges', 'show_app_mode_badges INTEGER DEFAULT 1');
+ensureColumn('branding_settings', 'default_home_desktop_view', "default_home_desktop_view TEXT DEFAULT 'cards' CHECK(default_home_desktop_view IN ('cards', 'compact'))");
 ensureColumn('branding_settings', 'default_compact_view', 'default_compact_view INTEGER DEFAULT 0');
+ensureColumn('branding_settings', 'default_language', `default_language TEXT DEFAULT '${DEFAULT_LANGUAGE}'`);
+ensureColumn('branding_settings', 'use_european_date_format', 'use_european_date_format INTEGER DEFAULT 0');
+ensureColumn('branding_settings', 'use_24h_time_format', 'use_24h_time_format INTEGER DEFAULT 0');
 ensureColumn('branding_settings', 'log_retention_days', 'log_retention_days INTEGER DEFAULT 90');
 ensureColumn('branding_settings', 'show_home_hero', 'show_home_hero INTEGER DEFAULT 1');
+ensureColumn('branding_settings', 'hide_home_hero_on_mobile', 'hide_home_hero_on_mobile INTEGER DEFAULT 0');
 ensureColumn('branding_settings', 'hide_login_page', 'hide_login_page INTEGER DEFAULT 0');
 ensureColumn('branding_settings', 'show_shared_cookie_mode', 'show_shared_cookie_mode INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'show_redirect_sso_mode', 'show_redirect_sso_mode INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'show_entra_app_mode', 'show_entra_app_mode INTEGER DEFAULT 1');
 ensureColumn('entra_group_cache', 'description', 'description TEXT');
 
-// Migration: expand user roles for superadmin/admin/admin_readonly on existing databases.
+// Migration: normalize user roles to owner/admin/admin_readonly/user on existing databases.
 {
   const usersSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
-  if (usersSchema && (!usersSchema.sql.includes('superadmin') || !usersSchema.sql.includes('admin_readonly'))) {
+  const usersSchemaSql = usersSchema?.sql || '';
+  const hasOwnerRole = usersSchemaSql.includes("'owner'");
+  const hasSuperadminRole = usersSchemaSql.includes("'superadmin'");
+  const hasReadonlyRole = usersSchemaSql.includes("'admin_readonly'");
+  const needsUsersRoleMigration = usersSchema && (!hasOwnerRole || hasSuperadminRole || !hasReadonlyRole);
+  const roleStatsBeforeMigration = usersSchema
+    ? db.prepare(`
+      SELECT
+        SUM(CASE WHEN role = 'superadmin' THEN 1 ELSE 0 END) AS superadmin_count,
+        SUM(CASE WHEN role = 'owner' THEN 1 ELSE 0 END) AS owner_count,
+        SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admin_count,
+        SUM(CASE WHEN role = 'admin_readonly' THEN 1 ELSE 0 END) AS admin_readonly_count,
+        SUM(CASE WHEN role = 'user' OR role IS NULL OR TRIM(COALESCE(role, '')) = '' THEN 1 ELSE 0 END) AS user_count
+      FROM users
+    `).get()
+    : null;
+  const legacySuperadminCountBeforeMigration = roleStatsBeforeMigration?.superadmin_count || 0;
+  let loggedNoRoleMigrationNeeded = false;
+
+  if (needsUsersRoleMigration) {
+    console.log('[startup][roles] users role schema migration required.');
+    console.log(`[startup][roles] schema snapshot: owner=${hasOwnerRole}, superadmin=${hasSuperadminRole}, admin_readonly=${hasReadonlyRole}`);
+    if (roleStatsBeforeMigration) {
+      console.log(`[startup][roles] rows before migration: superadmin=${roleStatsBeforeMigration.superadmin_count || 0}, owner=${roleStatsBeforeMigration.owner_count || 0}, admin=${roleStatsBeforeMigration.admin_count || 0}, admin_readonly=${roleStatsBeforeMigration.admin_readonly_count || 0}, user=${roleStatsBeforeMigration.user_count || 0}`);
+    }
+    const normalizeRoleSql = hasSuperadminRole || hasReadonlyRole
+      ? "CASE WHEN role = 'superadmin' THEN 'owner' ELSE COALESCE(role, 'user') END"
+      : "CASE WHEN role = 'admin' THEN 'owner' ELSE COALESCE(role, 'user') END";
     db.pragma('foreign_keys = OFF');
     db.exec(`
       CREATE TABLE users_new (
@@ -166,20 +212,107 @@ ensureColumn('entra_group_cache', 'description', 'description TEXT');
         email TEXT UNIQUE NOT NULL,
         display_name TEXT,
         microsoft_id TEXT UNIQUE,
-        role TEXT DEFAULT 'user' CHECK(role IN ('superadmin', 'admin', 'admin_readonly', 'user')),
+        role TEXT DEFAULT 'user' CHECK(role IN ('owner', 'admin', 'admin_readonly', 'user')),
         avatar_color TEXT,
+        home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact')),
+        preferred_language TEXT,
+        app_order TEXT,
+        app_order_updated_at TEXT,
         is_active INTEGER DEFAULT 1,
         last_login TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       );
-      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, is_active, last_login, created_at, updated_at)
-      SELECT id, email, display_name, microsoft_id,
-        CASE WHEN role = 'admin' THEN 'superadmin' ELSE COALESCE(role, 'user') END,
-        avatar_color, is_active, last_login, created_at, updated_at
+      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, app_order, app_order_updated_at, is_active, last_login, created_at, updated_at)
+      SELECT id, email, display_name, microsoft_id, ${normalizeRoleSql},
+        avatar_color, COALESCE(home_desktop_view, 'cards'), preferred_language, app_order, app_order_updated_at, is_active, last_login, created_at, updated_at
       FROM users;
       DROP TABLE users;
       ALTER TABLE users_new RENAME TO users;
+    `);
+    db.pragma('foreign_keys = ON');
+    console.log('[startup][roles] users table migrated to role set: owner/admin/admin_readonly/user.');
+  } else if (legacySuperadminCountBeforeMigration === 0) {
+    console.log('[startup][roles] users roles already normalized; no migration needed.');
+    loggedNoRoleMigrationNeeded = true;
+  }
+
+  const legacySuperadminCount = db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'superadmin'").get().count || 0;
+  if (legacySuperadminCount > 0) {
+    console.log(`[startup][roles] converting ${legacySuperadminCount} legacy superadmin role value(s) to owner.`);
+    const result = db.prepare("UPDATE users SET role = 'owner', updated_at = datetime('now') WHERE role = 'superadmin'").run();
+    console.log(`[startup][roles] converted ${result.changes || 0} user row(s) from superadmin to owner.`);
+  } else if (!loggedNoRoleMigrationNeeded) {
+    console.log('[startup][roles] no legacy superadmin role values found.');
+  }
+}
+
+// Migration: relax language CHECK constraints so adding new supported languages does not require DB schema edits.
+{
+  const usersSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
+  const brandingSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='branding_settings'").get();
+  const usersNeedLanguageMigration = usersSchema?.sql?.includes("preferred_language TEXT CHECK(preferred_language IN ('en', 'it'))");
+  const brandingNeedLanguageMigration = brandingSchema?.sql?.includes("default_language TEXT DEFAULT 'en' CHECK(default_language IN ('en', 'it'))");
+
+  if (usersNeedLanguageMigration) {
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      CREATE TABLE users_new (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        display_name TEXT,
+        microsoft_id TEXT UNIQUE,
+        role TEXT DEFAULT 'user' CHECK(role IN ('owner', 'admin', 'admin_readonly', 'user')),
+        avatar_color TEXT,
+        home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact')),
+        preferred_language TEXT,
+        app_order TEXT,
+        app_order_updated_at TEXT,
+        is_active INTEGER DEFAULT 1,
+        last_login TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, app_order, app_order_updated_at, is_active, last_login, created_at, updated_at)
+      SELECT id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, app_order, app_order_updated_at, is_active, last_login, created_at, updated_at
+      FROM users;
+      DROP TABLE users;
+      ALTER TABLE users_new RENAME TO users;
+    `);
+    db.pragma('foreign_keys = ON');
+  }
+
+  if (brandingNeedLanguageMigration) {
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      CREATE TABLE branding_settings_new (
+        id TEXT PRIMARY KEY,
+        hero_title_line1 TEXT NOT NULL,
+        hero_title_line2 TEXT NOT NULL,
+        hero_subtitle TEXT NOT NULL,
+        show_home_hero INTEGER DEFAULT 1,
+        hide_home_hero_on_mobile INTEGER DEFAULT 0,
+        show_app_mode_badges INTEGER DEFAULT 1,
+        default_home_desktop_view TEXT DEFAULT 'cards' CHECK(default_home_desktop_view IN ('cards', 'compact')),
+        default_compact_view INTEGER DEFAULT 0,
+        default_language TEXT DEFAULT '${DEFAULT_LANGUAGE}',
+        use_european_date_format INTEGER DEFAULT 0,
+        use_24h_time_format INTEGER DEFAULT 0,
+        log_retention_days INTEGER DEFAULT 90,
+        hide_login_page INTEGER DEFAULT 0,
+        show_shared_cookie_mode INTEGER DEFAULT 1,
+        show_redirect_sso_mode INTEGER DEFAULT 1,
+        show_entra_app_mode INTEGER DEFAULT 1,
+        logo_file_name TEXT,
+        logo_content_type TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      INSERT INTO branding_settings_new (id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type, created_at, updated_at)
+      SELECT id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type, created_at, updated_at
+      FROM branding_settings;
+      DROP TABLE branding_settings;
+      ALTER TABLE branding_settings_new RENAME TO branding_settings;
     `);
     db.pragma('foreign_keys = ON');
   }
@@ -244,9 +377,14 @@ ensureColumn('entra_group_cache', 'description', 'description TEXT');
   }
 }
 db.exec('UPDATE branding_settings SET show_app_mode_badges = COALESCE(show_app_mode_badges, 1)');
+db.exec("UPDATE branding_settings SET default_home_desktop_view = COALESCE(default_home_desktop_view, 'cards')");
 db.exec('UPDATE branding_settings SET default_compact_view = COALESCE(default_compact_view, 0)');
+db.exec(`UPDATE branding_settings SET default_language = COALESCE(default_language, '${DEFAULT_LANGUAGE}')`);
+db.exec('UPDATE branding_settings SET use_european_date_format = COALESCE(use_european_date_format, 0)');
+db.exec('UPDATE branding_settings SET use_24h_time_format = COALESCE(use_24h_time_format, 0)');
 db.exec('UPDATE branding_settings SET log_retention_days = COALESCE(log_retention_days, 90)');
 db.exec('UPDATE branding_settings SET show_home_hero = COALESCE(show_home_hero, 1)');
+db.exec('UPDATE branding_settings SET hide_home_hero_on_mobile = COALESCE(hide_home_hero_on_mobile, 0)');
 db.exec('UPDATE branding_settings SET hide_login_page = COALESCE(hide_login_page, 0)');
 db.exec('UPDATE branding_settings SET show_shared_cookie_mode = COALESCE(show_shared_cookie_mode, 1)');
 db.exec('UPDATE branding_settings SET show_redirect_sso_mode = COALESCE(show_redirect_sso_mode, 1)');
@@ -271,15 +409,22 @@ db.exec(`
 
 db.prepare(`
   INSERT OR IGNORE INTO branding_settings (
-    id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, show_app_mode_badges, default_compact_view, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type
+    id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type
   )
-  VALUES (?, ?, ?, ?, 1, 1, 0, 90, 0, 1, 1, 1, NULL, NULL)
+  VALUES (?, ?, ?, ?, 1, 0, 1, 'cards', 0, 'en', 0, 0, 90, 0, 1, 1, 1, NULL, NULL)
 `).run(
   'default',
-  'Le tue applicazioni,',
-  'tutte in un unico posto.',
-  'Accedi rapidamente a tutti gli strumenti e le piattaforme del tuo workspace.'
+  'Your apps,',
+  'all in one place.',
+  'Quickly access all the tools and platforms in your workspace.'
 );
+
+db.exec(`
+  UPDATE users
+  SET app_order_updated_at = COALESCE(app_order_updated_at, updated_at)
+  WHERE app_order IS NOT NULL
+    AND TRIM(COALESCE(app_order, '')) <> ''
+`);
 
 // --- RBAC Bootstrap: "default" group + backfill ---
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
@@ -288,14 +433,17 @@ const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
 db.prepare(`INSERT OR IGNORE INTO user_groups (id, name, description) VALUES (?, 'default', 'Default group: new users are added here')`)
   .run(DEFAULT_GROUP_ID);
 
-// Demo apps are intentionally not auto-seeded on restart.
-// Use `npm run db:seed` or the admin restore action when you want them back.
+// Seed demo apps on the very first startup when the catalog is still empty.
+if (!db.prepare('SELECT 1 FROM apps LIMIT 1').get()) {
+  const result = restoreDefaultDemoApps(db, DEFAULT_GROUP_ID);
+  console.log(`Seeded ${result.total} demo apps (${result.created} created, ${result.updated} refreshed).`);
+}
 
 // Ensure default admins (from env var, comma-separated)
 const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
 for (const email of adminEmails) {
-  const result = db.prepare("UPDATE users SET role = 'superadmin', updated_at = datetime('now') WHERE email = ? AND role != 'superadmin'").run(email);
-  if (result.changes > 0) console.log('Promoted user to superadmin.');
+  const result = db.prepare("UPDATE users SET role = 'owner', updated_at = datetime('now') WHERE email = ? AND role != 'owner'").run(email);
+  if (result.changes > 0) console.log(`[startup][roles] promoted compose-managed owner: ${email}`);
 }
 
 // Backfill: add users to "default" only if they are not in ANY group yet

@@ -27,6 +27,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 RUN apt-get purge -y python3 make g++ && apt-get autoremove -y
 
 COPY server/ ./server/
+COPY shared/ ./shared/
 COPY --from=builder /app/dist ./dist/
 
 ENV NODE_ENV=production

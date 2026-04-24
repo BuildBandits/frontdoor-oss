@@ -47,7 +47,7 @@ export function getStartupConfig() {
     AZURE_TENANT_ID: isSet(azureTenantId) ? REDACTED : '[missing]',
     AZURE_REDIRECT_URI: azureRedirectUri,
     JWT_SECRET: isSet(jwtSecret) ? REDACTED : '[missing]',
-    ADMIN_EMAILS: adminEmails ? `${adminEmails.split(',').filter(Boolean).length} superadmin configured` : '[empty]',
+    ADMIN_EMAILS: adminEmails ? `${adminEmails.split(',').filter(Boolean).length} owner configured` : '[empty]',
   };
 }
 
@@ -85,7 +85,7 @@ export function validateStartupEnv() {
     warnings.push('JWT_SECRET is shorter than 32 characters; use a longer random secret in production');
   }
   if (!isSet(process.env.ADMIN_EMAILS)) {
-    warnings.push('ADMIN_EMAILS is empty; no user will be auto-promoted to superadmin on first login');
+    warnings.push('ADMIN_EMAILS is empty; no user will be auto-promoted to owner on first login');
   }
 
   return { missing, warnings, errors };

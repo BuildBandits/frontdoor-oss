@@ -4,8 +4,19 @@ import DOMPurify from 'dompurify';
 import AppIcon from './AppIcon';
 import api from '../services/api';
 
+const defaultLabels = {
+  openAppNamed: (name) => `Open ${name}`,
+  appInfo: 'More information',
+  addFavorite: 'Add to favorites',
+  removeFavorite: 'Remove from favorites',
+  dragToReorder: 'Drag to reorder',
+  closeDialog: 'Close dialog',
+  entraBadgeShort: 'Entra',
+  externalBadgeShort: 'Ext',
+};
+
 const AppCard = forwardRef(function AppCard(
-  { app, isFavorite, onToggleFavorite, showModeBadges = true, compact = false, dragHandleProps, dragging, style },
+  { app, isFavorite, onToggleFavorite, showModeBadges = true, compact = false, dragHandleProps, dragging, style, labels = defaultLabels },
   ref
 ) {
   const [showInfo, setShowInfo] = useState(false);
@@ -38,6 +49,11 @@ const AppCard = forwardRef(function AppCard(
     onToggleFavorite?.(app.id);
   };
 
+  const getLabel = (key, fallback, ...args) => {
+    const value = labels?.[key] ?? defaultLabels[key];
+    return typeof value === 'function' ? value(...args) : (value || fallback);
+  };
+
   if (compact) {
     return (
       <>
@@ -52,8 +68,8 @@ const AppCard = forwardRef(function AppCard(
               handleClick();
             }}
             className="shrink-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40"
-            title={`Apri ${app.name}`}
-            aria-label={`Apri ${app.name}`}
+            title={getLabel('openAppNamed', `Open ${app.name}`, app.name)}
+            aria-label={getLabel('openAppNamed', `Open ${app.name}`, app.name)}
           >
             <AppIcon app={app} className="w-8 h-8" textClassName="text-xl" alt={app.name} />
           </button>
@@ -89,16 +105,16 @@ const AppCard = forwardRef(function AppCard(
               </span>
             )}
             {showModeBadges && isEntraApp && (
-              <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">entra</span>
+              <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">{getLabel('entraBadgeShort', 'Entra')}</span>
             )}
             {showModeBadges && isExternal && (
-              <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">ext</span>
+              <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{getLabel('externalBadgeShort', 'Ext')}</span>
             )}
             {hasLongDesc && (
               <button
                 onClick={handleInfo}
                 className="p-1 text-gray-300 hover:text-dark hover:bg-gray-100 rounded-lg transition-colors"
-                title="Informazioni"
+                title={getLabel('appInfo', 'More information')}
               >
                 <Info className="w-3.5 h-3.5" />
               </button>
@@ -110,14 +126,14 @@ const AppCard = forwardRef(function AppCard(
                   ? 'text-yellow-400 hover:text-yellow-500'
                   : 'text-gray-300 hover:text-yellow-400 hover:bg-gray-100'
               }`}
-              title={isFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+              title={isFavorite ? getLabel('removeFavorite', 'Remove from favorites') : getLabel('addFavorite', 'Add to favorites')}
             >
               <Star className="w-3.5 h-3.5" fill={isFavorite ? 'currentColor' : 'none'} />
             </button>
           </div>
         </div>
 
-        {showInfo && <InfoModal app={app} onClose={() => setShowInfo(false)} />}
+        {showInfo && <InfoModal app={app} onClose={() => setShowInfo(false)} labels={labels} />}
       </>
     );
   }
@@ -136,8 +152,8 @@ const AppCard = forwardRef(function AppCard(
             type="button"
             {...dragHandleProps}
             className="absolute top-2 left-2 p-1 text-gray-300 opacity-0 group-hover:opacity-100 hover:text-dark hover:bg-gray-100 rounded transition-opacity cursor-grab active:cursor-grabbing touch-none"
-            title="Trascina per riordinare"
-            aria-label="Trascina per riordinare"
+            title={getLabel('dragToReorder', 'Drag to reorder')}
+            aria-label={getLabel('dragToReorder', 'Drag to reorder')}
           >
             <GripVertical className="w-4 h-4" />
           </button>
@@ -150,8 +166,8 @@ const AppCard = forwardRef(function AppCard(
               handleClick();
             }}
             className="shrink-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/40"
-            title={`Apri ${app.name}`}
-            aria-label={`Apri ${app.name}`}
+            title={getLabel('openAppNamed', `Open ${app.name}`, app.name)}
+            aria-label={getLabel('openAppNamed', `Open ${app.name}`, app.name)}
           >
             <AppIcon app={app} className="w-12 h-12" textClassName="text-4xl" alt={app.name} />
           </button>
@@ -163,7 +179,7 @@ const AppCard = forwardRef(function AppCard(
                   ? 'text-yellow-400 hover:text-yellow-500'
                   : 'text-gray-300 hover:text-yellow-400 hover:bg-gray-100'
               }`}
-              title={isFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+              title={isFavorite ? getLabel('removeFavorite', 'Remove from favorites') : getLabel('addFavorite', 'Add to favorites')}
             >
               <Star className="w-4 h-4" fill={isFavorite ? 'currentColor' : 'none'} />
             </button>
@@ -171,7 +187,7 @@ const AppCard = forwardRef(function AppCard(
               <button
                 onClick={handleInfo}
                 className="p-1.5 text-gray-300 hover:text-dark hover:bg-gray-100 rounded-lg transition-colors"
-                title="Informazioni"
+                title={getLabel('appInfo', 'More information')}
               >
                 <Info className="w-4 h-4" />
               </button>
@@ -182,10 +198,10 @@ const AppCard = forwardRef(function AppCard(
               </span>
             )}
             {showModeBadges && isEntraApp && (
-              <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">entra</span>
+              <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">{getLabel('entraBadgeShort', 'Entra')}</span>
             )}
             {showModeBadges && isExternal && (
-              <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">ext</span>
+              <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{getLabel('externalBadgeShort', 'Ext')}</span>
             )}
           </div>
         </div>
@@ -208,12 +224,12 @@ const AppCard = forwardRef(function AppCard(
         )}
       </div>
 
-      {showInfo && <InfoModal app={app} onClose={() => setShowInfo(false)} />}
+      {showInfo && <InfoModal app={app} onClose={() => setShowInfo(false)} labels={labels} />}
     </>
   );
 });
 
-function InfoModal({ app, onClose }) {
+function InfoModal({ app, onClose, labels = defaultLabels }) {
   const sanitizedLongDescription = DOMPurify.sanitize(app.long_description || '', {
     ADD_ATTR: ['target', 'rel'],
   });
@@ -226,7 +242,7 @@ function InfoModal({ app, onClose }) {
             <AppIcon app={app} className="w-10 h-10" textClassName="text-3xl" />
             <h2 className="text-xl font-bold text-dark">{app.name}</h2>
           </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100">
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100" aria-label={labels.closeDialog || defaultLabels.closeDialog}>
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -239,7 +255,7 @@ function InfoModal({ app, onClose }) {
             onClick={() => { onClose(); window.open(app.url, '_blank', 'noopener'); }}
             className="w-full py-3 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors"
           >
-            Apri {app.name}
+            {typeof labels.openAppNamed === 'function' ? labels.openAppNamed(app.name) : defaultLabels.openAppNamed(app.name)}
           </button>
         </div>
       </div>

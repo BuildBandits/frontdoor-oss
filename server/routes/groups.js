@@ -228,7 +228,7 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
 
 // --- Membership ---
 
-// Add members to group (by userIds and/or emails)
+// Add members to group (by userIds only)
 router.post('/:id/members', authenticate, isAdminEditor, (req, res) => {
   const group = db.prepare('SELECT id FROM user_groups WHERE id = ?').get(req.params.id);
   if (!group) return res.status(404).json({ error: 'Group not found' });
@@ -241,8 +241,12 @@ router.post('/:id/members', authenticate, isAdminEditor, (req, res) => {
   const hasUserIds = Array.isArray(userIds) && userIds.length > 0;
   const hasEmails = Array.isArray(emails) && emails.length > 0;
 
-  if (!hasUserIds && !hasEmails) {
-    return res.status(400).json({ error: 'userIds or emails must be a non-empty array' });
+  if (hasEmails) {
+    return res.status(400).json({ error: 'Email invitations are no longer supported' });
+  }
+
+  if (!hasUserIds) {
+    return res.status(400).json({ error: 'userIds must be a non-empty array' });
   }
 
   // Collect all user IDs to add
@@ -258,32 +262,6 @@ router.post('/:id/members', authenticate, isAdminEditor, (req, res) => {
     resolvedUserIds.push(...userIds);
   }
 
-  // Resolve emails: find existing or create pre-registered users
-  const createdUsers = [];
-  if (hasEmails) {
-    for (const rawEmail of emails) {
-      const email = rawEmail.toLowerCase().trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return res.status(400).json({ error: `Invalid email: ${email}` });
-      }
-
-      let user = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-      if (!user) {
-        // Create pre-registered user
-        const userId = uuidv4();
-        const avatarColor = `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
-        db.prepare(`
-          INSERT INTO users (id, email, display_name, microsoft_id, role, avatar_color, last_login)
-          VALUES (?, ?, NULL, NULL, 'user', ?, NULL)
-        `).run(userId, email, avatarColor);
-        logRbacAudit(req.user.id, 'create', 'user_status', userId, { email, pre_registered: true });
-        createdUsers.push({ id: userId, email });
-        user = { id: userId };
-      }
-      resolvedUserIds.push(user.id);
-    }
-  }
-
   const insert = db.prepare('INSERT OR IGNORE INTO user_group_members (user_id, group_id) VALUES (?, ?)');
   const addAll = db.transaction(() => {
     let added = 0;
@@ -296,7 +274,7 @@ router.post('/:id/members', authenticate, isAdminEditor, (req, res) => {
   const added = addAll();
   if (added > 0) logRbacAudit(req.user.id, 'add_members', 'membership', req.params.id, { userIds: resolvedUserIds, added });
 
-  res.json({ message: `${added} members added`, createdUsers });
+  res.json({ message: `${added} members added` });
 });
 
 // Remove member from group

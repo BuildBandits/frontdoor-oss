@@ -1,0 +1,56 @@
+import en from './en.json';
+import it from './it.json';
+import {
+  DEFAULT_LANGUAGE,
+  SUPPORTED_LANGUAGES,
+  SUPPORTED_LANGUAGE_CODES,
+  isSupportedLanguage,
+} from '../../shared/languages.js';
+
+export { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE };
+
+const DICTIONARIES = {
+  en,
+  it,
+};
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function deepMerge(target, source) {
+  const output = { ...target };
+  Object.entries(source || {}).forEach(([key, value]) => {
+    if (isPlainObject(value) && isPlainObject(output[key])) {
+      output[key] = deepMerge(output[key], value);
+      return;
+    }
+    output[key] = value;
+  });
+  return output;
+}
+
+export function normalizeLanguage(value) {
+  return isSupportedLanguage(value) ? value : DEFAULT_LANGUAGE;
+}
+
+export function normalizeOptionalLanguage(value) {
+  return isSupportedLanguage(value) ? value : null;
+}
+
+export function resolveAppLanguage(preferredLanguage, defaultLanguage) {
+  return normalizeOptionalLanguage(preferredLanguage) || normalizeLanguage(defaultLanguage);
+}
+
+export function getSupportedLanguageOptions(ui) {
+  return SUPPORTED_LANGUAGES.map((language) => ({
+    code: language.code,
+    label: ui?.common?.[language.labelKey] || language.code,
+  }));
+}
+
+export function getUiStrings(language) {
+  const normalized = normalizeLanguage(language);
+  return deepMerge(en, DICTIONARIES[normalized] || {});
+}
+

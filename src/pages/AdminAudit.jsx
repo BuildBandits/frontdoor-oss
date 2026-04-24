@@ -3,10 +3,13 @@ import { ChevronLeft, ChevronRight, AlertCircle, Filter, ShieldCheck } from 'luc
 import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
 import ClearableSearchField from '../components/ClearableSearchField';
+import { useAuthStore } from '../stores/authStore';
+import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 
-const PRIVILEGED_ROLES = new Set(['superadmin', 'admin', 'admin_readonly']);
+const PRIVILEGED_ROLES = new Set(['owner', 'admin', 'admin_readonly']);
 
 export default function AdminAudit() {
+  const { user } = useAuthStore();
   const periodOptions = [1, 7, 14, 30, 60, 90];
   const [logs, setLogs] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
@@ -17,6 +20,23 @@ export default function AdminAudit() {
   const [retentionDays, setRetentionDays] = useState(30);
   const [pageSize, setPageSize] = useState(50);
   const [selectedActorId, setSelectedActorId] = useState('');
+  const [brandingLanguage, setBrandingLanguage] = useState('en');
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/branding')
+      .then((res) => {
+        if (!cancelled) setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+      })
+      .catch(() => {
+        if (!cancelled) setBrandingLanguage('en');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
 
   useEffect(() => {
     let cancelled = false;
@@ -79,11 +99,27 @@ export default function AdminAudit() {
 
   const formatDetails = (details) => {
     if (!details) return '-';
-    if (typeof details === 'string') return details;
+    if (typeof details === 'string') {
+      try {
+        return JSON.parse(details);
+      } catch {
+        return details;
+      }
+    }
+    return details;
+  };
+
+  const renderDetails = (details) => {
+    const normalizedDetails = formatDetails(details);
+
+    if (typeof normalizedDetails === 'string') {
+      return normalizedDetails;
+    }
+
     try {
-      return JSON.stringify(details, null, 2);
+      return JSON.stringify(normalizedDetails, null, 2);
     } catch {
-      return String(details);
+      return String(normalizedDetails);
     }
   };
 
@@ -92,8 +128,8 @@ export default function AdminAudit() {
       <div className="mb-6">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl font-extrabold text-dark">Audit</h1>
-            <p className="text-gray-500 mt-1">Traccia delle azioni amministrative e di accesso dei ruoli privilegiati</p>
+            <h1 className="text-2xl font-extrabold text-dark">{ui.admin.audit.pageTitle}</h1>
+            <p className="text-gray-500 mt-1">{ui.admin.audit.subtitle}</p>
           </div>
         </div>
       </div>
@@ -104,17 +140,18 @@ export default function AdminAudit() {
             <ClearableSearchField
               value={search}
               onChange={setSearch}
-              placeholder="Cerca attore, azione o target..."
+              placeholder={ui.admin.audit.searchPlaceholder}
+              clearLabel={ui.common.clearSearch}
             />
           </div>
           <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-            <span className="text-gray-400">Admin</span>
+            <span className="text-gray-400">{ui.admin.audit.admin}</span>
             <select
               value={selectedActorId}
               onChange={(e) => setSelectedActorId(e.target.value)}
               className="bg-transparent text-sm font-medium text-dark focus:outline-none max-w-[220px]"
             >
-              <option value="">Tutti gli admin</option>
+              <option value="">{ui.admin.audit.allAdmins}</option>
               {adminUsers.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.display_name || user.email}
@@ -124,7 +161,7 @@ export default function AdminAudit() {
           </div>
           <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
             <Filter className="w-4 h-4 text-gray-400" />
-            <span>Periodo</span>
+            <span>{ui.admin.audit.period}</span>
             <select
               value={retentionDays}
               onChange={(e) => setRetentionDays(parseInt(e.target.value, 10))}
@@ -132,13 +169,13 @@ export default function AdminAudit() {
             >
               {periodOptions.map((days) => (
                 <option key={days} value={days}>
-                  {days === 1 ? '1 giorno' : `${days} giorni`}
+                  {days === 1 ? `1 ${ui.common.day}` : `${days} ${ui.common.days}`}
                 </option>
               ))}
             </select>
           </div>
           <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-            <span className="text-gray-400">Righe</span>
+            <span className="text-gray-400">{ui.admin.audit.rows}</span>
             <select
               value={pageSize}
               onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
@@ -164,8 +201,8 @@ export default function AdminAudit() {
         ) : logs.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-40" />
-            <p className="text-lg font-medium">Nessun evento audit</p>
-            <p className="text-sm mt-1">Le azioni dei ruoli privilegiati appariranno qui.</p>
+            <p className="text-lg font-medium">{ui.admin.audit.emptyTitle}</p>
+            <p className="text-sm mt-1">{ui.admin.audit.emptyBody}</p>
           </div>
         ) : (
           <>
@@ -173,11 +210,11 @@ export default function AdminAudit() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Data</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Attore</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Azione</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Target</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Dettagli</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{ui.common.date}</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{ui.admin.audit.admin}</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{ui.admin.audit.action}</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{ui.admin.audit.target}</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">{ui.admin.audit.details}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -213,7 +250,7 @@ export default function AdminAudit() {
                       </td>
                       <td className="px-5 py-3 hidden lg:table-cell">
                         <pre className="max-w-[420px] whitespace-pre-wrap break-words text-[11px] text-gray-500 font-mono">
-                          {formatDetails(log.details)}
+                          {renderDetails(log.details)}
                         </pre>
                       </td>
                     </tr>

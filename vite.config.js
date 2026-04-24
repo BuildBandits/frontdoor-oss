@@ -32,6 +32,20 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('react-router-dom') || id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler') || id.includes('@remix-run/router')) {
+            return 'vendor-react';
+          }
+          if (id.includes('lucide-react')) return 'vendor-icons';
+          if (id.includes('@dnd-kit')) return 'vendor-dnd';
+          if (id.includes('dompurify') || id.includes('axios') || id.includes('zustand') || id.includes('clsx') || id.includes('uuid')) return 'vendor-shared';
+          return undefined;
+        },
+      },
+    },
   },
   server: {
     port: 5173,

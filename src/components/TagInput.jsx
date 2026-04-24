@@ -1,7 +1,15 @@
 import { useState, useRef, useMemo } from 'react';
 import { X } from 'lucide-react';
 
-export default function TagInput({ value = [], onChange, placeholder = 'Aggiungi etichetta...', suggestions = [] }) {
+export default function TagInput({
+  value = [],
+  onChange,
+  placeholder = 'Add tag...',
+  suggestions = [],
+  suggestionsLabel = 'Suggestions',
+  availableTagsLabel = 'Available tags',
+  useSuggestionLabel = 'Use existing tag',
+}) {
   const [input, setInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef(null);
@@ -113,7 +121,7 @@ export default function TagInput({ value = [], onChange, placeholder = 'Aggiungi
       {showSuggestions && normalizedSuggestions.length > 0 && (
         <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
           <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 border-b border-gray-100">
-            {input.trim() ? 'Suggerimenti' : 'Etichette disponibili'}
+            {input.trim() ? suggestionsLabel : availableTagsLabel}
           </div>
           <div className="max-h-48 overflow-y-auto py-1">
             {normalizedSuggestions.map((tag) => (
@@ -129,7 +137,7 @@ export default function TagInput({ value = [], onChange, placeholder = 'Aggiungi
                 className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-center justify-between gap-3"
               >
                 <span className="font-medium">{tag}</span>
-                <span className="text-[11px] text-gray-400">Usa tag esistente</span>
+                <span className="text-[11px] text-gray-400">{useSuggestionLabel}</span>
               </button>
             ))}
           </div>

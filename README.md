@@ -40,7 +40,7 @@ Each app in the catalog is accessible via its target URL. The gateway handles au
 - Microsoft SSO authentication
 - App catalog with search, tags, favorites
 - Group-by-tag view
-- RBAC: groups, per-group app visibility, and role tiers (`superadmin`, `admin`, `admin_readonly`)
+- RBAC: groups, per-group app visibility, and role tiers (`owner`, `admin`, `admin_readonly`)
 - RBAC discovery from Microsoft Entra groups at login, with admin import/force-sync flows
 - Admin panel: manage apps, users, groups, logs, audit, and branding
 - Access logs with analytics, period filters, page size selection, and search
@@ -107,7 +107,7 @@ App: http://localhost:3001
 | `JWT_SECRET` | JWT signing secret | - |
 | `ENTRA_GROUP_SYNC` | Discover Entra group memberships at login and enable admin import/force-sync flows | `false` |
 | `JWT_EXPIRES_IN` | JWT token duration | `7d` |
-| `ADMIN_EMAILS` | Comma-separated superadmin emails (auto-promoted) | - |
+| `ADMIN_EMAILS` | Comma-separated owner emails (auto-promoted) | - |
 | `ADMIN_API_KEY` | API key for bulk endpoints | - |
 
 #### Production checklist
@@ -136,14 +136,14 @@ If one of the required values is missing or malformed, the container now fails f
 
 Frontdoor supports four role values:
 
-- `superadmin` - full access, including Log, Audit, and Personalizza
+- `owner` - full access, including Log, Audit, and Personalizza
 - `admin` - full admin access except Log and Personalizza
 - `admin_readonly` - can view admin pages but cannot modify data
 - `user` - standard app-catalog user
 
-Users listed in `ADMIN_EMAILS` are auto-promoted to `superadmin` and remain protected from web UI changes while they stay in the compose/run list.
+Users listed in `ADMIN_EMAILS` are auto-promoted to `owner` and remain protected from web UI changes while they stay in the compose/run list.
 
-Only `superadmin` can access Log, Audit, and Personalizza. `admin` and `admin_readonly` can access Gestione App, Gruppi, and Utenti; the latter is read-only.
+Only `owner` can access Log, Audit, and Personalizza. `admin` and `admin_readonly` can access Gestione App, Gruppi, and Utenti; the latter is read-only.
 
 #### Criteri di conservazione
 
@@ -178,12 +178,12 @@ The home hero text, optional company logo, homepage/login behavior, and app badg
 - The `Vai subito alla Login SSO` option skips the login page and redirects directly to Microsoft sign-in.
 - The `Mostra badge ext / SSO sulle app` option controls whether app cards show mode badges.
 - The `Mostra Shared Cookie`, `Mostra Redirect SSO`, and `Mostra Entra App` options hide those app-mode buttons in the admin app editor.
-- The `Criteri di conservazione` section lets a superadmin invalidate the cached avatars and tune log retention so Microsoft/Gravatar changes and retention policy updates are picked up on the next cycle.
+- The `Criteri di conservazione` section lets an owner invalidate the cached avatars and tune log retention so Microsoft/Gravatar changes and retention policy updates are picked up on the next cycle.
 
 #### Audit and retention
 
 - Log and Audit timestamps are rendered with the container `TZ` setting, while the database continues to store UTC values.
-- Audit includes a superadmin-only admin filter so you can narrow the view to a single privileged account.
+- Audit includes an owner-only admin filter so you can narrow the view to a single privileged account.
 - Frontdoor automatically purges `access_logs` and `rbac_audit_logs` entries older than 90 days at startup and then once per day.
 
 #### App icons
@@ -215,7 +215,7 @@ Frontdoor startup configuration:
   AZURE_TENANT_ID=[set]
   AZURE_REDIRECT_URI=https://frontdoor.cerbero.cc/api/auth/microsoft/callback
   JWT_SECRET=[set]
-  ADMIN_EMAILS=1 superadmin configured
+  ADMIN_EMAILS=1 owner configured
   ENTRA_GROUP_SYNC=true
 ```
 
@@ -302,7 +302,7 @@ AZURE_REDIRECT_URI=https://your-domain.com/api/auth/microsoft/callback
 | GET | `/api/auth/me` | Bearer | Current user profile |
 | POST | `/api/auth/logout` | No | Logout (clear cookie) |
 | GET | `/api/branding` | Bearer | Read home branding settings |
-| PUT | `/api/branding` | Superadmin | Update home branding settings |
+| PUT | `/api/branding` | Owner | Update home branding settings |
 | GET | `/api/branding/logo` | No | Serve optional company logo |
 | GET | `/api/apps` | Bearer | List active apps (RBAC filtered) |
 | GET | `/api/apps/all` | Admin viewer | List all apps (including inactive) |
@@ -311,6 +311,7 @@ AZURE_REDIRECT_URI=https://your-domain.com/api/auth/microsoft/callback
 | POST | `/api/apps/restore-defaults` | Admin editor | Restore the default demo apps |
 | PUT | `/api/apps/:id` | Admin editor | Update app |
 | DELETE | `/api/apps/:id` | Admin editor | Delete app |
+| GET | `/api/apps/bulk` | API Key | Bulk export apps (full metadata) |
 | POST | `/api/apps/bulk` | API Key | Bulk upsert apps |
 | GET | `/api/users` | Admin viewer | List users |
 | PUT | `/api/users/:id/role` | Admin editor | Change user role |
@@ -328,9 +329,9 @@ AZURE_REDIRECT_URI=https://your-domain.com/api/auth/microsoft/callback
 | DELETE | `/api/groups/:id/members/:userId` | Admin editor | Remove member |
 | POST | `/api/groups/:id/apps` | Admin editor | Assign apps |
 | DELETE | `/api/groups/:id/apps/:appId` | Admin editor | Remove app |
-| GET | `/api/logs` | Superadmin | Access logs (paginated) |
-| GET | `/api/logs/top-apps` | Superadmin | Top apps analytics |
-| GET | `/api/logs/audit` | Superadmin | Audit logs (paginated) |
+| GET | `/api/logs` | Owner | Access logs (paginated) |
+| GET | `/api/logs/top-apps` | Owner | Top apps analytics |
+| GET | `/api/logs/audit` | Owner | Audit logs (paginated) |
 
 ## Database
 
@@ -338,7 +339,7 @@ SQLite with 9 tables:
 
 | Table | Description |
 |-------|-------------|
-| `users` | Users (auto-created on first SSO login), superadmin/admin/admin_readonly/user roles |
+| `users` | Users (auto-created on first SSO login), owner/admin/admin_readonly/user roles |
 | `apps` | App catalog (slug, target_url, icon, icon_file_name, description, tags) |
 | `access_logs` | Proxy access logs (user, app, IP, timestamp) |
 | `user_groups` | User groups for RBAC, including imported Entra groups |

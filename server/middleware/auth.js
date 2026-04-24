@@ -20,7 +20,11 @@ export const authenticate = (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const user = db
-      .prepare('SELECT id, email, display_name, role, avatar_color FROM users WHERE id = ? AND is_active = 1')
+      .prepare(`
+        SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, app_order, app_order_updated_at
+        FROM users
+        WHERE id = ? AND is_active = 1
+      `)
       .get(decoded.userId);
 
     if (!user) {
@@ -53,15 +57,15 @@ export const authorize = (...roles) => {
   };
 };
 
-export const ROLE_SUPERADMIN = 'superadmin';
+export const ROLE_OWNER = 'owner';
 export const ROLE_ADMIN = 'admin';
 export const ROLE_ADMIN_READONLY = 'admin_readonly';
 export const ROLE_USER = 'user';
 
-export const ADMIN_VIEWER_ROLES = [ROLE_SUPERADMIN, ROLE_ADMIN, ROLE_ADMIN_READONLY];
-export const ADMIN_EDITOR_ROLES = [ROLE_SUPERADMIN, ROLE_ADMIN];
+export const ADMIN_VIEWER_ROLES = [ROLE_OWNER, ROLE_ADMIN, ROLE_ADMIN_READONLY];
+export const ADMIN_EDITOR_ROLES = [ROLE_OWNER, ROLE_ADMIN];
 
-export const isSuperAdmin = authorize(ROLE_SUPERADMIN);
+export const isOwner = authorize(ROLE_OWNER);
 export const isAdminViewer = authorize(...ADMIN_VIEWER_ROLES);
 export const isAdminEditor = authorize(...ADMIN_EDITOR_ROLES);
 export const isAdmin = isAdminEditor;

@@ -4,8 +4,11 @@ import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
 import AppIcon from '../components/AppIcon';
 import ClearableSearchField from '../components/ClearableSearchField';
+import { useAuthStore } from '../stores/authStore';
+import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 
 export default function AdminLogs() {
+  const { user } = useAuthStore();
   const periodOptions = [1, 7, 14, 30, 60, 90];
   const [logs, setLogs] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
@@ -16,6 +19,23 @@ export default function AdminLogs() {
   const [search, setSearch] = useState('');
   const [retentionDays, setRetentionDays] = useState(30);
   const [pageSize, setPageSize] = useState(50);
+  const [brandingLanguage, setBrandingLanguage] = useState('en');
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/branding')
+      .then((res) => {
+        if (!cancelled) setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+      })
+      .catch(() => {
+        if (!cancelled) setBrandingLanguage('en');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
 
   const loadLogs = useCallback(async (p = 1) => {
     setLoading(true);
@@ -56,7 +76,7 @@ export default function AdminLogs() {
   const formatDate = (iso) => {
     if (!iso) return '-';
     try {
-      return new Date(iso).toLocaleDateString('it-IT', {
+      return new Date(iso).toLocaleDateString(ui.common.dateLocale, {
         day: '2-digit', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit', second: '2-digit',
       });
@@ -66,8 +86,8 @@ export default function AdminLogs() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-extrabold text-dark">Log di Accesso</h1>
-        <p className="text-gray-500 mt-1">Registro degli accessi SSO alle applicazioni</p>
+        <h1 className="text-2xl font-extrabold text-dark">{ui.admin.logs.pageTitle}</h1>
+        <p className="text-gray-500 mt-1">{ui.admin.logs.subtitle}</p>
       </div>
 
       <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-4">
@@ -76,12 +96,13 @@ export default function AdminLogs() {
             <ClearableSearchField
               value={search}
               onChange={setSearch}
-              placeholder="Cerca utente, app o IP..."
+              placeholder={ui.admin.logs.searchPlaceholder}
+              clearLabel={ui.common.clearSearch}
             />
           </div>
           <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
             <Filter className="w-4 h-4 text-gray-400" />
-            <span>Periodo</span>
+            <span>{ui.admin.logs.period}</span>
             <select
               value={retentionDays}
               onChange={(e) => setRetentionDays(parseInt(e.target.value, 10))}
@@ -89,13 +110,13 @@ export default function AdminLogs() {
             >
               {periodOptions.map((days) => (
                 <option key={days} value={days}>
-                  {days === 1 ? '1 giorno' : `${days} giorni`}
+                  {days === 1 ? `1 ${ui.common.day}` : `${days} ${ui.common.days}`}
                 </option>
               ))}
             </select>
           </div>
           <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-            <span className="text-gray-400">Righe</span>
+            <span className="text-gray-400">{ui.admin.logs.rows}</span>
             <select
               value={pageSize}
               onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
@@ -121,7 +142,7 @@ export default function AdminLogs() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-dark">{stats.total_accesses}</p>
-                <p className="text-xs text-gray-400">Accessi totali</p>
+                <p className="text-xs text-gray-400">{ui.admin.logs.statsTotal}</p>
               </div>
             </div>
           </div>
@@ -132,7 +153,7 @@ export default function AdminLogs() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-dark">{stats.unique_users}</p>
-                <p className="text-xs text-gray-400">Utenti unici</p>
+                <p className="text-xs text-gray-400">{ui.admin.logs.statsUsers}</p>
               </div>
             </div>
           </div>
@@ -143,7 +164,7 @@ export default function AdminLogs() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-dark">{stats.unique_apps}</p>
-                <p className="text-xs text-gray-400">App accedute</p>
+                <p className="text-xs text-gray-400">{ui.admin.logs.statsApps}</p>
               </div>
             </div>
           </div>
@@ -154,7 +175,7 @@ export default function AdminLogs() {
       {topApps.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-            <BarChart3 className="w-4 h-4" /> Top App (ultimi {retentionDays} giorni)
+            <BarChart3 className="w-4 h-4" /> {ui.admin.logs.topApps} ({retentionDays} {ui.common.days})
           </h2>
           <div className="space-y-2">
             {topApps.map((app, i) => {
@@ -167,7 +188,7 @@ export default function AdminLogs() {
                     <div className="flex items-center justify-between mb-0.5">
                       <span className="text-sm font-medium text-dark truncate">{app.name}</span>
                       <span className="text-xs text-gray-400 ml-2 flex-shrink-0">
-                        {app.access_count} accessi &middot; {app.unique_users} utenti
+                        {app.access_count} {ui.admin.logs.accessSummary} &middot; {app.unique_users} {ui.admin.logs.usersSummary}
                       </span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-1.5">
@@ -195,8 +216,8 @@ export default function AdminLogs() {
         ) : logs.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-40" />
-            <p className="text-lg font-medium">Nessun log di accesso</p>
-            <p className="text-sm mt-1">I log vengono generati quando gli utenti accedono alle app via SSO redirect</p>
+            <p className="text-lg font-medium">{ui.admin.logs.emptyTitle}</p>
+            <p className="text-sm mt-1">{ui.admin.logs.emptyBody}</p>
           </div>
         ) : (
           <>
@@ -204,9 +225,9 @@ export default function AdminLogs() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Data</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Utente</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">App</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{ui.common.date}</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{ui.nav.users}</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{ui.nav.apps}</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">IP</th>
                   </tr>
                 </thead>
@@ -225,7 +246,7 @@ export default function AdminLogs() {
                             initialsClassName="text-[10px]"
                           />
                           <div className="min-w-0">
-                            <p className="text-dark font-medium truncate text-xs">{log.user_name || 'Utente rimosso'}</p>
+                            <p className="text-dark font-medium truncate text-xs">{log.user_name || ui.admin.logs.removedUser}</p>
                             <p className="text-gray-400 truncate text-[11px]">{log.user_email || '-'}</p>
                           </div>
                         </div>
@@ -237,7 +258,7 @@ export default function AdminLogs() {
                             className="w-6 h-6"
                             textClassName="text-base"
                           />
-                          <span className="text-dark text-xs font-medium truncate">{log.app_name || 'App rimossa'}</span>
+                          <span className="text-dark text-xs font-medium truncate">{log.app_name || ui.admin.logs.removedApp}</span>
                         </div>
                       </td>
                       <td className="px-5 py-3 text-xs text-gray-400 hidden md:table-cell font-mono">{log.ip_address || '-'}</td>

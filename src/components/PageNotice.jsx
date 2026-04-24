@@ -15,7 +15,7 @@ const noticeStyles = {
   },
 };
 
-export default function PageNotice({ type = 'info', message, onClose }) {
+export default function PageNotice({ type = 'info', message, onClose, closeLabel = 'Close notice' }) {
   const config = noticeStyles[type] || noticeStyles.info;
   const Icon = config.icon;
 
@@ -30,7 +30,7 @@ export default function PageNotice({ type = 'info', message, onClose }) {
           type="button"
           onClick={onClose}
           className="rounded-lg p-1 transition-colors hover:bg-black/5"
-          aria-label="Chiudi notifica"
+          aria-label={closeLabel}
         >
           <X className="h-4 w-4" />
         </button>

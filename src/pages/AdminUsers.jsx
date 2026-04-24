@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X } from 'lucide-react';
+import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import UserAvatar from '../components/UserAvatar';
@@ -8,6 +8,7 @@ import AppIcon from '../components/AppIcon';
 import PageNotice from '../components/PageNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
+import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 
 export default function AdminUsers() {
   const { user: currentUser } = useAuthStore();
@@ -15,7 +16,7 @@ export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filterRole, setFilterRole] = useState('all'); // all | superadmin | admin | admin_readonly | user
+  const [filterRole, setFilterRole] = useState('all'); // all | owner | admin | admin_readonly | user
   const [filterActive, setFilterActive] = useState('all'); // all | active | inactive
   const [expandedUser, setExpandedUser] = useState(null);
   const [userDetail, setUserDetail] = useState(null);
@@ -24,12 +25,25 @@ export default function AdminUsers() {
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [showVisibleApps, setShowVisibleApps] = useState(false);
+  const [brandingLanguage, setBrandingLanguage] = useState('en');
 
   useEffect(() => {
     if (!pageNotice) return undefined;
     const timer = setTimeout(() => setPageNotice(null), 5000);
     return () => clearTimeout(timer);
   }, [pageNotice]);
+
+  useEffect(() => {
+    if (!showVisibleApps) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setShowVisibleApps(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showVisibleApps]);
 
   const showToast = (message, type = 'success') => setPageNotice({ message, type });
   const openConfirm = (dialog) => setConfirmDialog(dialog);
@@ -53,12 +67,28 @@ export default function AdminUsers() {
       const res = await api.get('/users');
       setUsers(Array.isArray(res.data.users) ? res.data.users : []);
     } catch {
-      showToast('Errore nel caricamento utenti', 'error');
+      showToast(t.errorLoadingUsers, 'error');
     }
     setLoading(false);
   }, []);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/branding')
+      .then((res) => {
+        if (!cancelled) setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+      })
+      .catch(() => {
+        if (!cancelled) setBrandingLanguage('en');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const ui = getUiStrings(resolveAppLanguage(currentUser?.preferredLanguage, brandingLanguage));
+  const t = ui.admin.common;
+  const u = ui.admin.users;
 
   const loadUserDetail = async (userId) => {
     setDetailLoading(true);
@@ -66,7 +96,7 @@ export default function AdminUsers() {
       const res = await api.get(`/users/${userId}`);
       setUserDetail(res.data && typeof res.data === 'object' ? res.data : null);
     } catch {
-      showToast('Errore nel caricamento dettaglio utente', 'error');
+      showToast(t.errorLoadingUserDetail, 'error');
     }
     setDetailLoading(false);
   };
@@ -86,35 +116,46 @@ export default function AdminUsers() {
   const canEditUsers = currentUser?.role !== 'admin_readonly';
   const isComposeLockedAdmin = (user) => Boolean(user?.is_compose_locked_admin);
   const roleLabel = (role) => {
-    if (role === 'superadmin') return 'superadmin';
-    if (role === 'admin_readonly') return 'sola lettura';
-    if (role === 'admin') return 'admin';
-    return 'utente';
+    if (role === 'owner') return u.ownerBadge;
+    if (role === 'admin_readonly') return t.readOnlyRole;
+    if (role === 'admin') return u.adminBadge;
+    return u.userBadge;
   };
   const roleBadgeClass = (role) => {
-    if (role === 'superadmin') return 'bg-rose-100 text-rose-700';
+    if (role === 'owner') return 'bg-rose-100 text-rose-700';
     if (role === 'admin') return 'bg-amber-100 text-amber-700';
     if (role === 'admin_readonly') return 'bg-slate-100 text-slate-700';
     return 'bg-gray-100 text-gray-600';
   };
+  const RoleBadgeIcon = ({ role, className = 'w-3 h-3' }) => {
+    if (role === 'admin') return <Shield className={className} />;
+    if (role === 'admin_readonly') return <Eye className={className} />;
+    return null;
+  };
+  const roleBadgeContent = (role) => (
+    <>
+      <RoleBadgeIcon role={role} />
+      <span>{roleLabel(role)}</span>
+    </>
+  );
   const updateRole = async (user, newRole) => {
     const action = roleLabel(newRole);
     openConfirm({
-      title: `Impostare il ruolo "${action}" per ${user.display_name || user.email}?`,
+      title: u.roleConfirmTitle.replace('{action}', action).replace('{name}', user.display_name || user.email),
       message: newRole === 'user'
-        ? 'L’utente tornerà a un profilo standard.'
+        ? t.roleUserStandardMessage
         : newRole === 'admin_readonly'
-          ? 'L’utente vedrà le pagine amministrative ma non potrà modificarle.'
-          : 'L’utente otterrà i privilegi amministrativi della web app.',
-      confirmLabel: 'Conferma',
+          ? t.roleReadonlyMessage
+          : t.roleAdminMessage,
+      confirmLabel: t.confirm,
       onConfirm: async () => {
         try {
           await api.put(`/users/${user.id}/role`, { role: newRole });
-          showToast(`Ruolo impostato su ${action}`);
+          showToast(t.roleSetTo.replace('{action}', action));
           await loadUsers();
           if (expandedUser === user.id) await loadUserDetail(user.id);
         } catch (err) {
-          showToast(err.response?.data?.error || 'Errore nel cambio ruolo', 'error');
+          showToast(err.response?.data?.error || t.errorSaving, 'error');
         }
       },
     });
@@ -122,21 +163,19 @@ export default function AdminUsers() {
 
   const toggleActive = async (user) => {
     const newActive = !user.is_active;
-    const action = newActive ? 'riattivare' : 'disattivare';
+    const action = newActive ? u.reactivateAction : u.deactivateAction;
     openConfirm({
-      title: `Vuoi ${action} ${user.display_name || user.email}?`,
-      message: newActive
-        ? 'L’utente tornerà attivo e potrà accedere nuovamente.'
-        : 'L’utente verrà disattivato e non potrà più accedere.',
-      confirmLabel: newActive ? 'Riattiva' : 'Disattiva',
+      title: u.toggleActiveTitle.replace('{action}', action).replace('{name}', user.display_name || user.email),
+      message: newActive ? u.reactivateMessage : u.deactivateMessage,
+      confirmLabel: newActive ? u.reactivateUser : u.deactivateUser,
       onConfirm: async () => {
         try {
           await api.put(`/users/${user.id}/active`, { is_active: newActive });
-          showToast(newActive ? 'Utente riattivato' : 'Utente disattivato');
+          showToast(newActive ? u.reactivateUser : u.deactivateUser);
           await loadUsers();
           if (expandedUser === user.id) await loadUserDetail(user.id);
         } catch (err) {
-          showToast(err.response?.data?.error || 'Errore', 'error');
+          showToast(err.response?.data?.error || t.errorSaving, 'error');
         }
       },
     });
@@ -146,22 +185,22 @@ export default function AdminUsers() {
     const name = user.display_name || user.email;
     const visibleApps = userDetail?.visibleAppCount || 0;
     const message = visibleApps > 0
-      ? `L’utente ${name} rende visibili ${visibleApps} app.\n\nEliminandolo perderai anche queste assegnazioni.`
-      : 'Questa azione non è reversibile. Verranno rimossi anche tutti i log di accesso e le appartenenze ai gruppi.';
+      ? t.deleteUserWithAppsMessage.replace('{name}', name).replace('{count}', String(visibleApps))
+      : t.deleteUserMessage;
     openConfirm({
-      title: `Eliminare definitivamente l'utente ${name}?`,
+      title: u.deleteUserTitle.replace('{name}', name),
       message,
-      confirmLabel: 'Elimina utente',
+      confirmLabel: u.deleteUser,
       onConfirm: async () => {
         try {
           await api.delete(`/users/${user.id}`);
-          showToast('Utente eliminato definitivamente');
+          showToast(u.deleteUser);
           setExpandedUser(null);
           setUserDetail(null);
           setShowVisibleApps(false);
           await loadUsers();
         } catch (err) {
-          showToast(err.response?.data?.error || 'Errore nell\'eliminazione', 'error');
+          showToast(err.response?.data?.error || t.errorSaving, 'error');
         }
       },
     });
@@ -184,10 +223,22 @@ export default function AdminUsers() {
   const entraGroups = userDetail?.groups?.filter((g) => g.source === 'entra') || [];
   const detectedEntraGroups = userDetail?.entraGroups || [];
   const visibleApps = userDetail?.visibleApps || [];
+  const appModeLabel = (mode) => {
+    if (mode === 'redirect') return 'SSO';
+    if (mode === 'shared-cookie') return 'cookie';
+    if (mode === 'entra-app') return 'entra';
+    return 'link';
+  };
+  const appModeBadgeClass = (mode) => {
+    if (mode === 'redirect') return 'bg-blue-100 text-blue-700';
+    if (mode === 'shared-cookie') return 'bg-emerald-100 text-emerald-700';
+    if (mode === 'entra-app') return 'bg-violet-100 text-violet-700';
+    return 'bg-gray-100 text-gray-600';
+  };
   const formatDate = (iso) => {
-    if (!iso) return 'Mai';
+    if (!iso) return t.noLogin;
     try {
-      return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return new Date(iso).toLocaleDateString(ui.common.dateLocale, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     } catch {
       return iso;
     }
@@ -201,75 +252,75 @@ export default function AdminUsers() {
       actions.push(
         {
           role: 'admin',
-          label: 'Assegna ruolo Admin (accesso completo)',
+          label: t.roleAdminFull,
           icon: Shield,
           className: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
-          confirmText: 'L’utente potrà gestire app, gruppi e utenti.',
+          confirmText: t.roleAdminFullConfirm,
         },
         {
           role: 'admin_readonly',
-          label: 'Assegna ruolo Admin (sola lettura)',
-          icon: ShieldOff,
+          label: t.roleAdminReadonly,
+          icon: Eye,
           className: 'bg-slate-50 text-slate-700 hover:bg-slate-100',
-          confirmText: 'L’utente vedrà le pagine amministrative ma non potrà modificarle.',
+          confirmText: t.roleAdminReadonlyConfirm,
         }
       );
     } else if (targetUser.role === 'admin_readonly') {
       actions.push(
         {
           role: 'admin',
-          label: 'Assegna ruolo Admin (accesso completo)',
+          label: t.roleAdminFull,
           icon: Shield,
           className: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
-          confirmText: 'L’utente potrà gestire app, gruppi e utenti.',
+          confirmText: t.roleAdminFullConfirm,
         },
         {
           role: 'user',
-          label: 'Rimuovi ruolo Admin',
+          label: t.roleRemove,
           icon: ShieldOff,
           className: 'bg-blue-50 text-blue-700 hover:bg-blue-100',
-          confirmText: 'L’utente tornerà a un profilo standard.',
+          confirmText: t.roleRemoveConfirm,
         }
       );
     } else if (targetUser.role === 'admin') {
       actions.push(
         {
           role: 'admin_readonly',
-          label: 'Assegna ruolo Admin (sola lettura)',
-          icon: ShieldOff,
+          label: t.roleAdminReadonly,
+          icon: Eye,
           className: 'bg-slate-50 text-slate-700 hover:bg-slate-100',
-          confirmText: 'L’utente perderà la possibilità di operare modifiche.',
+          confirmText: t.roleAdminReadonlyConfirm,
         },
         {
           role: 'user',
-          label: 'Rimuovi ruolo Admin',
+          label: t.roleRemove,
           icon: ShieldOff,
           className: 'bg-blue-50 text-blue-700 hover:bg-blue-100',
-          confirmText: 'L’utente tornerà a un profilo standard.',
+          confirmText: t.roleRemoveConfirm,
         }
       );
-    } else if (targetUser.role === 'superadmin') {
+    } else if (targetUser.role === 'owner') {
       actions.push(
         {
           role: 'admin',
-          label: 'Assegna ruolo Admin (accesso completo)',
-          icon: ShieldOff,
+          label: t.roleAdminFull,
+          icon: Shield,
           className: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
-          confirmText: 'L’utente potrà gestire app, gruppi e utenti.',
+          confirmText: t.roleAdminFullConfirm,
         },
         {
           role: 'admin_readonly',
-          label: 'Assegna ruolo Admin (sola lettura)',
-          icon: ShieldOff,
+          label: t.roleAdminReadonly,
+          icon: Eye,
           className: 'bg-slate-50 text-slate-700 hover:bg-slate-100',
-          confirmText: 'L’utente perderà la possibilità di operare modifiche.',
+          confirmText: t.roleAdminReadonlyConfirm,
         },
         {
           role: 'user',
-          label: 'Rimuovi ruolo Admin',
+          label: t.roleRemove,
           icon: ShieldOff,
           className: 'bg-blue-50 text-blue-700 hover:bg-blue-100',
-          confirmText: 'L’utente tornerà a un profilo standard.',
+          confirmText: t.roleRemoveConfirm,
         }
       );
     }
@@ -277,23 +328,23 @@ export default function AdminUsers() {
     return actions;
   };
 
-  const adminCount = users.filter((u) => ['superadmin', 'admin'].includes(u.role) && u.is_active).length;
+  const adminCount = users.filter((u) => ['owner', 'admin'].includes(u.role) && u.is_active).length;
   const activeCount = users.filter((u) => u.is_active).length;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark">Gestione Utenti</h1>
+          <h1 className="text-2xl font-extrabold text-dark">{ui.admin.users.pageTitle}</h1>
           <p className="text-gray-500 mt-1">
-            {users.length} utenti totali &middot; {activeCount} attivi &middot; {adminCount} con privilegi elevati
-          </p>
-        </div>
+          {users.length} {ui.nav.users.toLowerCase()} {t.total} &middot; {activeCount} {t.active} &middot; {adminCount} {t.privileged}
+        </p>
+      </div>
       </div>
 
       {!canEditUsers && (
         <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          Modalità sola lettura: puoi consultare gli utenti, ma non modificarne ruolo o stato.
+          {t.readOnly}
         </div>
       )}
 
@@ -303,39 +354,43 @@ export default function AdminUsers() {
             type={pageNotice.type}
             message={pageNotice.message}
             onClose={() => setPageNotice(null)}
+            closeLabel={ui.common.closeNotice}
           />
         </div>
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-8">
-        <div className="flex-1 min-w-[200px]">
-          <ClearableSearchField
-            value={search}
-            onChange={setSearch}
-            placeholder="Cerca per nome o email..."
-          />
+      <div className="mb-8 rounded-2xl border border-gray-100 bg-white p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[200px]">
+            <ClearableSearchField
+              value={search}
+              onChange={setSearch}
+              placeholder={ui.admin.users.searchPlaceholder}
+              clearLabel={ui.common.clearSearch}
+            />
+          </div>
+          <select
+            value={filterRole}
+            onChange={(e) => setFilterRole(e.target.value)}
+            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent"
+          >
+            <option value="all">{t.allRoles}</option>
+            <option value="owner">{u.ownerBadge}</option>
+            <option value="admin">{u.adminBadge}</option>
+            <option value="admin_readonly">{t.readOnlyRole}</option>
+            <option value="user">{t.usersOnly}</option>
+          </select>
+          <select
+            value={filterActive}
+            onChange={(e) => setFilterActive(e.target.value)}
+            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent"
+          >
+            <option value="all">{t.allStatuses}</option>
+            <option value="active">{t.activeOnly}</option>
+            <option value="inactive">{t.inactiveOnly}</option>
+          </select>
         </div>
-        <select
-          value={filterRole}
-          onChange={(e) => setFilterRole(e.target.value)}
-          className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-        >
-          <option value="all">Tutti i ruoli</option>
-          <option value="superadmin">Solo superadmin</option>
-          <option value="admin">Solo admin</option>
-          <option value="admin_readonly">Solo lettura</option>
-          <option value="user">Solo utenti</option>
-        </select>
-        <select
-          value={filterActive}
-          onChange={(e) => setFilterActive(e.target.value)}
-          className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-        >
-          <option value="all">Tutti gli stati</option>
-          <option value="active">Solo attivi</option>
-          <option value="inactive">Solo disattivati</option>
-        </select>
       </div>
 
       {loading ? (
@@ -347,8 +402,8 @@ export default function AdminUsers() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <Users className="w-12 h-12 mx-auto mb-3 opacity-40" />
-          <p className="text-lg font-medium">Nessun utente trovato</p>
-          {search && <p className="text-sm mt-1">Prova a cambiare i filtri di ricerca</p>}
+          <p className="text-lg font-medium">{t.noUsersFound}</p>
+          {search && <p className="text-sm mt-1">{ui.admin.users.noUsersFoundHelp}</p>}
         </div>
       ) : (
         <div className="space-y-2">
@@ -378,19 +433,19 @@ export default function AdminUsers() {
                       <span className={`font-semibold text-sm ${user.is_active ? 'text-dark' : 'text-gray-400 line-through'}`}>
                         {user.display_name || user.email}
                       </span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${roleBadgeClass(user.role)}`}>
-                        {roleLabel(user.role)}
+                      <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium ${roleBadgeClass(user.role)}`}>
+                        {roleBadgeContent(user.role)}
                       </span>
                       {isComposeLockedAdmin(user) && (
-                        <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">compose</span>
+                        <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">{u.composeBadge}</span>
                       )}
                       {!user.last_login && (
                         <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5">
-                          <Clock className="w-3 h-3" />mai loggato
+                          <Clock className="w-3 h-3" />{t.noLogin}
                         </span>
                       )}
                       {!user.is_active && (
-                        <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">disattivato</span>
+                        <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">{t.inactive}</span>
                       )}
                     </div>
                     <p className="text-xs text-gray-400 truncate">{user.email}</p>
@@ -398,10 +453,10 @@ export default function AdminUsers() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-gray-400 hidden sm:block">
-                    {user.group_count} gruppi
+                    {user.group_count} {t.groups}
                   </span>
                   <span className="text-xs text-gray-400 hidden md:block">
-                    Ultimo accesso: {formatDate(user.last_login)}
+                    {t.lastLogin}: {formatDate(user.last_login)}
                   </span>
                 </div>
               </div>
@@ -417,40 +472,43 @@ export default function AdminUsers() {
                     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.3fr)_minmax(0,0.88fr)] gap-6 lg:min-h-[460px]">
                       {/* Info */}
                       <div>
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Informazioni</h3>
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{t.info}</h3>
                         <dl className="space-y-2 text-sm">
                           <div>
-                            <dt className="text-gray-400">Email</dt>
+                            <dt className="text-gray-400">{u.emailLabel}</dt>
                             <dd className="text-dark font-medium">{userDetail.user.email}</dd>
                           </div>
                           <div>
-                            <dt className="text-gray-400">Ruolo</dt>
-                            <dd className="text-dark font-medium">{roleLabel(userDetail.user.role)}</dd>
-                          </div>
-                          <div>
-                            <dt className="text-gray-400">Stato</dt>
-                            <dd className={userDetail.user.is_active ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>
-                              {userDetail.user.is_active ? 'Attivo' : 'Disattivato'}
+                            <dt className="text-gray-400">{t.role}</dt>
+                            <dd className="inline-flex items-center gap-1 text-dark font-medium">
+                              {roleBadgeContent(userDetail.user.role)}
                             </dd>
                           </div>
                           <div>
-                            <dt className="text-gray-400">Registrato</dt>
+                          <dt className="text-gray-400">{t.status}</dt>
+                          <dd className={userDetail.user.is_active ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>
+                              {userDetail.user.is_active ? t.active : t.inactive}
+                          </dd>
+                        </div>
+                        <div>
+                            <dt className="text-gray-400">{t.registered}</dt>
                             <dd className="text-dark">{formatDate(userDetail.user.created_at)}</dd>
-                          </div>
-                          <div>
-                            <dt className="text-gray-400">Ultimo accesso</dt>
+                        </div>
+                        <div>
+                            <dt className="text-gray-400">{t.lastLogin}</dt>
                             <dd className="text-dark">{formatDate(userDetail.user.last_login)}</dd>
-                          </div>
+                        </div>
                           <div>
-                            <dt className="text-gray-400">App visibili</dt>
+                            <dt className="text-gray-400">{t.visibleApps}</dt>
                             <dd>
                               {userDetail.visibleAppCount > 0 ? (
                                 <button
                                   type="button"
                                   onClick={() => setShowVisibleApps(true)}
-                                  className="text-dark font-medium hover:text-accent-dark hover:underline"
+                                  className="inline-flex items-center gap-1 text-dark font-medium hover:text-accent-dark hover:underline"
                                 >
                                   {userDetail.visibleAppCount}
+                                  <Info className="w-3.5 h-3.5 text-gray-400" />
                                 </button>
                               ) : (
                                 <span className="text-dark font-medium">0</span>
@@ -463,19 +521,19 @@ export default function AdminUsers() {
                       {/* Groups */}
                       <div>
                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                          Gruppi Frontdoor ({userDetail.groups.length})
+                          {t.frontdoorGroups} ({userDetail.groups.length})
                         </h3>
 
                         <div className="space-y-5 h-full overflow-y-auto pr-1 lg:max-h-[390px]">
                           <div>
                             <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
-                              Gruppi locali ({localGroups.length})
+                              {t.localGroups} ({localGroups.length})
                             </p>
                             <p className="mb-2 text-xs text-sky-600">
-                              Sono gruppi creati e gestiti direttamente in Frontdoor, indipendenti dal tenant Entra.
+                              {t.localGroupsInfo}
                             </p>
                             {localGroups.length === 0 ? (
-                              <p className="text-sm text-gray-300 italic">Nessun gruppo locale</p>
+                            <p className="text-sm text-gray-300 italic">{t.noLocalGroups}</p>
                             ) : (
                               <div className="space-y-1.5">
                                 {localGroups.map((g) => (
@@ -493,13 +551,11 @@ export default function AdminUsers() {
 
                           <div>
                             <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
-                              Gruppi Frontdoor importati da Entra ({entraGroups.length})
+                              {t.importedEntraGroups} ({entraGroups.length})
                             </p>
-                            <p className="mb-2 text-xs text-sky-600">
-                              I gruppi Entra vengono rilevati al login o con Force Sync, poi importati manualmente da Gestione Gruppi.
-                            </p>
+                            <p className="mb-2 text-xs text-sky-600">{t.entraGroupsInfo}</p>
                             {entraGroups.length === 0 ? (
-                              <p className="text-sm text-gray-300 italic">Nessun gruppo Entra importato in Frontdoor</p>
+                            <p className="text-sm text-gray-300 italic">{t.noImportedEntraGroups}</p>
                             ) : (
                               <div className="space-y-1.5">
                                 {entraGroups.map((g) => (
@@ -507,7 +563,7 @@ export default function AdminUsers() {
                                     <Users className="w-3.5 h-3.5 text-gray-400" />
                                     <span className="text-sm text-dark">{groupLabel(g)}</span>
                                     <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">
-                                      Entra
+                                      {u.entraBadge}
                                     </span>
                                     {g.description && (
                                       <span className="text-xs text-gray-400 truncate max-w-[150px]">{g.description}</span>
@@ -522,13 +578,13 @@ export default function AdminUsers() {
 
                       <div>
                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                          Gruppi Entra rilevati ({detectedEntraGroups.length})
+                          {t.detectedEntraGroups} ({detectedEntraGroups.length})
                         </h3>
                         <p className="mb-2 text-xs text-sky-600">
-                          Questi gruppi vengono letti direttamente dal tenant Entra, anche se non sono ancora importati in Frontdoor.
+                          {t.detectedGroupsInfo}
                         </p>
                         {detectedEntraGroups.length === 0 ? (
-                          <p className="text-sm text-gray-300 italic">Nessun gruppo Entra rilevato</p>
+                              <p className="text-sm text-gray-300 italic">{t.noDetectedEntraGroups}</p>
                         ) : (
                           <div className="space-y-1.5 h-full overflow-y-auto pr-1 lg:max-h-[390px]">
                             {detectedEntraGroups.map((group) => (
@@ -552,14 +608,14 @@ export default function AdminUsers() {
                                 <Users className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                                 <span className="text-sm text-dark">{group.display_name}</span>
                                 {group.is_imported ? (
-                                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
-                                    Entra (importato)
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-                                    Entra (rilevato)
-                                  </span>
-                                )}
+                                      <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
+                                      {t.importedBadge}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                                    {t.detectedBadge}
+                                    </span>
+                                  )}
                               </button>
                             ))}
                           </div>
@@ -568,11 +624,11 @@ export default function AdminUsers() {
 
                       {/* Actions */}
                       <div>
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Azioni</h3>
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{t.actions}</h3>
                         <div className="space-y-2 lg:sticky lg:top-4">
                           {!canEditUsers && (
                             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                              Ruolo attuale in sola lettura: le modifiche non sono consentite per questo account.
+                              {u.readOnlyUsersMessage}
                             </div>
                           )}
 
@@ -602,11 +658,11 @@ export default function AdminUsers() {
                             }`}
                           >
                             {!canEditUsers || isComposeLockedAdmin(user) ? (
-                              <><UserX className="w-4 h-4" /> Disattivazione bloccata</>
+                              <><UserX className="w-4 h-4" /> {u.deactivateBlocked}</>
                             ) : user.is_active ? (
-                              <><UserX className="w-4 h-4" /> Disattiva utente</>
+                              <><UserX className="w-4 h-4" /> {u.deactivateUser}</>
                             ) : (
-                              <><UserCheck className="w-4 h-4" /> Riattiva utente</>
+                              <><UserCheck className="w-4 h-4" /> {u.reactivateUser}</>
                             )}
                           </button>
                           <div className="border-t border-gray-100 pt-2 mt-1">
@@ -619,13 +675,11 @@ export default function AdminUsers() {
                                   : 'bg-red-50 text-red-700 hover:bg-red-200'
                               }`}
                             >
-                              <Trash2 className="w-4 h-4" /> {!canEditUsers || isComposeLockedAdmin(user) ? 'Eliminazione bloccata' : 'Elimina definitivamente'}
+                              <Trash2 className="w-4 h-4" /> {!canEditUsers || isComposeLockedAdmin(user) ? u.deleteBlocked : u.deleteUser}
                             </button>
-                            <p className="text-[11px] text-gray-400 mt-1 px-1">Rimuove utente, gruppi e log di accesso</p>
+                            <p className="text-[11px] text-gray-400 mt-1 px-1">{u.removeUserSummary}</p>
                             {isComposeLockedAdmin(user) && (
-                              <p className="text-[11px] text-slate-400 mt-2 px-1">
-                                Questo superadmin è definito in `ADMIN_EMAILS` nel compose: va prima rimosso da lì.
-                              </p>
+                              <p className="text-[11px] text-slate-400 mt-2 px-1">{u.composeWarning}</p>
                             )}
                           </div>
                         </div>
@@ -644,8 +698,8 @@ export default function AdminUsers() {
           <div className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-bold text-dark">App visibili</h2>
-                <p className="text-sm text-gray-500 mt-1">{visibleApps.length} applicazioni disponibili per questo utente</p>
+                <h2 className="text-lg font-bold text-dark">{t.visibleApps}</h2>
+                <p className="text-sm text-gray-500 mt-1">{visibleApps.length} {t.appVisibleCount}</p>
               </div>
               <button onClick={() => setShowVisibleApps(false)} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100">
                 <X className="w-5 h-5" />
@@ -655,7 +709,7 @@ export default function AdminUsers() {
             {visibleApps.length === 0 ? (
               <div className="text-center py-10 text-gray-400">
                 <Users className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                <p className="text-sm font-medium">Nessuna app visibile</p>
+                <p className="text-sm font-medium">{t.noVisibleApps}</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -663,15 +717,18 @@ export default function AdminUsers() {
                   <button
                     key={app.id}
                     type="button"
-                    onClick={() => window.open(app.url, '_blank', 'noopener')}
+                    onClick={() => {
+                      setShowVisibleApps(false);
+                      navigate(`/admin?edit=${encodeURIComponent(app.slug)}`);
+                    }}
                     className="w-full flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left hover:border-accent hover:bg-accent/5 transition-colors"
                   >
                     <AppIcon app={app} className="w-8 h-8" textClassName="text-xl" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-dark truncate">{app.name}</span>
-                        <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">
-                          {app.mode}
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${appModeBadgeClass(app.mode)}`}>
+                          {appModeLabel(app.mode)}
                         </span>
                       </div>
                       <p className="text-xs text-gray-400 truncate">{app.description}</p>
@@ -688,7 +745,10 @@ export default function AdminUsers() {
         open={Boolean(confirmDialog)}
         title={confirmDialog?.title || ''}
         message={confirmDialog?.message || ''}
-        confirmLabel={confirmDialog?.confirmLabel || 'Conferma'}
+        confirmLabel={confirmDialog?.confirmLabel || t.confirm}
+        cancelLabel={confirmDialog?.cancelLabel || t.cancel}
+        closeLabel={ui.common.closeDialog}
+        busyLabel={ui.common.pleaseWait}
         busy={confirmBusy}
         onConfirm={runConfirm}
         onCancel={closeConfirm}

@@ -8,6 +8,7 @@ export default function ClearableSearchField({
   inputClassName = '',
   autoFocus = false,
   onKeyDown,
+  clearLabel = 'Clear search',
 }) {
   const handleKeyDown = (event) => {
     if (event.key === 'Escape' && value) {
@@ -36,8 +37,8 @@ export default function ClearableSearchField({
           type="button"
           onClick={() => onChange('')}
           className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-dark hover:bg-gray-100 rounded-md transition-colors"
-          aria-label="Cancella ricerca"
-          title="Cancella ricerca"
+          aria-label={clearLabel}
+          title={clearLabel}
         >
           <X className="w-4 h-4" />
         </button>

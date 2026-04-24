@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import BrandMark from '../components/BrandMark';
+import AppFooter from '../components/AppFooter';
 import api from '../services/api';
+import { getUiStrings, normalizeLanguage } from '../i18n';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -11,6 +13,8 @@ export default function Login() {
   const [branding, setBranding] = useState(null);
   const [brandingLoading, setBrandingLoading] = useState(true);
   const error = searchParams.get('error');
+  const language = normalizeLanguage(branding?.defaultLanguage);
+  const ui = getUiStrings(language);
 
   useEffect(() => {
     api.get('/branding')
@@ -57,55 +61,54 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        {/* Logo/Brand */}
-        <div className="text-center mb-12">
-          <div className="inline-flex mb-6">
-            <BrandMark size="lg" />
+    <div className="min-h-screen flex flex-col bg-[#FAFAFA]">
+      <div className="flex-1 flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-md">
+          {/* Logo/Brand */}
+          <div className="text-center mb-12">
+            <div className="inline-flex mb-6">
+              <BrandMark size="lg" />
+            </div>
+            <h1 className="text-4xl font-extrabold text-dark tracking-tight">
+              {ui.login.title}
+            </h1>
+            {/*
+              Sottotitolo temporaneamente rimosso.
+              Valutiamo in seguito se reintrodurre un testo descrittivo più mirato.
+            */}
           </div>
-          <h1 className="text-4xl font-extrabold text-dark tracking-tight">
-            Frontdoor
-          </h1>
-          {/*
-            Sottotitolo temporaneamente rimosso.
-            Valutiamo in seguito se reintrodurre un testo descrittivo più mirato.
-          */}
+
+          {brandingLoading && (
+            <div className="mb-6 p-4 bg-white border border-gray-200 rounded-xl text-gray-500 text-sm text-center">
+              {ui.login.loadingAuth}
+            </div>
+          )}
+
+          {/* Error message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm text-center">
+              {ui.login.errors[error] || ui.login.errors.generic}
+            </div>
+          )}
+
+          {!branding?.hideLoginPage && (
+            <button
+              onClick={handleSSOLogin}
+              className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-dark text-white rounded-xl font-semibold text-lg hover:bg-gray-800 transition-colors cursor-pointer"
+              >
+              <svg width="21" height="21" viewBox="0 0 21 21" fill="none">
+                <rect width="10" height="10" fill="#F25022" />
+                <rect x="11" width="10" height="10" fill="#7FBA00" />
+                <rect y="11" width="10" height="10" fill="#00A4EF" />
+                <rect x="11" y="11" width="10" height="10" fill="#FFB900" />
+              </svg>
+              {ui.login.signIn}
+            </button>
+          )}
         </div>
-
-        {brandingLoading && (
-          <div className="mb-6 p-4 bg-white border border-gray-200 rounded-xl text-gray-500 text-sm text-center">
-            Caricamento autenticazione...
-          </div>
-        )}
-
-        {/* Error message */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm text-center">
-            {error === 'sso_denied' && "Accesso negato. Riprova o contatta l'amministratore."}
-            {error === 'sso_failed' && "Errore durante l'autenticazione. Riprova."}
-            {error === 'sso_init_failed' && 'Errore di connessione con Microsoft. Riprova.'}
-            {error === 'invalid_state' && 'Sessione scaduta. Riprova.'}
-            {!['sso_denied', 'sso_failed', 'sso_init_failed', 'invalid_state'].includes(error) &&
-              "Si è verificato un errore. Riprova."}
-          </div>
-        )}
-
-        {!branding?.hideLoginPage && (
-          <button
-            onClick={handleSSOLogin}
-            className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-dark text-white rounded-xl font-semibold text-lg hover:bg-gray-800 transition-colors cursor-pointer"
-          >
-            <svg width="21" height="21" viewBox="0 0 21 21" fill="none">
-              <rect width="10" height="10" fill="#F25022" />
-              <rect x="11" width="10" height="10" fill="#7FBA00" />
-              <rect y="11" width="10" height="10" fill="#00A4EF" />
-              <rect x="11" y="11" width="10" height="10" fill="#FFB900" />
-            </svg>
-            Accedi
-          </button>
-        )}
       </div>
+
+      <AppFooter language={language} />
     </div>
   );
 }

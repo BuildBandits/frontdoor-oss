@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate, isSuperAdmin } from '../middleware/auth.js';
+import { authenticate, isOwner } from '../middleware/auth.js';
 import { logRbacAudit } from '../db.js';
 import { clearAvatarCache } from '../services/avatars.js';
 import { getBrandingSettings, serveBrandingLogo, updateBrandingSettings } from '../services/branding.js';
@@ -10,28 +10,18 @@ router.get('/', (req, res) => {
   res.json({ branding: getBrandingSettings() });
 });
 
-router.put('/', authenticate, isSuperAdmin, async (req, res) => {
+router.put('/', authenticate, isOwner, async (req, res) => {
   try {
-    const branding = await updateBrandingSettings(req.body || {});
-    logRbacAudit(req.user.id, 'update', 'branding', 'default', {
-      heroTitleLine1: branding.heroTitleLine1,
-      heroTitleLine2: branding.heroTitleLine2,
-      showHomeHero: branding.showHomeHero,
-      logRetentionDays: branding.logRetentionDays,
-      hideLoginPage: branding.hideLoginPage,
-      showAppModeBadges: branding.showAppModeBadges,
-      showSharedCookieMode: branding.showSharedCookieMode,
-      showRedirectSsoMode: branding.showRedirectSsoMode,
-      showEntraAppMode: branding.showEntraAppMode,
-    });
-    res.json({ message: 'Modifiche salvate', branding });
+    const { branding, auditDetails } = await updateBrandingSettings(req.body || {});
+    logRbacAudit(req.user.id, 'update', 'branding', 'default', auditDetails);
+    res.json({ message: 'Changes saved', branding });
   } catch (error) {
     console.error('Branding update failed:', error.message);
     res.status(400).json({ error: error.message || 'Failed to update branding' });
   }
 });
 
-router.post('/avatars/refresh', authenticate, isSuperAdmin, async (req, res) => {
+router.post('/avatars/refresh', authenticate, isOwner, async (req, res) => {
   try {
     const result = await clearAvatarCache();
     logRbacAudit(req.user.id, 'refresh', 'branding', 'avatar-cache', {
@@ -39,7 +29,7 @@ router.post('/avatars/refresh', authenticate, isSuperAdmin, async (req, res) => 
       scope: 'avatars',
     });
     res.json({
-      message: 'Cache avatar svuotata',
+      message: 'Avatar cache cleared',
       ...result,
     });
   } catch (error) {

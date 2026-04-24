@@ -1,15 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, ChevronRight, Clock3, Eye, Home, Image, LayoutPanelLeft, LogIn, RefreshCw, Save, Settings, SlidersHorizontal, Type } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronRight, Clock3, Eye, Home, Image, LogIn, RefreshCw, Save, Settings, Smartphone, Type, Wrench } from 'lucide-react';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useAuthStore } from '../stores/authStore';
+import { getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 
 const emptyBranding = {
-  heroTitleLine1: 'Le tue applicazioni,',
-  heroTitleLine2: 'tutte in un unico posto.',
-  heroSubtitle: 'Accedi rapidamente a tutti gli strumenti e le piattaforme del tuo workspace.',
+  heroTitleLine1: 'Your apps,',
+  heroTitleLine2: 'all in one place.',
+  heroSubtitle: 'Quickly access all the tools and platforms in your workspace.',
   showHomeHero: true,
+  hideHomeHeroOnMobile: false,
   showAppModeBadges: true,
+  defaultHomeDesktopView: 'cards',
   defaultCompactView: false,
+  defaultLanguage: 'en',
+  useEuropeanDateFormat: false,
+  use24hTimeFormat: false,
   logRetentionDays: 90,
   hideLoginPage: false,
   showSharedCookieMode: true,
@@ -22,8 +29,13 @@ const brandingKeys = [
   'heroTitleLine2',
   'heroSubtitle',
   'showHomeHero',
+  'hideHomeHeroOnMobile',
   'showAppModeBadges',
+  'defaultHomeDesktopView',
   'defaultCompactView',
+  'defaultLanguage',
+  'useEuropeanDateFormat',
+  'use24hTimeFormat',
   'logRetentionDays',
   'hideLoginPage',
   'showSharedCookieMode',
@@ -31,13 +43,16 @@ const brandingKeys = [
   'showEntraAppMode',
 ];
 
-export default function Personalizza() {
+export default function Customization() {
+  const { user } = useAuthStore();
   const [branding, setBranding] = useState(emptyBranding);
   const [initialBranding, setInitialBranding] = useState(emptyBranding);
+  const [uiLanguage, setUiLanguage] = useState('en');
   const [brandingLoading, setBrandingLoading] = useState(true);
   const [brandingSaving, setBrandingSaving] = useState(false);
   const [brandingLogoDataUrl, setBrandingLogoDataUrl] = useState('');
   const [brandingLogoPreview, setBrandingLogoPreview] = useState(null);
+  const [brandingLogoFileName, setBrandingLogoFileName] = useState('');
   const [removeBrandingLogo, setRemoveBrandingLogo] = useState(false);
   const [pageNotice, setPageNotice] = useState(null);
   const [saveNotice, setSaveNotice] = useState(null);
@@ -50,6 +65,10 @@ export default function Personalizza() {
   const appOptionsSectionRef = useRef(null);
   const homeOptionsSectionRef = useRef(null);
   const maintenanceSectionRef = useRef(null);
+  const mobileOptionsSectionRef = useRef(null);
+  const brandingLogoInputRef = useRef(null);
+  const ui = useMemo(() => getUiStrings(uiLanguage), [uiLanguage]);
+  const languageOptions = useMemo(() => getSupportedLanguageOptions(ui), [ui]);
 
   const pushNotice = (type, message) => {
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
@@ -92,13 +111,16 @@ export default function Personalizza() {
         const next = res.data.branding || emptyBranding;
         setBranding(next);
         setInitialBranding(next);
+        setUiLanguage(resolveAppLanguage(user?.preferredLanguage, next.defaultLanguage));
         setBrandingLogoPreview(next.logoUrl || null);
         setBrandingLogoDataUrl('');
+        setBrandingLogoFileName('');
         setRemoveBrandingLogo(false);
       })
       .catch(() => {
         setBranding(emptyBranding);
         setInitialBranding(emptyBranding);
+        setUiLanguage(resolveAppLanguage(user?.preferredLanguage, 'en'));
         setBrandingLogoPreview(null);
       })
       .finally(() => setBrandingLoading(false));
@@ -115,12 +137,15 @@ export default function Personalizza() {
         // ignore localStorage failures
       }
       window.dispatchEvent(new Event('frontdoor:avatar-cache-refresh'));
+      const cacheCleared = res.data?.removed
+        ? ui.customization.retention.avatarCacheClearedWithCount.replace('{count}', res.data.removed)
+        : ui.customization.retention.avatarCacheCleared;
       pushSaveNotice(
         'success',
-        `Cache avatar svuotata${res.data?.removed ? ` (${res.data.removed} file rimossi)` : ''}. Gli avatar verranno ricaricati alla prossima visualizzazione.`
+        `${cacheCleared}. ${ui.customization.retention.avatarCacheReloadNotice}`
       );
     } catch (err) {
-      pushSaveNotice('error', err.response?.data?.error || 'Errore nello svuotamento della cache avatar');
+      pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorRefreshingAvatarCache);
     }
     setAvatarRefreshing(false);
   };
@@ -133,12 +158,18 @@ export default function Personalizza() {
     };
   }, []);
 
+  useEffect(() => {
+    setUiLanguage(resolveAppLanguage(user?.preferredLanguage, initialBranding.defaultLanguage));
+  }, [user?.preferredLanguage, initialBranding.defaultLanguage]);
+
   const handleBrandingLogoChange = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setBrandingLogoFileName(file.name);
 
     if (file.size > 2 * 1024 * 1024) {
-      pushNotice('error', 'Il logo deve essere al massimo 2 MB.');
+      pushNotice('error', ui.customization.retention.logoTooLarge);
+      setBrandingLogoFileName('');
       event.target.value = '';
       return;
     }
@@ -162,8 +193,13 @@ export default function Personalizza() {
         heroTitleLine2: branding.heroTitleLine2,
         heroSubtitle: branding.heroSubtitle,
         showHomeHero: branding.showHomeHero,
+        hideHomeHeroOnMobile: branding.hideHomeHeroOnMobile,
         showAppModeBadges: branding.showAppModeBadges,
+        defaultHomeDesktopView: branding.defaultHomeDesktopView,
         defaultCompactView: branding.defaultCompactView,
+        defaultLanguage: branding.defaultLanguage,
+        useEuropeanDateFormat: branding.useEuropeanDateFormat,
+        use24hTimeFormat: branding.use24hTimeFormat,
         logRetentionDays: branding.logRetentionDays,
         hideLoginPage: branding.hideLoginPage,
         showSharedCookieMode: branding.showSharedCookieMode,
@@ -177,17 +213,20 @@ export default function Personalizza() {
       const next = res.data.branding || emptyBranding;
       setBranding(next);
       setInitialBranding(next);
+      setUiLanguage(resolveAppLanguage(user?.preferredLanguage, next.defaultLanguage));
       setBrandingLogoPreview(next.logoUrl || null);
       setBrandingLogoDataUrl('');
+      setBrandingLogoFileName('');
       setRemoveBrandingLogo(false);
+      window.dispatchEvent(new CustomEvent('frontdoor:branding-updated', { detail: next }));
       pushSaveNotice(
         'success',
         retentionChanged
-          ? `${res.data.message || 'Modifiche salvate'}. La nuova conservazione dei log si applicherà al prossimo ciclo di pulizia.`
-          : res.data.message || 'Modifiche salvate'
+          ? `${ui.common.changesSaved}. ${ui.customization.retention.logRetentionNextCleanup}`
+          : ui.common.changesSaved
       );
     } catch (err) {
-      pushSaveNotice('error', err.response?.data?.error || 'Errore nel salvataggio del branding');
+      pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorSaving);
     }
     setBrandingSaving(false);
   };
@@ -206,18 +245,47 @@ export default function Personalizza() {
   };
 
   const sectionNav = [
-    { label: 'Login', ref: homeOptionsSectionRef, icon: LogIn },
-    { label: 'Home', ref: brandingSectionRef, icon: Home },
-    { label: 'App', ref: appOptionsSectionRef, icon: Settings },
-    { label: 'Criteri', ref: maintenanceSectionRef, icon: Clock3 },
+    { label: ui.customization.login.title, ref: homeOptionsSectionRef, icon: LogIn },
+    { label: ui.customization.home.title, ref: brandingSectionRef, icon: Home },
+    { label: ui.customization.apps.title, ref: appOptionsSectionRef, icon: Settings },
+    { label: ui.customization.retention.title, ref: maintenanceSectionRef, icon: Wrench },
+    { label: ui.customization.mobile.title, ref: mobileOptionsSectionRef, icon: Smartphone },
   ];
+
+  const renderSaveStatusBar = (key) => (
+    <div key={key} className="mt-6 rounded-2xl border border-gray-200 bg-gray-50/80 px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-dark">{ui.common.changeStatus}</p>
+          {saveNotice ? (
+            <p className={`text-xs font-medium ${saveNotice.type === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>
+              {saveNotice.message}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500">
+              {isDirty ? ui.common.unsavedChanges : ui.common.noPendingChanges}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleSaveBranding}
+          disabled={brandingSaving || !isDirty}
+          className="inline-flex items-center gap-2 rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+        >
+          <Save className={`w-4 h-4 ${brandingSaving ? 'animate-pulse' : ''}`} />
+          {brandingSaving ? ui.common.saving : ui.common.saveChanges}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="pb-24">
       <div className="flex items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark">Personalizza</h1>
-          <p className="text-gray-500 mt-1">Personalizza Frontdoor in base alle tue esigenze</p>
+          <h1 className="text-2xl font-extrabold text-dark">{ui.customization.title}</h1>
+          <p className="text-gray-500 mt-1">{ui.customization.subtitle}</p>
         </div>
       </div>
 
@@ -243,11 +311,11 @@ export default function Personalizza() {
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
-                <LayoutPanelLeft className="w-4 h-4 text-slate-600" />
+                <Clock3 className="w-4 h-4 text-slate-600" />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-dark">Impostazioni</h2>
-                <p className="text-xs text-gray-500">Navigazione rapida</p>
+                <h2 className="text-sm font-bold text-dark">{ui.customization.navigationTitle}</h2>
+                <p className="text-xs text-gray-500">{ui.customization.navigationSubtitle}</p>
               </div>
             </div>
             <div className="flex xl:flex-col gap-2 overflow-x-auto pb-1 xl:pb-0">
@@ -276,14 +344,14 @@ export default function Personalizza() {
           <div className="xl:hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
-                <LayoutPanelLeft className="w-4 h-4 text-slate-600" />
+                <Clock3 className="w-4 h-4 text-slate-600" />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-dark">Vai alla sezione</h2>
-                <p className="text-xs text-gray-500">Navigazione rapida</p>
+                <h2 className="text-sm font-bold text-dark">{ui.customization.goToSection}</h2>
+                <p className="text-xs text-gray-500">{ui.customization.navigationSubtitle}</p>
               </div>
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="grid grid-cols-2 gap-2">
               {sectionNav.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -291,7 +359,7 @@ export default function Personalizza() {
                     key={item.label}
                     type="button"
                     onClick={() => jumpTo(item.ref)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-white min-w-[150px]"
+                    className="inline-flex w-full items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-white"
                   >
                     <Icon className="w-4 h-4 text-gray-500" />
                     {item.label}
@@ -307,8 +375,8 @@ export default function Personalizza() {
                 <LogIn className="w-5 h-5 text-rose-600" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-dark">Login</h2>
-                <p className="text-sm text-gray-500">Controlli dedicati all&apos;accesso iniziale.</p>
+                <h2 className="text-lg font-bold text-dark">{ui.customization.login.title}</h2>
+                <p className="text-sm text-gray-500">{ui.customization.login.subtitle}</p>
               </div>
             </div>
 
@@ -320,12 +388,12 @@ export default function Personalizza() {
                 className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
               />
               <span>
-                <span className="block text-sm font-medium text-gray-700">Vai subito alla Login SSO</span>
-                <span className="block text-xs text-gray-500 mt-0.5">
-                  Disattivando la pagina di login, l&apos;utente viene portato direttamente all&apos;autenticazione Microsoft e poi alla Home.
-                </span>
+                <span className="block text-sm font-medium text-gray-700">{ui.customization.login.hideLoginPageLabel}</span>
+                <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.login.hideLoginPageHelp}</span>
               </span>
             </label>
+
+            {renderSaveStatusBar('login')}
           </section>
 
           <section ref={brandingSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
@@ -334,8 +402,8 @@ export default function Personalizza() {
                 <Home className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-dark">Home</h2>
-                <p className="text-sm text-gray-500">Testi, logo, anteprima e comportamento della Home.</p>
+                <h2 className="text-lg font-bold text-dark">{ui.customization.home.title}</h2>
+                <p className="text-sm text-gray-500">{ui.customization.home.subtitle}</p>
               </div>
             </div>
 
@@ -347,8 +415,8 @@ export default function Personalizza() {
                       <Type className="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-dark">Testi</h3>
-                      <p className="text-sm text-gray-500">Titolo e sottotitolo della Home.</p>
+                      <h3 className="text-lg font-bold text-dark">{ui.customization.home.textsTitle}</h3>
+                      <p className="text-sm text-gray-500">{ui.customization.home.textsSubtitle}</p>
                     </div>
                   </div>
 
@@ -361,7 +429,7 @@ export default function Personalizza() {
                   ) : (
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1">Titolo hero, prima riga</label>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">{ui.customization.hero.line1}</label>
                         <input
                           type="text"
                           value={branding.heroTitleLine1}
@@ -371,7 +439,7 @@ export default function Personalizza() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1">Titolo hero, seconda riga</label>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">{ui.customization.hero.line2}</label>
                         <input
                           type="text"
                           value={branding.heroTitleLine2}
@@ -381,7 +449,7 @@ export default function Personalizza() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1">Sottotitolo hero</label>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">{ui.customization.hero.subtitle}</label>
                         <textarea
                           rows="3"
                           value={branding.heroSubtitle}
@@ -399,8 +467,8 @@ export default function Personalizza() {
                       <Image className="w-5 h-5 text-amber-600" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-dark">Logo aziendale</h3>
-                      <p className="text-sm text-gray-500">Carica, sostituisci o rimuovi il logo della Home.</p>
+                      <h3 className="text-lg font-bold text-dark">{ui.customization.home.logoTitle}</h3>
+                      <p className="text-sm text-gray-500">{ui.customization.home.logoSubtitle}</p>
                     </div>
                   </div>
 
@@ -413,24 +481,39 @@ export default function Personalizza() {
                   ) : (
                     <div className="space-y-4">
                       <input
+                        ref={brandingLogoInputRef}
                         type="file"
                         accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml"
                         onChange={handleBrandingLogoChange}
-                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-accent file:text-white file:font-semibold hover:file:bg-accent/90"
+                        className="hidden"
                       />
-                      <p className="text-xs text-gray-400">PNG, JPG, WEBP, GIF o SVG. Max 2 MB.</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => brandingLogoInputRef.current?.click()}
+                          className="inline-flex items-center justify-center rounded-xl bg-accent/20 px-4 py-2.5 text-sm font-semibold text-dark transition-colors hover:bg-accent/30"
+                        >
+                          {ui.customization.home.chooseFile}
+                        </button>
+                        <span className="text-sm text-gray-500">
+                          {brandingLogoFileName || ui.customization.home.noFileSelected}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400">
+                        {ui.customization.retention.assetFileHint}
+                      </p>
 
                       <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 min-h-[150px] flex items-center justify-center">
                         {brandingLogoPreview ? (
                           <img
                             src={brandingLogoPreview}
-                            alt="Logo selezionato"
+                            alt={ui.customization.hero.selectedLogo}
                             className="max-h-24 max-w-[220px] object-contain"
                           />
                         ) : (
                           <div className="text-center text-gray-400">
                             <Image className="w-8 h-8 mx-auto mb-2" />
-                            <p className="text-xs">Nessun logo selezionato</p>
+                            <p className="text-xs">{ui.customization.hero.noLogo}</p>
                           </div>
                         )}
                       </div>
@@ -442,13 +525,14 @@ export default function Personalizza() {
                             setRemoveBrandingLogo(true);
                             setBrandingLogoDataUrl('');
                             setBrandingLogoPreview(null);
+                            setBrandingLogoFileName('');
                           }}
                           className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-xl font-semibold text-sm hover:bg-red-100 transition-colors"
                         >
-                          Rimuovi logo
+                          {ui.customization.hero.removeLogo}
                         </button>
                         {branding.logoUrl && !removeBrandingLogo && (
-                          <span className="text-xs text-gray-400">Logo attuale attivo</span>
+                          <span className="text-xs text-gray-400">{ui.customization.hero.currentLogoActive}</span>
                         )}
                       </div>
                     </div>
@@ -462,8 +546,8 @@ export default function Personalizza() {
                     <Eye className="w-5 h-5 text-purple-600" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-dark">Anteprima</h2>
-                    <p className="text-sm text-gray-500">Controlla subito l&apos;effetto finale.</p>
+                    <h2 className="text-lg font-bold text-dark">{ui.customization.home.previewTitle}</h2>
+                    <p className="text-sm text-gray-500">{ui.customization.home.previewSubtitle}</p>
                   </div>
                 </div>
 
@@ -483,7 +567,7 @@ export default function Personalizza() {
                         {brandingLogoPreview ? (
                           <img
                             src={brandingLogoPreview}
-                            alt="Logo anteprima"
+                            alt={ui.customization.hero.selectedLogo}
                             className="max-h-24 max-w-[180px] object-contain"
                           />
                         ) : (
@@ -506,27 +590,37 @@ export default function Personalizza() {
                     className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
                   />
                   <span>
-                    <span className="block text-sm font-medium text-gray-700">Mostra banner hero nella Home</span>
-                    <span className="block text-xs text-gray-500 mt-0.5">
-                      Disattivalo per nascondere completamente il banner grande nella Home e lasciare più spazio alle applicazioni.
-                    </span>
+                    <span className="block text-sm font-medium text-gray-700">{ui.customization.home.heroLabel}</span>
+                    <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.home.heroHelp}</span>
                   </span>
                 </label>
 
-                <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 opacity-60">
-                  <input
-                    type="checkbox"
-                    checked={branding.defaultCompactView === true}
-                    onChange={(e) => setBranding({ ...branding, defaultCompactView: e.target.checked })}
-                    className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
-                  />
-                  <span>
-                    <span className="block text-sm font-medium text-gray-700">Visualizzazione applicazioni compatta di default</span>
-                    <span className="block text-xs text-gray-500 mt-0.5">
-                      In pausa. La terremo come opzione globale, ma per ora non è il focus della personalizzazione.
-                    </span>
-                  </span>
-                </label>
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-gray-900/5 flex items-center justify-center">
+                      <Eye className="w-4 h-4 text-gray-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <label htmlFor="home-desktop-view" className="block text-sm font-medium text-gray-700">
+                        {ui.customization.home.desktopViewLabel}
+                      </label>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {ui.customization.home.desktopViewHelp}
+                      </p>
+                      <select
+                        id="home-desktop-view"
+                        value={branding.defaultHomeDesktopView}
+                        onChange={(e) => setBranding({ ...branding, defaultHomeDesktopView: e.target.value })}
+                        className="mt-3 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-accent focus:ring-accent disabled:opacity-60"
+                      >
+                        <option value="cards">{ui.customization.home.cards}</option>
+                        <option value="compact">{ui.customization.home.compact}</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {renderSaveStatusBar('home')}
               </div>
             </div>
           </section>
@@ -537,8 +631,8 @@ export default function Personalizza() {
                 <Settings className="w-5 h-5 text-violet-600" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-dark">Gestione App</h2>
-                <p className="text-sm text-gray-500">Controlli che influenzano il catalogo e la gestione delle app.</p>
+                <h2 className="text-lg font-bold text-dark">{ui.customization.apps.title}</h2>
+                <p className="text-sm text-gray-500">{ui.customization.apps.subtitle}</p>
               </div>
             </div>
 
@@ -550,10 +644,8 @@ export default function Personalizza() {
                 className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
               />
               <span>
-                <span className="block text-sm font-medium text-gray-700">Mostra badge ext / SSO sulle app</span>
-                <span className="block text-xs text-gray-500 mt-0.5">
-                  Disattivalo se vuoi una griglia più pulita e senza indicatori di modalità nelle card.
-                </span>
+                <span className="block text-sm font-medium text-gray-700">{ui.customization.apps.badgesLabel}</span>
+                <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.apps.badgesHelp}</span>
               </span>
             </label>
 
@@ -566,10 +658,8 @@ export default function Personalizza() {
                   className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-gray-700">Mostra Shared Cookie</span>
-                  <span className="block text-xs text-gray-500 mt-0.5">
-                    Disattivalo per nascondere la modalità Shared Cookie nelle app.
-                  </span>
+                  <span className="block text-sm font-medium text-gray-700">{ui.customization.apps.sharedCookieLabel}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.apps.sharedCookieHelp}</span>
                 </span>
               </label>
 
@@ -581,10 +671,8 @@ export default function Personalizza() {
                   className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-gray-700">Mostra Redirect SSO</span>
-                  <span className="block text-xs text-gray-500 mt-0.5">
-                    Disattivalo per nascondere la modalità Redirect SSO nelle app.
-                  </span>
+                  <span className="block text-sm font-medium text-gray-700">{ui.customization.apps.redirectLabel}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.apps.redirectHelp}</span>
                 </span>
               </label>
 
@@ -596,40 +684,111 @@ export default function Personalizza() {
                   className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-gray-700">Mostra Entra App</span>
-                  <span className="block text-xs text-gray-500 mt-0.5">
-                    Disattivalo per nascondere la modalità Entra App nelle app.
-                  </span>
+                  <span className="block text-sm font-medium text-gray-700">{ui.customization.apps.entraLabel}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.apps.entraHelp}</span>
                 </span>
               </label>
             </div>
+
+            {renderSaveStatusBar('app')}
           </section>
 
           <section ref={maintenanceSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
-                <SlidersHorizontal className="w-5 h-5 text-amber-600" />
+                <Wrench className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-dark">Criteri di conservazione</h2>
-                <p className="text-sm text-gray-500">Conservazione dei log, cache avatar e manutenzioni periodiche della piattaforma.</p>
+                <h2 className="text-lg font-bold text-dark">{ui.customization.retention.title}</h2>
+                <p className="text-sm text-gray-500">{ui.customization.retention.subtitle}</p>
               </div>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-2">
-              <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-5">
-                <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-dark">Conservazione log</p>
-                    <p className="text-xs text-gray-500">Definisci per quanti giorni mantenere Log e Audit nel database.</p>
+                    <p className="text-sm font-semibold text-dark">{ui.customization.retention.languageTitle}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{ui.customization.retention.languageHelp}</p>
                   </div>
-                  <div className={`rounded-full px-3 py-1 text-xs font-semibold ${branding.logRetentionDays === 0 ? 'bg-red-100 text-red-700' : 'bg-white text-amber-700'}`}>
-                    {branding.logRetentionDays === 0 ? 'Logless' : `${branding.logRetentionDays} giorni`}
+                  <select
+                    value={branding.defaultLanguage || 'en'}
+                    onChange={(e) => setBranding({ ...branding, defaultLanguage: normalizeLanguage(e.target.value) })}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-accent focus:ring-accent lg:w-72"
+                  >
+                    {languageOptions.map((language) => (
+                      <option key={language.code} value={language.code}>{language.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={branding.use24hTimeFormat === true}
+                  onChange={(e) => setBranding({ ...branding, use24hTimeFormat: e.target.checked })}
+                  className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-gray-700">{ui.customization.retention.timeFormatTitle}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.retention.timeFormatHelp}</span>
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={branding.useEuropeanDateFormat === true}
+                  onChange={(e) => setBranding({ ...branding, useEuropeanDateFormat: e.target.checked })}
+                  className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-gray-700">{ui.customization.retention.dateFormatTitle}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.retention.dateFormatHelp}</span>
+                </span>
+              </label>
+
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-dark">{ui.customization.retention.avatarCacheTitle}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{ui.customization.retention.avatarCacheHelp}</p>
+                  </div>
+                  <div className="flex items-start lg:shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openConfirm({
+                        title: ui.customization.retention.refreshAvatarCacheConfirmTitle,
+                        message: ui.customization.retention.refreshAvatarCacheConfirmMessage,
+                        confirmLabel: ui.customization.retention.refreshAvatarCacheConfirmLabel,
+                        onConfirm: refreshAvatarCache,
+                      })}
+                      disabled={avatarRefreshing}
+                      className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${avatarRefreshing ? 'animate-spin' : ''}`} />
+                      {avatarRefreshing ? ui.customization.retention.refreshAvatarCacheBusy : ui.customization.retention.refreshAvatarCache}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <p className="text-sm font-semibold text-dark">{ui.customization.retention.logRetentionTitle}</p>
+                      <div className={`rounded-full px-3 py-1 text-xs font-semibold ${branding.logRetentionDays === 0 ? 'bg-red-100 text-red-700' : 'bg-white text-amber-700'}`}>
+                        {branding.logRetentionDays === 0 ? ui.customization.retention.logless : `${branding.logRetentionDays} ${ui.common.days}`}
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{ui.customization.retention.logRetentionHelp}</p>
                   </div>
                 </div>
 
                 {!brandingLoading ? (
-                  <div className="space-y-4">
+                  <div className="mt-4 space-y-4">
                     <input
                       type="range"
                       min="0"
@@ -641,73 +800,64 @@ export default function Personalizza() {
                     />
 
                     <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>0 = logless</span>
-                      <span>90 = default consigliato</span>
+                      <span>0 = {ui.customization.retention.logless}</span>
+                      <span>90 = {ui.customization.retention.recommended}</span>
                     </div>
 
                     <p className="rounded-xl border border-amber-200 bg-white px-4 py-3 text-sm text-amber-800 leading-6">
-                      La modifica non elimina subito i record: la pulizia avverrà al prossimo ciclo automatico, così hai tempo di tornare indietro se serve.
+                      {ui.customization.retention.logRetentionNotice}
                     </p>
                   </div>
                 ) : (
-                  <div className="h-24 rounded-2xl bg-gray-100 animate-pulse" />
+                  <div className="mt-4 h-24 rounded-2xl bg-gray-100 animate-pulse" />
                 )}
               </div>
+            </div>
 
-              <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-5">
-                <div>
-                  <p className="text-sm font-semibold text-dark">Cache avatar</p>
-                  <p className="text-xs text-gray-500">Se cambi l&apos;immagine profilo in Microsoft 365 e vuoi vederla subito
-                   in Frontdoor, puoi invalidare la cache degli avatar salvati sul server e nel browser. Al prossimo caricamento i profili verranno richiesti di nuovo.</p>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => openConfirm({
-                      title: 'Svuotare la cache avatar utenti?',
-                      message: 'La cache server e quella del browser verranno invalidate. Gli avatar saranno ricaricati al prossimo accesso o refresh della pagina.',
-                      confirmLabel: 'Svuota cache',
-                      onConfirm: refreshAvatarCache,
-                    })}
-                    disabled={avatarRefreshing}
-                    className="inline-flex items-center gap-2 rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${avatarRefreshing ? 'animate-spin' : ''}`} />
-                    {avatarRefreshing ? 'Svuotamento...' : 'Aggiorna avatar utenti'}
-                  </button>
-                  <span className="text-xs text-amber-700">
-                    Utile se vuoi ricaricare subito avatar Microsoft o Gravatar aggiornati.
-                  </span>
-                </div>
+            {renderSaveStatusBar('maintenance')}
+          </section>
+
+          <section ref={mobileOptionsSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center">
+                <Smartphone className="w-5 h-5 text-cyan-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-dark">{ui.customization.mobile.title}</h2>
+                <p className="text-sm text-gray-500">{ui.customization.mobile.subtitle}</p>
               </div>
             </div>
-          </section>
-        </div>
-      </div>
 
-      <div className="fixed bottom-4 left-1/2 z-40 w-[calc(100%-1.5rem)] max-w-5xl -translate-x-1/2">
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white/95 px-4 py-3 shadow-lg shadow-black/10 backdrop-blur">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-dark">Stato modifiche</p>
-            {saveNotice ? (
-              <p className={`text-xs font-medium ${saveNotice.type === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>
-                {saveNotice.message}
-              </p>
-            ) : (
-              <p className="text-xs text-gray-500">
-                {isDirty ? 'Hai modifiche non salvate' : 'Nessuna modifica in sospeso'}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={handleSaveBranding}
-            disabled={brandingSaving || !isDirty}
-            className="inline-flex items-center gap-2 rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" />
-            {brandingSaving ? 'Salvataggio...' : 'Salva modifiche'}
-          </button>
+            <div className="space-y-3">
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={branding.defaultCompactView === true}
+                  onChange={(e) => setBranding({ ...branding, defaultCompactView: e.target.checked })}
+                  className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-gray-700">{ui.customization.mobile.compactLabel}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.mobile.compactHelp}</span>
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={branding.hideHomeHeroOnMobile === true}
+                  onChange={(e) => setBranding({ ...branding, hideHomeHeroOnMobile: e.target.checked })}
+                  className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-gray-700">{ui.customization.mobile.hideHeroLabel}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.mobile.hideHeroHelp}</span>
+                </span>
+              </label>
+            </div>
+
+            {renderSaveStatusBar('mobile')}
+          </section>
         </div>
       </div>
 
@@ -715,8 +865,10 @@ export default function Personalizza() {
         open={Boolean(confirmDialog)}
         title={confirmDialog?.title || ''}
         message={confirmDialog?.message || ''}
-        confirmLabel={confirmDialog?.confirmLabel || 'Conferma'}
-        cancelLabel={confirmDialog?.cancelLabel || 'Annulla'}
+        confirmLabel={confirmDialog?.confirmLabel || ui.common.confirm}
+        cancelLabel={confirmDialog?.cancelLabel || ui.common.cancel}
+        closeLabel={ui.common.closeDialog}
+        busyLabel={ui.common.pleaseWait}
         busy={confirmBusy}
         onConfirm={runConfirm}
         onCancel={closeConfirm}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Pencil, Trash2, X, RefreshCw, Save, Copy, Users, ChevronDown, ChevronUp, Check, SlidersHorizontal } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Plus, Pencil, Trash2, X, RotateCcw, Save, Copy, Users, ChevronDown, ChevronUp, Check, SlidersHorizontal } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import TagInput from '../components/TagInput';
@@ -8,6 +8,7 @@ import AppIcon from '../components/AppIcon';
 import PageNotice from '../components/PageNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
+import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 
 const emptyApp = { name: '', slug: '', description: '', long_description: '', icon: '📦', target_url: '', sort_order: 0, mode: 'redirect-plain', sso_endpoint: '', sso_method: 'GET', tags: [] };
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
@@ -15,6 +16,7 @@ const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
 export default function Admin() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [apps, setApps] = useState([]);
   const [groups, setGroups] = useState([]);
   const [branding, setBranding] = useState(null);
@@ -46,6 +48,7 @@ export default function Admin() {
   const iconFileInputRef = useRef(null);
   const modeFilterRef = useRef(null);
   const canEdit = user?.role !== 'admin_readonly';
+  const [brandingLanguage, setBrandingLanguage] = useState('en');
 
   useEffect(() => {
     if (!pageNotice) return undefined;
@@ -100,9 +103,19 @@ export default function Admin() {
 
   const loadBranding = () => {
     api.get('/branding')
-      .then((res) => setBranding(res.data.branding || null))
-      .catch(() => setBranding(null));
+      .then((res) => {
+        setBranding(res.data.branding || null);
+        setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+      })
+      .catch(() => {
+        setBranding(null);
+        setBrandingLanguage('en');
+      });
   };
+
+  const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
+  const t = ui.admin.common;
+  const a = ui.admin.apps;
 
   useEffect(() => {
     loadApps();
@@ -112,7 +125,7 @@ export default function Admin() {
 
   const openNew = () => {
     if (!canEdit) {
-      pushNotice('error', 'Questa pagina è in sola lettura.');
+      pushNotice('error', t.readOnly);
       return;
     }
     setForm(emptyApp);
@@ -128,7 +141,7 @@ export default function Admin() {
 
   const openEdit = (app) => {
     if (!canEdit) {
-      pushNotice('error', 'Questa pagina è in sola lettura.');
+      pushNotice('error', t.readOnly);
       return;
     }
     setForm({
@@ -154,6 +167,19 @@ export default function Admin() {
     setEditing(app);
   };
 
+  useEffect(() => {
+    const editSlug = searchParams.get('edit');
+    if (!editSlug || apps.length === 0) return;
+    const target = apps.find((app) => app.slug === editSlug);
+    if (!target) return;
+    if (editing !== null && editing !== 'new' && editing.slug === target.slug) return;
+    openEdit(target);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('edit');
+    setSearchParams(nextParams, { replace: true });
+  }, [apps, editing, openEdit, searchParams, setSearchParams]);
+
   const openClone = async () => {
     if (!canEdit || editing === 'new' || !editing?.id) return;
 
@@ -161,7 +187,7 @@ export default function Admin() {
     try {
       const res = await api.post(`/apps/${editing.id}/clone`);
       const cloned = res.data?.app;
-      if (!cloned) throw new Error('Clone app data missing');
+      if (!cloned) throw new Error(t.cloneDataMissing);
 
       setEditing('new');
       setForm({
@@ -186,9 +212,9 @@ export default function Admin() {
       setRemoveIconAsset(false);
       setIncludeDefaultGroup(true);
       setClonedGroupIds(Array.isArray(cloned.groupIds) ? cloned.groupIds : []);
-      pushNotice('success', 'App duplicata: modifica solo i campi necessari');
+      pushNotice('success', a.duplicateNotice);
     } catch (err) {
-      pushNotice('error', err.response?.data?.error || err.message || 'Errore nella clonazione');
+      pushNotice('error', err.response?.data?.error || err.message || t.cloneFailed);
     }
     setCloning(false);
   };
@@ -261,9 +287,9 @@ export default function Admin() {
       event.preventDefault();
       if (appModalDirty) {
         openConfirm({
-          title: 'Chiudere senza salvare?',
-          message: 'Hai modifiche non salvate nella scheda app. Vuoi chiudere comunque?',
-          confirmLabel: 'Chiudi',
+          title: t.closeWithoutSavingTitle,
+          message: t.closeWithoutSavingAppMessage,
+          confirmLabel: t.close,
           onConfirm: async () => close(),
         });
         return;
@@ -281,9 +307,9 @@ export default function Admin() {
       event.preventDefault();
       if (groupAssignSelection.length > 0) {
         openConfirm({
-          title: 'Chiudere senza salvare?',
-          message: 'Hai selezionato dei gruppi non ancora salvati. Vuoi chiudere comunque?',
-          confirmLabel: 'Chiudi',
+          title: t.closeWithoutSavingTitle,
+          message: t.closeWithoutSavingGroupsMessage,
+          confirmLabel: t.close,
           onConfirm: async () => closeGroupAssignmentModal(),
         });
         return;
@@ -340,16 +366,16 @@ export default function Admin() {
 
   const handleSave = async () => {
     if (!canEdit) {
-      pushNotice('error', 'Questa pagina è in sola lettura.');
+      pushNotice('error', t.readOnly);
       return;
     }
     setSaving(true);
     try {
       if (iconMode === 'asset' && !iconAssetDataUrl && !iconSvgText && !iconAssetPreview && editing === 'new') {
-        throw new Error('Carica o incolla un\'immagine/SVG per l\'icona, oppure torna alla modalità emoji');
+        throw new Error(a.iconAssetRequired);
       }
       if (form.mode === 'entra-app' && !form.sso_endpoint.trim()) {
-        throw new Error('Inserisci l\'Application ID Entra');
+        throw new Error(a.enterApplicationId);
       }
 
       const iconPayload = iconMode === 'asset'
@@ -373,7 +399,7 @@ export default function Admin() {
         });
         loadApps();
         close();
-        pushNotice('success', 'App creata');
+        pushNotice('success', a.appCreated);
         if (!includeDefaultGroup) {
           openGroupAssignmentModal({
             ...res.data?.app,
@@ -388,30 +414,30 @@ export default function Admin() {
         });
         loadApps();
         close();
-        pushNotice('success', 'App aggiornata');
+        pushNotice('success', a.appUpdated);
       }
     } catch (err) {
-      pushNotice('error', err.response?.data?.error || err.message || 'Errore nel salvataggio');
+      pushNotice('error', err.response?.data?.error || err.message || t.errorSaving);
     }
     setSaving(false);
   };
 
   const handleDelete = async (app) => {
     if (!canEdit) {
-      pushNotice('error', 'Questa pagina è in sola lettura.');
+      pushNotice('error', t.readOnly);
       return;
     }
     openConfirm({
-      title: `Eliminare "${app.name}"?`,
-      message: 'Questa azione non è reversibile.',
-      confirmLabel: 'Elimina',
+      title: a.deleteTitle.replace('{name}', app.name),
+      message: a.deleteMessage,
+      confirmLabel: t.delete,
       onConfirm: async () => {
         try {
           await api.delete(`/apps/${app.id}`);
           loadApps();
-          pushNotice('success', `App "${app.name}" eliminata`);
+          pushNotice('success', a.appDeleted.replace('{name}', app.name));
         } catch (err) {
-          pushNotice('error', err.response?.data?.error || 'Errore nella cancellazione');
+          pushNotice('error', err.response?.data?.error || t.errorSaving);
         }
       },
     });
@@ -419,34 +445,34 @@ export default function Admin() {
 
   const handleToggle = async (app) => {
     if (!canEdit) {
-      pushNotice('error', 'Questa pagina è in sola lettura.');
+      pushNotice('error', t.readOnly);
       return;
     }
     try {
       await api.put(`/apps/${app.id}`, { is_active: app.is_active ? 0 : 1 });
       loadApps();
     } catch (err) {
-      pushNotice('error', err.response?.data?.error || 'Errore');
+      pushNotice('error', err.response?.data?.error || t.errorSaving);
     }
   };
 
   const handleRestoreDefaults = async () => {
     if (!canEdit) {
-      pushNotice('error', 'Questa pagina è in sola lettura.');
+      pushNotice('error', t.readOnly);
       return;
     }
     openConfirm({
-      title: 'Ripristinare le applicazioni dimostrative?',
-      message: 'Le app demo mancanti verranno aggiunte di nuovo. Quelle già presenti con lo stesso slug verranno aggiornate senza essere sostituite.',
-      confirmLabel: 'Ripristina',
+      title: a.restoreDemoTitle,
+      message: a.restoreDemoMessage,
+      confirmLabel: a.restoreDemoConfirm,
       onConfirm: async () => {
         setRestoringDefaults(true);
         try {
           const res = await api.post('/apps/restore-defaults');
           loadApps();
-          pushNotice('success', `${res.data.message}. Create: ${res.data.created}, aggiornate: ${res.data.updated}.`);
+          pushNotice('success', `${res.data.message}. ${a.restoreDemoSummary.replace('{created}', res.data.created).replace('{updated}', res.data.updated)}`);
         } catch (err) {
-          pushNotice('error', err.response?.data?.error || 'Errore nel ripristino delle demo app');
+          pushNotice('error', err.response?.data?.error || t.errorSaving);
         } finally {
           setRestoringDefaults(false);
         }
@@ -484,14 +510,14 @@ export default function Admin() {
     showEntraAppMode: true,
   };
   const modeOptions = [
-    { value: 'redirect-plain', label: 'Link esterno', active: 'bg-dark text-white border-dark', alwaysVisible: true },
-    { value: 'shared-cookie', label: 'Shared Cookie', active: 'bg-emerald-600 text-white border-emerald-600', visible: modeVisibility.showSharedCookieMode !== false },
-    { value: 'redirect', label: 'Redirect SSO', active: 'bg-blue-600 text-white border-blue-600', visible: modeVisibility.showRedirectSsoMode !== false },
-    { value: 'entra-app', label: 'Entra App', active: 'bg-violet-600 text-white border-violet-600', visible: modeVisibility.showEntraAppMode !== false },
+    { value: 'redirect-plain', label: a.externalLink, active: 'bg-dark text-white border-dark', alwaysVisible: true },
+    { value: 'shared-cookie', label: a.sharedCookie, active: 'bg-emerald-600 text-white border-emerald-600', visible: modeVisibility.showSharedCookieMode !== false },
+    { value: 'redirect', label: a.redirectSso, active: 'bg-blue-600 text-white border-blue-600', visible: modeVisibility.showRedirectSsoMode !== false },
+    { value: 'entra-app', label: a.entraApp, active: 'bg-violet-600 text-white border-violet-600', visible: modeVisibility.showEntraAppMode !== false },
   ];
   const visibleModeOptions = modeOptions.filter((opt) => opt.alwaysVisible || opt.visible);
   const visibleModeFilterOptions = [
-    { value: 'all', label: 'Tutti i collegamenti', active: 'bg-gray-900 text-white border-gray-900' },
+    { value: 'all', label: a.allConnections, active: 'bg-gray-900 text-white border-gray-900' },
     ...visibleModeOptions,
   ];
   const currentModeFilterOption = visibleModeFilterOptions.find((opt) => opt.value === appModeFilter) || visibleModeFilterOptions[0];
@@ -600,7 +626,7 @@ export default function Admin() {
 
   const saveGroupAssignment = async () => {
     if (!canEdit) {
-      pushNotice('error', 'Questa pagina è in sola lettura.');
+      pushNotice('error', t.readOnly);
       return;
     }
     if (!pendingGroupAssignApp || groupAssignSelection.length === 0) {
@@ -615,10 +641,10 @@ export default function Admin() {
       closeGroupAssignmentModal();
       pushNotice(
         'success',
-        res.data?.message || `${pendingGroupAssignApp.name} aggiunta a ${groupAssignSelection.length} gruppi`
+        res.data?.message || a.assignedToGroups.replace('{name}', pendingGroupAssignApp.name).replace('{count}', groupAssignSelection.length)
       );
     } catch (err) {
-      pushNotice('error', err.response?.data?.error || 'Errore nell\'assegnazione ai gruppi');
+      pushNotice('error', err.response?.data?.error || a.groupAssignmentError);
     } finally {
       setAssigningGroups(false);
     }
@@ -626,24 +652,24 @@ export default function Admin() {
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-4 mb-4">
+      <div className="flex items-center justify-between gap-4 mb-4 max-sm:flex-col max-sm:items-stretch max-sm:gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark">Gestione App</h1>
-          <p className="text-gray-500 mt-1">Aggiungi, modifica o rimuovi applicazioni dal catalogo</p>
+          <h1 className="text-2xl font-extrabold text-dark">{ui.admin.apps.pageTitle}</h1>
+          <p className="text-gray-500 mt-1">{ui.admin.apps.subtitle}</p>
         </div>
         <button
           onClick={openNew}
           disabled={!canEdit}
-          className="flex items-center gap-2 px-4 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed max-sm:w-full"
         >
           <Plus className="w-4 h-4" />
-          Nuova app
+          {ui.admin.apps.new}
         </button>
       </div>
 
       {!canEdit && (
         <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          Modalità sola lettura: puoi consultare il catalogo app, ma non modificarlo.
+          {ui.admin.apps.readOnly}
         </div>
       )}
 
@@ -653,33 +679,36 @@ export default function Admin() {
             type={pageNotice.type}
             message={pageNotice.message}
             onClose={() => setPageNotice(null)}
+            closeLabel={ui.common.closeNotice}
           />
         </div>
       )}
 
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="flex-1 min-w-[220px]">
-          <ClearableSearchField
-            value={appSearch}
-            onChange={setAppSearch}
-            placeholder="Cerca app per nome, slug, descrizione, URL o tag..."
-          />
-        </div>
-            <div className="relative" ref={modeFilterRef}>
-              <button
-                type="button"
-                onClick={() => setModeFilterOpen((prev) => !prev)}
-                className="relative inline-flex min-w-[220px] items-center w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm text-left text-gray-600 focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <span className="truncate">{currentModeFilterOption.label}</span>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              </button>
+      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[220px]">
+            <ClearableSearchField
+              value={appSearch}
+              onChange={setAppSearch}
+              placeholder={ui.admin.apps.searchPlaceholder}
+              clearLabel={ui.common.clearSearch}
+            />
+          </div>
+          <div className="relative" ref={modeFilterRef}>
+            <button
+              type="button"
+              onClick={() => setModeFilterOpen((prev) => !prev)}
+              className="relative inline-flex min-w-[220px] items-center w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm text-left text-gray-600 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent"
+            >
+              <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <span className="truncate">{currentModeFilterOption.label}</span>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            </button>
 
             {modeFilterOpen && (
               <div className="absolute right-0 z-20 mt-2 min-w-[260px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
                 <div className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 border-b border-gray-100">
-                  Filtro collegamento
+                  {ui.admin.apps.modeFilter}
                 </div>
                 <div className="py-1">
                   {visibleModeFilterOptions.map((opt) => {
@@ -712,8 +741,9 @@ export default function Admin() {
               </div>
             )}
           </div>
-        <div className="text-xs text-gray-400">
-          {filteredApps.length} app su {apps.length}
+          <div className="text-xs text-gray-400">
+            {filteredApps.length} {ui.nav.apps.toLowerCase()} {t.of} {apps.length}
+          </div>
         </div>
       </div>
 
@@ -731,30 +761,30 @@ export default function Admin() {
               <tr className="border-b border-gray-100">
                   <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     <button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
-                      <span>App</span> {sortIndicator('name')}
+                    <span>{ui.nav.apps}</span> {sortIndicator('name')}
                     </button>
                   </th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     <button type="button" onClick={() => toggleSort('slug')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
-                      <span>Slug</span> {sortIndicator('slug')}
+                      <span>{a.sortBySlug}</span> {sortIndicator('slug')}
                     </button>
                   </th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     <button type="button" onClick={() => toggleSort('target_url')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
-                      <span>Target URL</span> {sortIndicator('target_url')}
+                      <span>{a.sortByTargetUrl}</span> {sortIndicator('target_url')}
                     </button>
                   </th>
                   <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     <button type="button" onClick={() => toggleSort('mode')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
-                      <span>Modo</span> {sortIndicator('mode')}
+                    <span>{ui.admin.common.appMode}</span> {sortIndicator('mode')}
                     </button>
                   </th>
                   <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     <button type="button" onClick={() => toggleSort('is_active')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
-                      <span>Attiva</span> {sortIndicator('is_active')}
+                    <span>{ui.admin.common.active}</span> {sortIndicator('is_active')}
                     </button>
                   </th>
-                <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Azioni</th>
+                <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{t.actions}</th>
               </tr>
             </thead>
             <tbody>
@@ -775,7 +805,7 @@ export default function Admin() {
                         : app.mode === 'entra-app' ? 'bg-violet-100 text-violet-700'
                         : 'bg-gray-100 text-gray-600'
                     }`}>
-                      {app.mode === 'redirect' ? 'SSO' : app.mode === 'shared-cookie' ? 'cookie' : app.mode === 'entra-app' ? 'entra' : 'link'}
+                      {app.mode === 'redirect' ? t.redirectSso : app.mode === 'shared-cookie' ? t.sharedCookie : app.mode === 'entra-app' ? t.entraApp : t.link}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center">
@@ -799,7 +829,7 @@ export default function Admin() {
                         onClick={() => jumpToGroupsForApp(app)}
                         disabled={!canEdit}
                         className="p-2 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        title="Vai a Gestione Gruppi con ricerca precompilata"
+                        title={a.goToGroupsSearch}
                       >
                         <Users className="w-4 h-4" />
                       </button>
@@ -829,8 +859,8 @@ export default function Admin() {
               disabled={restoringDefaults || !canEdit}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-gray-200 bg-white text-gray-600 text-xs font-semibold hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${restoringDefaults ? 'animate-spin' : ''}`} />
-              Ripristina applicazioni dimostrative
+              <RotateCcw className={`w-3.5 h-3.5 ${restoringDefaults ? 'animate-spin' : ''}`} />
+              {ui.admin.apps.restoreDemoApps}
             </button>
           </div>
         </div>
@@ -842,7 +872,7 @@ export default function Admin() {
           <div className="bg-white rounded-2xl p-6 w-full max-w-6xl shadow-xl my-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-dark">
-                {editing === 'new' ? 'Nuova App' : 'Modifica App'}
+                {editing === 'new' ? ui.admin.apps.newApp : ui.admin.apps.editApp}
               </h2>
               <button onClick={close} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100">
                 <X className="w-5 h-5" />
@@ -853,9 +883,9 @@ export default function Admin() {
               <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4 space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">Icona</label>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">{a.icon}</label>
                     <p className="text-xs text-gray-400">
-                      Emoji classica oppure immagine / SVG incollati da file, clipboard o sito esterno.
+                      {a.iconHelp}
                     </p>
                   </div>
                   <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1">
@@ -872,7 +902,7 @@ export default function Admin() {
                         iconMode === 'emoji' ? 'bg-dark text-white' : 'text-gray-500 hover:text-dark'
                       }`}
                     >
-                      Usa emoji
+                      {a.useEmoji}
                     </button>
                     <button
                       type="button"
@@ -881,7 +911,7 @@ export default function Admin() {
                         iconMode === 'asset' ? 'bg-dark text-white' : 'text-gray-500 hover:text-dark'
                       }`}
                     >
-                      Usa immagine
+                      {a.useImage}
                     </button>
                   </div>
                 </div>
@@ -892,7 +922,7 @@ export default function Admin() {
                       <AppIcon app={{ icon: form.icon }} className="w-10 h-10" textClassName="text-3xl" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-1">Emoji o simbolo</label>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">{a.emojiOrSymbol}</label>
                       <input
                         type="text"
                         value={form.icon}
@@ -925,14 +955,14 @@ export default function Admin() {
                     >
                       <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center overflow-hidden">
                         {iconAssetPreview ? (
-                          <img src={iconAssetPreview} alt="Anteprima icona" className="w-full h-full object-contain" />
+                          <img src={iconAssetPreview} alt={a.uploadedIconPreview} className="w-full h-full object-contain" />
                         ) : (
                           <AppIcon app={{ icon: form.icon }} className="w-10 h-10" textClassName="text-3xl" />
                         )}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-dark">Clicca, incolla o trascina un file</p>
-                        <p className="text-xs text-gray-400">PNG, JPG, WEBP, GIF, SVG o immagini copiate negli appunti</p>
+                        <p className="text-sm font-medium text-dark">{a.iconUploadCta}</p>
+                        <p className="text-xs text-gray-400">{a.iconUploadHint}</p>
                       </div>
                     </div>
 
@@ -946,7 +976,7 @@ export default function Admin() {
                       />
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1">Oppure incolla SVG</label>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">{a.pasteSvgLabel}</label>
                         <textarea
                           value={iconSvgText}
                           onChange={(e) => {
@@ -958,7 +988,7 @@ export default function Admin() {
                             setIconAssetDataUrl('');
                             setRemoveIconAsset(false);
                           }}
-                          placeholder="<svg ...>...</svg>"
+                          placeholder={a.svgPlaceholder}
                           rows={4}
                           className="w-full px-3 py-2.5 border border-gray-200 rounded-xl font-mono text-xs focus:outline-none focus:ring-2 focus:ring-accent resize-y"
                         />
@@ -966,7 +996,7 @@ export default function Admin() {
 
                       {iconAssetPreview && (
                         <div className="flex items-center justify-between gap-3 text-xs text-gray-400">
-                          <span>Anteprima icona caricata</span>
+                          <span>{a.uploadedIconPreview}</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -977,12 +1007,12 @@ export default function Admin() {
                             }}
                             className="text-red-600 hover:text-red-700 font-semibold"
                           >
-                            Rimuovi immagine
+                            {a.removeImage}
                           </button>
                         </div>
                       )}
                       <p className="text-xs text-gray-400">
-                        Suggerimento: puoi anche incollare qui con <span className="font-semibold">Ctrl+V</span> un&apos;immagine copiata o un blocco SVG.
+                        {a.iconPasteHint}
                       </p>
                     </div>
                   </div>
@@ -990,45 +1020,45 @@ export default function Admin() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Nome</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{a.nameLabel}</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="ProfileFit"
+                  placeholder={a.nameExample}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Slug (subdomain)</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{a.slugLabel}</label>
                 <input
                   type="text"
                   value={form.slug}
                   onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
-                  placeholder="profilefit"
+                  placeholder={a.slugExample}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Descrizione</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{a.descriptionLabel}</label>
                 <input
                   type="text"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Quiz di profilazione e formazione gruppi"
+                  placeholder={a.descriptionPlaceholder}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Target URL</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{a.targetUrlLabel}</label>
                 <input
                   type="url"
                   value={form.target_url}
                   onChange={(e) => setForm({ ...form, target_url: e.target.value })}
-                  placeholder="https://myapp.example.com"
+                  placeholder={a.targetUrlExample}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl font-mono text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
@@ -1044,13 +1074,13 @@ export default function Admin() {
                       />
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium text-dark">Aggiungi al gruppo default</span>
+                          <span className="text-sm font-medium text-dark">{a.addToDefaultGroup}</span>
                           <span className="text-[10px] bg-accent/20 text-dark px-1.5 py-0.5 rounded font-medium">
-                            consigliato
+                            {ui.common.defaultRecommended}
                           </span>
                         </div>
                         <p className="text-xs text-gray-400 mt-1">
-                          L&apos;app verrà creata nel gruppo default. Dopo il salvataggio potrai aggiungerla a uno o pi&ugrave; gruppi Frontdoor con una ricerca dedicata.
+                          {a.defaultGroupIncludedHelp}
                         </p>
                       </div>
                     </label>
@@ -1058,7 +1088,7 @@ export default function Admin() {
                 )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Collegamento</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{a.connection}</label>
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                   {visibleModeOptions.map((opt) => (
                     <button
@@ -1075,31 +1105,31 @@ export default function Admin() {
                 </div>
                 {currentModeOption && !visibleModeOptions.some((opt) => opt.value === form.mode) && (
                   <p className="text-xs text-gray-400 mt-2">
-                    Modalità attuale: <span className="font-semibold text-gray-500">{currentModeOption.label}</span>. È nascosta dalle impostazioni globali, ma resta mantenuta su questa app finché non la cambi.
+                    {a.currentMode}: <span className="font-semibold text-gray-500">{currentModeOption.label}</span>. {a.currentModeHelp}
                   </p>
                 )}
               </div>
 
               {form.mode === 'entra-app' && (
                 <div className="p-3 bg-violet-50 rounded-xl">
-                  <label className="block text-sm font-medium text-violet-700 mb-1">Application ID Entra</label>
+                    <label className="block text-sm font-medium text-violet-700 mb-1">{ui.admin.apps.entraApplicationId}</label>
                   <input
                     type="text"
                     value={form.sso_endpoint}
                     onChange={(e) => setForm({ ...form, sso_endpoint: e.target.value })}
-                    placeholder="Inserisci l'Application ID"
+                    placeholder={ui.admin.apps.enterApplicationId}
                     className="w-full px-3 py-2 border border-violet-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                   />
                   <p className="text-xs text-violet-500 mt-1">
-                    L&apos;Application ID si trova nell&apos;URL di MyApps: launcher.myapps.microsoft.com/api/signin/&lt;ID&gt;
+                    {ui.admin.apps.applicationIdHelp}
                   </p>
                 </div>
               )}
 
               {form.mode === 'redirect' && (
                 <div className="grid grid-cols-[1fr_auto] gap-4 p-3 bg-blue-50 rounded-xl">
-                  <div>
-                    <label className="block text-sm font-medium text-blue-700 mb-1">Endpoint SSO</label>
+                    <div>
+                    <label className="block text-sm font-medium text-blue-700 mb-1">{a.ssoEndpointLabel}</label>
                     <input
                       type="text"
                       value={form.sso_endpoint}
@@ -1107,9 +1137,9 @@ export default function Admin() {
                       placeholder="/sso"
                       className="w-full px-3 py-2 border border-blue-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-blue-700 mb-1">Metodo</label>
+                    </div>
+                    <div>
+                    <label className="block text-sm font-medium text-blue-700 mb-1">{a.ssoMethodLabel}</label>
                     <select
                       value={form.sso_method}
                       onChange={(e) => setForm({ ...form, sso_method: e.target.value })}
@@ -1124,18 +1154,21 @@ export default function Admin() {
 
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Etichette</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{a.tagsLabel}</label>
                   <TagInput
                     value={form.tags}
                     onChange={(tags) => setForm({ ...form, tags })}
                     suggestions={allTags}
-                    placeholder="Digita e premi Invio..."
+                    placeholder={a.tagsPlaceholder}
+                    suggestionsLabel={a.tagSuggestionsTitle}
+                    availableTagsLabel={a.availableTagsTitle}
+                    useSuggestionLabel={a.useExistingTag}
                   />
-                  <p className="text-xs text-gray-400 mt-1">Invio o virgola per aggiungere. Appaiono come badge sulla card.</p>
+                  <p className="text-xs text-gray-400 mt-1">{ui.admin.apps.enterToAddTags}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Ordine</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{a.sortOrderLabel}</label>
                   <input
                     type="number"
                     value={form.sort_order}
@@ -1146,34 +1179,34 @@ export default function Admin() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Descrizione estesa (HTML)</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{a.longDescriptionLabel}</label>
                 <textarea
                   value={form.long_description}
                   onChange={(e) => setForm({ ...form, long_description: e.target.value })}
-                  placeholder="<p>Descrizione dettagliata dell'applicazione...</p>"
+                  placeholder={a.longDescriptionPlaceholder}
                   rows={4}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl font-mono text-xs focus:outline-none focus:ring-2 focus:ring-accent resize-y"
                 />
-                <p className="text-xs text-gray-400 mt-1">Supporta HTML (sanitizzato). Visibile cliccando il bottone info sulla card.</p>
+                <p className="text-xs text-gray-400 mt-1">{a.longDescriptionHelp}</p>
               </div>
             </div>
 
             <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-100">
               {editing !== 'new' && (
-                <button
-                  onClick={openClone}
-                  disabled={cloning || !canEdit}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-violet-700 hover:text-violet-800 hover:bg-violet-50 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Copy className="w-4 h-4" />
-                  {cloning ? 'Duplicazione...' : 'Duplica'}
-                </button>
+              <button
+                onClick={openClone}
+                disabled={cloning || !canEdit}
+                className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-violet-700 hover:text-violet-800 hover:bg-violet-50 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Copy className="w-4 h-4" />
+                  {cloning ? a.duplicating : a.duplicate}
+              </button>
               )}
               <button
                 onClick={close}
                 className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-dark hover:bg-gray-100 rounded-xl transition-colors"
               >
-                Annulla
+                {ui.common.cancel}
               </button>
               <button
                 onClick={handleSave}
@@ -1181,7 +1214,7 @@ export default function Admin() {
                 className="flex items-center gap-2 px-5 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4" />
-                {saving ? 'Salvataggio...' : 'Salva'}
+                {saving ? a.saving : a.save}
               </button>
             </div>
           </div>
@@ -1196,9 +1229,9 @@ export default function Admin() {
               onClick={() => {
                 if (groupAssignSelection.length > 0) {
                   openConfirm({
-                    title: 'Chiudere senza salvare?',
-                    message: 'Hai selezionato dei gruppi non ancora salvati. Vuoi chiudere comunque?',
-                    confirmLabel: 'Chiudi',
+                    title: t.closeWithoutSavingTitle,
+                    message: t.closeWithoutSavingGroupsMessage,
+                    confirmLabel: t.close,
                     onConfirm: async () => closeGroupAssignmentModal(),
                   });
                   return;
@@ -1206,24 +1239,24 @@ export default function Admin() {
                 closeGroupAssignmentModal();
               }}
               className="absolute top-4 right-4 p-2 text-gray-400 hover:text-dark hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="Chiudi selezione gruppi"
+              aria-label={a.closeGroupSelection}
             >
               <X className="w-4 h-4" />
             </button>
 
             <div className="p-6 sm:p-8">
               <div className="mb-6">
-                <h2 className="text-2xl font-extrabold text-dark">Aggiungi ai gruppi</h2>
+                <h2 className="text-2xl font-extrabold text-dark">{a.addToGroupsTitle}</h2>
                 <p className="text-gray-500 mt-1">
-                  Seleziona uno o pi&ugrave; gruppi Frontdoor per rendere l&apos;app disponibile anche lì.
+                  {a.addToGroupsHelp}
                 </p>
                 {pendingGroupAssignApp?.defaultIncluded ? (
                   <p className="text-xs text-gray-400 mt-2">
-                    L&apos;app è già stata creata nel gruppo <span className="font-semibold">default</span>.
+                    {a.defaultGroupAlreadyCreated}
                   </p>
                 ) : (
                   <p className="text-xs text-gray-400 mt-2">
-                    Questa app non è stata aggiunta al gruppo default, quindi devi scegliere almeno un gruppo per renderla visibile.
+                    {a.defaultGroupMissingHelp}
                   </p>
                 )}
               </div>
@@ -1232,11 +1265,12 @@ export default function Admin() {
                 <ClearableSearchField
                   value={groupAssignSearch}
                   onChange={setGroupAssignSearch}
-                  placeholder="Cerca gruppo per nome, descrizione o origine..."
+                  placeholder={ui.admin.apps.searchGroupsPlaceholder}
+                  clearLabel={ui.common.clearSearch}
                 />
                 <div className="mt-2 text-xs text-gray-400 flex items-center justify-between gap-3">
-                  <span>{groupAssignSelection.length} selezionati</span>
-                  <span>{filteredGroups.length} gruppi</span>
+                  <span>{groupAssignSelection.length} {a.selectedGroupSummary}</span>
+                  <span>{filteredGroups.length} {t.groups}</span>
                 </div>
               </div>
 
@@ -1248,7 +1282,7 @@ export default function Admin() {
                 </div>
               ) : filteredGroups.length === 0 ? (
                 <div className="text-sm text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200 px-3 py-4">
-                  Nessun gruppo trovato.
+                  {ui.admin.apps.noGroupsFound}
                 </div>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2 max-h-[52vh] overflow-y-auto pr-1">
@@ -1305,7 +1339,7 @@ export default function Admin() {
                   className="flex items-center gap-2 px-5 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Save className="w-4 h-4" />
-                  {assigningGroups ? 'Salvataggio...' : 'Aggiungi gruppi selezionati'}
+                  {assigningGroups ? t.saving : ui.admin.apps.addSelectedGroups}
                 </button>
               </div>
             </div>
@@ -1317,7 +1351,10 @@ export default function Admin() {
         open={Boolean(confirmDialog)}
         title={confirmDialog?.title || ''}
         message={confirmDialog?.message || ''}
-        confirmLabel={confirmDialog?.confirmLabel || 'Conferma'}
+        confirmLabel={confirmDialog?.confirmLabel || ui.common.confirm}
+        cancelLabel={confirmDialog?.cancelLabel || ui.common.cancel}
+        closeLabel={ui.common.closeDialog}
+        busyLabel={ui.common.pleaseWait}
         busy={confirmBusy}
         onConfirm={runConfirm}
         onCancel={closeConfirm}

@@ -5,8 +5,10 @@ export default function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = 'Conferma',
-  cancelLabel = 'Annulla',
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
+  closeLabel = 'Close dialog',
+  busyLabel = 'Please wait...',
   busy = false,
   onConfirm,
   onCancel,
@@ -41,7 +43,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={onCancel}
             className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-dark"
-            aria-label="Chiudi conferma"
+            aria-label={closeLabel}
             disabled={busy}
           >
             <X className="h-4 w-4" />
@@ -63,7 +65,7 @@ export default function ConfirmDialog({
             disabled={busy}
             className="inline-flex items-center gap-2 rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {busy ? 'Attendere...' : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>

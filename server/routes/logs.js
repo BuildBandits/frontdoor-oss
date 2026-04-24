@@ -1,6 +1,6 @@
 import express from 'express';
 import db from '../db.js';
-import { authenticate, isSuperAdmin } from '../middleware/auth.js';
+import { authenticate, isOwner } from '../middleware/auth.js';
 import { iconUrlForApp } from '../services/appIcons.js';
 
 const router = express.Router();
@@ -257,11 +257,11 @@ function loadAuditLogs(req, res) {
   });
 }
 
-// List access logs with pagination (superadmin only)
-router.get('/', authenticate, isSuperAdmin, loadAccessLogs);
+// List access logs with pagination (owner only)
+router.get('/', authenticate, isOwner, loadAccessLogs);
 
-// Top apps by access count (superadmin only)
-router.get('/top-apps', authenticate, isSuperAdmin, (req, res) => {
+// Top apps by access count (owner only)
+router.get('/top-apps', authenticate, isOwner, (req, res) => {
   const days = normalizeRetentionDays(req.query.days);
   const q = parseSearch(req.query.q);
   const searchClause = buildLikeSearchClause(q, ['a.name', 'a.slug']);
@@ -283,10 +283,10 @@ router.get('/top-apps', authenticate, isSuperAdmin, (req, res) => {
   res.json({ topApps, days, timeZone: APP_TIMEZONE });
 });
 
-// List audit logs with pagination (superadmin only)
-router.get('/audit', authenticate, isSuperAdmin, loadAuditLogs);
+// List audit logs with pagination (owner only)
+router.get('/audit', authenticate, isOwner, loadAuditLogs);
 
 // Backwards-compatible alias
-router.get('/rbac-audit', authenticate, isSuperAdmin, loadAuditLogs);
+router.get('/rbac-audit', authenticate, isOwner, loadAuditLogs);
 
 export default router;

@@ -9,6 +9,7 @@ import { getRequiredEnv } from '../config.js';
 import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, refreshGroupCacheFromTenant, syncUserEntraGroups } from '../services/entraGroups.js';
 import { ensureAvatarCached } from '../services/avatars.js';
 import { logRbacAudit } from '../db.js';
+import { isSupportedLanguage } from '../../shared/languages.js';
 
 const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 const authScopes = getAuthScopes();
@@ -30,6 +31,34 @@ const msalClient = process.env.AZURE_CLIENT_ID
 // CSRF state store — in-memory, suitable for single-instance deployments only.
 // For multi-replica/horizontal-scaling deployments, replace with a shared store (e.g. Redis).
 const pendingAuthStates = new Map();
+
+const parseStoredAppOrder = (value) => {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string' && id.trim()) : null;
+  } catch {
+    return null;
+  }
+};
+
+const normalizePreferredLanguage = (value) => (
+  isSupportedLanguage(value) ? value : null
+);
+
+const serializeCurrentUser = (user) => ({
+  id: user.id,
+  email: user.email,
+  displayName: user.display_name,
+  role: user.role,
+  avatarColor: user.avatar_color,
+  homeDesktopView: user.home_desktop_view
+    ? (user.home_desktop_view === 'compact' ? 'compact' : 'cards')
+    : null,
+  preferredLanguage: normalizePreferredLanguage(user.preferred_language),
+  appOrder: parseStoredAppOrder(user.app_order),
+  appOrderUpdatedAt: user.app_order_updated_at || null,
+});
 
 // Initiate SSO login
 router.get('/microsoft', async (req, res) => {
@@ -130,12 +159,12 @@ router.get('/microsoft/callback', async (req, res) => {
 
     if (user) {
       // Existing user (either pre-registered or returning) — update profile
-      const shouldPromote = adminEmails.includes(email.toLowerCase()) && user.role !== 'superadmin';
+      const shouldPromote = adminEmails.includes(email.toLowerCase()) && user.role !== 'owner';
       db.prepare(
         `UPDATE users SET microsoft_id = ?, display_name = ?, last_login = datetime('now'), updated_at = datetime('now') WHERE id = ?`
       ).run(microsoftId, displayName, user.id);
       if (shouldPromote) {
-        db.prepare(`UPDATE users SET role = 'superadmin', updated_at = datetime('now') WHERE id = ?`).run(user.id);
+        db.prepare(`UPDATE users SET role = 'owner', updated_at = datetime('now') WHERE id = ?`).run(user.id);
         user = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
       }
     } else {
@@ -143,7 +172,7 @@ router.get('/microsoft/callback', async (req, res) => {
       const userId = uuidv4();
       const avatarColor = `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
 
-      const role = adminEmails.includes(email.toLowerCase()) ? 'superadmin' : 'user';
+      const role = adminEmails.includes(email.toLowerCase()) ? 'owner' : 'user';
       db.prepare(`
         INSERT INTO users (id, email, display_name, microsoft_id, role, avatar_color, last_login)
         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
@@ -164,7 +193,7 @@ router.get('/microsoft/callback', async (req, res) => {
       }
     }
 
-    if (['superadmin', 'admin', 'admin_readonly'].includes(user.role)) {
+    if (['owner', 'admin', 'admin_readonly'].includes(user.role)) {
       logRbacAudit(user.id, 'login', 'auth', user.id, {
         role: user.role,
         microsoftId: user.microsoft_id,
@@ -182,7 +211,10 @@ router.get('/microsoft/callback', async (req, res) => {
     const token = jwt.sign(
       { userId: user.id, email: user.email, name: user.display_name, role: user.role },
       jwtSecret,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      {
+        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+        issuer: process.env.JWT_ISSUER || 'frontdoor',
+      }
     );
 
     // Set httpOnly cookie on wildcard domain for subdomain proxy auth
@@ -209,13 +241,69 @@ router.get('/microsoft/callback', async (req, res) => {
 // Get current user
 router.get('/me', authenticate, (req, res) => {
   res.json({
-    user: {
-      id: req.user.id,
-      email: req.user.email,
-      displayName: req.user.display_name,
-      role: req.user.role,
-      avatarColor: req.user.avatar_color,
-    },
+    user: serializeCurrentUser(req.user),
+  });
+});
+
+router.put('/me/preferences', authenticate, (req, res) => {
+  const updates = [];
+  const values = [];
+
+  if (Object.prototype.hasOwnProperty.call(req.body, 'homeDesktopView')) {
+    const { homeDesktopView } = req.body;
+    if (homeDesktopView !== null && !['cards', 'compact'].includes(homeDesktopView)) {
+      return res.status(400).json({ error: 'homeDesktopView must be cards, compact, or null' });
+    }
+    updates.push('home_desktop_view = ?');
+    values.push(homeDesktopView);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, 'preferredLanguage')) {
+    const { preferredLanguage } = req.body;
+    if (preferredLanguage !== null && !isSupportedLanguage(preferredLanguage)) {
+      return res.status(400).json({ error: 'preferredLanguage must be a supported language or null' });
+    }
+    updates.push('preferred_language = ?');
+    values.push(preferredLanguage);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, 'appOrder')) {
+    const { appOrder } = req.body;
+    if (appOrder !== null && !Array.isArray(appOrder)) {
+      return res.status(400).json({ error: 'appOrder must be an array or null' });
+    }
+    if (Array.isArray(appOrder)) {
+      const normalized = appOrder.filter((id) => typeof id === 'string' && id.trim());
+      if (normalized.length > 0) {
+        updates.push('app_order = ?');
+        values.push(JSON.stringify(normalized));
+        updates.push('app_order_updated_at = datetime(\'now\')');
+      } else {
+        updates.push('app_order = NULL');
+        updates.push('app_order_updated_at = NULL');
+      }
+    } else {
+      updates.push('app_order = NULL');
+      updates.push('app_order_updated_at = NULL');
+    }
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No preference updates provided' });
+  }
+
+  db.prepare(
+    `UPDATE users
+     SET ${updates.join(', ')},
+         updated_at = datetime('now')
+     WHERE id = ?`
+  ).run(...values, req.user.id);
+
+  const user = db.prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, app_order, app_order_updated_at FROM users WHERE id = ?').get(req.user.id);
+
+  res.json({
+    message: 'Preferenze aggiornate',
+    user: serializeCurrentUser(user),
   });
 });
 

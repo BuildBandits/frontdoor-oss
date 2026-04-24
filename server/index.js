@@ -37,6 +37,36 @@ if (startupErrors.length > 0) {
   process.exit(1);
 }
 
+function logDatabaseBackedSettings() {
+  try {
+    const branding = getBrandingSettings();
+    const databaseBackedSettings = {
+      defaultLanguage: branding.defaultLanguage,
+      defaultHomeDesktopView: branding.defaultHomeDesktopView,
+      defaultCompactView: branding.defaultCompactView,
+      showHomeHero: branding.showHomeHero,
+      hideHomeHeroOnMobile: branding.hideHomeHeroOnMobile,
+      showAppModeBadges: branding.showAppModeBadges,
+      showSharedCookieMode: branding.showSharedCookieMode,
+      showRedirectSsoMode: branding.showRedirectSsoMode,
+      showEntraAppMode: branding.showEntraAppMode,
+      hideLoginPage: branding.hideLoginPage,
+      useEuropeanDateFormat: branding.useEuropeanDateFormat,
+      use24hTimeFormat: branding.use24hTimeFormat,
+      logRetentionDays: branding.logRetentionDays,
+      logoConfigured: Boolean(branding.logoUrl),
+      brandingUpdatedAt: branding.updatedAt || 'never',
+    };
+
+    console.log('Frontdoor database-backed settings:');
+    for (const [key, value] of Object.entries(databaseBackedSettings)) {
+      console.log(`  ${key}=${value}`);
+    }
+  } catch (error) {
+    console.error(`Frontdoor database-backed settings read failed: ${error.message}`);
+  }
+}
+
 function runLogRetentionPurge() {
   try {
     const retentionDays = getBrandingSettings().logRetentionDays ?? 90;
@@ -131,6 +161,7 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Frontdoor running on port ${PORT}`);
+  logDatabaseBackedSettings();
   runLogRetentionPurge();
   const dailyRetentionTimer = setInterval(runLogRetentionPurge, 24 * 60 * 60 * 1000);
   dailyRetentionTimer.unref?.();

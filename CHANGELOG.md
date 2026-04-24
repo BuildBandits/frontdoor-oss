@@ -14,7 +14,59 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+- Account menu: users can now save a personal UI language (`English` / `Italiano`) independently from the global branding default. The preference is persisted per user in both localStorage and the database, matching the existing personal Home-view and app-order behavior.
+- Webapp localization foundation based on UTF-8 JSON dictionaries under `src/i18n/`, with English as the default language and Italian available as a persisted option from `Personalizza`.
+
+### Fixed
+- Docker image: production runtime now copies the shared language catalog into `/app/shared`, fixing the startup crash introduced by the new language-preference imports.
+- App editor: the duplicate action, icon mode buttons, icon helper text and SSO labels are now fully localized; the Customize logo picker text is easier to read, and changing the default language no longer re-translates the page before saving.
+- Apps: the connection filter now shows the Entra App option correctly, the group/user confirm dialogs use the localized cancel label, the superadmin deactivate action shows the proper blocked message, and the Customize logo picker now uses translated file controls instead of the browser default text.
+- `AdminGroups`: the "Nuovo gruppo da Entra" button no longer crashes the page with `selectedEntraGroups.includes is not a function`. The click handler was passing the React `SyntheticEvent` as the first argument to `openEntraImport`, which since the default-args refactor uses it as the `prefillGroupIds` array — the event object would land in state and break the next render. Wrapped the handler in an arrow function so `openEntraImport()` is called with its defaults.
+
 ### Changed
+- Audit page: branding updates now log only the changed fields, and the details column renders them as compact plain JSON instead of a full branding snapshot or heavier visual emphasis.
+- Admin role actions: the role-assignment buttons now mirror the new badge language too, using a shield for `Admin` and an eye for `Admin (sola lettura)` / `Admin (read only)` instead of relying on the previous generic icon.
+- Admin role badges: `Admin` and `Admin (sola lettura)` / `Admin (read only)` now use distinct icons in the admin UI, so the difference is visible beyond color alone.
+- Localization/RBAC copy: admin-role actions now say simply `Admin` vs `Admin (sola lettura)` / `Admin (read only)`, removing the redundant `completo` / `full access` wording from role-assignment labels.
+- Account menu: the personal Home view switch now uses the same select pattern as the personal language selector, for a more consistent menu interaction.
+- Personalizza: the "Criteri e preferenze" card now uses a cleaner single-row layout for language/date/time controls, moves avatar cache into its own maintenance row with action button, and shows log retention as a full-width row with the existing slider logic.
+- Personalizza: removed the extra avatar-cache helper hint from the "Criteri e preferenze" section and cleaned the unused i18n entries.
+- Localization: language pickers now render from a shared supported-language catalog instead of hardcoded `en/it` buttons, and DB language columns no longer enforce a two-language SQLite check constraint.
+- Roles/RBAC: the highest privileged backend role is now `owner` instead of `superadmin`, with startup migration converting existing databases automatically, verbose container-start logging for legacy-role rewrites, and `ADMIN_EMAILS` promoting compose-defined owners at container boot.
+- Startup logs: owner-role migration now emits a single concise line when no role migration is needed, while keeping the detailed multi-line output only when an actual legacy rewrite runs.
+- Admin Users UI: renamed the visible `superadmin` role label to `Owner` across badges, filters and helper text, and aligned the role filter labels to `Owner`, `Admin`, `Admin (sola lettura)` and `Utenti` with matching English strings.
+- i18n: renamed the legacy role badge keys to `ownerBadge` and introduced a dedicated `userBadge` string so the user badge is capitalized without affecting lowercase narrative text.
+- Frontend build: admin and auth routes now load lazily, and Vite splits the main vendor libraries into separate chunks to keep the initial bundle smaller and reduce the `500 kB` warning.
+- Gestione Gruppi: the "Aggiungi membri" modal now only shows the existing-user picker; the legacy email invitation path and its backend support have been removed.
+- Localizations: removed the obsolete email-invite strings from the Admin Groups language files after the modal cleanup.
+- Admin route: the personalization page moved from `/admin/personalizza` to `/admin/customization` to match the new English page name and menu links.
+- Personalizza Home: the desktop default view is now a true global branding setting, separate from the mobile compact forcing.
+- Account menu and Home: resetting the per-user Home view now returns to the global default from Personalizza, not always to box cards.
+- Account menu: the Home switch uses a subtler recessed selection state again, with readable text.
+- Account menu: the Home reset row now says when the default view is in use and switches to a restore label when overridden.
+- Account menu: the app-order reset row now says when the default order is in use and switches to a restore label when overridden.
+- Account menu: the per-user preference sections now use compact inline restore/default pills, the Home title is shorter, and the `Ordine app` block stays hidden until the user actually has a custom app order saved.
+- Account menu: the selected Home switch now keeps readable contrast between background and text.
+- Account menu: the Home selector now uses a higher-contrast accent state so the selected view is easier to read.
+- Account menu: the saved app-order timestamp can now be shown with a more European date format, controlled by a global Personalizza toggle.
+- Personalizza Home: the 24h and European date toggles now explicitly say they only affect menu rendering, not the stored data.
+- Account menu: the "Ordine app" section now shows the last saved custom order timestamp, formatted with the global 12h/24h preference.
+- Back-to-top button: the floating label now reads `Torna su`.
+- Account menu: the Home view segmented switch now highlights the effective current view immediately, including the global default when the user has no personal override yet.
+- Account menu: the Home view choice now uses a single-line segmented switch for `Box pieni` / `Compattata` instead of two separate stacked buttons.
+- Personalizza save area: the "Stato modifiche" bar is now integrated inside each section card instead of appearing as a detached block below it.
+- User detail modal: "App visibili" now closes with `Esc`, uses App-page-style mode badges, and clicking an app opens its edit modal in `Gestione App` instead of launching it.
+- User detail modal: the visible-app count now shows an info icon to hint that it is clickable.
+- Personalizza save area: the floating "Stato modifiche" bar has been moved into each section card, keeping the save action inside the page body without a detached duplicate block.
+- Home personalization: the desktop Home view preference now lives in the database per user, and the user menu can reset it back to the global default.
+- Home ordering: the custom drag-and-drop app order is now stored per user in the database instead of localStorage, with a user-menu reset back to the global order.
+- Home mobile toolbar: the search field stays on its own row on small screens, while on desktop it shares the same line with the action buttons again.
+- Footer: the MIT license reference in the shared footer now links to the official Open Source Initiative license page.
+- Mobile toolbar layout: Home now keeps the search field on its own row on mobile, with action buttons moved below into a single comfortable row; the same mobile-only treatment now applies to the Gestione App and Gestione Gruppi primary actions, while desktop layouts stay unchanged.
+- Personalizza responsive: the quick navigation panel now uses a compact grid on mobile instead of horizontal scrolling, reducing overflow and making section jumping easier on small screens.
+- Footer: moved the build sigla into a shared footer shown on the login page and all authenticated pages, with the official webapp version pinned to `v1.0.0`, an open-source note, and MIT reference without a repo link.
+- Admin UX: the search/filter bars on Gestione App, Gestione Gruppi, Gestione Utenti and Log now use a shared Audit-style surface with a bordered white container and consistent filter controls.
 - App table: the connection filter is now a dropdown with checkbox-style options whose trigger matches the search field look and feel, and the table headers keep the original uppercase treatment while staying clickable for sorting on every field except actions.
 - App table: the sortable header labels now apply uppercase directly on the clickable buttons, so the look stays consistent even though the cells are interactive; the sort marker uses chevron up/down icons again.
 - App table: `AZIONI` is centered again so it visually matches the rest of the header row.
@@ -26,6 +78,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - The app info modal no longer crashes when opened, the browser tab favicon now always uses the dark artwork, the app list includes a direct jump to Gestione Gruppi with a prefilled search, and the tag field shows available labels as soon as it receives focus.
 
 ### Added
+- Personalizza Home: added a global toggle to show menu dates in a more European day/month/year format.
+- Personalizza Home: added a global toggle to show menu timestamps in 24-hour format.
+- Personalizza page: added a per-user Home desktop view dropdown under the Home section, moved the Mobile section after Criteri, and refreshed the Mobile block icon.
+- Layout nav: the account dropdown next to the avatar/name now exposes the per-user Home view preference and writes it to the database.
+- Personalizza: added a dedicated Mobile section with a mobile-compact Home default toggle and a mobile-only hero hide toggle.
 - Roles: introduced `superadmin`, `admin`, and `admin_readonly`, with compose-defined superadmins kept out of the UI for demotion/deletion
 - Admin UX: added a dedicated `Audit` page for privileged actions, visible only to superadmins, with search, retention filters, and pagination
 - Log pages: added search, period filters, and page-size selection up to 250 rows
@@ -49,13 +106,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - DB migration on startup: expands `apps.mode` CHECK constraint to include `entra-app` for existing databases (table reconstruction pattern)
 - `AppCard`: violet `entra` badge for `entra-app` mode apps, consistent with admin panel
 - `AppIcon`: emoji/text icons now rendered inside a fixed-size flex container matching image dimensions, ensuring visual consistency between emoji and SVG/image icons at every size
-- `Home`: compact list view — toggle "Compatta" in toolbar, persisted in localStorage; apps rendered as dense horizontal rows with icon, name, description, tags and badges in a single line
+- `Home`: compact list view — toggle "Compatta" in toolbar, now backed by the authenticated user's database preference and resettable to the global default; apps rendered as dense horizontal rows with icon, name, description, tags and badges in a single line
 - `AppCard`: extracted shared `InfoModal` component to avoid duplication between card and compact layouts
 - `AppCard`: app icons on the Home card are now clickable and open the app link like the name and description
 - Admin UX: search fields in Gestione App, Gestione Gruppi and Gestione Utenti now include a clear button and support `Esc` to clear the current query
 - Admin UX: the Entra app creation field no longer pre-fills `/sso`; it now starts empty and prompts for the Microsoft Entra Application ID
 - Home page: favorites are now pinned at the top of the grid (above non-favorites)
-- Home page: drag-and-drop reordering of app tiles with `@dnd-kit/sortable`; personal order persisted in `localStorage` (`frontdoor_app_order`). Drag handle appears on card hover (top-left grip). Drag is disabled in group-by-tag view and while search/tag filters are active to avoid surprising jumps. Cross-section drags (fav ↔ non-fav) are blocked so the "favorites first" invariant always holds.
+- Home page: drag-and-drop reordering of app tiles with `@dnd-kit/sortable`; personal order is now persisted per user in the database. Drag handle appears on card hover (top-left grip). Drag is disabled in group-by-tag view and while search/tag filters are active to avoid surprising jumps. Cross-section drags (fav ↔ non-fav) are blocked so the "favorites first" invariant always holds.
 - Home page footer shows the build's short commit SHA (e.g. `vd83c54e`). Injected at build time by Vite via a `__COMMIT_SHA__` global, resolved from `git rev-parse --short HEAD` with a fallback to the `VITE_COMMIT_SHA` env var. When neither is available (e.g. Docker builds without `.git` in the context), falls back to a compact UTC build timestamp (e.g. `v20260415-1147`) so the footer always shows a meaningful version string.
 - New `POST /api/apps/:slug/track-access` endpoint records an access_logs row for a given app. Authenticated + RBAC-gated. Frontend calls it fire-and-forget from `AppCard.handleClick` before opening the target URL in a new tab. Previously only apps with `mode='redirect'` produced access logs (via the `/sso-redirect` server round-trip); apps with `redirect-plain` or `shared-cookie` modes bypass the server on click and were invisible in the access log. This endpoint closes that gap.
 - App icon uploads now support pasted images, pasted SVG, and file upload, with cached assets stored on the data volume and icon rendering falling back to emoji when assets are missing.
@@ -64,6 +121,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - App tags are normalized case-insensitively so tag grouping and filters do not duplicate `AI`/`ai` variants.
 
 ### Fixed
+- Account menu and Home reload: `/api/auth/me` now returns the full user preference payload again, so a hard refresh no longer drops the saved app order and its timestamp back to the global default.
+- Account menu: custom app order and its saved timestamp are now kept in the local user cache too, so a hard refresh no longer falls back to the global order while the profile rehydrates.
+- Account menu: the Home view switch no longer mixes the mobile compact default with the desktop preference, so the highlighted state now matches the actual desktop view.
+- Gestione App: the deep-link handler for `?edit=` no longer trips a render-time reference error, so the page loads correctly again.
 - `server/db.js`: expands user roles and RBAC audit target types on startup for existing databases, mapping legacy admins to `superadmin`
 - `server/routes/auth.js`: compose-defined admin emails are auto-promoted to `superadmin`, and privileged logins are recorded in the audit trail
 - `server/routes/apps.js`, `server/routes/groups.js`, `server/routes/users.js`, and `server/routes/branding.js` now enforce viewer/editor/superadmin role splits instead of a single `admin` gate
