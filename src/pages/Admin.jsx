@@ -39,6 +39,7 @@ export default function Admin() {
   const [assigningGroups, setAssigningGroups] = useState(false);
   const [appSearch, setAppSearch] = useState('');
   const [appModeFilter, setAppModeFilter] = useState('all');
+  const [showOnlyOrphanApps, setShowOnlyOrphanApps] = useState(false);
   const [modeFilterOpen, setModeFilterOpen] = useState(false);
   const [appSort, setAppSort] = useState({ key: 'sort_order', direction: 'asc' });
   const [pageNotice, setPageNotice] = useState(null);
@@ -540,6 +541,7 @@ export default function Admin() {
   const filteredApps = useMemo(() => {
     const q = appSearch.toLowerCase().trim();
     const filtered = apps.filter((app) => {
+      if (showOnlyOrphanApps && Number(app.group_count || 0) !== 0) return false;
       if (appModeFilter !== 'all' && app.mode !== appModeFilter) return false;
       if (!q) return true;
       const tags = Array.isArray(app.tags) ? app.tags : [];
@@ -586,7 +588,17 @@ export default function Admin() {
       }
       return result * direction;
     });
-  }, [apps, appSearch, appModeFilter, appSort]);
+  }, [apps, appSearch, appModeFilter, appSort, showOnlyOrphanApps]);
+  const orphanApps = useMemo(
+    () => apps.filter((app) => Number(app.group_count || 0) === 0),
+    [apps],
+  );
+
+  useEffect(() => {
+    if (showOnlyOrphanApps && orphanApps.length === 0) {
+      setShowOnlyOrphanApps(false);
+    }
+  }, [showOnlyOrphanApps, orphanApps.length]);
 
   const openGroupAssignmentModal = (app, selectedIds = []) => {
     setPendingGroupAssignApp(app);
@@ -746,6 +758,33 @@ export default function Admin() {
           </div>
         </div>
       </div>
+
+      {orphanApps.length > 0 && (
+        <div className="mb-8">
+          <PageNotice
+            type="warning"
+            title={a.unassignedAppsTitle}
+            message={a.unassignedAppsHelp}
+            actionLabel={showOnlyOrphanApps ? a.showAllApps : a.showOnlyUnassigned}
+            onAction={() => setShowOnlyOrphanApps((prev) => !prev)}
+          >
+            <div className="flex flex-wrap gap-2">
+              {orphanApps.map((app) => (
+                <button
+                  key={app.id}
+                  type="button"
+                  onClick={() => openEdit(app)}
+                  className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100"
+                  title={a.unassignedAppOpen}
+                >
+                  <AppIcon app={app} className="h-4 w-4" textClassName="text-[10px]" />
+                  <span className="max-w-[220px] truncate">{app.name}</span>
+                </button>
+              ))}
+            </div>
+          </PageNotice>
+        </div>
+      )}
 
       {/* App table */}
       {loading ? (

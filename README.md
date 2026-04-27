@@ -300,6 +300,7 @@ AZURE_REDIRECT_URI=https://your-domain.com/api/auth/microsoft/callback
 | GET | `/api/auth/microsoft` | No | Initiate SSO flow |
 | GET | `/api/auth/microsoft/callback` | No | SSO callback |
 | GET | `/api/auth/me` | Bearer | Current user profile |
+| POST | `/api/auth/verify-sso-token` | None (token+aud in body) | SSO token introspection for satellite apps |
 | POST | `/api/auth/logout` | No | Logout (clear cookie) |
 | GET | `/api/branding` | Bearer | Read home branding settings |
 | PUT | `/api/branding` | Owner | Update home branding settings |
@@ -332,6 +333,51 @@ AZURE_REDIRECT_URI=https://your-domain.com/api/auth/microsoft/callback
 | GET | `/api/logs` | Owner | Access logs (paginated) |
 | GET | `/api/logs/top-apps` | Owner | Top apps analytics |
 | GET | `/api/logs/audit` | Owner | Audit logs (paginated) |
+
+### Auth integration patterns for satellite apps
+
+Apps in the catalog can pick one of three patterns to consume frontdoor authentication. Pick the most restrictive that fits the deployment.
+
+| Pattern | When to use | What the satellite needs |
+|---------|-------------|--------------------------|
+| **Shared cookie** (`mode=shared-cookie`) | Satellite hosted under a subdomain of `BASE_DOMAIN`. | Read the `frontdoor_token` httpOnly cookie and verify it locally with the shared `JWT_SECRET`. |
+| **Redirect with shared secret** (`mode=redirect`, classic) | Satellite on a different domain, operated by the same team. | Receive the short-lived token via GET query string or POST form, verify it locally with the shared `JWT_SECRET`. |
+| **Redirect with introspection** (`mode=redirect`, A.3) | Satellite on a different domain that should NOT hold the frontdoor secret (third-party, lower-trust environment, blast-radius reduction). | Receive the short-lived token, then POST it to `/api/auth/verify-sso-token` together with its own slug as `expected_aud`. No shared secret. |
+
+#### `POST /api/auth/verify-sso-token`
+
+Server-to-server token introspection (RFC 7662-inspired, scoped to this flow). The frontdoor verifies signature, expiration, issuer (`JWT_ISSUER` or `frontdoor`), audience match, user activation and app activation in one shot. Authorization to call the endpoint is implicit in possessing a valid token for the requested `expected_aud`; no API key needed.
+
+```bash
+curl -sX POST https://<frontdoor-host>/api/auth/verify-sso-token \
+  -H 'Content-Type: application/json' \
+  -d '{"token":"<jwt>","expected_aud":"<your-app-slug>"}'
+```
+
+200 response:
+
+```json
+{
+  "valid": true,
+  "user": { "id": "...", "email": "...", "name": "...", "role": "user" },
+  "aud": "<your-app-slug>",
+  "exp": 1745740300
+}
+```
+
+Error codes:
+
+| Status | `error` | Meaning |
+|--------|---------|---------|
+| 400 | `bad_request` | Missing/malformed `token` or `expected_aud` (slug regex). |
+| 401 | `invalid_token` | Bad signature or expired (intentionally indistinguishable). |
+| 401 | `invalid_issuer` | Token wasn't issued by this frontdoor. |
+| 401 | `user_not_found_or_inactive` | `sub` doesn't resolve to an active user. |
+| 403 | `audience_mismatch` | Token replay across apps — caller logged at `warn`. |
+| 403 | `app_inactive` | `expected_aud` matches an app that has been deactivated. |
+| 429 | `too_many_requests` | Rate limit (120 req/min per IP) tripped. |
+
+Use `exp` to scope the local satellite session: `min(default_session_ttl, exp - now)` keeps the local session from outliving the frontdoor token.
 
 ## Database
 

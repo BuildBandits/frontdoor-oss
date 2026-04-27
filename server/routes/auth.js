@@ -1,4 +1,5 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfidentialClientApplication } from '@azure/msal-node';
@@ -8,6 +9,7 @@ import { authenticate } from '../middleware/auth.js';
 import { getRequiredEnv } from '../config.js';
 import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, refreshGroupCacheFromTenant, syncUserEntraGroups } from '../services/entraGroups.js';
 import { ensureAvatarCached } from '../services/avatars.js';
+import { verifySsoTokenChain } from '../services/verifySsoToken.js';
 import { logRbacAudit } from '../db.js';
 import { isSupportedLanguage } from '../../shared/languages.js';
 
@@ -312,6 +314,40 @@ router.post('/logout', (req, res) => {
   const baseDomain = process.env.BASE_DOMAIN || 'frontdoor.local';
   res.clearCookie('frontdoor_token', { domain: `.${baseDomain}` });
   res.json({ message: 'Logged out' });
+});
+
+// SSO token introspection — RFC 7662-inspired endpoint for satellite apps in
+// `mode=redirect` that DON'T share JWT_SECRET with the frontdoor (pattern A.3).
+//
+// The satellite POSTs a token (just received via /api/apps/:slug/sso-redirect)
+// together with the slug it expects the token to be addressed to. The frontdoor
+// validates signature, expiration, issuer, audience, user activation and app
+// activation, then returns a minimal user payload. Unlike /auth/me this does
+// NOT require a session cookie and only accepts SSO short-lived tokens (claim
+// `sub`), not long-lived cookie session tokens (claim `userId`).
+//
+// Single source of truth for what counts as a valid token-for-app pair: do not
+// duplicate this chain in satellites by decoding without verifying.
+const ssoTokenIntrospectionLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: { error: 'too_many_requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.post('/verify-sso-token', ssoTokenIntrospectionLimiter, (req, res) => {
+  const jwtSecret = getRequiredEnv('JWT_SECRET', 'SSO token introspection');
+  const expectedIssuer = process.env.JWT_ISSUER || 'frontdoor';
+  const { token, expected_aud: expectedAud } = req.body || {};
+  const { status, body } = verifySsoTokenChain({
+    token,
+    expectedAud,
+    jwtSecret,
+    expectedIssuer,
+    dbHandle: db,
+  });
+  res.status(status).json(body);
 });
 
 export default router;

@@ -72,6 +72,7 @@ export default function AdminGroups() {
   const [allApps, setAllApps] = useState([]);
   const [appSearch, setAppSearch] = useState('');
   const [selectedGroupIds, setSelectedGroupIds] = useState([]);
+  const [showOnlyProblemGroups, setShowOnlyProblemGroups] = useState(false);
 
   // Entra import modal
   const [showEntraImport, setShowEntraImport] = useState(false);
@@ -580,6 +581,28 @@ export default function AdminGroups() {
       return searchable.includes(q);
     });
   }, [groups, groupSearch]);
+  const groupsWithoutApps = useMemo(
+    () => groups.filter((group) => Number(group.app_count || 0) === 0),
+    [groups],
+  );
+  const groupsWithoutMembers = useMemo(
+    () => groups.filter((group) => Number(group.member_count || 0) === 0),
+    [groups],
+  );
+  const problemGroups = useMemo(
+    () => groups.filter((group) => Number(group.app_count || 0) === 0 || Number(group.member_count || 0) === 0),
+    [groups],
+  );
+  const hasIncompleteGroupsNotice = problemGroups.length > 0;
+  const visibleGroups = showOnlyProblemGroups
+    ? filteredGroups.filter((group) => Number(group.app_count || 0) === 0 || Number(group.member_count || 0) === 0)
+    : filteredGroups;
+
+  useEffect(() => {
+    if (showOnlyProblemGroups && problemGroups.length === 0) {
+      setShowOnlyProblemGroups(false);
+    }
+  }, [showOnlyProblemGroups, problemGroups.length]);
 
   return (
     <div>
@@ -691,10 +714,65 @@ export default function AdminGroups() {
             />
           </div>
           <div className="text-xs text-gray-400">
-            {filteredGroups.length} {ui.nav.groups.toLowerCase()} {t.of} {groups.length}
+            {visibleGroups.length} {ui.nav.groups.toLowerCase()} {t.of} {groups.length}
           </div>
         </div>
       </div>
+
+      {hasIncompleteGroupsNotice && (
+        <div className="mb-8">
+          <PageNotice
+            type="warning"
+            title={g.problemGroupsNoticeTitle}
+            message={g.problemGroupsNoticeHelp}
+            actionLabel={showOnlyProblemGroups ? g.showAllGroups : g.showOnlyProblemGroups}
+            onAction={() => setShowOnlyProblemGroups((prev) => !prev)}
+            closeLabel={ui.common.closeNotice}
+          >
+            <div className="space-y-4">
+              {groupsWithoutApps.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">
+                    {g.groupsWithoutAppsLabel} ({groupsWithoutApps.length})
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {groupsWithoutApps.map((group) => (
+                      <button
+                        key={`no-apps-${group.id}`}
+                        type="button"
+                        onClick={() => toggleExpand(group.id)}
+                        className="inline-flex items-center rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100"
+                      >
+                        {groupLabel(group)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {groupsWithoutMembers.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">
+                    {g.groupsWithoutMembersLabel} ({groupsWithoutMembers.length})
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {groupsWithoutMembers.map((group) => (
+                      <button
+                        key={`no-members-${group.id}`}
+                        type="button"
+                        onClick={() => toggleExpand(group.id)}
+                        className="inline-flex items-center rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100"
+                      >
+                        {groupLabel(group)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </PageNotice>
+        </div>
+      )}
 
       {loading ? (
         <div className="animate-pulse space-y-3">
@@ -756,7 +834,7 @@ export default function AdminGroups() {
             </div>
           </div>
 
-          {filteredGroups.map((group) => (
+          {visibleGroups.map((group) => (
             <div key={group.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
               {/* Group row */}
               <div

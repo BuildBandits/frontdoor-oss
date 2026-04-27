@@ -15,16 +15,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- **`POST /api/auth/verify-sso-token`** — server-to-server token introspection endpoint for satellite apps in `mode=redirect` that don't share `JWT_SECRET` with the frontdoor. Validates a short-lived token issued by `/api/apps/:slug/sso-redirect` against expected audience, issuer, signature, expiration and user/app activation. Body: `{ token, expected_aud }`. Returns `{ valid, user, aud, exp }` on 200, distinct error codes on 401/403/400/429. Rate limited to 120 req/min per IP. RFC 7662-inspired but scoped to the frontdoor SSO flow. Lets satellites stay loosely coupled: a compromised satellite can no longer be parlayed into forging tokens for sibling apps.
 - Account menu: users can now save a personal UI language (`English` / `Italiano`) independently from the global branding default. The preference is persisted per user in both localStorage and the database, matching the existing personal Home-view and app-order behavior.
 - Webapp localization foundation based on UTF-8 JSON dictionaries under `src/i18n/`, with English as the default language and Italian available as a persisted option from `Personalizza`.
+- Admin App and Groups pages now surface info boxes for orphan apps and incomplete groups, making unassigned apps and groups missing apps/members easier to spot before they cause visibility gaps.
 
 ### Fixed
+- POST SSO redirect: the auto-submitted form was being blocked by helmet's default `form-action 'self'` CSP directive when the target app lived on a different origin (e.g. `autoprompter.coolify.logotel.cloud/api/.../sso-callback`). The `/sso-redirect` handler now sets a per-response CSP that allows `form-action` only towards the configured target app origin, leaving the global CSP untouched.
 - Docker image: production runtime now copies the shared language catalog into `/app/shared`, fixing the startup crash introduced by the new language-preference imports.
 - App editor: the duplicate action, icon mode buttons, icon helper text and SSO labels are now fully localized; the Customize logo picker text is easier to read, and changing the default language no longer re-translates the page before saving.
 - Apps: the connection filter now shows the Entra App option correctly, the group/user confirm dialogs use the localized cancel label, the superadmin deactivate action shows the proper blocked message, and the Customize logo picker now uses translated file controls instead of the browser default text.
+- Admin App and Groups: the quick filters now automatically reset back to the full page once there are no more unassigned apps or problematic groups left to show.
+- Admin App: the orphan-app info box now reads from the correct `admin.apps` translation namespace, preventing the page from crashing on render.
+- Admin App: the orphan-app box now lists the actual unassigned apps and lets you open each app’s editor directly from the warning.
+- Admin Groups: the incomplete-groups warning now lists the actual problematic group names and lets you jump straight into each group’s details.
+- Admin App and Groups: the orphan/incomplete alerts now use a shared amber warning banner style so they look more standard and consistent.
+- Admin App and Groups: both warning areas now sit apart from the table and expose a compact text link inside the warning box to show only unassigned/problematic items.
 - `AdminGroups`: the "Nuovo gruppo da Entra" button no longer crashes the page with `selectedEntraGroups.includes is not a function`. The click handler was passing the React `SyntheticEvent` as the first argument to `openEntraImport`, which since the default-args refactor uses it as the `prefillGroupIds` array — the event object would land in state and break the next render. Wrapped the handler in an arrow function so `openEntraImport()` is called with its defaults.
 
 ### Changed
+- The SSO short-lived token issued by `/api/apps/:slug/sso-redirect` now uses jsonwebtoken's `issuer` option (honoring `JWT_ISSUER`, default `frontdoor`) instead of a hard-coded `iss: 'frontdoor'` literal claim, so cookie tokens and SSO tokens stay in sync if the issuer is overridden via env. No behavioral change at the default.
+- Browser tab favicon now uses `public/frontdoor-favicon-appicon.svg`, while the in-page `BrandMark` now uses the recovered `public/frontdoor-icon.svg` asset.
+- The in-page `BrandMark` icon now uses a static dark mark for stronger contrast in the app header, while the browser tab favicon keeps the adaptive dark/light artwork.
+- Removed unused SVG icon assets from `public` so the folder now keeps only the icons still referenced by the app.
 - Audit page: branding updates now log only the changed fields, and the details column renders them as compact plain JSON instead of a full branding snapshot or heavier visual emphasis.
 - Admin role actions: the role-assignment buttons now mirror the new badge language too, using a shield for `Admin` and an eye for `Admin (sola lettura)` / `Admin (read only)` instead of relying on the previous generic icon.
 - Admin role badges: `Admin` and `Admin (sola lettura)` / `Admin (read only)` now use distinct icons in the admin UI, so the difference is visible beyond color alone.

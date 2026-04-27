@@ -7,7 +7,7 @@ export default function BrandMark({ size = 'sm' }) {
       aria-hidden="true"
     >
       <img
-        src="/favicon.svg"
+        src="/frontdoor-icon.svg"
         alt=""
         className="absolute inset-0 h-full w-full object-contain"
         draggable="false"

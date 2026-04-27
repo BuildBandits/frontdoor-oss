@@ -66,17 +66,22 @@ router.get('/:slug/sso-redirect', authenticate, (req, res) => {
 
   // Generate a short-lived JWT with user info for the target app
   const jwtSecret = getRequiredEnv('JWT_SECRET', 'SSO redirect');
+  // `issuer` is set via jsonwebtoken option (not a literal claim) so it stays
+  // in sync with the cookie token issued by /auth/microsoft/callback. Both
+  // tokens default to 'frontdoor' and honor JWT_ISSUER when set.
   const ssoToken = jwt.sign(
     {
       sub: req.user.id,
       email: req.user.email,
       name: req.user.display_name,
       role: req.user.role,
-      iss: 'frontdoor',
       aud: app.slug,
     },
     jwtSecret,
-    { expiresIn: '5m' }
+    {
+      expiresIn: '5m',
+      issuer: process.env.JWT_ISSUER || 'frontdoor',
+    }
   );
 
   const endpoint = app.sso_endpoint || '/sso';
@@ -87,6 +92,14 @@ router.get('/:slug/sso-redirect', authenticate, (req, res) => {
     // Auto-submit form for POST method
     const safeUrl = targetUrl.replace(/"/g, '&quot;');
     const safeToken = ssoToken.replace(/"/g, '&quot;');
+    // The global helmet CSP defaults form-action to 'self', which blocks the
+    // cross-origin POST below. Scope a stricter CSP just to this response that
+    // permits form submission only to the configured target app origin.
+    const targetOrigin = new URL(targetUrl).origin;
+    res.setHeader(
+      'Content-Security-Policy',
+      `default-src 'none'; script-src 'unsafe-inline'; form-action ${targetOrigin}`
+    );
     return res.send(`
       <!DOCTYPE html>
       <html><body>
@@ -203,7 +216,12 @@ router.get('/:id/icon', (req, res) => {
 // List ALL apps including inactive (viewer roles only)
 router.get('/all', authenticate, isAdminViewer, (req, res) => {
   const apps = db
-    .prepare('SELECT * FROM apps ORDER BY sort_order, name')
+    .prepare(`
+      SELECT a.*,
+        (SELECT COUNT(*) FROM app_permissions WHERE app_id = a.id) AS group_count
+      FROM apps a
+      ORDER BY sort_order, name
+    `)
     .all();
   res.json({ apps: apps.map((app) => ({ ...app, tags: parseTags(app.tags), iconUrl: iconUrlForApp(app) })) });
 });
