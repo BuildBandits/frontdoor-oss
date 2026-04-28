@@ -9,6 +9,7 @@ import PageNotice from '../components/PageNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { normalizeEntraApplicationId } from '../../shared/entra.js';
 
 const emptyApp = { name: '', slug: '', description: '', long_description: '', icon: '📦', target_url: '', sort_order: 0, mode: 'redirect-plain', sso_endpoint: '', sso_method: 'GET', tags: [] };
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
@@ -379,6 +380,10 @@ export default function Admin() {
         throw new Error(a.enterApplicationId);
       }
 
+      const normalizedSsoEndpoint = form.mode === 'entra-app'
+        ? normalizeEntraApplicationId(form.sso_endpoint)
+        : form.sso_endpoint;
+
       const iconPayload = iconMode === 'asset'
         ? {
             iconDataUrl: iconAssetDataUrl || undefined,
@@ -392,6 +397,7 @@ export default function Admin() {
       if (editing === 'new') {
         const res = await api.post('/apps', {
           ...form,
+          sso_endpoint: normalizedSsoEndpoint,
           ...iconPayload,
           icon: iconMode === 'emoji' ? form.icon : form.icon || '🖼️',
           groupIds: includeDefaultGroup
@@ -410,6 +416,7 @@ export default function Admin() {
       } else {
         await api.put(`/apps/${editing.id}`, {
           ...form,
+          sso_endpoint: normalizedSsoEndpoint,
           ...iconPayload,
           icon: iconMode === 'emoji' ? form.icon : form.icon || '🖼️',
         });
@@ -1156,6 +1163,12 @@ export default function Admin() {
                     type="text"
                     value={form.sso_endpoint}
                     onChange={(e) => setForm({ ...form, sso_endpoint: e.target.value })}
+                    onBlur={(e) => {
+                      const normalized = normalizeEntraApplicationId(e.target.value);
+                      if (normalized !== e.target.value) {
+                        setForm((prev) => ({ ...prev, sso_endpoint: normalized }));
+                      }
+                    }}
                     placeholder={ui.admin.apps.enterApplicationId}
                     className="w-full px-3 py-2 border border-violet-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
                   />

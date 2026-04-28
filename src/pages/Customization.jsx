@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, ChevronRight, Clock3, Eye, Home, Image, LogIn, RefreshCw, Save, Settings, Smartphone, Type, Wrench } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronRight, Clock3, Eye, Home, Image, LogIn, Save, Settings, Smartphone, Trash2, Type, Wrench } from 'lucide-react';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useAuthStore } from '../stores/authStore';
@@ -59,6 +59,9 @@ export default function Customization() {
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [avatarRefreshing, setAvatarRefreshing] = useState(false);
+  const [iconCacheCleaning, setIconCacheCleaning] = useState(false);
+  const [cacheStats, setCacheStats] = useState(null);
+  const [cacheStatsLoading, setCacheStatsLoading] = useState(true);
   const noticeTimer = useRef(null);
   const saveNoticeTimer = useRef(null);
   const brandingSectionRef = useRef(null);
@@ -104,6 +107,13 @@ export default function Customization() {
     }
   };
 
+  const formatBytes = (bytes) => {
+    if (!Number.isFinite(bytes)) return '-';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const loadBranding = () => {
     setBrandingLoading(true);
     api.get('/branding')
@@ -126,6 +136,14 @@ export default function Customization() {
       .finally(() => setBrandingLoading(false));
   };
 
+  const loadCacheStats = () => {
+    setCacheStatsLoading(true);
+    api.get('/branding/cache')
+      .then((res) => setCacheStats(res.data || null))
+      .catch(() => setCacheStats(null))
+      .finally(() => setCacheStatsLoading(false));
+  };
+
   const refreshAvatarCache = async () => {
     setAvatarRefreshing(true);
     try {
@@ -137,6 +155,7 @@ export default function Customization() {
         // ignore localStorage failures
       }
       window.dispatchEvent(new Event('frontdoor:avatar-cache-refresh'));
+      loadCacheStats();
       const cacheCleared = res.data?.removed
         ? ui.customization.retention.avatarCacheClearedWithCount.replace('{count}', res.data.removed)
         : ui.customization.retention.avatarCacheCleared;
@@ -150,8 +169,24 @@ export default function Customization() {
     setAvatarRefreshing(false);
   };
 
+  const cleanupAppIconCache = async () => {
+    setIconCacheCleaning(true);
+    try {
+      const res = await api.post('/branding/app-icons/cleanup');
+      loadCacheStats();
+      const message = res.data?.removed
+        ? ui.customization.retention.appIconCacheClearedWithCount.replace('{count}', res.data.removed)
+        : ui.customization.retention.appIconCacheCleared;
+      pushSaveNotice('success', `${message}. ${ui.customization.retention.appIconCacheReloadNotice}`);
+    } catch (err) {
+      pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorSaving);
+    }
+    setIconCacheCleaning(false);
+  };
+
   useEffect(() => {
     loadBranding();
+    loadCacheStats();
     return () => {
       if (noticeTimer.current) clearTimeout(noticeTimer.current);
       if (saveNoticeTimer.current) clearTimeout(saveNoticeTimer.current);
@@ -754,6 +789,9 @@ export default function Customization() {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-dark">{ui.customization.retention.avatarCacheTitle}</p>
                     <p className="text-xs text-gray-500 mt-0.5">{ui.customization.retention.avatarCacheHelp}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {cacheStatsLoading ? ui.common.loading : `${cacheStats?.avatarCache?.files || 0} ${ui.customization.retention.cacheFiles} · ${formatBytes(cacheStats?.avatarCache?.bytes || 0)}`}
+                    </p>
                   </div>
                   <div className="flex items-start lg:shrink-0">
                     <button
@@ -765,10 +803,38 @@ export default function Customization() {
                         onConfirm: refreshAvatarCache,
                       })}
                       disabled={avatarRefreshing}
-                      className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                      className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
                     >
-                      <RefreshCw className={`w-4 h-4 ${avatarRefreshing ? 'animate-spin' : ''}`} />
+                      <Trash2 className="w-4 h-4" />
                       {avatarRefreshing ? ui.customization.retention.refreshAvatarCacheBusy : ui.customization.retention.refreshAvatarCache}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-dark">{ui.customization.retention.appIconCacheTitle}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{ui.customization.retention.appIconCacheHelp}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {cacheStatsLoading ? ui.common.loading : `${cacheStats?.appIconCache?.totalFiles || 0} ${ui.customization.retention.cacheFiles} · ${formatBytes(cacheStats?.appIconCache?.totalBytes || 0)} · ${cacheStats?.appIconCache?.orphanFiles || 0} ${ui.customization.retention.cacheOrphans}`}
+                    </p>
+                  </div>
+                  <div className="flex items-start lg:shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openConfirm({
+                        title: ui.customization.retention.refreshAppIconCacheConfirmTitle,
+                        message: ui.customization.retention.refreshAppIconCacheConfirmMessage,
+                        confirmLabel: ui.customization.retention.refreshAppIconCacheConfirmLabel,
+                        onConfirm: cleanupAppIconCache,
+                      })}
+                      disabled={iconCacheCleaning}
+                      className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {iconCacheCleaning ? ui.customization.retention.refreshAppIconCacheBusy : ui.customization.retention.refreshAppIconCache}
                     </button>
                   </div>
                 </div>

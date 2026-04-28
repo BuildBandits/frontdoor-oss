@@ -15,12 +15,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- Media library index: uploaded app icons and branding logos are now indexed directly from their existing caches, with admin-only browse and file endpoints under `/api/media-assets`. No separate media archive directory is required.
+- Hidden admin media browser: a new on-demand `/admin/icons` page lets privileged users inspect the media index, preview files, copy asset links and filter by icon/logo kind without adding a visible navigation entry.
+- Media library backfill: on startup, existing app icon and branding files already stored on disk are indexed so the hidden page starts with the historic assets too.
+- Home now shows a live application counter next to the search field, so users can see how many apps are currently visible while browsing or filtering.
+- Entra App creation now accepts the full Microsoft MyApps launcher URL and automatically stores only the Application ID.
+- Media library deduplication: assets with the same content hash are now grouped into a single card in `/admin/icons`, while preserving the linked app references and merged occurrence count.
+
+### Changed
+- Removed the marketing/product claim from the shared footer and deleted the matching localized strings, leaving only the product name/version and license notice.
+- Hidden admin media browser: SVG assets now expose a dedicated "Copy SVG" action so the raw markup can be pasted directly into the App icon editor.
+- Media library search and cards now carry the source app name, slug, URL and mode for app icons, so the index can be searched and reopened by the app context rather than only by technical asset id.
 - **`POST /api/auth/verify-sso-token`** — server-to-server token introspection endpoint for satellite apps in `mode=redirect` that don't share `JWT_SECRET` with the frontdoor. Validates a short-lived token issued by `/api/apps/:slug/sso-redirect` against expected audience, issuer, signature, expiration and user/app activation. Body: `{ token, expected_aud }`. Returns `{ valid, user, aud, exp }` on 200, distinct error codes on 401/403/400/429. Rate limited to 120 req/min per IP. RFC 7662-inspired but scoped to the frontdoor SSO flow. Lets satellites stay loosely coupled: a compromised satellite can no longer be parlayed into forging tokens for sibling apps.
 - Account menu: users can now save a personal UI language (`English` / `Italiano`) independently from the global branding default. The preference is persisted per user in both localStorage and the database, matching the existing personal Home-view and app-order behavior.
 - Webapp localization foundation based on UTF-8 JSON dictionaries under `src/i18n/`, with English as the default language and Italian available as a persisted option from `Personalizza`.
 - Admin App and Groups pages now surface info boxes for orphan apps and incomplete groups, making unassigned apps and groups missing apps/members easier to spot before they cause visibility gaps.
 
 ### Fixed
+- Admin media library previews now render the actual image/SVG first and fall back to the missing-file placeholder only if the browser cannot load the asset URL.
+- Admin Users: the imported and detected Entra group badges now read the correct user-section labels and keep the compact pill style in the right-hand Entra groups panel.
+- Admin Groups: Entra badges were restored to the original `main` treatment, with bold group names and the small rounded badge style from the pre-regression page.
+- Media library assets now fall back to another duplicate with the same content hash when the representative file is missing, so `/admin/icons` and the download link stay usable after partial file loss.
+- Media library assets now resolve from the existing app icon and branding caches, and startup refreshes the index instead of copying files into a separate media-library directory.
+- Startup migration: existing databases without the new `media_assets.app_slug` column no longer crash on boot; the column is ensured before the related index is created.
 - POST SSO redirect: the auto-submitted form was being blocked by helmet's default `form-action 'self'` CSP directive when the target app lived on a different origin (e.g. `autoprompter.coolify.logotel.cloud/api/.../sso-callback`). The `/sso-redirect` handler now sets a per-response CSP that allows `form-action` only towards the configured target app origin, leaving the global CSP untouched.
 - Docker image: production runtime now copies the shared language catalog into `/app/shared`, fixing the startup crash introduced by the new language-preference imports.
 - App editor: the duplicate action, icon mode buttons, icon helper text and SSO labels are now fully localized; the Customize logo picker text is easier to read, and changing the default language no longer re-translates the page before saving.
@@ -44,7 +61,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - Localization/RBAC copy: admin-role actions now say simply `Admin` vs `Admin (sola lettura)` / `Admin (read only)`, removing the redundant `completo` / `full access` wording from role-assignment labels.
 - Account menu: the personal Home view switch now uses the same select pattern as the personal language selector, for a more consistent menu interaction.
 - Personalizza: the "Criteri e preferenze" card now uses a cleaner single-row layout for language/date/time controls, moves avatar cache into its own maintenance row with action button, and shows log retention as a full-width row with the existing slider logic.
+- Personalizza: the avatar and app-icon cache cleanup buttons now share the same size and icon, and the avatar action was relabeled to "Pulisci cache avatar" for consistency.
 - Personalizza: removed the extra avatar-cache helper hint from the "Criteri e preferenze" section and cleaned the unused i18n entries.
+- Media Library: delete actions now use the shared confirmation dialog instead of a native browser popup, matching the rest of Frontdoor.
 - Localization: language pickers now render from a shared supported-language catalog instead of hardcoded `en/it` buttons, and DB language columns no longer enforce a two-language SQLite check constraint.
 - Roles/RBAC: the highest privileged backend role is now `owner` instead of `superadmin`, with startup migration converting existing databases automatically, verbose container-start logging for legacy-role rewrites, and `ADMIN_EMAILS` promoting compose-defined owners at container boot.
 - Startup logs: owner-role migration now emits a single concise line when no role migration is needed, while keeping the detailed multi-line output only when an actual legacy rewrite runs.

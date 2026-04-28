@@ -1,6 +1,9 @@
 import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import db from '../db.js';
+import { archiveMediaAsset } from './mediaAssets.js';
 
 const DEFAULT_CACHE_DIR = process.env.APP_ICON_CACHE_DIR || path.join(process.cwd(), 'data', 'app-icon-cache');
 
@@ -12,8 +15,8 @@ function ensureCacheDir() {
 
 ensureCacheDir();
 
-function iconPath(appId, extension) {
-  return path.join(DEFAULT_CACHE_DIR, `${appId}.${extension}`);
+function iconPath(cacheDir, fileName) {
+  return path.join(cacheDir, fileName);
 }
 
 function extensionFromContentType(contentType) {
@@ -63,9 +66,9 @@ function parseDataUrl(dataUrl) {
   return { buffer, contentType };
 }
 
-export function iconUrlForApp(app) {
+export function iconUrlForApp(app, { cacheDir = DEFAULT_CACHE_DIR } = {}) {
   if (!app?.icon_file_name || !app?.id) return null;
-  const absolutePath = path.join(DEFAULT_CACHE_DIR, app.icon_file_name);
+  const absolutePath = path.join(cacheDir, app.icon_file_name);
   if (!fs.existsSync(absolutePath)) return null;
   const version = app.updated_at ? `?v=${encodeURIComponent(app.updated_at)}` : '';
   return `/api/apps/${encodeURIComponent(app.id)}/icon${version}`;
@@ -75,54 +78,59 @@ export function isAppIconAsset(app) {
   return Boolean(app?.icon_file_name);
 }
 
-export async function saveAppIconAsset(appId, source) {
+export async function saveAppIconAsset(appId, source, appMeta = null, { cacheDir = DEFAULT_CACHE_DIR } = {}) {
   if (!appId || !source?.buffer) return null;
 
   const extension = extensionFromContentType(source.contentType);
-  const fileName = `${appId}.${extension}`;
-  const absolutePath = iconPath(appId, extension);
+  const fileName = `${appId}.${Date.now()}.${uuidv4().slice(0, 8)}.${extension}`;
+  const absolutePath = iconPath(cacheDir, fileName);
 
   await fsp.writeFile(absolutePath, source.buffer);
-
-  const entries = await fsp.readdir(DEFAULT_CACHE_DIR).catch(() => []);
-  await Promise.all(
-    entries
-      .filter((entry) => entry.startsWith(`${appId}.`) && entry !== fileName)
-      .map((entry) => fsp.rm(path.join(DEFAULT_CACHE_DIR, entry), { force: true }))
-  );
+  await archiveMediaAsset({
+    kind: 'app-icon',
+    sourceRef: appId,
+    originalName: fileName,
+    appName: appMeta?.name || null,
+    appSlug: appMeta?.slug || null,
+    appTargetUrl: appMeta?.target_url || null,
+    appMode: appMeta?.mode || null,
+    storedFileName: fileName,
+    contentType: source.contentType,
+    buffer: source.buffer,
+  });
 
   return { fileName };
 }
 
 export async function removeAppIconAsset(appId) {
   if (!appId) return;
-  const entries = await fsp.readdir(DEFAULT_CACHE_DIR).catch(() => []);
-  await Promise.all(
-    entries
-      .filter((entry) => entry.startsWith(`${appId}.`))
-      .map((entry) => fsp.rm(path.join(DEFAULT_CACHE_DIR, entry), { force: true }))
-  );
+  // Intentionally keep historical icon files as cache history.
+  // The admin cache cleanup sweeps only unreferenced files later.
 }
 
-export async function duplicateAppIconAsset(sourceAppId, targetAppId) {
+export async function duplicateAppIconAsset(sourceAppId, targetAppId, { cacheDir = DEFAULT_CACHE_DIR } = {}) {
   if (!sourceAppId || !targetAppId) return null;
 
-  const entries = await fsp.readdir(DEFAULT_CACHE_DIR).catch(() => []);
-  const sourceEntry = entries.find((entry) => entry.startsWith(`${sourceAppId}.`));
+  const entries = await fsp.readdir(cacheDir).catch(() => []);
+  const sourceEntry = entries
+    .filter((entry) => entry.startsWith(`${sourceAppId}.`))
+    .sort()
+    .at(-1);
   if (!sourceEntry) return null;
 
-  const sourcePath = path.join(DEFAULT_CACHE_DIR, sourceEntry);
-  const targetFileName = `${targetAppId}${path.extname(sourceEntry)}`;
-  const targetPath = path.join(DEFAULT_CACHE_DIR, targetFileName);
+  const sourcePath = path.join(cacheDir, sourceEntry);
+  const extension = path.extname(sourceEntry).slice(1).toLowerCase() || 'png';
+  const targetFileName = `${targetAppId}.${Date.now()}.${uuidv4().slice(0, 8)}.${extension}`;
+  const targetPath = path.join(cacheDir, targetFileName);
 
   await fsp.copyFile(sourcePath, targetPath);
   return { fileName: targetFileName };
 }
 
-export async function readAppIconAssetDataUrl(app) {
+export async function readAppIconAssetDataUrl(app, { cacheDir = DEFAULT_CACHE_DIR } = {}) {
   if (!app?.icon_file_name || !app?.id) return '';
 
-  const absolutePath = path.join(DEFAULT_CACHE_DIR, app.icon_file_name);
+  const absolutePath = path.join(cacheDir, app.icon_file_name);
   if (!fs.existsSync(absolutePath)) return '';
 
   const buffer = await fsp.readFile(absolutePath);
@@ -152,12 +160,12 @@ export function parseAppIconPayload({ iconDataUrl, iconSvgText }) {
   return null;
 }
 
-export async function serveAppIconForApp(app, res) {
+export async function serveAppIconForApp(app, res, { cacheDir = DEFAULT_CACHE_DIR } = {}) {
   if (!app?.icon_file_name) {
     return res.status(404).end();
   }
 
-  const absolutePath = path.join(DEFAULT_CACHE_DIR, app.icon_file_name);
+  const absolutePath = path.join(cacheDir, app.icon_file_name);
   if (!fs.existsSync(absolutePath)) {
     return res.status(404).end();
   }
@@ -166,4 +174,64 @@ export async function serveAppIconForApp(app, res) {
   res.type(contentTypeFromExtension(extension));
   res.set('Cache-Control', 'public, max-age=31536000, immutable');
   return res.sendFile(absolutePath);
+}
+
+async function readAppIconCacheEntries(dbHandle = db, { cacheDir = DEFAULT_CACHE_DIR } = {}) {
+  const entries = await fsp.readdir(cacheDir).catch(() => []);
+  const files = entries.filter((entry) => !entry.endsWith('.json'));
+  const stats = await Promise.all(files.map(async (entry) => {
+    const absolutePath = path.join(cacheDir, entry);
+    try {
+      const fileStats = await fsp.stat(absolutePath);
+      return { entry, absolutePath, size: fileStats.size };
+    } catch {
+      return { entry, absolutePath, size: 0 };
+    }
+  }));
+
+  const referencedFiles = new Set();
+  if (dbHandle) {
+    const currentIcons = dbHandle.prepare('SELECT icon_file_name FROM apps WHERE icon_file_name IS NOT NULL AND TRIM(icon_file_name) <> \'\'').all();
+    for (const row of currentIcons) {
+      referencedFiles.add(row.icon_file_name);
+    }
+
+    const indexedIcons = dbHandle.prepare("SELECT stored_file_name FROM media_assets WHERE kind = 'app-icon'").all();
+    for (const row of indexedIcons) {
+      if (row?.stored_file_name) referencedFiles.add(row.stored_file_name);
+    }
+  }
+
+  return {
+    files: stats,
+    referencedFiles,
+  };
+}
+
+export async function getAppIconCacheStats({ dbHandle = db, cacheDir = DEFAULT_CACHE_DIR } = {}) {
+  const { files, referencedFiles } = await readAppIconCacheEntries(dbHandle, { cacheDir });
+  const currentFiles = files.filter(({ entry }) => referencedFiles.has(entry));
+  const orphanFiles = files.filter(({ entry }) => !referencedFiles.has(entry));
+
+  const sumBytes = (list) => list.reduce((total, item) => total + (item.size || 0), 0);
+
+  return {
+    totalFiles: files.length,
+    totalBytes: sumBytes(files),
+    currentFiles: currentFiles.length,
+    currentBytes: sumBytes(currentFiles),
+    orphanFiles: orphanFiles.length,
+    orphanBytes: sumBytes(orphanFiles),
+  };
+}
+
+export async function cleanupAppIconCache({ dbHandle = db, cacheDir = DEFAULT_CACHE_DIR } = {}) {
+  const { files, referencedFiles } = await readAppIconCacheEntries(dbHandle, { cacheDir });
+  const orphanFiles = files.filter(({ entry }) => !referencedFiles.has(entry));
+  await Promise.all(orphanFiles.map(({ absolutePath }) => fsp.rm(absolutePath, { force: true })));
+  const removedBytes = orphanFiles.reduce((total, item) => total + (item.size || 0), 0);
+  return {
+    removed: orphanFiles.length,
+    removedBytes,
+  };
 }

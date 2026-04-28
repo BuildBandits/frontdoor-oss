@@ -9,11 +9,13 @@ import db from './db.js';
 import authRoutes from './routes/auth.js';
 import brandingRoutes from './routes/branding.js';
 import appsRoutes from './routes/apps.js';
+import mediaAssetsRoutes from './routes/mediaAssets.js';
 import usersRoutes from './routes/users.js';
 import groupsRoutes from './routes/groups.js';
 import logsRoutes, { purgeLogsOlderThan } from './routes/logs.js';
 import { getStartupConfig, validateStartupEnv } from './config.js';
 import { getBrandingSettings } from './services/branding.js';
+import { backfillMediaLibrary } from './services/mediaAssets.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -148,6 +150,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/branding', brandingRoutes);
 app.use('/api/apps', appsRoutes);
+app.use('/api/media-assets', mediaAssetsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/groups', groupsRoutes);
 app.use('/api/logs', logsRoutes);
@@ -158,6 +161,15 @@ app.use(express.static(distPath, { dotfiles: 'deny' }));
 app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
+
+try {
+  const result = await backfillMediaLibrary();
+  if (result.totalImported > 0) {
+    console.log(`Frontdoor media library index refresh: indexed ${result.totalImported} asset(s) (${result.appIconsImported} app icons, ${result.brandingImported} branding logos).`);
+  }
+} catch (error) {
+  console.error(`Frontdoor media library backfill failed: ${error.message}`);
+}
 
 app.listen(PORT, () => {
   console.log(`Frontdoor running on port ${PORT}`);

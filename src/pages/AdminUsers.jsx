@@ -555,7 +555,7 @@ export default function AdminUsers() {
                             </p>
                             <p className="mb-2 text-xs text-sky-600">{t.entraGroupsInfo}</p>
                             {entraGroups.length === 0 ? (
-                            <p className="text-sm text-gray-300 italic">{t.noImportedEntraGroups}</p>
+                              <p className="text-sm text-gray-300 italic">{t.noImportedEntraGroups}</p>
                             ) : (
                               <div className="space-y-1.5">
                                 {entraGroups.map((g) => (
@@ -584,7 +584,7 @@ export default function AdminUsers() {
                           {t.detectedGroupsInfo}
                         </p>
                         {detectedEntraGroups.length === 0 ? (
-                              <p className="text-sm text-gray-300 italic">{t.noDetectedEntraGroups}</p>
+                          <p className="text-sm text-gray-300 italic">{t.noDetectedEntraGroups}</p>
                         ) : (
                           <div className="space-y-1.5 h-full overflow-y-auto pr-1 lg:max-h-[390px]">
                             {detectedEntraGroups.map((group) => (
@@ -608,14 +608,14 @@ export default function AdminUsers() {
                                 <Users className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                                 <span className="text-sm text-dark">{group.display_name}</span>
                                 {group.is_imported ? (
-                                      <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
-                                      {t.importedBadge}
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-                                    {t.detectedBadge}
-                                    </span>
-                                  )}
+                                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
+                                    {u.importedBadge}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                                    {u.detectedBadge}
+                                  </span>
+                                )}
                               </button>
                             ))}
                           </div>

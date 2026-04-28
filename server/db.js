@@ -83,6 +83,23 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS media_assets (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL CHECK(kind IN ('app-icon', 'branding-logo')),
+    source_ref TEXT,
+    original_name TEXT,
+    app_name TEXT,
+    app_slug TEXT,
+    app_target_url TEXT,
+    app_mode TEXT,
+    stored_file_name TEXT NOT NULL UNIQUE,
+    content_type TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    sha256 TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS user_groups (
     id TEXT PRIMARY KEY,
     name TEXT UNIQUE NOT NULL,
@@ -137,6 +154,9 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_app_permissions_app ON app_permissions(app_id);
   CREATE INDEX IF NOT EXISTS idx_access_logs_app ON access_logs(app_id);
   CREATE INDEX IF NOT EXISTS idx_access_logs_user ON access_logs(user_id);
+  CREATE INDEX IF NOT EXISTS idx_media_assets_kind ON media_assets(kind);
+  CREATE INDEX IF NOT EXISTS idx_media_assets_source_ref ON media_assets(source_ref);
+  CREATE INDEX IF NOT EXISTS idx_media_assets_created_at ON media_assets(created_at);
   CREATE INDEX IF NOT EXISTS idx_rbac_audit_actor ON rbac_audit_logs(actor_id);
   CREATE INDEX IF NOT EXISTS idx_rbac_audit_target ON rbac_audit_logs(target_type, target_id);
   CREATE INDEX IF NOT EXISTS idx_entra_group_cache_last_seen ON entra_group_cache(last_seen_at);
@@ -173,6 +193,11 @@ ensureColumn('branding_settings', 'show_shared_cookie_mode', 'show_shared_cookie
 ensureColumn('branding_settings', 'show_redirect_sso_mode', 'show_redirect_sso_mode INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'show_entra_app_mode', 'show_entra_app_mode INTEGER DEFAULT 1');
 ensureColumn('entra_group_cache', 'description', 'description TEXT');
+ensureColumn('media_assets', 'app_name', 'app_name TEXT');
+ensureColumn('media_assets', 'app_slug', 'app_slug TEXT');
+ensureColumn('media_assets', 'app_target_url', 'app_target_url TEXT');
+ensureColumn('media_assets', 'app_mode', 'app_mode TEXT');
+db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(app_slug);');
 
 // Migration: normalize user roles to owner/admin/admin_readonly/user on existing databases.
 {

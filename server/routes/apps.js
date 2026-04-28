@@ -9,6 +9,7 @@ import { getRequiredEnv } from '../config.js';
 import { restoreDefaultDemoApps } from '../services/demoApps.js';
 import { iconUrlForApp, parseAppIconPayload, readAppIconAssetDataUrl, removeAppIconAsset, saveAppIconAsset, serveAppIconForApp } from '../services/appIcons.js';
 import { getBrandingSettings } from '../services/branding.js';
+import { isValidEntraApplicationId, normalizeEntraApplicationId } from '../../shared/entra.js';
 
 const router = express.Router();
 
@@ -257,6 +258,10 @@ function validateTargetUrl(target_url) {
   }
 }
 
+function normalizeEntraEndpoint(value) {
+  return normalizeEntraApplicationId(value);
+}
+
 function normalizeTag(tag) {
   return (tag ?? '').toString().trim().toLowerCase();
 }
@@ -290,7 +295,7 @@ function isAppModeEnabled(mode, branding = getBrandingSettings()) {
   return false;
 }
 
-async function applyAppIconChange(appId, existingApp, { icon, iconDataUrl, iconSvgText, removeIconAsset }) {
+async function applyAppIconChange(appId, existingApp, { icon, iconDataUrl, iconSvgText, removeIconAsset, appMeta = null }) {
   const payload = parseAppIconPayload({ iconDataUrl, iconSvgText });
 
   if (removeIconAsset) {
@@ -302,7 +307,7 @@ async function applyAppIconChange(appId, existingApp, { icon, iconDataUrl, iconS
   }
 
   if (payload) {
-    const saved = await saveAppIconAsset(appId, payload);
+    const saved = await saveAppIconAsset(appId, payload, appMeta);
     return {
       icon: icon || existingApp?.icon || '📦',
       icon_file_name: saved.fileName,
@@ -383,6 +388,13 @@ router.post('/', authenticate, isAdminEditor, async (req, res) => {
       return res.status(400).json({ error: 'Selected app mode is disabled by personalization settings' });
     }
 
+    const normalizedSsoEndpoint = requestedMode === 'entra-app'
+      ? normalizeEntraEndpoint(sso_endpoint)
+      : (sso_endpoint || '/sso');
+    if (requestedMode === 'entra-app' && !isValidEntraApplicationId(normalizedSsoEndpoint)) {
+      return res.status(400).json({ error: 'Enter a valid MyApps Application ID or launcher URL' });
+    }
+
     if (normalizedGroupIds.length > 0) {
       const placeholders = normalizedGroupIds.map(() => '?').join(', ');
       const existingGroups = db.prepare(`SELECT id FROM user_groups WHERE id IN (${placeholders})`).all(...normalizedGroupIds);
@@ -398,7 +410,18 @@ router.post('/', authenticate, isAdminEditor, async (req, res) => {
 
     const id = uuidv4();
     createdAppId = id;
-    const iconChange = await applyAppIconChange(id, null, { icon, iconDataUrl, iconSvgText, removeIconAsset });
+    const iconChange = await applyAppIconChange(id, null, {
+      icon,
+      iconDataUrl,
+      iconSvgText,
+      removeIconAsset,
+      appMeta: {
+        name,
+        slug,
+        target_url,
+        mode: requestedMode,
+      },
+    });
     const normalizedTags = normalizeTagList(tags);
     const insertApp = db.prepare(`
       INSERT INTO apps (id, name, slug, description, long_description, icon, icon_file_name, target_url, sort_order, mode, sso_endpoint, sso_method, tags)
@@ -406,7 +429,7 @@ router.post('/', authenticate, isAdminEditor, async (req, res) => {
     `);
     const insertPermission = db.prepare('INSERT OR IGNORE INTO app_permissions (app_id, group_id) VALUES (?, ?)');
     const createApp = db.transaction(() => {
-      insertApp.run(id, name, slug, description || '', long_description || '', iconChange.icon || '📦', iconChange.icon_file_name, target_url, sort_order || 0, requestedMode, sso_endpoint || '/sso', sso_method || 'GET', JSON.stringify(normalizedTags));
+      insertApp.run(id, name, slug, description || '', long_description || '', iconChange.icon || '📦', iconChange.icon_file_name, target_url, sort_order || 0, requestedMode, normalizedSsoEndpoint, sso_method || 'GET', JSON.stringify(normalizedTags));
       for (const groupId of normalizedGroupIds) {
         insertPermission.run(id, groupId);
       }
@@ -460,7 +483,26 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
       return res.status(400).json({ error: 'Selected app mode is disabled by personalization settings' });
     }
 
-    const iconChange = await applyAppIconChange(id, existing, { icon, iconDataUrl, iconSvgText, removeIconAsset });
+    const nextMode = mode !== undefined ? mode : existing.mode;
+    const normalizedSsoEndpoint = nextMode === 'entra-app'
+      ? normalizeEntraEndpoint(sso_endpoint !== undefined ? sso_endpoint : existing.sso_endpoint)
+      : (sso_endpoint !== undefined ? sso_endpoint : existing.sso_endpoint);
+    if (nextMode === 'entra-app' && !isValidEntraApplicationId(normalizedSsoEndpoint)) {
+      return res.status(400).json({ error: 'Enter a valid MyApps Application ID or launcher URL' });
+    }
+
+    const iconChange = await applyAppIconChange(id, existing, {
+      icon,
+      iconDataUrl,
+      iconSvgText,
+      removeIconAsset,
+      appMeta: {
+        name: name !== undefined ? name : existing.name,
+        slug: slug !== undefined ? slug : existing.slug,
+        target_url: target_url !== undefined ? target_url : existing.target_url,
+        mode: mode !== undefined ? mode : existing.mode,
+      },
+    });
     const normalizedTags = tags !== undefined ? normalizeTagList(tags) : undefined;
 
     db.prepare(`
@@ -480,7 +522,7 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
         tags = COALESCE(?, tags),
         updated_at = datetime('now')
       WHERE id = ?
-    `).run(name, slug, description, iconChange.icon, iconChange.icon_file_name, target_url, is_active, sort_order, mode, sso_endpoint, sso_method, long_description, normalizedTags !== undefined ? JSON.stringify(normalizedTags) : null, id);
+    `).run(name, slug, description, iconChange.icon, iconChange.icon_file_name, target_url, is_active, sort_order, mode, normalizedSsoEndpoint, sso_method, long_description, normalizedTags !== undefined ? JSON.stringify(normalizedTags) : null, id);
 
     const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
     logRbacAudit(req.user.id, 'update', 'app', id, {
@@ -637,6 +679,14 @@ router.post('/bulk', (req, res) => {
         continue;
       }
 
+      const normalizedSsoEndpoint = requestedMode === 'entra-app'
+        ? normalizeEntraEndpoint(app.sso_endpoint || existing?.sso_endpoint)
+        : (app.sso_endpoint || existing?.sso_endpoint || '/sso');
+      if (requestedMode === 'entra-app' && !isValidEntraApplicationId(normalizedSsoEndpoint)) {
+        results.push({ slug: app.slug, status: 'skipped', reason: 'invalid MyApps Application ID or launcher URL' });
+        continue;
+      }
+
       if (existing) {
         // Merge tags: combine existing + new, deduplicate
         let mergedTags = null;
@@ -662,7 +712,7 @@ router.post('/bulk', (req, res) => {
           WHERE id = ?
         `).run(
           app.name, app.description, app.long_description, app.icon, null, app.target_url,
-          app.mode, app.sso_endpoint, app.sso_method,
+          app.mode, normalizedSsoEndpoint, app.sso_method,
           mergedTags,
           existing.id
         );
@@ -687,7 +737,8 @@ router.post('/bulk', (req, res) => {
           id, app.name, app.slug, app.description || '', app.long_description || '',
           app.icon || '📦', null, app.target_url,
           app.sort_order || 99, app.mode || 'redirect-plain',
-          app.sso_endpoint || '/sso', app.sso_method || 'GET',
+          normalizedSsoEndpoint,
+          app.sso_method || 'GET',
           JSON.stringify(normalizeTagList(app.tags))
         );
         const insertPermission = db.prepare('INSERT OR IGNORE INTO app_permissions (app_id, group_id) VALUES (?, ?)');

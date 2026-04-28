@@ -106,24 +106,42 @@ async function writeMeta(userId, meta) {
   await fsp.writeFile(metaPath(userId), `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
 }
 
-async function removeOldAvatarFiles(userId, keepFileName) {
-  const entries = await fsp.readdir(DEFAULT_CACHE_DIR).catch(() => []);
+async function removeOldAvatarFiles(userId, keepFileName, cacheDir = DEFAULT_CACHE_DIR) {
+  const entries = await fsp.readdir(cacheDir).catch(() => []);
   const keepBaseName = path.basename(keepFileName);
   const userPrefix = `${userId}.`;
   await Promise.all(
     entries
       .filter((entry) => entry.startsWith(userPrefix) && entry !== keepBaseName && !entry.endsWith('.json'))
-      .map((entry) => fsp.rm(path.join(DEFAULT_CACHE_DIR, entry), { force: true }))
+      .map((entry) => fsp.rm(path.join(cacheDir, entry), { force: true }))
   );
 }
 
-async function clearAvatarCache() {
-  const entries = await fsp.readdir(DEFAULT_CACHE_DIR).catch(() => []);
+async function clearAvatarCache(cacheDir = DEFAULT_CACHE_DIR) {
+  const entries = await fsp.readdir(cacheDir).catch(() => []);
   const removed = entries.length;
 
-  await Promise.all(entries.map((entry) => fsp.rm(path.join(DEFAULT_CACHE_DIR, entry), { force: true })));
+  await Promise.all(entries.map((entry) => fsp.rm(path.join(cacheDir, entry), { force: true })));
 
   return { removed };
+}
+
+export async function getAvatarCacheStats({ cacheDir = DEFAULT_CACHE_DIR } = {}) {
+  const entries = await fsp.readdir(cacheDir).catch(() => []);
+  const files = entries.filter((entry) => !entry.endsWith('.json'));
+  const details = await Promise.all(files.map(async (entry) => {
+    const absolutePath = path.join(cacheDir, entry);
+    try {
+      const stats = await fsp.stat(absolutePath);
+      return { size: stats.size };
+    } catch {
+      return { size: 0 };
+    }
+  }));
+  return {
+    files: files.length,
+    bytes: details.reduce((sum, item) => sum + (item.size || 0), 0),
+  };
 }
 
 async function saveAvatarBuffer(userId, buffer, contentType, source) {

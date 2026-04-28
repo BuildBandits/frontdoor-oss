@@ -11,7 +11,6 @@ export default function AppFooter({ language = 'en' }) {
             <p className="text-sm font-semibold text-dark">
               {APP_NAME} <span className="text-gray-400">{APP_VERSION}</span> (<span className="font-mono text-gray-400">{APP_SIGNATURE}</span>)
             </p>
-            <p className="mt-1 text-sm text-gray-400 md:italic">{ui.footer.claim}</p>
           </div>
 
           <div className="text-xs text-gray-500 md:text-right">

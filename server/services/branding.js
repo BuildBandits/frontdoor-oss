@@ -1,8 +1,10 @@
 import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { DEFAULT_LANGUAGE, isSupportedLanguage } from '../../shared/languages.js';
+import { archiveMediaAsset } from './mediaAssets.js';
 
 const BRANDING_ID = 'default';
 const BRANDING_ASSET_DIR = process.env.BRANDING_ASSET_DIR || path.join(process.cwd(), 'data', 'branding');
@@ -145,24 +147,21 @@ function extensionFromContentType(contentType) {
   return 'jpg';
 }
 
-async function removeExistingLogoFiles(keepFileName = null) {
-  const entries = await fsp.readdir(BRANDING_ASSET_DIR).catch(() => []);
-  await Promise.all(
-    entries
-      .filter((entry) => entry.startsWith('company-logo.'))
-      .filter((entry) => entry !== keepFileName)
-      .map((entry) => fsp.rm(path.join(BRANDING_ASSET_DIR, entry), { force: true }))
-  );
-}
-
 async function saveLogo(dataUrl) {
   const { contentType, buffer } = parseLogoDataUrl(dataUrl);
   const extension = extensionFromContentType(contentType);
-  const fileName = `company-logo.${extension}`;
+  const fileName = `company-logo.${Date.now()}.${uuidv4().slice(0, 8)}.${extension}`;
   const filePath = path.join(BRANDING_ASSET_DIR, fileName);
 
   await fsp.writeFile(filePath, buffer);
-  await removeExistingLogoFiles(fileName);
+  await archiveMediaAsset({
+    kind: 'branding-logo',
+    sourceRef: 'default',
+    originalName: 'company-logo',
+    storedFileName: fileName,
+    contentType,
+    buffer,
+  });
 
   return { fileName, contentType };
 }
@@ -225,7 +224,6 @@ export async function updateBrandingSettings(input = {}) {
   let logoContentType = current?.logo_content_type || null;
 
   if (input.removeLogo) {
-    await removeExistingLogoFiles();
     logoFileName = null;
     logoContentType = null;
   } else if (input.logoDataUrl) {

@@ -1,7 +1,8 @@
 import express from 'express';
 import { authenticate, isOwner } from '../middleware/auth.js';
 import { logRbacAudit } from '../db.js';
-import { clearAvatarCache } from '../services/avatars.js';
+import { clearAvatarCache, getAvatarCacheStats } from '../services/avatars.js';
+import { cleanupAppIconCache, getAppIconCacheStats } from '../services/appIcons.js';
 import { getBrandingSettings, serveBrandingLogo, updateBrandingSettings } from '../services/branding.js';
 
 const router = express.Router();
@@ -35,6 +36,37 @@ router.post('/avatars/refresh', authenticate, isOwner, async (req, res) => {
   } catch (error) {
     console.error('Avatar cache refresh failed:', error.message);
     res.status(500).json({ error: 'Failed to refresh avatar cache' });
+  }
+});
+
+router.get('/cache', authenticate, isOwner, async (req, res) => {
+  try {
+    const [avatarCache, appIconCache] = await Promise.all([
+      getAvatarCacheStats(),
+      getAppIconCacheStats(),
+    ]);
+    res.json({ avatarCache, appIconCache });
+  } catch (error) {
+    console.error('Cache stats load failed:', error.message);
+    res.status(500).json({ error: 'Failed to load cache stats' });
+  }
+});
+
+router.post('/app-icons/cleanup', authenticate, isOwner, async (req, res) => {
+  try {
+    const result = await cleanupAppIconCache();
+    logRbacAudit(req.user.id, 'refresh', 'branding', 'app-icon-cache', {
+      removedFiles: result.removed,
+      removedBytes: result.removedBytes,
+      scope: 'app-icons',
+    });
+    res.json({
+      message: 'App icon cache cleaned',
+      ...result,
+    });
+  } catch (error) {
+    console.error('App icon cache cleanup failed:', error.message);
+    res.status(500).json({ error: 'Failed to clean app icon cache' });
   }
 });
 

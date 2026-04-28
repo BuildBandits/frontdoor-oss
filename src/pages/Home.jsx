@@ -227,6 +227,7 @@ export default function Home() {
 
   const filtersActive = search.trim().length > 0 || selectedTags.length > 0;
   const dragEnabled = !groupByTag && !filtersActive && !compactView;
+  const appCountLabel = ui.home.appCount.replace('{count}', String(filtered.length));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -365,6 +366,10 @@ export default function Home() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition"
             />
+          </div>
+
+          <div className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm font-semibold text-gray-600 whitespace-nowrap">
+            {appCountLabel}
           </div>
 
             <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-nowrap sm:gap-3 sm:shrink-0">
