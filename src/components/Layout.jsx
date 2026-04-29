@@ -308,7 +308,7 @@ export default function Layout({ children }) {
                             {ui.layout.restoreView}
                           </button>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-2 py-1 text-[11px] font-medium text-accent-dark">
                             <Check className="h-3 w-3" />
                             {ui.layout.defaultView}
                           </span>
@@ -347,7 +347,7 @@ export default function Layout({ children }) {
                             {ui.layout.restoreLanguage}
                           </button>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-2 py-1 text-[11px] font-medium text-accent-dark">
                             <Check className="h-3 w-3" />
                             {ui.layout.defaultLanguage}
                           </span>

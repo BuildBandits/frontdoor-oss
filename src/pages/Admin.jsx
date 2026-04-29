@@ -10,6 +10,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { normalizeEntraApplicationId } from '../../shared/entra.js';
+import { normalizeAppSlug, suggestAppSlug } from '../../shared/appSlug.js';
 
 const emptyApp = { name: '', slug: '', description: '', long_description: '', icon: '📦', target_url: '', sort_order: 0, mode: 'redirect-plain', sso_endpoint: '', sso_method: 'GET', tags: [] };
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
@@ -48,6 +49,7 @@ export default function Admin() {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [cloning, setCloning] = useState(false);
   const iconFileInputRef = useRef(null);
+  const slugAutoFillRef = useRef(false);
   const modeFilterRef = useRef(null);
   const canEdit = user?.role !== 'admin_readonly';
   const [brandingLanguage, setBrandingLanguage] = useState('en');
@@ -130,6 +132,7 @@ export default function Admin() {
       pushNotice('error', t.readOnly);
       return;
     }
+    slugAutoFillRef.current = false;
     setForm(emptyApp);
     setIconMode('emoji');
     setIconAssetDataUrl('');
@@ -191,6 +194,7 @@ export default function Admin() {
       const cloned = res.data?.app;
       if (!cloned) throw new Error(t.cloneDataMissing);
 
+      slugAutoFillRef.current = false;
       setEditing('new');
       setForm({
         name: cloned.name || '',
@@ -222,6 +226,7 @@ export default function Admin() {
   };
 
   const close = () => {
+    slugAutoFillRef.current = false;
     setEditing(null);
     setForm(emptyApp);
     setIconMode('emoji');
@@ -281,6 +286,16 @@ export default function Admin() {
       iconDirty
     );
   }, [editing, form, iconMode, iconAssetDataUrl, iconSvgText, iconAssetPreview, removeIconAsset]);
+
+  useEffect(() => {
+    if (editing !== 'new' || slugAutoFillRef.current) return;
+    const suggestedSlug = form.name.trim() ? suggestAppSlug(form.name) : '';
+    setForm((current) => {
+      if (current.slug === suggestedSlug) return current;
+      if (current.name !== form.name) return current;
+      return { ...current, slug: suggestedSlug };
+    });
+  }, [editing, form.name]);
 
   useEffect(() => {
     if (editing === null || confirmDialog) return undefined;
@@ -366,7 +381,7 @@ export default function Admin() {
     }
   };
 
-  const handleSave = async () => {
+  const saveApp = async ({ openGroupAssignmentAfterSave = false } = {}) => {
     if (!canEdit) {
       pushNotice('error', t.readOnly);
       return;
@@ -397,6 +412,7 @@ export default function Admin() {
       if (editing === 'new') {
         const res = await api.post('/apps', {
           ...form,
+          slug: normalizeAppSlug(form.slug),
           sso_endpoint: normalizedSsoEndpoint,
           ...iconPayload,
           icon: iconMode === 'emoji' ? form.icon : form.icon || '🖼️',
@@ -416,18 +432,40 @@ export default function Admin() {
       } else {
         await api.put(`/apps/${editing.id}`, {
           ...form,
+          slug: normalizeAppSlug(form.slug),
           sso_endpoint: normalizedSsoEndpoint,
           ...iconPayload,
           icon: iconMode === 'emoji' ? form.icon : form.icon || '🖼️',
         });
+        const savedApp = {
+          ...editing,
+          ...form,
+          slug: normalizeAppSlug(form.slug),
+          sso_endpoint: normalizedSsoEndpoint,
+          icon: iconMode === 'emoji' ? form.icon : form.icon || '🖼️',
+          groupIds: Array.isArray(editing.groupIds) ? editing.groupIds : [],
+        };
         loadApps();
-        close();
         pushNotice('success', a.appUpdated);
+        if (openGroupAssignmentAfterSave) {
+          close();
+          openGroupAssignmentModal(savedApp, savedApp.groupIds, savedApp.groupIds.includes(DEFAULT_GROUP_ID));
+        } else {
+          close();
+        }
       }
     } catch (err) {
       pushNotice('error', err.response?.data?.error || err.message || t.errorSaving);
     }
     setSaving(false);
+  };
+
+  const handleSave = async () => {
+    await saveApp();
+  };
+
+  const handleSaveAndAssignGroups = async () => {
+    await saveApp({ openGroupAssignmentAfterSave: true });
   };
 
   const handleDelete = async (app) => {
@@ -495,6 +533,11 @@ export default function Admin() {
     return groupLabel(group).toLowerCase().includes(q) || (group.description || '').toLowerCase().includes(q) || (group.source || '').toLowerCase().includes(q);
   };
   const filteredGroups = groups.filter(groupMatchesSearch);
+  const hasGroupAssignSearch = groupAssignSearch.trim().length > 0;
+  const selectVisibleGroups = () => {
+    if (filteredGroups.length === 0) return;
+    setGroupAssignSelection((prev) => Array.from(new Set([...prev, ...filteredGroups.map((group) => group.id)])));
+  };
   const allTags = useMemo(() => {
     const tagSet = new Set();
     apps.forEach((app) => {
@@ -519,7 +562,7 @@ export default function Admin() {
   };
   const modeOptions = [
     { value: 'redirect-plain', label: a.externalLink, active: 'bg-dark text-white border-dark', alwaysVisible: true },
-    { value: 'shared-cookie', label: a.sharedCookie, active: 'bg-emerald-600 text-white border-emerald-600', visible: modeVisibility.showSharedCookieMode !== false },
+    { value: 'shared-cookie', label: a.sharedCookie, active: 'bg-accent text-dark border-accent', visible: modeVisibility.showSharedCookieMode !== false },
     { value: 'redirect', label: a.redirectSso, active: 'bg-blue-600 text-white border-blue-600', visible: modeVisibility.showRedirectSsoMode !== false },
     { value: 'entra-app', label: a.entraApp, active: 'bg-violet-600 text-white border-violet-600', visible: modeVisibility.showEntraAppMode !== false },
   ];
@@ -607,8 +650,8 @@ export default function Admin() {
     }
   }, [showOnlyOrphanApps, orphanApps.length]);
 
-  const openGroupAssignmentModal = (app, selectedIds = []) => {
-    setPendingGroupAssignApp(app);
+  const openGroupAssignmentModal = (app, selectedIds = [], defaultIncluded = false) => {
+    setPendingGroupAssignApp({ ...app, defaultIncluded });
     setGroupAssignSelection(selectedIds);
     setGroupAssignSearch('');
   };
@@ -847,7 +890,7 @@ export default function Admin() {
                   <td className="px-6 py-4 text-center">
                     <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                       app.mode === 'redirect' ? 'bg-blue-100 text-blue-700'
-                        : app.mode === 'shared-cookie' ? 'bg-emerald-100 text-emerald-700'
+                        : app.mode === 'shared-cookie' ? 'bg-accent/10 text-accent-dark'
                         : app.mode === 'entra-app' ? 'bg-violet-100 text-violet-700'
                         : 'bg-gray-100 text-gray-600'
                     }`}>
@@ -1081,10 +1124,16 @@ export default function Admin() {
                 <input
                   type="text"
                   value={form.slug}
-                  onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                  onChange={(e) => {
+                    slugAutoFillRef.current = true;
+                    setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') });
+                  }}
                   placeholder={a.slugExample}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-accent"
                 />
+                <p className="text-xs text-gray-400 mt-1">
+                  {a.slugHelp}
+                </p>
               </div>
 
               <div>
@@ -1243,31 +1292,47 @@ export default function Admin() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-100">
-              {editing !== 'new' && (
-              <button
-                onClick={openClone}
-                disabled={cloning || !canEdit}
-                className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-violet-700 hover:text-violet-800 hover:bg-violet-50 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Copy className="w-4 h-4" />
-                  {cloning ? a.duplicating : a.duplicate}
-              </button>
-              )}
-              <button
-                onClick={close}
-                className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-dark hover:bg-gray-100 rounded-xl transition-colors"
-              >
-                {ui.common.cancel}
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !form.name || !form.slug || !form.target_url}
-                className="flex items-center gap-2 px-5 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Save className="w-4 h-4" />
-                {saving ? a.saving : a.save}
-              </button>
+              <div className="flex flex-col gap-3 mt-6 pt-6 border-t border-gray-100 sm:flex-row sm:items-center sm:justify-end">
+                {editing !== 'new' && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveAndAssignGroups}
+                      disabled={saving || !form.name || !form.slug || !form.target_url}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-dark bg-accent hover:bg-accent/80 shadow-sm shadow-accent/20 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Users className="w-4 h-4" />
+                      {saving ? a.saving : a.saveAndAssignGroups}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openClone}
+                      disabled={cloning || !canEdit}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-violet-700 hover:text-violet-800 hover:bg-violet-50 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Copy className="w-4 h-4" />
+                      {cloning ? a.duplicating : a.duplicate}
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={close}
+                    className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-dark hover:bg-gray-100 rounded-xl transition-colors"
+                  >
+                    {ui.common.cancel}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving || !form.name || !form.slug || !form.target_url}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Save className="w-4 h-4" />
+                    {saving ? a.saving : a.save}
+                  </button>
+                </div>
             </div>
           </div>
         </div>
@@ -1324,6 +1389,18 @@ export default function Admin() {
                   <span>{groupAssignSelection.length} {a.selectedGroupSummary}</span>
                   <span>{filteredGroups.length} {t.groups}</span>
                 </div>
+                {hasGroupAssignSearch && (
+                  <div className="mt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={selectVisibleGroups}
+                      disabled={filteredGroups.length === 0}
+                      className="text-xs font-medium text-accent-dark hover:underline disabled:opacity-40 disabled:no-underline"
+                    >
+                      {a.selectAllFiltered}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {groupsLoading ? (

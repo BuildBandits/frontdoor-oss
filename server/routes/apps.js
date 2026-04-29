@@ -10,6 +10,7 @@ import { restoreDefaultDemoApps } from '../services/demoApps.js';
 import { iconUrlForApp, parseAppIconPayload, readAppIconAssetDataUrl, removeAppIconAsset, saveAppIconAsset, serveAppIconForApp } from '../services/appIcons.js';
 import { getBrandingSettings } from '../services/branding.js';
 import { isValidEntraApplicationId, normalizeEntraApplicationId } from '../../shared/entra.js';
+import { normalizeAppSlug } from '../../shared/appSlug.js';
 
 const router = express.Router();
 
@@ -224,7 +225,26 @@ router.get('/all', authenticate, isAdminViewer, (req, res) => {
       ORDER BY sort_order, name
     `)
     .all();
-  res.json({ apps: apps.map((app) => ({ ...app, tags: parseTags(app.tags), iconUrl: iconUrlForApp(app) })) });
+  const appGroupRows = db.prepare(`
+    SELECT app_id, group_id
+    FROM app_permissions
+    ORDER BY app_id, group_id
+  `).all();
+  const groupIdsByAppId = new Map();
+  for (const row of appGroupRows) {
+    if (!groupIdsByAppId.has(row.app_id)) {
+      groupIdsByAppId.set(row.app_id, []);
+    }
+    groupIdsByAppId.get(row.app_id).push(row.group_id);
+  }
+  res.json({
+    apps: apps.map((app) => ({
+      ...app,
+      tags: parseTags(app.tags),
+      iconUrl: iconUrlForApp(app),
+      groupIds: groupIdsByAppId.get(app.id) || [],
+    })),
+  });
 });
 
 // Restore the default demo apps (editor roles only)
@@ -332,13 +352,7 @@ function buildCloneName(originalName) {
 }
 
 function buildCloneSlug(originalSlug) {
-  const base = (originalSlug || 'app')
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '') || 'app';
+  const base = normalizeAppSlug(originalSlug, 'app');
 
   const candidates = [`${base}-copy`, `${base}-copia`];
   for (const candidate of candidates) {

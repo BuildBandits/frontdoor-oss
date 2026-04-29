@@ -148,8 +148,8 @@ export default function AdminLogs() {
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                <Users className="w-5 h-5 text-emerald-600" />
+              <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center">
+                <Users className="w-5 h-5 text-accent-dark" />
               </div>
               <div>
                 <p className="text-2xl font-bold text-dark">{stats.unique_users}</p>

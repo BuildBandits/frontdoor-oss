@@ -78,7 +78,7 @@ export function isAppIconAsset(app) {
   return Boolean(app?.icon_file_name);
 }
 
-export async function saveAppIconAsset(appId, source, appMeta = null, { cacheDir = DEFAULT_CACHE_DIR } = {}) {
+export async function saveAppIconAsset(appId, source, appMeta = null, { cacheDir = DEFAULT_CACHE_DIR, dbHandle = db } = {}) {
   if (!appId || !source?.buffer) return null;
 
   const extension = extensionFromContentType(source.contentType);
@@ -97,6 +97,7 @@ export async function saveAppIconAsset(appId, source, appMeta = null, { cacheDir
     storedFileName: fileName,
     contentType: source.contentType,
     buffer: source.buffer,
+    dbHandle,
   });
 
   return { fileName };
@@ -235,3 +236,5 @@ export async function cleanupAppIconCache({ dbHandle = db, cacheDir = DEFAULT_CA
     removedBytes,
   };
 }
+
+export { DEFAULT_CACHE_DIR as APP_ICON_CACHE_DIR };

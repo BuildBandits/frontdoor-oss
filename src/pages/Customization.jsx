@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, ChevronRight, Clock3, Eye, Home, Image, LogIn, Save, Settings, Smartphone, Trash2, Type, Wrench } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, CheckCircle2, ChevronRight, Database, Eye, Home, Image, LogIn, Save, Settings, Smartphone, SlidersHorizontal, Trash2, Type, Wrench } from 'lucide-react';
+import { Link as RouterLink, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useAuthStore } from '../stores/authStore';
@@ -45,6 +46,8 @@ const brandingKeys = [
 
 export default function Customization() {
   const { user } = useAuthStore();
+  const location = useLocation();
+  const isOwner = user?.role === 'owner';
   const [branding, setBranding] = useState(emptyBranding);
   const [initialBranding, setInitialBranding] = useState(emptyBranding);
   const [uiLanguage, setUiLanguage] = useState('en');
@@ -60,6 +63,7 @@ export default function Customization() {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [avatarRefreshing, setAvatarRefreshing] = useState(false);
   const [iconCacheCleaning, setIconCacheCleaning] = useState(false);
+  const [accessLogPurging, setAccessLogPurging] = useState(false);
   const [cacheStats, setCacheStats] = useState(null);
   const [cacheStatsLoading, setCacheStatsLoading] = useState(true);
   const noticeTimer = useRef(null);
@@ -67,11 +71,20 @@ export default function Customization() {
   const brandingSectionRef = useRef(null);
   const appOptionsSectionRef = useRef(null);
   const homeOptionsSectionRef = useRef(null);
-  const maintenanceSectionRef = useRef(null);
+  const preferencesSectionRef = useRef(null);
   const mobileOptionsSectionRef = useRef(null);
+  const maintenanceSectionRef = useRef(null);
   const brandingLogoInputRef = useRef(null);
   const ui = useMemo(() => getUiStrings(uiLanguage), [uiLanguage]);
   const languageOptions = useMemo(() => getSupportedLanguageOptions(ui), [ui]);
+  const sectionRefs = useMemo(() => ({
+    login: homeOptionsSectionRef,
+    home: brandingSectionRef,
+    apps: appOptionsSectionRef,
+    preferences: preferencesSectionRef,
+    mobile: mobileOptionsSectionRef,
+    maintenance: maintenanceSectionRef,
+  }), []);
 
   const pushNotice = (type, message) => {
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
@@ -157,11 +170,11 @@ export default function Customization() {
       window.dispatchEvent(new Event('frontdoor:avatar-cache-refresh'));
       loadCacheStats();
       const cacheCleared = res.data?.removed
-        ? ui.customization.retention.avatarCacheClearedWithCount.replace('{count}', res.data.removed)
-        : ui.customization.retention.avatarCacheCleared;
+        ? ui.customization.maintenance.avatarCacheClearedWithCount.replace('{count}', res.data.removed)
+        : ui.customization.maintenance.avatarCacheCleared;
       pushSaveNotice(
         'success',
-        `${cacheCleared}. ${ui.customization.retention.avatarCacheReloadNotice}`
+        `${cacheCleared}. ${ui.customization.maintenance.avatarCacheReloadNotice}`
       );
     } catch (err) {
       pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorRefreshingAvatarCache);
@@ -175,13 +188,30 @@ export default function Customization() {
       const res = await api.post('/branding/app-icons/cleanup');
       loadCacheStats();
       const message = res.data?.removed
-        ? ui.customization.retention.appIconCacheClearedWithCount.replace('{count}', res.data.removed)
-        : ui.customization.retention.appIconCacheCleared;
-      pushSaveNotice('success', `${message}. ${ui.customization.retention.appIconCacheReloadNotice}`);
+        ? ui.customization.maintenance.appIconCacheClearedWithCount.replace('{count}', res.data.removed)
+        : ui.customization.maintenance.appIconCacheCleared;
+      pushSaveNotice('success', `${message}. ${ui.customization.maintenance.appIconCacheReloadNotice}`);
     } catch (err) {
       pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorSaving);
     }
     setIconCacheCleaning(false);
+  };
+
+  const clearAccessLog = async () => {
+    setAccessLogPurging(true);
+    try {
+      const res = await api.post('/logs/clear-access');
+      const clearedMessage = res.data?.accessRemoved
+        ? ui.customization.maintenance.accessLogClearedWithCount.replace('{count}', res.data.accessRemoved)
+        : ui.customization.maintenance.accessLogCleared;
+      pushSaveNotice(
+        'success',
+        `${clearedMessage}. ${ui.customization.maintenance.accessLogReloadNotice}`
+      );
+    } catch (err) {
+      pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorSaving);
+    }
+    setAccessLogPurging(false);
   };
 
   useEffect(() => {
@@ -203,7 +233,7 @@ export default function Customization() {
     setBrandingLogoFileName(file.name);
 
     if (file.size > 2 * 1024 * 1024) {
-      pushNotice('error', ui.customization.retention.logoTooLarge);
+      pushNotice('error', ui.customization.preferences.logoTooLarge);
       setBrandingLogoFileName('');
       event.target.value = '';
       return;
@@ -257,7 +287,7 @@ export default function Customization() {
       pushSaveNotice(
         'success',
         retentionChanged
-          ? `${ui.common.changesSaved}. ${ui.customization.retention.logRetentionNextCleanup}`
+          ? `${ui.common.changesSaved}. ${ui.customization.preferences.logRetentionNextCleanup}`
           : ui.common.changesSaved
       );
     } catch (err) {
@@ -272,19 +302,36 @@ export default function Customization() {
     return brandingDirty || logoDirty;
   }, [branding, initialBranding, brandingLogoDataUrl, removeBrandingLogo]);
 
-  const jumpTo = (ref) => {
+  const scrollToSection = useCallback((ref) => {
     if (!ref.current) return;
     const offset = window.innerWidth >= 1280 ? 112 : 96;
     const top = ref.current.getBoundingClientRect().top + window.scrollY - offset;
     window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-  };
+  }, []);
+
+  const jumpTo = useCallback((sectionId, ref) => {
+    if (!ref.current) return;
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${sectionId}`);
+    scrollToSection(ref);
+  }, [scrollToSection]);
+
+  useEffect(() => {
+    if (brandingLoading || cacheStatsLoading) return;
+    const sectionId = location.hash.replace('#', '');
+    if (!sectionId) return;
+    const targetRef = sectionRefs[sectionId];
+    if (!targetRef?.current) return;
+    const frame = window.requestAnimationFrame(() => scrollToSection(targetRef));
+    return () => window.cancelAnimationFrame(frame);
+  }, [brandingLoading, cacheStatsLoading, location.hash, scrollToSection, sectionRefs]);
 
   const sectionNav = [
-    { label: ui.customization.login.title, ref: homeOptionsSectionRef, icon: LogIn },
-    { label: ui.customization.home.title, ref: brandingSectionRef, icon: Home },
-    { label: ui.customization.apps.title, ref: appOptionsSectionRef, icon: Settings },
-    { label: ui.customization.retention.title, ref: maintenanceSectionRef, icon: Wrench },
-    { label: ui.customization.mobile.title, ref: mobileOptionsSectionRef, icon: Smartphone },
+    { id: 'login', label: ui.customization.login.title, ref: homeOptionsSectionRef, icon: LogIn },
+    { id: 'home', label: ui.customization.home.title, ref: brandingSectionRef, icon: Home },
+    { id: 'apps', label: ui.customization.apps.title, ref: appOptionsSectionRef, icon: Settings },
+    { id: 'preferences', label: ui.customization.preferences.title, ref: preferencesSectionRef, icon: SlidersHorizontal },
+    { id: 'mobile', label: ui.customization.mobile.title, ref: mobileOptionsSectionRef, icon: Smartphone },
+    { id: 'maintenance', label: ui.customization.maintenance.title, ref: maintenanceSectionRef, icon: Wrench },
   ];
 
   const renderSaveStatusBar = (key) => (
@@ -293,7 +340,7 @@ export default function Customization() {
         <div className="min-w-0">
           <p className="text-sm font-semibold text-dark">{ui.common.changeStatus}</p>
           {saveNotice ? (
-            <p className={`text-xs font-medium ${saveNotice.type === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>
+            <p className={`text-xs font-medium ${saveNotice.type === 'error' ? 'text-red-600' : 'text-accent-dark'}`}>
               {saveNotice.message}
             </p>
           ) : (
@@ -329,7 +376,7 @@ export default function Customization() {
           className={`mb-8 flex items-start gap-3 rounded-2xl border px-4 py-3 ${
             pageNotice.type === 'error'
               ? 'border-red-200 bg-red-50 text-red-700'
-              : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-accent/30 bg-accent/10 text-dark'
           }`}
         >
           {pageNotice.type === 'error' ? (
@@ -344,14 +391,9 @@ export default function Customization() {
       <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
         <aside className="hidden xl:block xl:sticky xl:top-24 h-fit">
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
-                <Clock3 className="w-4 h-4 text-slate-600" />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-dark">{ui.customization.navigationTitle}</h2>
-                <p className="text-xs text-gray-500">{ui.customization.navigationSubtitle}</p>
-              </div>
+            <div className="mb-4">
+              <h2 className="text-sm font-bold text-dark">{ui.customization.navigationTitle}</h2>
+              <p className="text-xs text-gray-500">{ui.customization.navigationSubtitle}</p>
             </div>
             <div className="flex xl:flex-col gap-2 overflow-x-auto pb-1 xl:pb-0">
               {sectionNav.map((item) => {
@@ -360,7 +402,7 @@ export default function Customization() {
                   <button
                     key={item.label}
                     type="button"
-                    onClick={() => jumpTo(item.ref)}
+                    onClick={() => jumpTo(item.id, item.ref)}
                     className="inline-flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-white min-w-[170px] xl:min-w-0"
                   >
                     <span className="flex items-center gap-2">
@@ -377,14 +419,9 @@ export default function Customization() {
 
         <div className="flex flex-col gap-4">
           <div className="xl:hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center">
-                <Clock3 className="w-4 h-4 text-slate-600" />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-dark">{ui.customization.goToSection}</h2>
-                <p className="text-xs text-gray-500">{ui.customization.navigationSubtitle}</p>
-              </div>
+            <div className="mb-3">
+              <h2 className="text-sm font-bold text-dark">{ui.customization.goToSection}</h2>
+              <p className="text-xs text-gray-500">{ui.customization.navigationSubtitle}</p>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {sectionNav.map((item) => {
@@ -393,7 +430,7 @@ export default function Customization() {
                   <button
                     key={item.label}
                     type="button"
-                    onClick={() => jumpTo(item.ref)}
+                    onClick={() => jumpTo(item.id, item.ref)}
                     className="inline-flex w-full items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-white"
                   >
                     <Icon className="w-4 h-4 text-gray-500" />
@@ -404,7 +441,7 @@ export default function Customization() {
             </div>
           </div>
 
-          <section ref={homeOptionsSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
+          <section id="login" ref={homeOptionsSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center">
                 <LogIn className="w-5 h-5 text-rose-600" />
@@ -431,10 +468,10 @@ export default function Customization() {
             {renderSaveStatusBar('login')}
           </section>
 
-          <section ref={brandingSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
+          <section id="home" ref={brandingSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
-                <Home className="w-5 h-5 text-emerald-600" />
+              <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+                <Home className="w-5 h-5 text-accent-dark" />
               </div>
               <div>
                 <h2 className="text-lg font-bold text-dark">{ui.customization.home.title}</h2>
@@ -535,7 +572,7 @@ export default function Customization() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-400">
-                        {ui.customization.retention.assetFileHint}
+                        {ui.customization.preferences.assetFileHint}
                       </p>
 
                       <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 min-h-[150px] flex items-center justify-center">
@@ -660,7 +697,7 @@ export default function Customization() {
             </div>
           </section>
 
-          <section ref={appOptionsSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
+          <section id="apps" ref={appOptionsSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center">
                 <Settings className="w-5 h-5 text-violet-600" />
@@ -728,14 +765,14 @@ export default function Customization() {
             {renderSaveStatusBar('app')}
           </section>
 
-          <section ref={maintenanceSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
+          <section id="preferences" ref={preferencesSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
-                <Wrench className="w-5 h-5 text-amber-600" />
+              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
+                <SlidersHorizontal className="w-5 h-5 text-slate-600" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-dark">{ui.customization.retention.title}</h2>
-                <p className="text-sm text-gray-500">{ui.customization.retention.subtitle}</p>
+                <h2 className="text-lg font-bold text-dark">{ui.customization.preferences.title}</h2>
+                <p className="text-sm text-gray-500">{ui.customization.preferences.subtitle}</p>
               </div>
             </div>
 
@@ -743,8 +780,8 @@ export default function Customization() {
               <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-dark">{ui.customization.retention.languageTitle}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{ui.customization.retention.languageHelp}</p>
+                    <p className="text-sm font-semibold text-dark">{ui.customization.preferences.languageTitle}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{ui.customization.preferences.languageHelp}</p>
                   </div>
                   <select
                     value={branding.defaultLanguage || 'en'}
@@ -766,8 +803,8 @@ export default function Customization() {
                   className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
                 />
                 <span className="min-w-0">
-                  <span className="block text-sm font-medium text-gray-700">{ui.customization.retention.timeFormatTitle}</span>
-                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.retention.timeFormatHelp}</span>
+                  <span className="block text-sm font-medium text-gray-700">{ui.customization.preferences.timeFormatTitle}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.preferences.timeFormatHelp}</span>
                 </span>
               </label>
 
@@ -779,77 +816,21 @@ export default function Customization() {
                   className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
                 />
                 <span className="min-w-0">
-                  <span className="block text-sm font-medium text-gray-700">{ui.customization.retention.dateFormatTitle}</span>
-                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.retention.dateFormatHelp}</span>
+                  <span className="block text-sm font-medium text-gray-700">{ui.customization.preferences.dateFormatTitle}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.preferences.dateFormatHelp}</span>
                 </span>
               </label>
-
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-dark">{ui.customization.retention.avatarCacheTitle}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{ui.customization.retention.avatarCacheHelp}</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {cacheStatsLoading ? ui.common.loading : `${cacheStats?.avatarCache?.files || 0} ${ui.customization.retention.cacheFiles} · ${formatBytes(cacheStats?.avatarCache?.bytes || 0)}`}
-                    </p>
-                  </div>
-                  <div className="flex items-start lg:shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => openConfirm({
-                        title: ui.customization.retention.refreshAvatarCacheConfirmTitle,
-                        message: ui.customization.retention.refreshAvatarCacheConfirmMessage,
-                        confirmLabel: ui.customization.retention.refreshAvatarCacheConfirmLabel,
-                        onConfirm: refreshAvatarCache,
-                      })}
-                      disabled={avatarRefreshing}
-                      className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      {avatarRefreshing ? ui.customization.retention.refreshAvatarCacheBusy : ui.customization.retention.refreshAvatarCache}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-dark">{ui.customization.retention.appIconCacheTitle}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{ui.customization.retention.appIconCacheHelp}</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {cacheStatsLoading ? ui.common.loading : `${cacheStats?.appIconCache?.totalFiles || 0} ${ui.customization.retention.cacheFiles} · ${formatBytes(cacheStats?.appIconCache?.totalBytes || 0)} · ${cacheStats?.appIconCache?.orphanFiles || 0} ${ui.customization.retention.cacheOrphans}`}
-                    </p>
-                  </div>
-                  <div className="flex items-start lg:shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => openConfirm({
-                        title: ui.customization.retention.refreshAppIconCacheConfirmTitle,
-                        message: ui.customization.retention.refreshAppIconCacheConfirmMessage,
-                        confirmLabel: ui.customization.retention.refreshAppIconCacheConfirmLabel,
-                        onConfirm: cleanupAppIconCache,
-                      })}
-                      disabled={iconCacheCleaning}
-                      className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      {iconCacheCleaning ? ui.customization.retention.refreshAppIconCacheBusy : ui.customization.retention.refreshAppIconCache}
-                    </button>
-                  </div>
-                </div>
-              </div>
 
               <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-5">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <p className="text-sm font-semibold text-dark">{ui.customization.retention.logRetentionTitle}</p>
+                      <p className="text-sm font-semibold text-dark">{ui.customization.preferences.logRetentionTitle}</p>
                       <div className={`rounded-full px-3 py-1 text-xs font-semibold ${branding.logRetentionDays === 0 ? 'bg-red-100 text-red-700' : 'bg-white text-amber-700'}`}>
-                        {branding.logRetentionDays === 0 ? ui.customization.retention.logless : `${branding.logRetentionDays} ${ui.common.days}`}
+                        {branding.logRetentionDays === 0 ? ui.customization.preferences.logless : `${branding.logRetentionDays} ${ui.common.days}`}
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">{ui.customization.retention.logRetentionHelp}</p>
+                    <p className="text-xs text-gray-500 mt-1">{ui.customization.preferences.logRetentionHelp}</p>
                   </div>
                 </div>
 
@@ -866,12 +847,12 @@ export default function Customization() {
                     />
 
                     <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>0 = {ui.customization.retention.logless}</span>
-                      <span>90 = {ui.customization.retention.recommended}</span>
+                      <span>0 = {ui.customization.preferences.logless}</span>
+                      <span>90 = {ui.customization.preferences.recommended}</span>
                     </div>
 
                     <p className="rounded-xl border border-amber-200 bg-white px-4 py-3 text-sm text-amber-800 leading-6">
-                      {ui.customization.retention.logRetentionNotice}
+                      {ui.customization.preferences.logRetentionNotice}
                     </p>
                   </div>
                 ) : (
@@ -880,10 +861,10 @@ export default function Customization() {
               </div>
             </div>
 
-            {renderSaveStatusBar('maintenance')}
+            {renderSaveStatusBar('preferences')}
           </section>
 
-          <section ref={mobileOptionsSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
+          <section id="mobile" ref={mobileOptionsSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center">
                 <Smartphone className="w-5 h-5 text-cyan-600" />
@@ -924,6 +905,128 @@ export default function Customization() {
 
             {renderSaveStatusBar('mobile')}
           </section>
+
+          <section id="maintenance" ref={maintenanceSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+                <Wrench className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-dark">{ui.customization.maintenance.title}</h2>
+                <p className="text-sm text-gray-500">{ui.customization.maintenance.subtitle}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-dark">{ui.customization.maintenance.avatarCacheTitle}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{ui.customization.maintenance.avatarCacheHelp}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {cacheStatsLoading ? ui.common.loading : `${cacheStats?.avatarCache?.files || 0} ${ui.customization.maintenance.cacheFiles} · ${formatBytes(cacheStats?.avatarCache?.bytes || 0)}`}
+                    </p>
+                  </div>
+                  <div className="flex items-start lg:shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openConfirm({
+                        title: ui.customization.maintenance.refreshAvatarCacheConfirmTitle,
+                        message: ui.customization.maintenance.refreshAvatarCacheConfirmMessage,
+                        confirmLabel: ui.customization.maintenance.refreshAvatarCacheConfirmLabel,
+                        onConfirm: refreshAvatarCache,
+                      })}
+                      disabled={avatarRefreshing}
+                      className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {avatarRefreshing ? ui.customization.maintenance.refreshAvatarCacheBusy : ui.customization.maintenance.refreshAvatarCache}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-dark">{ui.customization.maintenance.appIconCacheTitle}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{ui.customization.maintenance.appIconCacheHelp}</p>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs text-gray-400">
+                      <span>
+                        {cacheStatsLoading
+                          ? ui.common.loading
+                          : `${cacheStats?.appIconCache?.totalFiles || 0} ${ui.customization.maintenance.cacheFiles} · ${formatBytes(cacheStats?.appIconCache?.totalBytes || 0)} · ${cacheStats?.appIconCache?.orphanFiles || 0} ${ui.customization.maintenance.cacheOrphans} ·`}
+                      </span>
+                      <a
+                        href="/admin/icons"
+                        className="font-semibold text-dark underline decoration-accent decoration-2 underline-offset-2 transition-colors hover:text-accent-dark hover:decoration-accent-dark"
+                      >
+                        {ui.customization.maintenance.openMediaLibrary}
+                      </a>
+                    </p>
+                  </div>
+                  <div className="flex items-start lg:shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openConfirm({
+                        title: ui.customization.maintenance.refreshAppIconCacheConfirmTitle,
+                        message: ui.customization.maintenance.refreshAppIconCacheConfirmMessage,
+                        confirmLabel: ui.customization.maintenance.refreshAppIconCacheConfirmLabel,
+                        onConfirm: cleanupAppIconCache,
+                      })}
+                      disabled={iconCacheCleaning}
+                      className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {iconCacheCleaning ? ui.customization.maintenance.refreshAppIconCacheBusy : ui.customization.maintenance.refreshAppIconCache}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-red-100 bg-red-50/50 p-5">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-dark">{ui.customization.maintenance.accessLogCleanupTitle}</p>
+                  <p className="text-xs text-gray-500 mt-1">{ui.customization.maintenance.accessLogCleanupHelp}</p>
+                </div>
+                  <div className="flex items-start lg:shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openConfirm({
+                        title: ui.customization.maintenance.clearAccessLogConfirmTitle,
+                        message: ui.customization.maintenance.clearAccessLogConfirmMessage,
+                        confirmLabel: ui.customization.maintenance.clearAccessLogConfirmLabel,
+                        onConfirm: clearAccessLog,
+                      })}
+                      disabled={!isOwner || accessLogPurging}
+                      className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {accessLogPurging ? ui.customization.maintenance.clearAccessLogBusy : ui.customization.maintenance.clearAccessLog}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-dark">{ui.customization.maintenance.backupRestoreTitle}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{ui.customization.maintenance.backupRestoreHelp}</p>
+                </div>
+                <RouterLink
+                  to="/admin/backup"
+                  className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
+                >
+                  <Database className="h-4 w-4" />
+                  {ui.customization.maintenance.openBackupRestore}
+                </RouterLink>
+              </div>
+            </div>
+          </section>
+
         </div>
       </div>
 

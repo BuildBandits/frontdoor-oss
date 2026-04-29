@@ -567,6 +567,7 @@ export default function AdminGroups() {
       || group.local_name?.toLowerCase().includes(q)
     );
   });
+  const hasEntraSearch = entraSearch.trim().length > 0;
 
   const filteredGroups = useMemo(() => {
     if (!groupSearch.trim()) return groups;
@@ -811,7 +812,7 @@ export default function AdminGroups() {
                 type="button"
                 onClick={selectAllDeletableGroups}
                 disabled={!canEdit}
-                className="font-medium text-accent hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                className="font-medium text-accent-dark hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {g.selectAll}
               </button>
@@ -835,13 +836,13 @@ export default function AdminGroups() {
           </div>
 
           {visibleGroups.map((group) => (
-            <div key={group.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div key={group.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden transition-colors">
               {/* Group row */}
               <div
-                className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-gray-50/50"
+                className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50/50"
                 onClick={() => toggleExpand(group.id)}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 min-w-0">
                   {group.id !== DEFAULT_GROUP_ID && (
                     <input
                       type="checkbox"
@@ -856,33 +857,33 @@ export default function AdminGroups() {
                     />
                   )}
                   {expandedGroup === group.id
-                    ? <ChevronDown className="w-4 h-4 text-gray-400" />
-                    : <ChevronRight className="w-4 h-4 text-gray-400" />}
-                  <div>
+                    ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    : <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-dark">{groupLabel(group)}</span>
+                      <span className="truncate font-semibold text-sm text-dark">{groupLabel(group)}</span>
                       {group.source === 'entra' && (
-                        <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
                       )}
                       {group.id === DEFAULT_GROUP_ID && (
-                        <span className="text-xs bg-accent/30 text-dark px-2 py-0.5 rounded-full font-medium">{g.defaultBadge}</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-accent/30 text-dark px-1.5 py-0.5 rounded-full font-medium">{g.defaultBadge}</span>
                       )}
                     </div>
-                    {group.description && <p className="text-sm text-gray-500 mt-0.5">{group.description}</p>}
+                    {group.description && <p className="mt-0.5 truncate text-xs text-gray-400">{group.description}</p>}
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className="flex items-center gap-1 text-sm text-gray-500">
-                    <Users className="w-4 h-4" /> {group.member_count}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="flex items-center gap-1 text-xs text-gray-400">
+                    <Users className="w-3.5 h-3.5 flex-shrink-0" /> {group.member_count}
                   </span>
-                  <span className="flex items-center gap-1 text-sm text-gray-500">
-                    <AppWindow className="w-4 h-4" /> {group.app_count}
+                  <span className="flex items-center gap-1 text-xs text-gray-400">
+                    <AppWindow className="w-3.5 h-3.5 flex-shrink-0" /> {group.app_count}
                   </span>
                   {group.id !== DEFAULT_GROUP_ID && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(group); }}
                       disabled={!canEdit}
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       title={g.deleteGroupTooltip}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -968,7 +969,7 @@ export default function AdminGroups() {
                               className={`text-xs font-medium transition-colors ${
                                 !canEdit || isEntraGroup(group)
                                   ? 'text-gray-300 cursor-not-allowed'
-                                  : 'text-accent hover:underline'
+                                  : 'text-accent-dark hover:underline'
                               }`}
                             >
                               + {t.add}
@@ -981,7 +982,7 @@ export default function AdminGroups() {
                               <p className="text-xs mt-1">{t.memberAssignedHelp}</p>
                             </div>
                           ) : (
-                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                            <div className="space-y-2 max-h-64 overflow-y-auto pr-3 [scrollbar-gutter:stable]">
                               {groupDetail.members.map((m) => (
                                 <div key={m.id} className="flex items-center justify-between py-1.5">
                                   <div className="flex items-center gap-2">
@@ -1045,7 +1046,7 @@ export default function AdminGroups() {
                             <button
                               onClick={openAddApps}
                               disabled={!canEdit}
-                              className="text-xs font-medium text-accent hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="text-xs font-medium text-accent-dark hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               + {t.add}
                             </button>
@@ -1057,7 +1058,7 @@ export default function AdminGroups() {
                               <p className="text-xs mt-1">{t.appAssignedHelp}</p>
                             </div>
                           ) : (
-                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                            <div className="space-y-2 max-h-64 overflow-y-auto pr-3 [scrollbar-gutter:stable]">
                               {groupDetail.apps.map((a) => (
                                 <div key={a.id} className="flex items-center justify-between py-1.5">
                                   <div className="flex items-center gap-2">
@@ -1169,12 +1170,14 @@ export default function AdminGroups() {
                 <span>
                   {g.groupsFound.replace('{count}', filteredEntraCandidates.length)} · {g.selectedCount.replace('{count}', selectedEntraGroups.length)}
                 </span>
-                <button
-                  onClick={selectVisibleEntraGroups}
-                  className="font-medium text-accent hover:underline"
-                >
-                  {g.selectAllFiltered}
-                </button>
+                {hasEntraSearch && (
+                  <button
+                    onClick={selectVisibleEntraGroups}
+                    className="font-medium text-accent-dark hover:underline"
+                  >
+                    {g.selectAllFiltered}
+                  </button>
+                )}
               </div>
 
               {entraCandidatesLoading ? (
@@ -1210,7 +1213,7 @@ export default function AdminGroups() {
                             <span className="text-sm font-medium text-dark truncate">{group.display_name}</span>
                             <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
                             {group.is_imported ? (
-                              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">{g.alreadyImported}</span>
+                              <span className="text-[10px] bg-accent/10 text-accent-dark px-1.5 py-0.5 rounded font-medium">{g.alreadyImported}</span>
                             ) : (
                               <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">{g.onlyEntraDetected}</span>
                             )}

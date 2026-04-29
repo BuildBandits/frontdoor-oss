@@ -6,7 +6,7 @@ export default {
       colors: {
         accent: {
           DEFAULT: '#C5F467',
-          dark: '#A8D44F',
+          dark: '#365314',
           light: '#D8F99A',
         },
         dark: '#1A1A1A',

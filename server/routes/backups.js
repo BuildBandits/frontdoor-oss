@@ -1,0 +1,120 @@
+import express from 'express';
+import { authenticate, isOwner } from '../middleware/auth.js';
+import { createBackupArchive, restoreBackupArchive } from '../services/backup.js';
+import { getBackupExportJob, getBackupExportJobArchive, startBackupExportJob, subscribeBackupExportJob } from '../services/backupJobs.js';
+
+const router = express.Router();
+
+router.get('/export', authenticate, isOwner, async (req, res) => {
+  try {
+    const { archive, snapshot, fileName } = await createBackupArchive();
+    res.setHeader('Content-Type', 'application/gzip');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('X-Backup-Version', String(snapshot.version));
+    res.setHeader('X-Backup-Table-Count', String(snapshot.summary.tableCount));
+    res.setHeader('X-Backup-File-Count', String(snapshot.summary.fileCount));
+    res.setHeader('X-Backup-File-Bytes', String(snapshot.summary.fileBytes));
+    res.send(archive);
+  } catch (error) {
+    console.error('Backup export failed:', error.message);
+    res.status(500).json({ error: 'Failed to create backup' });
+  }
+});
+
+router.post('/export-jobs', authenticate, isOwner, async (req, res) => {
+  try {
+    const job = startBackupExportJob();
+    res.status(202).json({
+      jobId: job.jobId,
+      eventsUrl: `/api/backups/export-jobs/${job.jobId}/events`,
+      downloadUrl: `/api/backups/export-jobs/${job.jobId}/file`,
+    });
+  } catch (error) {
+    console.error('Backup export job start failed:', error.message);
+    res.status(500).json({ error: 'Failed to create backup' });
+  }
+});
+
+router.get('/export-jobs/:jobId/events', authenticate, isOwner, async (req, res) => {
+  const job = getBackupExportJob(req.params.jobId);
+  if (!job) {
+    res.status(404).json({ error: 'Backup job not found' });
+    return;
+  }
+
+  res.status(200);
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  const sendState = (state) => {
+    res.write(`event: progress\ndata: ${JSON.stringify(state)}\n\n`);
+    if (state.status === 'done') {
+      res.write(`event: done\ndata: ${JSON.stringify(state)}\n\n`);
+      res.end();
+    }
+    if (state.status === 'error') {
+      res.write(`event: error\ndata: ${JSON.stringify(state)}\n\n`);
+      res.end();
+    }
+  };
+
+  const unsubscribe = subscribeBackupExportJob(req.params.jobId, sendState);
+  const heartbeat = setInterval(() => {
+    res.write(': keep-alive\n\n');
+  }, 15000);
+  heartbeat.unref?.();
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  });
+});
+
+router.get('/export-jobs/:jobId/file', authenticate, isOwner, async (req, res) => {
+  const job = getBackupExportJobArchive(req.params.jobId);
+  if (!job) {
+    const backupJob = getBackupExportJob(req.params.jobId);
+    if (!backupJob) {
+      res.status(404).json({ error: 'Backup job not found' });
+      return;
+    }
+    res.status(409).json({ error: 'Backup job is not ready yet' });
+    return;
+  }
+
+  res.setHeader('Content-Type', 'application/gzip');
+  res.setHeader('Content-Disposition', `attachment; filename="${job.fileName}"`);
+  res.setHeader('X-Backup-Version', String(job.version));
+  res.setHeader('X-Backup-Table-Count', String(job.summary.tableCount));
+  res.setHeader('X-Backup-File-Count', String(job.summary.fileCount));
+  res.setHeader('X-Backup-File-Bytes', String(job.summary.fileBytes));
+  res.send(job.archive);
+});
+
+router.post(
+  '/restore',
+  authenticate,
+  isOwner,
+  express.raw({
+    type: ['application/gzip', 'application/x-gzip', 'application/octet-stream'],
+    limit: '200mb',
+  }),
+  async (req, res) => {
+    try {
+      const buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || []);
+      const { snapshot: _snapshot, ...result } = await restoreBackupArchive(buffer);
+      res.json({
+        message: 'Backup restored',
+        ...result,
+      });
+    } catch (error) {
+      console.error('Backup restore failed:', error.message);
+      res.status(400).json({ error: error.message || 'Failed to restore backup' });
+    }
+  }
+);
+
+export default router;

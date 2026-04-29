@@ -15,6 +15,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- Backup and restore: owner-only download/upload flow for portable Frontdoor snapshots, including the database plus persisted app icon, branding and avatar cache files, exposed through a new `/admin/backup` page and `/api/backups` endpoints.
+- Personalizza: added an Owner-only action to clear the access log immediately from the retention section, leaving Audit untouched.
+- Admin app editor: new apps now get an automatic slug suggestion from the app name until you edit the slug manually, and the Entra App field now explains that you can paste the full MyApps URL.
 - Media library index: uploaded app icons and branding logos are now indexed directly from their existing caches, with admin-only browse and file endpoints under `/api/media-assets`. No separate media archive directory is required.
 - Hidden admin media browser: a new on-demand `/admin/icons` page lets privileged users inspect the media index, preview files, copy asset links and filter by icon/logo kind without adding a visible navigation entry.
 - Media library backfill: on startup, existing app icon and branding files already stored on disk are indexed so the hidden page starts with the historic assets too.
@@ -23,6 +26,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - Media library deduplication: assets with the same content hash are now grouped into a single card in `/admin/icons`, while preserving the linked app references and merged occurrence count.
 
 ### Changed
+- Theme cleanup: residual emerald-positive badges and status chips were normalized to the lime accent family across the app, including the media library, notices, layout chips and admin status pills.
+- Theme: the shared `accent` palette is back to the original lime family, with a darker `accent-dark` so buttons and links stay readable.
+- Theme cleanup: generic accent links/buttons now lean on `accent-dark` or dark text instead of pale lime text, while semantic success/status greens stay unchanged.
+- UI polish: the app editor shortcut and the media-library link now use safer hover treatments so the lime palette stays readable on hover.
+- Admin Groups: the group list rows now use a denser, Users-like layout with slimmer padding, smaller metadata text and tighter count/badge treatment while keeping the same content and actions.
+- Admin: the "Aggiungi ai gruppi" modal on app creation/editing now includes a "seleziona tutti i filtrati" bulk action so every visible group can be selected in one shot, matching the Entra import flow.
+- Admin and Admin Groups: the "select all filtered" action is now shown only after typing a search term, so it appears when bulk-selecting a filtered result set rather than on the full unfiltered list.
+- Admin app editor: existing apps now have a "save and assign groups" shortcut inside the edit modal, so you can jump straight into group assignment without leaving the app flow.
+- Admin app list payload: the editor now receives each app's current `groupIds`, so the "save and assign groups" shortcut can correctly detect when the default group is already attached.
 - Removed the marketing/product claim from the shared footer and deleted the matching localized strings, leaving only the product name/version and license notice.
 - Hidden admin media browser: SVG assets now expose a dedicated "Copy SVG" action so the raw markup can be pasted directly into the App icon editor.
 - Media library search and cards now carry the source app name, slug, URL and mode for app icons, so the index can be searched and reopened by the app context rather than only by technical asset id.
@@ -32,6 +44,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - Admin App and Groups pages now surface info boxes for orphan apps and incomplete groups, making unassigned apps and groups missing apps/members easier to spot before they cause visibility gaps.
 
 ### Fixed
+- Backup page: the download flow now reflects the real export stages with live SSE progress, green checkmarks for each included snapshot block and aligned action buttons.
+- Backup page: the export and restore cards now keep their primary actions aligned at the bottom, and the export flow shows a progress bar plus checkmarked snapshot contents.
+- Backup CTA in Personalizza now uses a database icon, and the page sections support hash links like `#maintenance` for direct jumps.
+- Backup CTA in Personalizza now shows an icon again, matching the other actions in the Maintenance block.
+- Maintenance backup CTA in Personalizza now uses a proper router link button, so the text renders correctly and opens the backup page cleanly.
+- Admin media library: delete is now blocked for assets still referenced by an app or branding setting, while orphaned/old assets remain removable.
+- Maintenance in Personalizza now shows a clearer backup/restore CTA button with localized label, so the owner can jump to the backup page directly.
+- Backup is owner-only again: the route now matches the original permission model, and the Maintenance block in Personalizza links directly to the backup page.
+- Personalizza now shows "Manutenzione" in Italian for the Maintenance section, with a clearer CTA to open Backup and restore.
+- The media library is no longer presented as an on-demand-only page. The `/admin/icons` entry is now linked from the app icon cache maintenance box in Personalizza, making it easier for admins to reach.
+- Media library: grouped assets now paginate 25 per page by default, with 50/75/100 options and an `Orphans` type filter. Live assets remain the default representative, orphaned members are flagged inside the expandable duplicate list, and groups made only of missing files stay hidden from the main grid unless explicitly filtered.
+- Admin Groups: the expanded member/app lists now reserve scrollbar space so long lists do not overlap the right-edge action icons or other nearby elements.
+- Media library asset indexing now respects the provided database handle when app icons and branding logos are archived, so isolated test databases and cache stats stay in sync.
 - Admin media library previews now render the actual image/SVG first and fall back to the missing-file placeholder only if the browser cannot load the asset URL.
 - Admin Users: the imported and detected Entra group badges now read the correct user-section labels and keep the compact pill style in the right-hand Entra groups panel.
 - Admin Groups: Entra badges were restored to the original `main` treatment, with bold group names and the small rounded badge style from the pre-regression page.
@@ -153,6 +178,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - App tags are normalized case-insensitively so tag grouping and filters do not duplicate `AI`/`ai` variants.
 
 ### Fixed
+- Entra App clicks now write only one access log row: the frontend no longer sends the extra `track-access` request for `entra-app`, avoiding the duplicate audit/access entry caused by the server-side redirect already recording the action.
 - Account menu and Home reload: `/api/auth/me` now returns the full user preference payload again, so a hard refresh no longer drops the saved app order and its timestamp back to the global default.
 - Account menu: custom app order and its saved timestamp are now kept in the local user cache too, so a hard refresh no longer falls back to the global order while the profile rehydrates.
 - Account menu: the Home view switch no longer mixes the mobile compact default with the desktop preference, so the highlighted state now matches the actual desktop view.

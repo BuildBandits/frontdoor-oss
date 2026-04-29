@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, ExternalLink, Filter, Image, RefreshCw, ShieldCheck, Tag, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, ExternalLink, Filter, Image, RefreshCw, Tag, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -16,7 +16,7 @@ function AssetPreview({ asset, missingLabel }) {
     setImageFailed(false);
   }, [asset.id, asset.assetUrl]);
 
-  if (imageFailed) {
+  if (asset.fileExists === false || imageFailed) {
     return (
       <div className="text-center text-gray-400">
         <Image className="mx-auto mb-2 w-10 h-10 opacity-50" />
@@ -44,9 +44,14 @@ export default function AdminIcons() {
   const [assets, setAssets] = useState([]);
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: 25 });
+  const [summary, setSummary] = useState({ total: 0, appIcon: 0, brandingLogo: 0, orphanAssets: 0 });
   const [notice, setNotice] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [expandedAssetIds, setExpandedAssetIds] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,31 +69,66 @@ export default function AdminIcons() {
 
   const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
 
-  const loadAssets = useCallback(async () => {
+  const handleSearchChange = (value) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  const handleKindChange = (value) => {
+    setKindFilter(value);
+    setPage(1);
+  };
+
+  const handlePageSizeChange = (value) => {
+    setPageSize(value);
+    setPage(1);
+  };
+
+  const loadAssets = useCallback(async (requestedPage = 1) => {
     setLoading(true);
     try {
       const res = await api.get('/media-assets', {
         params: {
-          limit: 500,
+          limit: pageSize,
+          page: requestedPage,
           kind: kindFilter !== 'all' ? kindFilter : undefined,
           q: search.trim() || undefined,
         },
       });
-      setAssets(Array.isArray(res.data?.assets) ? res.data.assets : []);
+      const nextAssets = Array.isArray(res.data?.assets) ? res.data.assets : [];
+      const nextPagination = res.data?.pagination || {
+        page: requestedPage,
+        pages: 1,
+        total: nextAssets.length,
+        limit: pageSize,
+      };
+      setAssets(nextAssets);
+      setPagination(nextPagination);
+      setSummary(res.data?.summary || {
+        total: nextAssets.length,
+        appIcon: nextAssets.filter((asset) => asset.kind === 'app-icon').length,
+        brandingLogo: nextAssets.filter((asset) => asset.kind === 'branding-logo').length,
+        orphanAssets: 0,
+      });
+      if (nextPagination.page !== requestedPage) {
+        setPage(nextPagination.page);
+      }
       setNotice(null);
       return true;
     } catch {
       setAssets([]);
+      setPagination({ page: 1, pages: 1, total: 0, limit: pageSize });
+      setSummary({ total: 0, appIcon: 0, brandingLogo: 0, orphanAssets: 0 });
       setNotice({ type: 'error', message: ui.admin.icons.loadFailed });
       return false;
     } finally {
       setLoading(false);
     }
-  }, [kindFilter, search, ui.admin.icons.loadFailed]);
+  }, [kindFilter, pageSize, search, ui.admin.icons.loadFailed]);
 
   useEffect(() => {
-    loadAssets();
-  }, [loadAssets]);
+    loadAssets(page);
+  }, [loadAssets, page]);
 
   const filteredAssets = useMemo(() => {
     return [...assets].sort((a, b) => {
@@ -99,11 +139,26 @@ export default function AdminIcons() {
     });
   }, [assets]);
 
+  const visibleAssets = useMemo(() => (
+    kindFilter === 'orphan'
+      ? filteredAssets.filter((asset) => asset.hasOrphanMembers)
+      : filteredAssets.filter((asset) => (asset.liveCount || 0) > 0)
+  ), [filteredAssets, kindFilter]);
+
   const counts = useMemo(() => ({
-    total: assets.length,
-    appIcon: assets.filter((asset) => asset.kind === 'app-icon').length,
-    brandingLogo: assets.filter((asset) => asset.kind === 'branding-logo').length,
-  }), [assets]);
+    total: summary.total,
+    appIcon: summary.appIcon,
+    brandingLogo: summary.brandingLogo,
+    orphanAssets: summary.orphanAssets,
+  }), [summary]);
+
+  const toggleAssetDetails = (assetId) => {
+    setExpandedAssetIds((current) => (
+      current.includes(assetId)
+        ? current.filter((id) => id !== assetId)
+        : [...current, assetId]
+    ));
+  };
 
   const copyText = async (text) => {
     try {
@@ -127,6 +182,10 @@ export default function AdminIcons() {
   };
 
   const deleteAsset = async (asset) => {
+    if (asset.inUse) {
+      setNotice({ type: 'error', message: ui.admin.icons.deleteBlockedTooltip });
+      return;
+    }
     setConfirmDialog({
       title: ui.admin.icons.deleteTitle,
       message: ui.admin.icons.deleteConfirm.replace('{name}', asset.original_name || asset.stored_file_name),
@@ -147,9 +206,14 @@ export default function AdminIcons() {
       await api.delete(`/media-assets/${confirmDialog.assetId}`);
       setNotice({ type: 'success', message: ui.admin.icons.deleteSuccess });
       setConfirmDialog(null);
-      await loadAssets();
-    } catch {
-      setNotice({ type: 'error', message: ui.admin.icons.deleteFailed });
+      await loadAssets(page);
+    } catch (error) {
+      setNotice({
+        type: 'error',
+        message: error.response?.status === 409
+          ? ui.admin.icons.deleteBlockedTooltip
+          : ui.admin.icons.deleteFailed,
+      });
     } finally {
       setConfirmBusy(false);
     }
@@ -158,7 +222,7 @@ export default function AdminIcons() {
   const refresh = async () => {
     setRefreshing(true);
     try {
-      const ok = await loadAssets();
+      const ok = await loadAssets(page);
       if (ok) {
         setNotice({ type: 'success', message: ui.admin.icons.refreshed });
       }
@@ -193,15 +257,8 @@ export default function AdminIcons() {
     <div className="pb-24">
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            {ui.admin.icons.hiddenBadge}
-          </div>
           <h1 className="mt-3 text-2xl font-extrabold text-dark">{ui.admin.icons.pageTitle}</h1>
           <p className="mt-1 max-w-2xl text-gray-500">{ui.admin.icons.subtitle}</p>
-        </div>
-        <div className="text-sm text-gray-400">
-          {ui.admin.icons.visibleOnlyOnDemand}
         </div>
       </div>
 
@@ -209,7 +266,7 @@ export default function AdminIcons() {
         <div className={`mb-6 rounded-2xl border px-4 py-3 text-sm font-medium ${
           notice.type === 'error'
             ? 'border-red-200 bg-red-50 text-red-700'
-            : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            : 'border-accent/30 bg-accent/10 text-dark'
         }`}>
           {notice.message}
         </div>
@@ -220,7 +277,7 @@ export default function AdminIcons() {
           <div className="flex-1 min-w-[240px]">
             <ClearableSearchField
               value={search}
-              onChange={setSearch}
+              onChange={handleSearchChange}
               placeholder={ui.admin.icons.searchPlaceholder}
               clearLabel={ui.common.clearSearch}
             />
@@ -231,12 +288,27 @@ export default function AdminIcons() {
             <span>{ui.admin.icons.kindFilter}</span>
             <select
               value={kindFilter}
-              onChange={(e) => setKindFilter(e.target.value)}
+              onChange={(e) => handleKindChange(e.target.value)}
               className="bg-transparent text-sm font-medium text-dark focus:outline-none"
             >
               <option value="all">{ui.common.all}</option>
               <option value="app-icon">{ui.admin.icons.kindAppIcon}</option>
               <option value="branding-logo">{ui.admin.icons.kindBrandingLogo}</option>
+              <option value="orphan">{ui.admin.icons.kindOrphan}</option>
+            </select>
+          </div>
+
+          <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+            <span>{ui.admin.icons.itemsPerPage}</span>
+            <select
+              value={pageSize}
+              onChange={(e) => handlePageSizeChange(parseInt(e.target.value, 10))}
+              className="bg-transparent text-sm font-medium text-dark focus:outline-none"
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={75}>75</option>
+              <option value={100}>100</option>
             </select>
           </div>
 
@@ -252,7 +324,7 @@ export default function AdminIcons() {
         </div>
       </div>
 
-      <div className="mb-6 grid gap-4 md:grid-cols-3">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">{ui.admin.icons.totalAssets}</p>
           <p className="mt-1 text-2xl font-bold text-dark">{counts.total}</p>
@@ -265,6 +337,10 @@ export default function AdminIcons() {
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">{ui.admin.icons.totalBrandingLogos}</p>
           <p className="mt-1 text-2xl font-bold text-dark">{counts.brandingLogo}</p>
         </div>
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">{ui.admin.icons.totalOrphanAssets}</p>
+          <p className="mt-1 text-2xl font-bold text-dark">{counts.orphanAssets}</p>
+        </div>
       </div>
 
       {loading ? (
@@ -273,7 +349,7 @@ export default function AdminIcons() {
             <div key={i} className="h-64 animate-pulse rounded-2xl border border-gray-100 bg-white" />
           ))}
         </div>
-      ) : filteredAssets.length === 0 ? (
+      ) : assets.length === 0 ? (
         <div className="rounded-2xl border border-gray-100 bg-white px-6 py-16 text-center text-gray-400 shadow-sm">
           <Image className="mx-auto mb-3 w-12 h-12 opacity-40" />
           <p className="text-lg font-medium">{ui.admin.icons.emptyTitle}</p>
@@ -281,7 +357,7 @@ export default function AdminIcons() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredAssets.map((asset) => (
+          {visibleAssets.map((asset) => (
             <article key={asset.id} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
               <div className="aspect-[4/3] bg-gradient-to-br from-gray-50 via-white to-gray-100 p-4">
                 <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white/70 p-4">
@@ -297,9 +373,16 @@ export default function AdminIcons() {
                     </h2>
                     <p className="mt-1 text-xs text-gray-500">{asset.stored_file_name}</p>
                   </div>
-                  <span className="inline-flex shrink-0 items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
-                    {asset.kind === 'app-icon' ? ui.admin.icons.kindAppIcon : ui.admin.icons.kindBrandingLogo}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                      {asset.kind === 'app-icon' ? ui.admin.icons.kindAppIcon : ui.admin.icons.kindBrandingLogo}
+                    </span>
+                    {asset.hasOrphanMembers && (
+                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                        {ui.admin.icons.containsOrphans}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
@@ -322,25 +405,63 @@ export default function AdminIcons() {
                 </div>
 
                 {asset.kind === 'app-icon' && Array.isArray(asset.linkedApps) && asset.linkedApps.length > 0 && (
-                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-3 py-3 text-xs text-emerald-800">
-                    <p className="font-semibold uppercase tracking-wider text-emerald-600">{ui.admin.icons.linkedApp}</p>
+                  <div className="rounded-2xl border border-accent/20 bg-accent/10 px-3 py-3 text-xs text-dark">
+                    <p className="font-semibold uppercase tracking-wider text-accent-dark">{ui.admin.icons.linkedApp}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {asset.linkedApps.map((linkedApp) => (
                         <button
                           key={linkedApp.slug || linkedApp.id}
                           type="button"
                           onClick={() => linkedApp.slug && navigate(`/admin?edit=${encodeURIComponent(linkedApp.slug)}`)}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1.5 font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-white px-3 py-1.5 font-semibold text-dark transition-colors hover:bg-accent/10"
                           title={linkedApp.target_url || linkedApp.slug || linkedApp.name}
                         >
                           <span className="truncate max-w-[180px]">{linkedApp.name}</span>
-                          {linkedApp.slug && <span className="text-emerald-500">#{linkedApp.slug}</span>}
+                          {linkedApp.slug && <span className="text-accent-dark">#{linkedApp.slug}</span>}
                           {linkedApp.slug && <span className="sr-only">{ui.admin.icons.openAppEditor}</span>}
                         </button>
                       ))}
                     </div>
                     {asset.duplicateCount > 1 && (
-                      <p className="mt-2 text-emerald-700">{ui.admin.icons.duplicateCount.replace('{count}', asset.duplicateCount)}</p>
+                      <div className="mt-3 rounded-xl border border-accent/20 bg-white/70 px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleAssetDetails(asset.id)}
+                          className="flex w-full items-center justify-between gap-3 text-left text-dark"
+                        >
+                          <span className="font-semibold">{ui.admin.icons.duplicateCount.replace('{count}', asset.duplicateCount)}</span>
+                          <span className="inline-flex items-center gap-1 font-semibold text-accent-dark">
+                            {expandedAssetIds.includes(asset.id) ? ui.admin.icons.hideDuplicates : ui.admin.icons.showDuplicates}
+                            {expandedAssetIds.includes(asset.id) ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          </span>
+                        </button>
+                        {expandedAssetIds.includes(asset.id) && (
+                          <div className="mt-3 space-y-2">
+                            {Array.isArray(asset.duplicateAssets) && asset.duplicateAssets.map((member) => (
+                              <div key={member.id} className="flex items-center gap-3 rounded-xl border border-accent/20 bg-white px-3 py-2">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+                                  <AssetPreview asset={member} missingLabel={ui.admin.icons.missingFile} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate font-semibold text-dark">{member.original_name || member.stored_file_name}</p>
+                                  <p className="truncate text-gray-600">{member.stored_file_name}</p>
+                                </div>
+                                <div className="flex shrink-0 flex-col items-end gap-1 text-right">
+                                  {member.fileExists === false ? (
+                                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-1 font-semibold text-amber-700">
+                                      {ui.admin.icons.orphanBadge}
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center rounded-full border border-accent/30 bg-accent/10 px-2 py-1 font-semibold text-accent-dark">
+                                      {ui.admin.icons.liveBadge}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -376,10 +497,12 @@ export default function AdminIcons() {
                   <button
                     type="button"
                     onClick={() => deleteAsset(asset)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50"
+                    disabled={asset.inUse}
+                    title={asset.inUse ? ui.admin.icons.deleteBlockedTooltip : ui.admin.icons.deleteAsset}
+                    className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-white"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    {ui.admin.icons.deleteAsset}
+                    {asset.inUse ? ui.admin.icons.deleteBlockedByUsage : ui.admin.icons.deleteAsset}
                   </button>
                   {asset.sha256 && (
                     <div className="inline-flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-500">
@@ -391,6 +514,37 @@ export default function AdminIcons() {
               </div>
             </article>
           ))}
+        </div>
+      )}
+
+      {pagination.pages > 1 && (
+        <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+          <p className="text-sm text-gray-500">
+            {ui.admin.icons.paginationSummary
+              .replace('{page}', pagination.page)
+              .replace('{pages}', pagination.pages)
+              .replace('{total}', pagination.total)}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={pagination.page <= 1}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              {ui.admin.icons.previousPage}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(pagination.pages, current + 1))}
+              disabled={pagination.page >= pagination.pages}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {ui.admin.icons.nextPage}
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 

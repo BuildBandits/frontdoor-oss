@@ -14,6 +14,7 @@ const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const AdminLogs = lazy(() => import('./pages/AdminLogs'));
 const AdminAudit = lazy(() => import('./pages/AdminAudit'));
 const AdminIcons = lazy(() => import('./pages/AdminIcons'));
+const AdminBackup = lazy(() => import('./pages/AdminBackup'));
 
 const ADMIN_VIEWER_ROLES = ['owner', 'admin', 'admin_readonly'];
 
@@ -126,6 +127,16 @@ export default function App() {
             <ProtectedRoute adminOnly>
               <Layout>
                 <AdminIcons />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/backup"
+          element={
+            <ProtectedRoute ownerOnly>
+              <Layout>
+                <AdminBackup />
               </Layout>
             </ProtectedRoute>
           }

@@ -5,13 +5,14 @@ import { deleteMediaAssetById, getMediaAssetById, listMediaAssets, serveMediaAss
 const router = express.Router();
 
 router.get('/', authenticate, isAdminViewer, (req, res) => {
-  const assets = listMediaAssets({
+  const result = listMediaAssets({
     kind: typeof req.query.kind === 'string' ? req.query.kind : null,
     query: typeof req.query.q === 'string' ? req.query.q : null,
     limit: req.query.limit,
+    page: req.query.page,
   });
 
-  res.json({ assets });
+  res.json(result);
 });
 
 router.get('/:id/file', authenticate, isAdminViewer, async (req, res) => {
@@ -33,12 +34,22 @@ router.get('/:id', authenticate, isAdminViewer, (req, res) => {
 });
 
 router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
-  const removed = deleteMediaAssetById(req.params.id);
-  if (!removed) {
-    return res.status(404).json({ error: 'Media asset not found' });
-  }
+  try {
+    const removed = deleteMediaAssetById(req.params.id);
+    if (!removed) {
+      return res.status(404).json({ error: 'Media asset not found' });
+    }
 
-  return res.json({ message: 'Media asset removed from index' });
+    return res.json({ message: 'Media asset removed from index' });
+  } catch (error) {
+    if (error?.statusCode === 409) {
+      return res.status(409).json({
+        error: error.message,
+        usageCount: error.usageCount || 0,
+      });
+    }
+    throw error;
+  }
 });
 
 export default router;

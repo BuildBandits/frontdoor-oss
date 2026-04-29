@@ -27,13 +27,13 @@ const AppCard = forwardRef(function AppCard(
   const tags = Array.isArray(app.tags) ? app.tags : [];
 
   const handleClick = () => {
-    // Fire-and-forget access tracking. For mode='redirect' the server already
-    // logs via /sso-redirect, so we skip the explicit track call to avoid a
-    // duplicate row. For redirect-plain / shared-cookie modes the browser goes
-    // directly to target_url with no server round-trip, so this is the only
-    // signal the server gets. Errors are swallowed — tracking must not block
-    // navigation.
-    if (app.mode !== 'redirect') {
+    // Fire-and-forget access tracking. For mode='redirect' and
+    // mode='entra-app' the server already logs via the dedicated redirect
+    // endpoint, so we skip the explicit track call to avoid duplicate rows.
+    // For redirect-plain / shared-cookie modes the browser goes directly to
+    // target_url with no server round-trip, so this is the only signal the
+    // server gets. Errors are swallowed — tracking must not block navigation.
+    if (app.mode !== 'redirect' && app.mode !== 'entra-app') {
       api.post(`/apps/${app.slug}/track-access`).catch(() => {});
     }
     window.open(app.url, '_blank', 'noopener');
@@ -100,7 +100,7 @@ const AppCard = forwardRef(function AppCard(
 
           <div className="flex items-center gap-1 shrink-0">
             {showModeBadges && isSharedCookie && (
-              <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              <span className="text-[10px] font-medium text-accent-dark bg-accent/10 px-1.5 py-0.5 rounded flex items-center gap-0.5">
                 <Lock className="w-2.5 h-2.5" />SSO
               </span>
             )}
@@ -193,7 +193,7 @@ const AppCard = forwardRef(function AppCard(
               </button>
             )}
             {showModeBadges && isSharedCookie && (
-              <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              <span className="text-[10px] font-medium text-accent-dark bg-accent/10 px-1.5 py-0.5 rounded flex items-center gap-0.5">
                 <Lock className="w-2.5 h-2.5" />SSO
               </span>
             )}

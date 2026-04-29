@@ -147,7 +147,7 @@ function extensionFromContentType(contentType) {
   return 'jpg';
 }
 
-async function saveLogo(dataUrl) {
+async function saveLogo(dataUrl, { dbHandle = db } = {}) {
   const { contentType, buffer } = parseLogoDataUrl(dataUrl);
   const extension = extensionFromContentType(contentType);
   const fileName = `company-logo.${Date.now()}.${uuidv4().slice(0, 8)}.${extension}`;
@@ -161,6 +161,7 @@ async function saveLogo(dataUrl) {
     storedFileName: fileName,
     contentType,
     buffer,
+    dbHandle,
   });
 
   return { fileName, contentType };
@@ -227,7 +228,7 @@ export async function updateBrandingSettings(input = {}) {
     logoFileName = null;
     logoContentType = null;
   } else if (input.logoDataUrl) {
-    const logo = await saveLogo(input.logoDataUrl);
+    const logo = await saveLogo(input.logoDataUrl, { dbHandle: db });
     logoFileName = logo.fileName;
     logoContentType = logo.contentType;
   }

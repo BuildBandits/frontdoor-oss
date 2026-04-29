@@ -122,7 +122,8 @@ describe('mediaAssets service', () => {
       const result = await backfillMediaLibrary({ dbHandle: db, appIconDir, brandingDir });
       assert.equal(result.totalImported, 2);
 
-      const assets = listMediaAssets({ dbHandle: db, appIconDir, brandingDir });
+      const mediaIndex = listMediaAssets({ dbHandle: db, appIconDir, brandingDir });
+      const assets = mediaIndex.assets;
       assert.equal(assets.length, 2);
       assert.equal(assets.find((asset) => asset.kind === 'app-icon').fileExists, true);
       assert.equal(assets.find((asset) => asset.kind === 'branding-logo').fileExists, true);
@@ -164,6 +165,7 @@ describe('mediaAssets service', () => {
         mode: 'redirect',
       }, {
         cacheDir: appIconDir,
+        dbHandle: db,
       });
       db.prepare('UPDATE apps SET icon_file_name = ? WHERE id = ?').run(first.fileName, 'app-2');
 
@@ -177,10 +179,12 @@ describe('mediaAssets service', () => {
         mode: 'redirect',
       }, {
         cacheDir: appIconDir,
+        dbHandle: db,
       });
       db.prepare('UPDATE apps SET icon_file_name = ? WHERE id = ?').run(second.fileName, 'app-2');
 
-      const assets = listMediaAssets({ dbHandle: db, appIconDir });
+      const result = listMediaAssets({ dbHandle: db, appIconDir });
+      const assets = result.assets;
       assert.equal(assets.length, 2);
       assert.equal(fs.existsSync(path.join(appIconDir, first.fileName)), true);
       assert.equal(fs.existsSync(path.join(appIconDir, second.fileName)), true);
@@ -194,8 +198,9 @@ describe('mediaAssets service', () => {
     }
   });
 
-  it('deletes media index rows without touching the physical file', async () => {
+  it('blocks deletion for assets still referenced by apps or branding, but allows orphan rows', async () => {
     const appIconDir = fs.mkdtempSync(path.join(os.tmpdir(), 'frontdoor-media-delete-'));
+    const brandingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'frontdoor-media-branding-delete-'));
 
     try {
       resetTables();
@@ -207,8 +212,13 @@ describe('mediaAssets service', () => {
         'redirect',
         null
       );
+      db.prepare('INSERT INTO branding_settings (id, logo_file_name, logo_content_type) VALUES (?, ?, ?)').run(
+        'default',
+        null,
+        null
+      );
 
-      const saved = await saveAppIconAsset('app-3', {
+      const liveAppIcon = await saveAppIconAsset('app-3', {
         buffer: Buffer.from('<svg viewBox="0 0 24 24"><rect width="24" height="24"/></svg>', 'utf8'),
         contentType: 'image/svg+xml',
       }, {
@@ -218,13 +228,36 @@ describe('mediaAssets service', () => {
         mode: 'redirect',
       }, {
         cacheDir: appIconDir,
+        dbHandle: db,
       });
-      const assetId = getAssetIdByStoredFileName(saved.fileName);
-      assert.ok(assetId);
+      db.prepare('UPDATE apps SET icon_file_name = ? WHERE id = ?').run(liveAppIcon.fileName, 'app-3');
 
-      assert.equal(deleteMediaAssetById(assetId, db), 1);
-      assert.equal(listMediaAssets({ dbHandle: db, appIconDir }).length, 0);
-      assert.equal(fs.existsSync(path.join(appIconDir, saved.fileName)), true);
+      const liveAppIconId = getAssetIdByStoredFileName(liveAppIcon.fileName);
+      assert.ok(liveAppIconId);
+      assert.throws(() => deleteMediaAssetById(liveAppIconId, db), (error) => error?.statusCode === 409 && error?.code === 'MEDIA_ASSET_IN_USE');
+      assert.equal(listMediaAssets({ dbHandle: db, appIconDir }).assets.length, 1);
+      assert.equal(fs.existsSync(path.join(appIconDir, liveAppIcon.fileName)), true);
+
+      const liveBrandingFileName = 'company-logo.svg';
+      fs.writeFileSync(path.join(brandingDir, liveBrandingFileName), '<svg viewBox="0 0 24 24"><rect width="24" height="24"/></svg>', 'utf8');
+      db.prepare('UPDATE branding_settings SET logo_file_name = ?, logo_content_type = ? WHERE id = ?').run(
+        liveBrandingFileName,
+        'image/svg+xml',
+        'default'
+      );
+      const brandingImported = await backfillMediaLibrary({ dbHandle: db, appIconDir, brandingDir });
+      assert.equal(brandingImported.totalImported >= 1, true);
+      const brandingIndex = listMediaAssets({ dbHandle: db, appIconDir, brandingDir, kind: 'branding-logo' });
+      const brandingLiveAsset = brandingIndex.assets[0];
+      assert.ok(brandingLiveAsset);
+      assert.throws(() => deleteMediaAssetById(brandingLiveAsset.id, db), (error) => error?.statusCode === 409 && error?.code === 'MEDIA_ASSET_IN_USE');
+
+      db.prepare('UPDATE apps SET icon_file_name = NULL WHERE id = ?').run('app-3');
+      const orphanDeleteId = getAssetIdByStoredFileName(liveAppIcon.fileName);
+      assert.ok(orphanDeleteId);
+      assert.equal(deleteMediaAssetById(orphanDeleteId, db), 1);
+      assert.equal(listMediaAssets({ dbHandle: db, appIconDir, kind: 'app-icon' }).assets.length, 0);
+      assert.equal(fs.existsSync(path.join(appIconDir, liveAppIcon.fileName)), true);
 
       const stats = await getAppIconCacheStats({ dbHandle: db, cacheDir: appIconDir });
       assert.equal(stats.totalFiles, 1);
@@ -232,9 +265,10 @@ describe('mediaAssets service', () => {
 
       const cleanup = await cleanupAppIconCache({ dbHandle: db, cacheDir: appIconDir });
       assert.equal(cleanup.removed, 1);
-      assert.equal(fs.existsSync(path.join(appIconDir, saved.fileName)), false);
+      assert.equal(fs.existsSync(path.join(appIconDir, liveAppIcon.fileName)), false);
     } finally {
       fs.rmSync(appIconDir, { recursive: true, force: true });
+      fs.rmSync(brandingDir, { recursive: true, force: true });
     }
   });
 

@@ -9,6 +9,7 @@ import db from './db.js';
 import authRoutes from './routes/auth.js';
 import brandingRoutes from './routes/branding.js';
 import appsRoutes from './routes/apps.js';
+import backupsRoutes from './routes/backups.js';
 import mediaAssetsRoutes from './routes/mediaAssets.js';
 import usersRoutes from './routes/users.js';
 import groupsRoutes from './routes/groups.js';
@@ -150,6 +151,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/branding', brandingRoutes);
 app.use('/api/apps', appsRoutes);
+app.use('/api/backups', backupsRoutes);
 app.use('/api/media-assets', mediaAssetsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/groups', groupsRoutes);

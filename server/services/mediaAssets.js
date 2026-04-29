@@ -181,6 +181,25 @@ export async function archiveMediaAsset(options = {}) {
 
 export function deleteMediaAssetById(assetId, dbHandle = db) {
   if (!assetId) return 0;
+  const asset = dbHandle.prepare('SELECT * FROM media_assets WHERE id = ?').get(assetId);
+  if (!asset) return 0;
+
+  const appUsageCount = asset.kind === 'app-icon' && asset.stored_file_name
+    ? (dbHandle.prepare('SELECT COUNT(*) AS count FROM apps WHERE icon_file_name = ?').get(asset.stored_file_name)?.count || 0)
+    : 0;
+  const brandingUsageCount = asset.kind === 'branding-logo' && asset.stored_file_name
+    ? (dbHandle.prepare('SELECT COUNT(*) AS count FROM branding_settings WHERE logo_file_name = ?').get(asset.stored_file_name)?.count || 0)
+    : 0;
+  const usageCount = appUsageCount + brandingUsageCount;
+
+  if (usageCount > 0) {
+    const error = new Error('This asset is still referenced by an app or branding setting');
+    error.statusCode = 409;
+    error.code = 'MEDIA_ASSET_IN_USE';
+    error.usageCount = usageCount;
+    throw error;
+  }
+
   const result = dbHandle.prepare('DELETE FROM media_assets WHERE id = ?').run(assetId);
   return result.changes || 0;
 }
@@ -301,19 +320,23 @@ export function listMediaAssets({
   dbHandle = db,
   kind = null,
   query = null,
-  limit = 200,
+  limit = 25,
+  page = 1,
   appIconDir = APP_ICON_CACHE_DIR,
   brandingDir = BRANDING_ASSET_DIR,
 } = {}) {
-  const safeLimit = Math.min(500, Math.max(1, Number.parseInt(limit, 10) || 200));
-  const hasKindFilter = typeof kind === 'string' && kind.trim() !== '';
+  const safeLimit = Math.min(100, Math.max(25, Number.parseInt(limit, 10) || 25));
+  const safePage = Math.max(1, Number.parseInt(page, 10) || 1);
+  const normalizedKind = typeof kind === 'string' ? kind.trim() : '';
+  const isOrphanFilter = normalizedKind === 'orphan';
+  const hasKindFilter = normalizedKind !== '' && normalizedKind !== 'all' && !isOrphanFilter;
   const hasQuery = typeof query === 'string' && query.trim() !== '';
   const whereClauses = [];
   const params = [];
 
   if (hasKindFilter) {
     whereClauses.push('kind = ?');
-    params.push(kind.trim());
+    params.push(normalizedKind);
   }
 
   if (hasQuery) {
@@ -337,8 +360,15 @@ export function listMediaAssets({
     FROM media_assets
     ${whereSql}
     ORDER BY created_at DESC, id DESC
-    LIMIT ?
-  `).all(...params, safeLimit);
+  `).all(...params);
+  const referencedAppFiles = new Set(
+    dbHandle.prepare("SELECT icon_file_name FROM apps WHERE icon_file_name IS NOT NULL AND TRIM(icon_file_name) <> ''").all()
+      .map((row) => row.icon_file_name)
+  );
+  const referencedBrandingFiles = new Set(
+    dbHandle.prepare("SELECT logo_file_name FROM branding_settings WHERE logo_file_name IS NOT NULL AND TRIM(logo_file_name) <> ''").all()
+      .map((row) => row.logo_file_name)
+  );
 
   const grouped = new Map();
   for (const row of rows) {
@@ -346,23 +376,92 @@ export function listMediaAssets({
     const groupKey = asset.sha256 ? `${asset.kind}:${asset.sha256}` : `${asset.kind}:${asset.id}`;
     const existing = grouped.get(groupKey);
     const linkedApp = buildLinkedApp(asset);
+    const fileExists = asset.fileExists !== false;
+    const currentUsage = asset.kind === 'app-icon'
+      ? referencedAppFiles.has(asset.stored_file_name)
+      : asset.kind === 'branding-logo'
+        ? referencedBrandingFiles.has(asset.stored_file_name)
+        : false;
 
     if (!existing) {
       grouped.set(groupKey, {
         ...asset,
         duplicateCount: 1,
         duplicateAssetIds: [asset.id],
+        duplicateAssets: [asset],
         linkedApps: linkedApp ? [linkedApp] : [],
+        inUse: currentUsage,
+        liveCount: fileExists ? 1 : 0,
+        orphanCount: fileExists ? 0 : 1,
+        hasLiveMembers: fileExists,
+        hasOrphanMembers: !fileExists,
+        groupSortCreatedAt: asset.created_at || null,
       });
       continue;
     }
 
     existing.duplicateCount += 1;
     existing.duplicateAssetIds.push(asset.id);
+    existing.duplicateAssets.push(asset);
     existing.linkedApps = mergeLinkedApps(existing.linkedApps, linkedApp);
+    if (fileExists) {
+      existing.liveCount = (existing.liveCount || 0) + 1;
+      existing.hasLiveMembers = true;
+      if (existing.fileExists === false) {
+        const preserved = {
+          duplicateCount: existing.duplicateCount,
+          duplicateAssetIds: existing.duplicateAssetIds,
+          duplicateAssets: existing.duplicateAssets,
+          linkedApps: existing.linkedApps,
+          inUse: Boolean(existing.inUse || currentUsage),
+          liveCount: existing.liveCount,
+          orphanCount: existing.orphanCount || 0,
+          hasLiveMembers: true,
+          hasOrphanMembers: Boolean(existing.orphanCount),
+          groupSortCreatedAt: existing.groupSortCreatedAt || asset.created_at || null,
+        };
+        Object.assign(existing, asset, preserved);
+      }
+    } else {
+      existing.orphanCount = (existing.orphanCount || 0) + 1;
+      existing.hasOrphanMembers = true;
+      existing.inUse = Boolean(existing.inUse || currentUsage);
+    }
   }
 
-  return [...grouped.values()];
+  const groupedAssets = [...grouped.values()];
+  const visibleAssets = isOrphanFilter
+    ? groupedAssets.filter((asset) => asset.hasOrphanMembers)
+    : groupedAssets.filter((asset) => (asset.liveCount || 0) > 0);
+
+  visibleAssets.sort((a, b) => {
+    const kindA = ['app-icon', 'branding-logo'].indexOf(a.kind);
+    const kindB = ['app-icon', 'branding-logo'].indexOf(b.kind);
+    if (kindA !== kindB) return kindA - kindB;
+    return String(b.groupSortCreatedAt || b.created_at || '').localeCompare(String(a.groupSortCreatedAt || a.created_at || ''));
+  });
+
+  const total = visibleAssets.length;
+  const pages = Math.max(1, Math.ceil(total / safeLimit));
+  const currentPage = Math.min(safePage, pages);
+  const start = (currentPage - 1) * safeLimit;
+  const assets = visibleAssets.slice(start, start + safeLimit);
+
+  return {
+    assets,
+    summary: {
+      total,
+      appIcon: visibleAssets.filter((asset) => asset.kind === 'app-icon').length,
+      brandingLogo: visibleAssets.filter((asset) => asset.kind === 'branding-logo').length,
+      orphanAssets: groupedAssets.filter((asset) => asset.hasOrphanMembers).length,
+    },
+    pagination: {
+      page: currentPage,
+      pages,
+      total,
+      limit: safeLimit,
+    },
+  };
 }
 
 export function getMediaAssetById(assetId, {

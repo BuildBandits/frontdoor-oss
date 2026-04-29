@@ -231,7 +231,7 @@ export default function AdminUsers() {
   };
   const appModeBadgeClass = (mode) => {
     if (mode === 'redirect') return 'bg-blue-100 text-blue-700';
-    if (mode === 'shared-cookie') return 'bg-emerald-100 text-emerald-700';
+    if (mode === 'shared-cookie') return 'bg-accent/10 text-accent-dark';
     if (mode === 'entra-app') return 'bg-violet-100 text-violet-700';
     return 'bg-gray-100 text-gray-600';
   };
@@ -486,7 +486,7 @@ export default function AdminUsers() {
                           </div>
                           <div>
                           <dt className="text-gray-400">{t.status}</dt>
-                          <dd className={userDetail.user.is_active ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>
+                          <dd className={userDetail.user.is_active ? 'text-accent-dark font-medium' : 'text-red-500 font-medium'}>
                               {userDetail.user.is_active ? t.active : t.inactive}
                           </dd>
                         </div>
@@ -608,7 +608,7 @@ export default function AdminUsers() {
                                 <Users className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                                 <span className="text-sm text-dark">{group.display_name}</span>
                                 {group.is_imported ? (
-                                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
+                                  <span className="text-[10px] bg-accent/10 text-accent-dark px-1.5 py-0.5 rounded font-medium">
                                     {u.importedBadge}
                                   </span>
                                 ) : (
@@ -654,7 +654,7 @@ export default function AdminUsers() {
                                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                 : user.is_active
                                   ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                  : 'bg-accent/10 text-accent-dark hover:bg-accent/20'
                             }`}
                           >
                             {!canEditUsers || isComposeLockedAdmin(user) ? (

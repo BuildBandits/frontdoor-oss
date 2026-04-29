@@ -2,7 +2,7 @@ import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 
 const noticeStyles = {
   success: {
-    wrapper: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    wrapper: 'border-accent/30 bg-accent/10 text-dark',
     icon: CheckCircle2,
   },
   error: {

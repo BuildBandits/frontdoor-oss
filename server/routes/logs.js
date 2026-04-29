@@ -88,6 +88,13 @@ export function purgeLogsOlderThan(days = 90) {
   return { retentionDays, ...result };
 }
 
+export function purgeAccessLogs() {
+  const accessRemoved = db.transaction(() => (
+    db.prepare('DELETE FROM access_logs').run().changes || 0
+  ))();
+  return { accessRemoved };
+}
+
 function buildLikeSearchClause(search, aliases) {
   if (!search) return { sql: '', params: [] };
   const like = `%${search.toLowerCase()}%`;
@@ -259,6 +266,20 @@ function loadAuditLogs(req, res) {
 
 // List access logs with pagination (owner only)
 router.get('/', authenticate, isOwner, loadAccessLogs);
+
+// Clear the full access log immediately (owner only)
+router.post('/clear-access', authenticate, isOwner, (req, res) => {
+  try {
+    const { accessRemoved } = purgeAccessLogs();
+    res.json({
+      message: 'Access log cleared',
+      accessRemoved,
+    });
+  } catch (error) {
+    console.error(`Access log purge failed: ${error.message}`);
+    res.status(500).json({ error: 'Access log purge failed' });
+  }
+});
 
 // Top apps by access count (owner only)
 router.get('/top-apps', authenticate, isOwner, (req, res) => {
