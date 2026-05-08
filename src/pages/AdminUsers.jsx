@@ -746,7 +746,7 @@ export default function AdminUsers() {
         title={confirmDialog?.title || ''}
         message={confirmDialog?.message || ''}
         confirmLabel={confirmDialog?.confirmLabel || t.confirm}
-        cancelLabel={confirmDialog?.cancelLabel || t.cancel}
+        cancelLabel={confirmDialog?.cancelLabel || ui.common.cancel}
         closeLabel={ui.common.closeDialog}
         busyLabel={ui.common.pleaseWait}
         busy={confirmBusy}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowUp, Activity, Check, ChevronDown, Globe, Home, LogOut, Menu, Palette, RotateCcw, Settings, Users, UserCog, X, ShieldCheck } from 'lucide-react';
+import { ArrowUp, Activity, ChevronDown, Globe, Home, LogOut, Menu, Palette, RotateCcw, Settings, Users, UserCog, X, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import BrandMark from './BrandMark';
 import AppFooter from './AppFooter';
@@ -28,10 +28,13 @@ export default function Layout({ children }) {
   const [brandingLanguage, setBrandingLanguage] = useState('en');
   const [useEuropeanDateFormat, setUseEuropeanDateFormat] = useState(false);
   const [use24hTimeFormat, setUse24hTimeFormat] = useState(false);
+  const [hideLoginPage, setHideLoginPage] = useState(false);
   const accountMenuRef = useRef(null);
   const role = user?.role;
   const canUseAdminPages = ['owner', 'admin', 'admin_readonly'].includes(role);
   const isOwner = role === 'owner';
+  const showHomeNav = role !== 'user';
+  const showLogoutAction = !hideLoginPage;
 
   const handleLogout = () => {
     logout();
@@ -55,6 +58,7 @@ export default function Layout({ children }) {
           setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
           setUseEuropeanDateFormat(res.data?.branding?.useEuropeanDateFormat === true);
           setUse24hTimeFormat(res.data?.branding?.use24hTimeFormat === true);
+          setHideLoginPage(res.data?.branding?.hideLoginPage === true);
         }
       })
       .catch(() => {
@@ -63,6 +67,7 @@ export default function Layout({ children }) {
           setBrandingLanguage('en');
           setUseEuropeanDateFormat(false);
           setUse24hTimeFormat(false);
+          setHideLoginPage(false);
         }
       });
     return () => {
@@ -76,6 +81,7 @@ export default function Layout({ children }) {
       setBrandingLanguage(normalizeLanguage(event.detail?.defaultLanguage));
       setUseEuropeanDateFormat(event.detail?.useEuropeanDateFormat === true);
       setUse24hTimeFormat(event.detail?.use24hTimeFormat === true);
+      setHideLoginPage(event.detail?.hideLoginPage === true);
     };
     window.addEventListener('frontdoor:branding-updated', onBrandingUpdated);
     return () => window.removeEventListener('frontdoor:branding-updated', onBrandingUpdated);
@@ -140,7 +146,6 @@ export default function Layout({ children }) {
     setHomeViewSaving(true);
     try {
       await updateHomeDesktopView(nextView);
-      setAccountMenuOpen(false);
     } finally {
       setHomeViewSaving(false);
     }
@@ -151,7 +156,6 @@ export default function Layout({ children }) {
     setHomeViewSaving(true);
     try {
       await resetHomeDesktopView();
-      setAccountMenuOpen(false);
     } finally {
       setHomeViewSaving(false);
     }
@@ -224,10 +228,12 @@ export default function Layout({ children }) {
             </div>
 
             <div className="hidden md:flex items-center gap-2 min-w-0">
-              <Link to="/" className={navLinkClass('/')}>
-                <Home className="w-4 h-4" />
-                {ui.nav.home}
-              </Link>
+              {showHomeNav && (
+                <Link to="/" className={navLinkClass('/')}>
+                  <Home className="w-4 h-4" />
+                  {ui.nav.home}
+                </Link>
+              )}
 
               {canUseAdminPages && (
                 <>
@@ -297,7 +303,7 @@ export default function Layout({ children }) {
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
                           {ui.layout.personalHomeViewShort || ui.layout.personalHomeView}
                         </p>
-                        {hasHomeViewOverride ? (
+                        {hasHomeViewOverride && (
                           <button
                             type="button"
                             onClick={handleResetHomeView}
@@ -307,23 +313,18 @@ export default function Layout({ children }) {
                             <RotateCcw className="h-3 w-3" />
                             {ui.layout.restoreView}
                           </button>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-2 py-1 text-[11px] font-medium text-accent-dark">
-                            <Check className="h-3 w-3" />
-                            {ui.layout.defaultView}
-                          </span>
                         )}
                       </div>
-                      <div className="rounded-xl border border-accent/15 bg-accent/5 p-1">
+                      <div className="rounded-2xl border border-gray-200 bg-white p-1.5 shadow-sm">
                         <label className="sr-only" htmlFor="personal-home-view-select">{ui.layout.personalHomeView}</label>
                         <div className="relative">
-                          <Home className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <Home className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                           <select
                             id="personal-home-view-select"
                             value={effectiveHomeView}
                             onChange={(event) => handleHomeViewChange(event.target.value)}
                             disabled={homeViewSaving}
-                            className="w-full appearance-none rounded-lg border-0 bg-white/90 py-2 pl-9 pr-8 text-sm font-medium text-dark shadow-inner ring-1 ring-accent/20 transition disabled:opacity-60"
+                            className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-8 text-sm font-medium text-dark transition focus:border-accent focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
                           >
                             <option value="cards">{ui.layout.homeViewCards}</option>
                             <option value="compact">{ui.layout.homeViewCompact}</option>
@@ -336,7 +337,7 @@ export default function Layout({ children }) {
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
                           {ui.common.language}
                         </p>
-                        {hasPreferredLanguageOverride ? (
+                        {hasPreferredLanguageOverride && (
                           <button
                             type="button"
                             onClick={handleResetPreferredLanguage}
@@ -346,23 +347,18 @@ export default function Layout({ children }) {
                             <RotateCcw className="h-3 w-3" />
                             {ui.layout.restoreLanguage}
                           </button>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-2 py-1 text-[11px] font-medium text-accent-dark">
-                            <Check className="h-3 w-3" />
-                            {ui.layout.defaultLanguage}
-                          </span>
                         )}
                       </div>
-                      <div className="rounded-xl border border-accent/15 bg-accent/5 p-1">
+                      <div className="rounded-2xl border border-gray-200 bg-white p-1.5 shadow-sm">
                         <label className="sr-only" htmlFor="personal-language-select">{ui.common.language}</label>
                         <div className="relative">
-                          <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                           <select
                             id="personal-language-select"
                             value={effectiveLanguage}
                             onChange={(event) => handlePreferredLanguageChange(event.target.value)}
                             disabled={languageSaving}
-                            className="w-full appearance-none rounded-lg border-0 bg-white/90 py-2 pl-9 pr-8 text-sm font-medium text-dark shadow-inner ring-1 ring-accent/20 transition disabled:opacity-60"
+                            className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-8 text-sm font-medium text-dark transition focus:border-accent focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
                           >
                             {languageOptions.map((language) => (
                               <option key={language.code} value={language.code}>{language.label}</option>
@@ -398,13 +394,15 @@ export default function Layout({ children }) {
                       </>
                     )}
                     <div className="my-1 h-px bg-gray-100" />
-                    <button
-                      onClick={handleLogout}
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      {ui.nav.logout}
-                    </button>
+                    {showLogoutAction && (
+                      <button
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        {ui.nav.logout}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -415,10 +413,12 @@ export default function Layout({ children }) {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-100 bg-white">
             <div className="max-w-7xl mx-auto px-4 py-4 space-y-3">
-              <Link to="/" className={mobileNavLinkClass('/')}>
-                <Home className="w-4 h-4" />
-                {ui.nav.home}
-              </Link>
+              {showHomeNav && (
+                <Link to="/" className={mobileNavLinkClass('/')}>
+                  <Home className="w-4 h-4" />
+                  {ui.nav.home}
+                </Link>
+              )}
 
               {canUseAdminPages && (
                 <>
@@ -470,13 +470,15 @@ export default function Layout({ children }) {
                     <p className="text-xs text-gray-400 truncate">{user?.email}</p>
                   </div>
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600"
-                >
-                  <LogOut className="w-4 h-4" />
-                  {ui.nav.logout}
-                </button>
+                {showLogoutAction && (
+                  <button
+                    onClick={handleLogout}
+                    className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    {ui.nav.logout}
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -347,7 +347,12 @@ export function listDiscoveredEntraGroups() {
         SELECT COUNT(*)
         FROM entra_user_group_memberships m
         WHERE m.entra_group_id = c.entra_group_id
-      ) AS synced_member_count
+      ) AS synced_member_count,
+      (
+        SELECT COUNT(*)
+        FROM group_entra_group_memberships gm
+        WHERE gm.entra_group_id = c.entra_group_id
+      ) AS linked_parent_count
     FROM entra_group_cache c
     LEFT JOIN user_groups g
       ON g.entra_group_id = c.entra_group_id
@@ -358,6 +363,7 @@ export function listDiscoveredEntraGroups() {
     description: row.description || null,
     is_imported: Boolean(row.is_imported),
     synced_member_count: Number(row.synced_member_count || 0),
+    linked_parent_count: Number(row.linked_parent_count || 0),
   }));
 }
 

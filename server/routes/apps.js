@@ -7,6 +7,7 @@ import { logRbacAudit } from '../db.js';
 import { authenticate, isAdminViewer, isAdminEditor } from '../middleware/auth.js';
 import { getRequiredEnv } from '../config.js';
 import { restoreDefaultDemoApps } from '../services/demoApps.js';
+import { getAccessibleGroupIdsForUser } from '../services/groupHierarchy.js';
 import { iconUrlForApp, parseAppIconPayload, readAppIconAssetDataUrl, removeAppIconAsset, saveAppIconAsset, serveAppIconForApp } from '../services/appIcons.js';
 import { getBrandingSettings } from '../services/branding.js';
 import { isValidEntraApplicationId, normalizeEntraApplicationId } from '../../shared/entra.js';
@@ -14,17 +15,30 @@ import { normalizeAppSlug } from '../../shared/appSlug.js';
 
 const router = express.Router();
 
+function buildGroupFilterClause(groupIds) {
+  const placeholders = groupIds.map(() => '?').join(', ');
+  return {
+    clause: `IN (${placeholders})`,
+    params: groupIds,
+  };
+}
+
 // List active apps visible to current user (RBAC applies to all, including admins)
 router.get('/', authenticate, (req, res) => {
+  const accessibleGroupIds = getAccessibleGroupIdsForUser(req.user.id);
+  if (accessibleGroupIds.length === 0) {
+    return res.json({ apps: [] });
+  }
+
+  const { clause, params } = buildGroupFilterClause(accessibleGroupIds);
   const apps = db.prepare(`
     SELECT DISTINCT a.id, a.name, a.slug, a.description, a.long_description, a.icon, a.icon_file_name, a.target_url,
       a.is_active, a.sort_order, a.mode, a.sso_endpoint, a.sso_method, a.tags, a.updated_at
     FROM apps a
     JOIN app_permissions p ON a.id = p.app_id
-    JOIN user_group_members m ON p.group_id = m.group_id
-    WHERE a.is_active = 1 AND m.user_id = ?
+    WHERE a.is_active = 1 AND p.group_id ${clause}
     ORDER BY a.sort_order, a.name
-  `).all(req.user.id);
+  `).all(...params);
 
   const appsWithUrls = apps.map((app) => {
     const url = app.mode === 'redirect'
@@ -50,11 +64,13 @@ router.get('/:slug/sso-redirect', authenticate, (req, res) => {
   }
 
   // RBAC check: user must have group permission
-  const hasAccess = db.prepare(`
-    SELECT 1 FROM app_permissions p
-    JOIN user_group_members m ON p.group_id = m.group_id
-    WHERE p.app_id = ? AND m.user_id = ?
-  `).get(app.id, req.user.id);
+  const accessibleGroupIds = getAccessibleGroupIdsForUser(req.user.id);
+  const hasAccess = accessibleGroupIds.length > 0
+    ? db.prepare(`
+      SELECT 1 FROM app_permissions
+      WHERE app_id = ? AND group_id IN (${accessibleGroupIds.map(() => '?').join(', ')})
+    `).get(app.id, ...accessibleGroupIds)
+    : null;
   if (!hasAccess) return res.status(403).json({ error: 'Access denied' });
 
   // Log access
@@ -129,11 +145,13 @@ router.get('/:slug/entra-redirect', authenticate, (req, res) => {
   }
 
   // RBAC check: user must have group permission
-  const hasAccess = db.prepare(`
-    SELECT 1 FROM app_permissions p
-    JOIN user_group_members m ON p.group_id = m.group_id
-    WHERE p.app_id = ? AND m.user_id = ?
-  `).get(app.id, req.user.id);
+  const accessibleGroupIds = getAccessibleGroupIdsForUser(req.user.id);
+  const hasAccess = accessibleGroupIds.length > 0
+    ? db.prepare(`
+      SELECT 1 FROM app_permissions
+      WHERE app_id = ? AND group_id IN (${accessibleGroupIds.map(() => '?').join(', ')})
+    `).get(app.id, ...accessibleGroupIds)
+    : null;
   if (!hasAccess) return res.status(403).json({ error: 'Access denied' });
 
   // Log access
@@ -162,11 +180,13 @@ router.post('/:slug/track-access', authenticate, (req, res) => {
   if (!app) return res.status(404).json({ error: 'App not found' });
 
   // RBAC check: user must have group permission on this app
-  const hasAccess = db.prepare(`
-    SELECT 1 FROM app_permissions p
-    JOIN user_group_members m ON p.group_id = m.group_id
-    WHERE p.app_id = ? AND m.user_id = ?
-  `).get(app.id, req.user.id);
+  const accessibleGroupIds = getAccessibleGroupIdsForUser(req.user.id);
+  const hasAccess = accessibleGroupIds.length > 0
+    ? db.prepare(`
+      SELECT 1 FROM app_permissions
+      WHERE app_id = ? AND group_id IN (${accessibleGroupIds.map(() => '?').join(', ')})
+    `).get(app.id, ...accessibleGroupIds)
+    : null;
   if (!hasAccess) return res.status(403).json({ error: 'Access denied' });
 
   try {

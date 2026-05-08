@@ -64,23 +64,63 @@ function initSchema(database) {
       PRIMARY KEY (app_id, group_id)
     );
 
+    CREATE TABLE group_group_memberships (
+      parent_group_id TEXT REFERENCES user_groups(id),
+      child_group_id TEXT REFERENCES user_groups(id),
+      PRIMARY KEY (parent_group_id, child_group_id)
+    );
+
+    CREATE TABLE group_entra_group_memberships (
+      parent_group_id TEXT REFERENCES user_groups(id),
+      entra_group_id TEXT NOT NULL,
+      PRIMARY KEY (parent_group_id, entra_group_id)
+    );
+
+    CREATE TABLE entra_user_group_memberships (
+      user_id TEXT REFERENCES users(id),
+      entra_group_id TEXT NOT NULL,
+      synced_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, entra_group_id)
+    );
+
     CREATE INDEX idx_user_group_members_group ON user_group_members(group_id);
     CREATE INDEX idx_app_permissions_group ON app_permissions(group_id);
     CREATE INDEX idx_app_permissions_app ON app_permissions(app_id);
+    CREATE INDEX idx_group_group_memberships_parent ON group_group_memberships(parent_group_id);
+    CREATE INDEX idx_group_group_memberships_child ON group_group_memberships(child_group_id);
+    CREATE INDEX idx_group_entra_group_memberships_parent ON group_entra_group_memberships(parent_group_id);
+    CREATE INDEX idx_group_entra_group_memberships_entra ON group_entra_group_memberships(entra_group_id);
+    CREATE INDEX idx_entra_user_group_memberships_group ON entra_user_group_memberships(entra_group_id);
   `);
 }
 
 // The RBAC visibility query (mirrors server/routes/apps.js GET /)
 function getVisibleApps(userId) {
   const stmt = db.prepare(`
+    WITH RECURSIVE accessible_groups(group_type, group_id) AS (
+      SELECT 'local', group_id
+      FROM user_group_members
+      WHERE user_id = ?
+      UNION
+      SELECT 'entra', entra_group_id
+      FROM entra_user_group_memberships
+      WHERE user_id = ?
+      UNION
+      SELECT 'local', gm.parent_group_id
+      FROM group_group_memberships gm
+      JOIN accessible_groups ag ON ag.group_type = 'local' AND ag.group_id = gm.child_group_id
+      UNION
+      SELECT 'local', gem.parent_group_id
+      FROM group_entra_group_memberships gem
+      JOIN accessible_groups ag ON ag.group_type = 'entra' AND ag.group_id = gem.entra_group_id
+    )
     SELECT DISTINCT a.id, a.name, a.slug
     FROM apps a
     JOIN app_permissions p ON a.id = p.app_id
-    JOIN user_group_members m ON p.group_id = m.group_id
-    WHERE a.is_active = 1 AND m.user_id = ?
+    WHERE a.is_active = 1 AND p.group_id IN (SELECT group_id FROM accessible_groups)
     ORDER BY a.sort_order, a.name
   `);
-  return stmt.all(userId);
+  return stmt.all(userId, userId);
 }
 
 // Seed helpers
@@ -104,6 +144,14 @@ function addMembership(userId, groupId) {
 
 function addPermission(appId, groupId) {
   db.prepare('INSERT OR IGNORE INTO app_permissions (app_id, group_id) VALUES (?, ?)').run(appId, groupId);
+}
+
+function addGroupLink(parentGroupId, childGroupId) {
+  db.prepare('INSERT OR IGNORE INTO group_group_memberships (parent_group_id, child_group_id) VALUES (?, ?)').run(parentGroupId, childGroupId);
+}
+
+function addEntraGroupLink(parentGroupId, entraGroupId) {
+  db.prepare('INSERT OR IGNORE INTO group_entra_group_memberships (parent_group_id, entra_group_id) VALUES (?, ?)').run(parentGroupId, entraGroupId);
 }
 
 // --- Tests ---
@@ -228,6 +276,44 @@ describe('RBAC app visibility', () => {
     const visible = getVisibleApps(userId);
     const count = visible.filter(a => a.slug === 'shared-app').length;
     assert.equal(count, 1, 'shared-app should appear exactly once');
+  });
+
+  it('user in a child group inherits apps assigned to the parent group', () => {
+    const userId = randomUUID();
+    const parentGroup = randomUUID();
+    const childGroup = randomUUID();
+    const app = randomUUID();
+
+    addUser(userId, 'hannah@test.com');
+    addGroup(parentGroup, 'parent-group');
+    addGroup(childGroup, 'entra-group-a');
+    addGroupLink(parentGroup, childGroup);
+
+    addApp(app, 'Parent App', 'parent-app');
+    addPermission(app, parentGroup);
+    addMembership(userId, childGroup);
+
+    const visible = getVisibleApps(userId);
+    assert.ok(visible.map(a => a.slug).includes('parent-app'), 'should see parent-app through the linked child group');
+  });
+
+  it('user in a raw Entra group inherits apps from a composed parent group without importing the group', () => {
+    const userId = randomUUID();
+    const parentGroup = randomUUID();
+    const entraGroupId = randomUUID();
+    const app = randomUUID();
+
+    addUser(userId, 'ivy@test.com');
+    addGroup(parentGroup, 'composite-parent');
+
+    db.prepare('INSERT INTO apps (id, name, slug, target_url) VALUES (?, ?, ?, ?)').run(app, 'Hidden App', 'hidden-app', 'https://hidden.example.com');
+    addPermission(app, parentGroup);
+
+    db.prepare('INSERT INTO entra_user_group_memberships (user_id, entra_group_id) VALUES (?, ?)').run(userId, entraGroupId);
+    addEntraGroupLink(parentGroup, entraGroupId);
+
+    const visible = getVisibleApps(userId);
+    assert.ok(visible.map(a => a.slug).includes('hidden-app'), 'should see hidden-app through the raw Entra group link');
   });
 
   it('deleting a group removes its app permissions (cascade logic)', () => {

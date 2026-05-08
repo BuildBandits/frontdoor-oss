@@ -12,9 +12,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ### Changed
 - **`POST /api/apps/bulk`**: API-key validation extracted into a shared `requireBulkApiKey` helper also used by the new GET endpoint. Now returns **503** when `ADMIN_API_KEY` is not configured on the server (previously surfaced as a misleading generic 401).
 
+## [1.0.1] — 2026-05-08
+
+### Changed
+- Version bumped to `1.0.1` after the latest UI and menu polish batch.
+- Layout: the personal Home view and language selectors now use a stronger dropdown treatment, with the faint accent aura removed so they read more clearly as menus.
+- Home: the `Raggruppa` and `Compatta` toggles now swap icons between selected and unselected states so their behavior is easier to distinguish at a glance.
+
 ## [Unreleased]
 
 ### Added
+- Admin Groups: added a hidden admin-only utility page to copy or move all direct app permissions from one group to another in a single action, with copy/move confirmation.
+- Admin app editor: apps without at least one label now surface only through a quick filter badge with a live count, keeping the warning discrete while still making unlabeled items easy to spot and filter.
+- Admin Groups: clicking a problematic group from the warning banner now expands it and scrolls the row into view, making the missing-assignment fix faster to reach.
+- Group-of-groups support: local groups can now link multiple child groups and inherit app visibility through that container, so one Frontdoor group can represent several Entra groups at once. The admin Groups page now exposes linked-group management, and RBAC/user detail lookups resolve the inherited access path.
+- Admin Groups: local composite groups can now also reference discovered Entra groups directly without importing them into the main group list, keeping the list cleaner while preserving inherited app visibility.
+- Admin Groups: the new "Collega gruppi" modal now exposes a filtered "select all" shortcut, matching the bulk-selection behavior already available in the other admin modals.
 - Backup and restore: owner-only download/upload flow for portable Frontdoor snapshots, including the database plus persisted app icon, branding and avatar cache files, exposed through a new `/admin/backup` page and `/api/backups` endpoints.
 - Personalizza: added an Owner-only action to clear the access log immediately from the retention section, leaving Audit untouched.
 - Admin app editor: new apps now get an automatic slug suggestion from the app name until you edit the slug manually, and the Entra App field now explains that you can paste the full MyApps URL.
@@ -25,7 +38,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - Entra App creation now accepts the full Microsoft MyApps launcher URL and automatically stores only the Application ID.
 - Media library deduplication: assets with the same content hash are now grouped into a single card in `/admin/icons`, while preserving the linked app references and merged occurrence count.
 
+### Fixed
+- Admin Groups: the Entra import toast now uses the correct singular/plural wording from the active locale, so importing one group no longer shows a plural message.
+- Admin Groups: the create-local-group modal now reads the cancel label from the shared common namespace, so the button no longer renders empty when a locale is selected.
+- Account menu: changing the personal Home view no longer closes the menu, matching the language selector behavior.
+- CI: group app transfer tests now work with both `better-sqlite3` and `node:sqlite` database handles, so the GitHub Actions suite no longer fails on `dbHandle.transaction is not a function`.
+- Home: `Compatta` and `Raggruppa` are now mutually exclusive, with the inactive compact state using a different icon so the toggle state is easier to read.
+- User avatars: users without a Microsoft or Gravatar photo now receive a generated initials placeholder image instead of a 404, so Chrome no longer logs missing-avatar requests in the console.
+- Layout: the top navigation now hides the redundant Home link for plain users, the personal logout action disappears when direct SSO login is enabled, and the “default view/language” badges are no longer shown once the system defaults are already active.
+
 ### Changed
+- Admin Groups: the group detail view now keeps `App visibili` fixed in its own column, while `Membri` and `Gruppi collegati` behave like a click-to-expand accordion on desktop so the active section can take the available height with a single tap on its title.
+- Home: the active `Compatta` view toggle now uses a colored sky/cyan gradient instead of a flat black fill, matching the more vivid selected treatment used by the other controls.
+- Home and personalization: the Home view labels now consistently use `Card` and `Compatta`, including the toolbar toggle, the personal view picker and the customization dropdown.
+- Home: the app counter next to the search field now reads more like a passive label than an action button, reducing the visual suggestion that it is clickable.
+- Home: the search field and app counter now sit inside the same white filter bar while the toolbar buttons stay on one line, and the counter is rendered as plain text instead of a pill.
 - Theme cleanup: residual emerald-positive badges and status chips were normalized to the lime accent family across the app, including the media library, notices, layout chips and admin status pills.
 - Theme: the shared `accent` palette is back to the original lime family, with a darker `accent-dark` so buttons and links stay readable.
 - Theme cleanup: generic accent links/buttons now lean on `accent-dark` or dark text instead of pale lime text, while semantic success/status greens stay unchanged.
@@ -44,6 +71,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - Admin App and Groups pages now surface info boxes for orphan apps and incomplete groups, making unassigned apps and groups missing apps/members easier to spot before they cause visibility gaps.
 
 ### Fixed
+- Admin Users: deleting a user now clears imported Entra membership rows as well, so the delete flow no longer fails with a foreign key constraint after restoring a populated database from another environment.
+- RBAC test schema: the in-memory RBAC suite now creates `entra_user_group_memberships`, matching production and unblocking the CI visibility tests.
+- Admin app clone flow: when the default group is disabled in the clone modal, the new app is no longer created with the original app's group memberships first. The follow-up group picker now controls the real final memberships, so unchecking a group removes it from the cloned app.
+- Admin app table: the "Modo" badge now stays on a single line instead of wrapping when the adjacent columns need more room.
 - Backup page: the download flow now reflects the real export stages with live SSE progress, green checkmarks for each included snapshot block and aligned action buttons.
 - Backup page: the export and restore cards now keep their primary actions aligned at the bottom, and the export flow shows a progress bar plus checkmarked snapshot contents.
 - Backup CTA in Personalizza now uses a database icon, and the page sections support hash links like `#maintenance` for direct jumps.
@@ -99,7 +130,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - Localizations: removed the obsolete email-invite strings from the Admin Groups language files after the modal cleanup.
 - Admin route: the personalization page moved from `/admin/personalizza` to `/admin/customization` to match the new English page name and menu links.
 - Personalizza Home: the desktop default view is now a true global branding setting, separate from the mobile compact forcing.
-- Account menu and Home: resetting the per-user Home view now returns to the global default from Personalizza, not always to box cards.
+- Account menu and Home: resetting the per-user Home view now returns to the global default from Personalizza, not always to the card view.
 - Account menu: the Home switch uses a subtler recessed selection state again, with readable text.
 - Account menu: the Home reset row now says when the default view is in use and switches to a restore label when overridden.
 - Account menu: the app-order reset row now says when the default order is in use and switches to a restore label when overridden.
@@ -111,7 +142,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - Account menu: the "Ordine app" section now shows the last saved custom order timestamp, formatted with the global 12h/24h preference.
 - Back-to-top button: the floating label now reads `Torna su`.
 - Account menu: the Home view segmented switch now highlights the effective current view immediately, including the global default when the user has no personal override yet.
-- Account menu: the Home view choice now uses a single-line segmented switch for `Box pieni` / `Compattata` instead of two separate stacked buttons.
+- Account menu: the Home view choice now uses a single-line segmented switch for `Card` / `Compatta` instead of two separate stacked buttons.
 - Personalizza save area: the "Stato modifiche" bar is now integrated inside each section card instead of appearing as a detached block below it.
 - User detail modal: "App visibili" now closes with `Esc`, uses App-page-style mode badges, and clicking an app opens its edit modal in `Gestione App` instead of launching it.
 - User detail modal: the visible-app count now shows an info icon to hint that it is clickable.

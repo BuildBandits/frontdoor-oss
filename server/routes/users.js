@@ -4,6 +4,7 @@ import { logRbacAudit } from '../db.js';
 import { authenticate, isAdminViewer, isAdminEditor, ROLE_OWNER } from '../middleware/auth.js';
 import { ensureAvatarCached, serveAvatarForUser } from '../services/avatars.js';
 import { iconUrlForApp } from '../services/appIcons.js';
+import { getAccessibleGroupIdsForUser } from '../services/groupHierarchy.js';
 
 const router = express.Router();
 const composeAdminEmails = new Set(
@@ -43,7 +44,7 @@ router.get('/', authenticate, isAdminViewer, (req, res) => {
 
 // Serve cached user avatar or discover it on demand (authenticated)
 router.get('/:id/avatar', authenticate, async (req, res) => {
-  const user = db.prepare('SELECT id, email, microsoft_id, display_name FROM users WHERE id = ?').get(req.params.id);
+  const user = db.prepare('SELECT id, email, microsoft_id, display_name, avatar_color FROM users WHERE id = ?').get(req.params.id);
 
   if (!user) {
     return res.status(404).end();
@@ -67,9 +68,19 @@ router.get('/:id', authenticate, isAdminViewer, (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   const groups = db.prepare(`
-    SELECT g.id, g.name, g.description, g.source, g.entra_display_name
-    FROM user_groups g JOIN user_group_members m ON g.id = m.group_id
-    WHERE m.user_id = ? ORDER BY g.name
+    WITH RECURSIVE effective_groups(group_id) AS (
+      SELECT group_id
+      FROM user_group_members
+      WHERE user_id = ?
+      UNION
+      SELECT gm.parent_group_id
+      FROM group_group_memberships gm
+      JOIN effective_groups eg ON eg.group_id = gm.child_group_id
+    )
+    SELECT DISTINCT g.id, g.name, g.description, g.source, g.entra_display_name
+    FROM user_groups g
+    JOIN effective_groups eg ON g.id = eg.group_id
+    ORDER BY g.name
   `).all(req.params.id);
 
   const entraGroups = db.prepare(`
@@ -96,14 +107,16 @@ router.get('/:id', authenticate, isAdminViewer, (req, res) => {
     is_imported: Boolean(row.local_group_id),
   }));
 
-  const visibleApps = db.prepare(`
-    SELECT DISTINCT a.id, a.name, a.slug, a.description, a.long_description, a.icon, a.icon_file_name, a.target_url, a.mode, a.sso_endpoint, a.sso_method, a.tags, a.updated_at
-    FROM apps a
-    JOIN app_permissions p ON a.id = p.app_id
-    JOIN user_group_members m ON p.group_id = m.group_id
-    WHERE m.user_id = ?
-    ORDER BY a.sort_order, a.name
-  `).all(req.params.id);
+  const accessibleGroupIds = getAccessibleGroupIdsForUser(req.params.id);
+  const visibleApps = accessibleGroupIds.length > 0
+    ? db.prepare(`
+      SELECT DISTINCT a.id, a.name, a.slug, a.description, a.long_description, a.icon, a.icon_file_name, a.target_url, a.mode, a.sso_endpoint, a.sso_method, a.tags, a.updated_at
+      FROM apps a
+      JOIN app_permissions p ON a.id = p.app_id
+      WHERE p.group_id IN (${accessibleGroupIds.map(() => '?').join(', ')})
+      ORDER BY a.sort_order, a.name
+    `).all(...accessibleGroupIds)
+    : [];
 
   const visibleAppsWithUrls = visibleApps.map((app) => ({
     ...app,
@@ -216,6 +229,7 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
 
   const deleteAll = db.transaction(() => {
     db.prepare('DELETE FROM user_group_members WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM entra_user_group_memberships WHERE user_id = ?').run(id);
     db.prepare('DELETE FROM access_logs WHERE user_id = ?').run(id);
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
   });

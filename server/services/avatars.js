@@ -42,8 +42,53 @@ function normalizeEmail(email) {
   return (email || '').toString().trim().toLowerCase();
 }
 
+function escapeXml(value) {
+  return (value || '').toString()
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function gravatarHash(email) {
   return crypto.createHash('md5').update(normalizeEmail(email)).digest('hex');
+}
+
+function getInitials(name) {
+  return (name || '?')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2) || '?';
+}
+
+function buildFallbackAvatarSvg(user = {}) {
+  const resolvedDisplayName = user.displayName || user.display_name || '';
+  const resolvedEmail = user.email || '';
+  const resolvedAvatarColor = user.avatarColor || user.avatar_color || '#666666';
+  const accessibleLabel = resolvedDisplayName || resolvedEmail || 'User';
+  const initials = escapeXml(getInitials(resolvedDisplayName || resolvedEmail));
+  const background = escapeXml(resolvedAvatarColor);
+
+  return Buffer.from(`<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="${escapeXml(accessibleLabel)} avatar">
+  <rect width="256" height="256" rx="128" fill="${background}" />
+  <text
+    x="128"
+    y="138"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    fill="#ffffff"
+    font-family="Inter, Segoe UI, Arial, sans-serif"
+    font-size="96"
+    font-weight="700"
+    letter-spacing="-2"
+  >${initials}</text>
+</svg>
+`, 'utf8');
 }
 
 function extensionFromContentType(contentType) {
@@ -345,7 +390,10 @@ export async function prewarmAvatarCacheForUser(user, accessToken = null) {
 export async function serveAvatarForUser(user, res) {
   const status = await getAvatarStatus(user.id);
   if (!status) {
-    res.status(404).end();
+    const fallbackAvatar = buildFallbackAvatarSvg(user);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+    res.status(200).send(fallbackAvatar);
     return;
   }
 

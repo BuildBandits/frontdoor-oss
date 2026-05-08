@@ -123,6 +123,18 @@ db.exec(`
     PRIMARY KEY (app_id, group_id)
   );
 
+  CREATE TABLE IF NOT EXISTS group_group_memberships (
+    parent_group_id TEXT REFERENCES user_groups(id),
+    child_group_id TEXT REFERENCES user_groups(id),
+    PRIMARY KEY (parent_group_id, child_group_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS group_entra_group_memberships (
+    parent_group_id TEXT REFERENCES user_groups(id),
+    entra_group_id TEXT NOT NULL,
+    PRIMARY KEY (parent_group_id, entra_group_id)
+  );
+
   CREATE TABLE IF NOT EXISTS entra_group_cache (
     entra_group_id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
@@ -152,6 +164,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_user_group_members_group ON user_group_members(group_id);
   CREATE INDEX IF NOT EXISTS idx_app_permissions_group ON app_permissions(group_id);
   CREATE INDEX IF NOT EXISTS idx_app_permissions_app ON app_permissions(app_id);
+  CREATE INDEX IF NOT EXISTS idx_group_group_memberships_parent ON group_group_memberships(parent_group_id);
+  CREATE INDEX IF NOT EXISTS idx_group_group_memberships_child ON group_group_memberships(child_group_id);
+  CREATE INDEX IF NOT EXISTS idx_group_entra_group_memberships_parent ON group_entra_group_memberships(parent_group_id);
+  CREATE INDEX IF NOT EXISTS idx_group_entra_group_memberships_entra ON group_entra_group_memberships(entra_group_id);
   CREATE INDEX IF NOT EXISTS idx_access_logs_app ON access_logs(app_id);
   CREATE INDEX IF NOT EXISTS idx_access_logs_user ON access_logs(user_id);
   CREATE INDEX IF NOT EXISTS idx_media_assets_kind ON media_assets(kind);
@@ -216,11 +232,8 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         SUM(CASE WHEN role = 'admin_readonly' THEN 1 ELSE 0 END) AS admin_readonly_count,
         SUM(CASE WHEN role = 'user' OR role IS NULL OR TRIM(COALESCE(role, '')) = '' THEN 1 ELSE 0 END) AS user_count
       FROM users
-    `).get()
+  `).get()
     : null;
-  const legacySuperadminCountBeforeMigration = roleStatsBeforeMigration?.superadmin_count || 0;
-  let loggedNoRoleMigrationNeeded = false;
-
   if (needsUsersRoleMigration) {
     console.log('[startup][roles] users role schema migration required.');
     console.log(`[startup][roles] schema snapshot: owner=${hasOwnerRole}, superadmin=${hasSuperadminRole}, admin_readonly=${hasReadonlyRole}`);
@@ -257,9 +270,6 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
     `);
     db.pragma('foreign_keys = ON');
     console.log('[startup][roles] users table migrated to role set: owner/admin/admin_readonly/user.');
-  } else if (legacySuperadminCountBeforeMigration === 0) {
-    console.log('[startup][roles] users roles already normalized; no migration needed.');
-    loggedNoRoleMigrationNeeded = true;
   }
 
   const legacySuperadminCount = db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'superadmin'").get().count || 0;
@@ -267,7 +277,7 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
     console.log(`[startup][roles] converting ${legacySuperadminCount} legacy superadmin role value(s) to owner.`);
     const result = db.prepare("UPDATE users SET role = 'owner', updated_at = datetime('now') WHERE role = 'superadmin'").run();
     console.log(`[startup][roles] converted ${result.changes || 0} user row(s) from superadmin to owner.`);
-  } else if (!loggedNoRoleMigrationNeeded) {
+  } else if (needsUsersRoleMigration) {
     console.log('[startup][roles] no legacy superadmin role values found.');
   }
 }

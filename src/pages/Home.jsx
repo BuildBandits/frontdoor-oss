@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, X, Star, LayoutGrid, List, AlignJustify } from 'lucide-react';
+import { Search, X, Star, List, AlignJustify, Rows3, AppWindow } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -229,6 +229,45 @@ export default function Home() {
   const dragEnabled = !groupByTag && !filtersActive && !compactView;
   const appCountLabel = ui.home.appCount.replace('{count}', String(filtered.length));
 
+  const handleToggleGroupByTag = async () => {
+    if (mobileCompactViewForced) return;
+
+    if (groupByTag) {
+      setGroupByTag(false);
+      return;
+    }
+
+    if (compactView) {
+      try {
+        await updateHomeDesktopView('cards');
+      } catch {
+        return;
+      }
+    }
+
+    setGroupByTag(true);
+  };
+
+  const handleToggleCompactView = async () => {
+    if (mobileCompactViewForced) return;
+
+    const next = compactView ? 'cards' : 'compact';
+    const shouldDisableGrouping = !compactView && groupByTag;
+    const restoreGrouping = shouldDisableGrouping ? groupByTag : false;
+
+    if (shouldDisableGrouping) {
+      setGroupByTag(false);
+    }
+
+    try {
+      await updateHomeDesktopView(next);
+    } catch {
+      if (shouldDisableGrouping && restoreGrouping) {
+        setGroupByTag(true);
+      }
+    }
+  };
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -356,70 +395,64 @@ export default function Home() {
 
       {/* Search + toggles + tag filters */}
       <div className="mb-8 space-y-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder={ui.home.searchPlaceholder}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition"
-            />
+        <div className="flex items-stretch gap-3 min-w-0 overflow-x-auto pb-1">
+          <div className="flex min-w-0 h-14 flex-1 items-center gap-3 rounded-2xl border border-gray-100 bg-white px-4">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder={ui.home.searchPlaceholder}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-11 w-full pl-12 pr-4 bg-white border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition"
+              />
+            </div>
+
+            <span className="text-sm font-medium text-gray-500 whitespace-nowrap">
+              {appCountLabel}
+            </span>
           </div>
+          <div className="flex shrink-0 items-stretch gap-2 sm:gap-3">
+            <button
+              onClick={() => setShowFavorites((v) => !v)}
+              className={`flex h-14 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
+                showFavorites
+                  ? 'bg-yellow-50 border-yellow-300 text-yellow-700'
+                  : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }`}
+              title={showFavorites ? ui.home.showAll : ui.home.favoritesTitle}
+            >
+              <Star className="w-4 h-4" fill={showFavorites ? 'currentColor' : 'none'} />
+              <span className="hidden sm:inline">{ui.home.favorites}</span>
+            </button>
 
-          <div className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm font-semibold text-gray-600 whitespace-nowrap">
-            {appCountLabel}
-          </div>
+            <button
+              onClick={handleToggleGroupByTag}
+              disabled={mobileCompactViewForced}
+              className={`flex h-14 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
+                groupByTag
+                  ? 'bg-purple-50 border-purple-300 text-purple-700'
+                  : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
+              title={groupByTag ? ui.home.gridViewTitle : ui.home.groupByTitle}
+            >
+              {groupByTag ? <AppWindow className="w-4 h-4" /> : <AlignJustify className="w-4 h-4" />}
+              <span className="hidden sm:inline">{ui.home.groupBy}</span>
+            </button>
 
-            <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-nowrap sm:gap-3 sm:shrink-0">
-          <button
-            onClick={() => setShowFavorites((v) => !v)}
-            className={`flex items-center justify-center gap-1.5 px-3 py-3.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap sm:flex-none ${
-              showFavorites
-                ? 'bg-yellow-50 border-yellow-300 text-yellow-700'
-                : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
-            }`}
-            title={showFavorites ? ui.home.showAll : ui.home.favoritesTitle}
-          >
-            <Star className="w-4 h-4" fill={showFavorites ? 'currentColor' : 'none'} />
-            <span className="hidden sm:inline">{ui.home.favorites}</span>
-          </button>
-
-          <button
-            onClick={() => setGroupByTag((v) => !v)}
-            className={`flex items-center justify-center gap-1.5 px-3 py-3.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap sm:flex-none ${
-              groupByTag
-                ? 'bg-purple-50 border-purple-300 text-purple-700'
-                : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
-            }`}
-            title={groupByTag ? ui.home.gridViewTitle : ui.home.groupByTitle}
-          >
-            {groupByTag ? <LayoutGrid className="w-4 h-4" /> : <List className="w-4 h-4" />}
-            <span className="hidden sm:inline">{ui.home.groupBy}</span>
-          </button>
-
-          <button
-            onClick={async () => {
-              if (mobileCompactViewForced) return;
-              const next = compactView ? 'cards' : 'compact';
-              try {
-                await updateHomeDesktopView(next);
-              } catch {
-                // Leave the current view unchanged if the save fails.
-              }
-            }}
-            disabled={mobileCompactViewForced}
-            className={`flex items-center justify-center gap-1.5 px-3 py-3.5 rounded-xl border text-sm font-medium transition-colors whitespace-nowrap sm:flex-none ${
-              compactView
-                ? 'bg-gray-900 border-gray-900 text-white'
-                : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
-            } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
-            title={mobileCompactViewForced ? ui.home.compactViewForcedTitle : (compactView ? ui.home.cardsLabel : ui.home.compactViewTitle)}
-          >
-            <AlignJustify className="w-4 h-4" />
-            <span className="hidden sm:inline">{mobileCompactViewForced ? ui.home.compactMobileLabel : ui.home.compactLabel}</span>
-          </button>
+            <button
+              onClick={handleToggleCompactView}
+              disabled={mobileCompactViewForced}
+              className={`flex h-14 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
+                compactView
+                  ? 'bg-gradient-to-br from-sky-50 via-cyan-50 to-indigo-50 border-sky-300 text-sky-700 shadow-sm shadow-sky-200/50'
+                  : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
+              title={mobileCompactViewForced ? ui.home.compactViewForcedTitle : (compactView ? ui.home.cardsLabel : ui.home.compactViewTitle)}
+            >
+              {compactView ? <Rows3 className="w-4 h-4" /> : <List className="w-4 h-4" />}
+              <span className="hidden sm:inline">{mobileCompactViewForced ? ui.home.compactMobileLabel : ui.home.compactLabel}</span>
+            </button>
           </div>
         </div>
 

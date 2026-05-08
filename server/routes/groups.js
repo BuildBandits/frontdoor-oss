@@ -4,6 +4,8 @@ import db from '../db.js';
 import { DEFAULT_GROUP_ID, logRbacAudit } from '../db.js';
 import { authenticate, isAdminViewer, isAdminEditor } from '../middleware/auth.js';
 import { forceSyncAllEntraUsers, importEntraGroups, listDiscoveredEntraGroups } from '../services/entraGroups.js';
+import { getDescendantGroupIds } from '../services/groupHierarchy.js';
+import { transferGroupApps } from '../services/groupAppTransfer.js';
 import { iconUrlForApp } from '../services/appIcons.js';
 
 const router = express.Router();
@@ -23,18 +25,52 @@ function validateGroupName(name) {
   return null;
 }
 
+function getLinkedEntraGroups(parentGroupId) {
+  return db.prepare(`
+    SELECT
+      gm.entra_group_id,
+      COALESCE(c.display_name, gm.entra_group_id) AS display_name,
+      c.description,
+      c.first_seen_at,
+      c.last_seen_at
+    FROM group_entra_group_memberships gm
+    LEFT JOIN entra_group_cache c ON c.entra_group_id = gm.entra_group_id
+    WHERE gm.parent_group_id = ?
+    ORDER BY COALESCE(c.display_name, gm.entra_group_id)
+  `).all(parentGroupId).map((row) => ({
+    ...row,
+    description: row.description || null,
+  }));
+}
+
 // List all groups (viewer roles only)
 router.get('/', authenticate, isAdminViewer, (req, res) => {
   const groups = db.prepare(`
     SELECT g.*,
       (SELECT COUNT(*) FROM user_group_members WHERE group_id = g.id) AS member_count,
       (SELECT COUNT(*) FROM app_permissions WHERE group_id = g.id) AS app_count,
+      (SELECT COUNT(*) FROM group_group_memberships WHERE parent_group_id = g.id) AS child_group_count,
+      (SELECT COUNT(*) FROM group_entra_group_memberships WHERE parent_group_id = g.id) AS entra_child_group_count,
       (
         SELECT GROUP_CONCAT(a.name || ' ' || a.slug, ' ')
         FROM app_permissions p
         JOIN apps a ON a.id = p.app_id
         WHERE p.group_id = g.id
-      ) AS app_search_text
+      ) AS app_search_text,
+      (
+        SELECT GROUP_CONCAT(value, ' ')
+        FROM (
+          SELECT cg.name || ' ' || COALESCE(cg.entra_display_name, '') AS value
+          FROM group_group_memberships gm
+          JOIN user_groups cg ON cg.id = gm.child_group_id
+          WHERE gm.parent_group_id = g.id
+          UNION ALL
+          SELECT COALESCE(c.display_name, gem.entra_group_id) AS value
+          FROM group_entra_group_memberships gem
+          LEFT JOIN entra_group_cache c ON c.entra_group_id = gem.entra_group_id
+          WHERE gem.parent_group_id = g.id
+        ) AS linked_values
+      ) AS group_search_text
     FROM user_groups g ORDER BY g.name
   `).all();
   res.json({ groups });
@@ -59,7 +95,9 @@ router.post('/entra/import', authenticate, isAdminEditor, (req, res) => {
       skippedGroups: result.skippedGroups,
     });
     res.json({
-      message: `${result.importedGroups} Entra groups imported`,
+      message: result.importedGroups === 1
+        ? '1 Entra group imported'
+        : `${result.importedGroups} Entra groups imported`,
       ...result,
     });
   } catch (error) {
@@ -99,6 +137,9 @@ router.post('/bulk-delete', authenticate, isAdminEditor, (req, res) => {
   }
 
   const uniqueGroupIds = [...new Set(groupIds.filter(Boolean))];
+  if (uniqueGroupIds.length === 0) {
+    return res.status(400).json({ error: 'groupIds must contain at least one valid group id' });
+  }
   const placeholders = uniqueGroupIds.map(() => '?').join(', ');
   const groups = db.prepare(`SELECT id, name FROM user_groups WHERE id IN (${placeholders})`).all(...uniqueGroupIds);
 
@@ -115,6 +156,7 @@ router.post('/bulk-delete', authenticate, isAdminEditor, (req, res) => {
     for (const group of groups) {
       db.prepare('DELETE FROM user_group_members WHERE group_id = ?').run(group.id);
       db.prepare('DELETE FROM app_permissions WHERE group_id = ?').run(group.id);
+      db.prepare('DELETE FROM group_group_memberships WHERE parent_group_id = ? OR child_group_id = ?').run(group.id, group.id);
       db.prepare('DELETE FROM user_groups WHERE id = ?').run(group.id);
       logRbacAudit(req.user.id, 'delete', 'group', group.id, { name: group.name, bulk: true });
     }
@@ -148,7 +190,19 @@ router.get('/:id', authenticate, isAdminViewer, (req, res) => {
     iconUrl: iconUrlForApp(app),
   }));
 
-  res.json({ group, members, apps });
+  const childGroups = db.prepare(`
+    SELECT g.id, g.name, g.description, g.source, g.entra_display_name,
+      (SELECT COUNT(*) FROM user_group_members WHERE group_id = g.id) AS member_count,
+      (SELECT COUNT(*) FROM app_permissions WHERE group_id = g.id) AS app_count
+    FROM group_group_memberships gm
+    JOIN user_groups g ON g.id = gm.child_group_id
+    WHERE gm.parent_group_id = ?
+    ORDER BY g.name
+  `).all(req.params.id);
+
+  const childEntraGroups = getLinkedEntraGroups(req.params.id);
+
+  res.json({ group, members, apps, childGroups, childEntraGroups });
 });
 
 // Create group (editor roles only)
@@ -218,12 +272,169 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   const deleteAll = db.transaction(() => {
     db.prepare('DELETE FROM user_group_members WHERE group_id = ?').run(req.params.id);
     db.prepare('DELETE FROM app_permissions WHERE group_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM group_group_memberships WHERE parent_group_id = ? OR child_group_id = ?').run(req.params.id, req.params.id);
+    db.prepare('DELETE FROM group_entra_group_memberships WHERE parent_group_id = ?').run(req.params.id);
     db.prepare('DELETE FROM user_groups WHERE id = ?').run(req.params.id);
   });
   deleteAll();
   logRbacAudit(req.user.id, 'delete', 'group', req.params.id, { name: group.name });
 
   res.json({ message: 'Group deleted' });
+});
+
+// Link child groups to a parent group
+router.post('/:id/groups', authenticate, isAdminEditor, (req, res) => {
+  const parentGroup = db.prepare('SELECT id, name, source FROM user_groups WHERE id = ?').get(req.params.id);
+  if (!parentGroup) return res.status(404).json({ error: 'Group not found' });
+  if (parentGroup.source === 'entra') {
+    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally' });
+  }
+  if (parentGroup.id === DEFAULT_GROUP_ID) {
+    return res.status(400).json({ error: 'Cannot link groups to the default group' });
+  }
+
+  const { groupIds } = req.body;
+  if (!Array.isArray(groupIds) || groupIds.length === 0) {
+    return res.status(400).json({ error: 'groupIds must be a non-empty array' });
+  }
+
+  const uniqueGroupIds = [...new Set(groupIds.filter(Boolean))];
+  if (uniqueGroupIds.length === 0) {
+    return res.status(400).json({ error: 'groupIds must contain at least one valid group id' });
+  }
+  if (uniqueGroupIds.includes(parentGroup.id) || uniqueGroupIds.includes(DEFAULT_GROUP_ID)) {
+    return res.status(400).json({ error: 'Cannot link the selected group' });
+  }
+
+  const placeholders = uniqueGroupIds.map(() => '?').join(', ');
+  const childGroups = db.prepare(`SELECT id, name, source FROM user_groups WHERE id IN (${placeholders})`).all(...uniqueGroupIds);
+  if (childGroups.length !== uniqueGroupIds.length) {
+    return res.status(404).json({ error: 'One or more groups were not found' });
+  }
+
+  for (const childGroup of childGroups) {
+    const descendantIds = getDescendantGroupIds(childGroup.id);
+    if (descendantIds.includes(parentGroup.id)) {
+      return res.status(400).json({ error: 'Cannot create a circular group link' });
+    }
+    if (childGroup.source === 'entra' && childGroup.entra_group_id) {
+      const alreadyLinkedAsEntra = db.prepare(`
+        SELECT 1
+        FROM group_entra_group_memberships
+        WHERE parent_group_id = ? AND entra_group_id = ?
+      `).get(parentGroup.id, childGroup.entra_group_id);
+      if (alreadyLinkedAsEntra) {
+        return res.status(409).json({ error: 'This Entra group is already linked to the container' });
+      }
+    }
+  }
+
+  const insert = db.prepare('INSERT OR IGNORE INTO group_group_memberships (parent_group_id, child_group_id) VALUES (?, ?)');
+  const addAll = db.transaction(() => {
+    let added = 0;
+    for (const childGroupId of uniqueGroupIds) {
+      const result = insert.run(parentGroup.id, childGroupId);
+      added += result.changes;
+    }
+    return added;
+  });
+  const added = addAll();
+  if (added > 0) {
+    logRbacAudit(req.user.id, 'add_linked_groups', 'group', parentGroup.id, { childGroupIds: uniqueGroupIds, added });
+  }
+
+  res.json({ message: `${added} linked groups added` });
+});
+
+// Link Entra groups directly to a parent group without importing them
+router.post('/:id/entra-groups', authenticate, isAdminEditor, (req, res) => {
+  const parentGroup = db.prepare('SELECT id, source FROM user_groups WHERE id = ?').get(req.params.id);
+  if (!parentGroup) return res.status(404).json({ error: 'Group not found' });
+  if (parentGroup.source === 'entra') {
+    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally' });
+  }
+  if (parentGroup.id === DEFAULT_GROUP_ID) {
+    return res.status(400).json({ error: 'Cannot link groups to the default group' });
+  }
+
+  const { entraGroupIds } = req.body;
+  if (!Array.isArray(entraGroupIds) || entraGroupIds.length === 0) {
+    return res.status(400).json({ error: 'entraGroupIds must be a non-empty array' });
+  }
+
+  const uniqueEntraGroupIds = [...new Set(entraGroupIds.filter(Boolean))];
+  if (uniqueEntraGroupIds.length === 0) {
+    return res.status(400).json({ error: 'entraGroupIds must contain at least one valid group id' });
+  }
+
+  const placeholders = uniqueEntraGroupIds.map(() => '?').join(', ');
+  const discoveredGroups = db.prepare(`SELECT entra_group_id FROM entra_group_cache WHERE entra_group_id IN (${placeholders})`).all(...uniqueEntraGroupIds);
+  if (discoveredGroups.length !== uniqueEntraGroupIds.length) {
+    return res.status(404).json({ error: 'One or more Entra groups were not found' });
+  }
+
+  for (const entraGroupId of uniqueEntraGroupIds) {
+    const alreadyLinkedAsLocal = db.prepare(`
+      SELECT 1
+      FROM group_group_memberships gm
+      JOIN user_groups ug ON ug.id = gm.child_group_id
+      WHERE gm.parent_group_id = ? AND ug.entra_group_id = ?
+    `).get(parentGroup.id, entraGroupId);
+    if (alreadyLinkedAsLocal) {
+      return res.status(409).json({ error: 'This Entra group is already linked to the container' });
+    }
+  }
+
+  const insert = db.prepare('INSERT OR IGNORE INTO group_entra_group_memberships (parent_group_id, entra_group_id) VALUES (?, ?)');
+  const addAll = db.transaction(() => {
+    let added = 0;
+    for (const entraGroupId of uniqueEntraGroupIds) {
+      const result = insert.run(parentGroup.id, entraGroupId);
+      added += result.changes;
+    }
+    return added;
+  });
+  const added = addAll();
+  if (added > 0) {
+    logRbacAudit(req.user.id, 'add_linked_entra_groups', 'group', parentGroup.id, { entraGroupIds: uniqueEntraGroupIds, added });
+  }
+
+  res.json({ message: `${added} linked Entra groups added` });
+});
+
+// Remove a linked child group
+router.delete('/:id/groups/:childGroupId', authenticate, isAdminEditor, (req, res) => {
+  const parentGroup = db.prepare('SELECT id, source FROM user_groups WHERE id = ?').get(req.params.id);
+  if (!parentGroup) return res.status(404).json({ error: 'Group not found' });
+  if (parentGroup.source === 'entra') {
+    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally' });
+  }
+
+  const result = db.prepare(`
+    DELETE FROM group_group_memberships
+    WHERE parent_group_id = ? AND child_group_id = ?
+  `).run(req.params.id, req.params.childGroupId);
+
+  if (result.changes === 0) return res.status(404).json({ error: 'Linked group not found' });
+  logRbacAudit(req.user.id, 'remove_linked_group', 'group', req.params.id, { childGroupId: req.params.childGroupId });
+  res.json({ message: 'Linked group removed' });
+});
+
+router.delete('/:id/entra-groups/:entraGroupId', authenticate, isAdminEditor, (req, res) => {
+  const parentGroup = db.prepare('SELECT id, source FROM user_groups WHERE id = ?').get(req.params.id);
+  if (!parentGroup) return res.status(404).json({ error: 'Group not found' });
+  if (parentGroup.source === 'entra') {
+    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally' });
+  }
+
+  const result = db.prepare(`
+    DELETE FROM group_entra_group_memberships
+    WHERE parent_group_id = ? AND entra_group_id = ?
+  `).run(req.params.id, req.params.entraGroupId);
+
+  if (result.changes === 0) return res.status(404).json({ error: 'Linked Entra group not found' });
+  logRbacAudit(req.user.id, 'remove_linked_entra_group', 'group', req.params.id, { entraGroupId: req.params.entraGroupId });
+  res.json({ message: 'Linked Entra group removed' });
 });
 
 // --- Membership ---
@@ -339,6 +550,54 @@ router.delete('/:id/apps/:appId', authenticate, isAdminEditor, (req, res) => {
   if (result.changes === 0) return res.status(404).json({ error: 'Permission not found' });
   logRbacAudit(req.user.id, 'remove_app', 'permission', req.params.id, { appId: req.params.appId });
   res.json({ message: 'App permission removed' });
+});
+
+// Copy or move all app permissions from one group to another
+router.post('/:id/apps/transfer', authenticate, isAdminEditor, (req, res) => {
+  const sourceGroup = db.prepare('SELECT id, name, source FROM user_groups WHERE id = ?').get(req.params.id);
+  if (!sourceGroup) return res.status(404).json({ error: 'Source group not found' });
+
+  const { targetGroupId, mode } = req.body;
+  if (typeof targetGroupId !== 'string' || !targetGroupId.trim()) {
+    return res.status(400).json({ error: 'targetGroupId is required' });
+  }
+  if (!['copy', 'move'].includes(mode)) {
+    return res.status(400).json({ error: 'mode must be copy or move' });
+  }
+  if (targetGroupId === sourceGroup.id) {
+    return res.status(400).json({ error: 'Source and target groups must be different' });
+  }
+
+  const targetGroup = db.prepare('SELECT id, name, source FROM user_groups WHERE id = ?').get(targetGroupId);
+  if (!targetGroup) return res.status(404).json({ error: 'Target group not found' });
+
+  const result = transferGroupApps({
+    dbHandle: db,
+    sourceGroupId: sourceGroup.id,
+    targetGroupId: targetGroup.id,
+    mode,
+  });
+
+  logRbacAudit(req.user.id, mode === 'move' ? 'move_apps' : 'copy_apps', 'permission', sourceGroup.id, {
+    sourceGroupId: sourceGroup.id,
+    sourceGroupName: sourceGroup.name,
+    targetGroupId: targetGroup.id,
+    targetGroupName: targetGroup.name,
+    mode: result.mode,
+    appIds: result.appIds,
+    sourceCount: result.sourceCount,
+    addedCount: result.addedCount,
+    removedCount: result.removedCount,
+  });
+
+  res.json({
+    message: mode === 'move'
+      ? `${result.removedCount} app permissions moved`
+      : `${result.addedCount} app permissions copied`,
+    ...result,
+    sourceGroup,
+    targetGroup,
+  });
 });
 
 export default router;

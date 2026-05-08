@@ -42,6 +42,7 @@ export default function Admin() {
   const [appSearch, setAppSearch] = useState('');
   const [appModeFilter, setAppModeFilter] = useState('all');
   const [showOnlyOrphanApps, setShowOnlyOrphanApps] = useState(false);
+  const [showOnlyUnlabeledApps, setShowOnlyUnlabeledApps] = useState(false);
   const [modeFilterOpen, setModeFilterOpen] = useState(false);
   const [appSort, setAppSort] = useState({ key: 'sort_order', direction: 'asc' });
   const [pageNotice, setPageNotice] = useState(null);
@@ -416,9 +417,11 @@ export default function Admin() {
           sso_endpoint: normalizedSsoEndpoint,
           ...iconPayload,
           icon: iconMode === 'emoji' ? form.icon : form.icon || '🖼️',
+          // When the clone flow skips the default group, create the app with no
+          // memberships yet so the follow-up picker defines the real final set.
           groupIds: includeDefaultGroup
             ? [DEFAULT_GROUP_ID, ...clonedGroupIds]
-            : clonedGroupIds,
+            : [],
         });
         loadApps();
         close();
@@ -588,10 +591,14 @@ export default function Admin() {
     }
     setForm((prev) => ({ ...prev, mode: nextMode }));
   };
+  function hasAppLabels(app) {
+    return Array.isArray(app.tags) && app.tags.some((tag) => String(tag || '').trim().length > 0);
+  }
   const filteredApps = useMemo(() => {
     const q = appSearch.toLowerCase().trim();
     const filtered = apps.filter((app) => {
       if (showOnlyOrphanApps && Number(app.group_count || 0) !== 0) return false;
+      if (showOnlyUnlabeledApps && hasAppLabels(app)) return false;
       if (appModeFilter !== 'all' && app.mode !== appModeFilter) return false;
       if (!q) return true;
       const tags = Array.isArray(app.tags) ? app.tags : [];
@@ -638,9 +645,13 @@ export default function Admin() {
       }
       return result * direction;
     });
-  }, [apps, appSearch, appModeFilter, appSort, showOnlyOrphanApps]);
+  }, [apps, appSearch, appModeFilter, appSort, showOnlyOrphanApps, showOnlyUnlabeledApps]);
   const orphanApps = useMemo(
     () => apps.filter((app) => Number(app.group_count || 0) === 0),
+    [apps],
+  );
+  const unlabeledApps = useMemo(
+    () => apps.filter((app) => !hasAppLabels(app)),
     [apps],
   );
 
@@ -649,6 +660,12 @@ export default function Admin() {
       setShowOnlyOrphanApps(false);
     }
   }, [showOnlyOrphanApps, orphanApps.length]);
+
+  useEffect(() => {
+    if (showOnlyUnlabeledApps && unlabeledApps.length === 0) {
+      setShowOnlyUnlabeledApps(false);
+    }
+  }, [showOnlyUnlabeledApps, unlabeledApps.length]);
 
   const openGroupAssignmentModal = (app, selectedIds = [], defaultIncluded = false) => {
     setPendingGroupAssignApp({ ...app, defaultIncluded });
@@ -803,6 +820,24 @@ export default function Admin() {
               </div>
             )}
           </div>
+          {unlabeledApps.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowOnlyUnlabeledApps((prev) => !prev)}
+              className={`inline-flex min-w-[220px] items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent ${
+                showOnlyUnlabeledApps
+                  ? 'border-amber-300 bg-amber-100 text-amber-900'
+                  : 'border-amber-200 bg-white text-amber-900 hover:bg-amber-50'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2">
+                <span>{showOnlyUnlabeledApps ? a.showAllApps : a.showOnlyUnlabeled}</span>
+                <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                  {unlabeledApps.length}
+                </span>
+              </span>
+            </button>
+          )}
           <div className="text-xs text-gray-400">
             {filteredApps.length} {ui.nav.apps.toLowerCase()} {t.of} {apps.length}
           </div>
@@ -863,7 +898,7 @@ export default function Admin() {
                       <span>{a.sortByTargetUrl}</span> {sortIndicator('target_url')}
                     </button>
                   </th>
-                  <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
                     <button type="button" onClick={() => toggleSort('mode')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
                     <span>{ui.admin.common.appMode}</span> {sortIndicator('mode')}
                     </button>
@@ -887,8 +922,8 @@ export default function Admin() {
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500 font-mono">{app.slug}</td>
                   <td className="px-6 py-4 text-sm text-gray-500 truncate max-w-[200px]">{app.target_url}</td>
-                  <td className="px-6 py-4 text-center">
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                  <td className="px-6 py-4 text-center whitespace-nowrap">
+                    <span className={`inline-flex items-center text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ${
                       app.mode === 'redirect' ? 'bg-blue-100 text-blue-700'
                         : app.mode === 'shared-cookie' ? 'bg-accent/10 text-accent-dark'
                         : app.mode === 'entra-app' ? 'bg-violet-100 text-violet-700'

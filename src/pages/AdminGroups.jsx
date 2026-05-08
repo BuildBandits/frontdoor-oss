@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Eye, Plus, Shield, Trash2, X, Save, Users, ChevronDown, ChevronRight, AppWindow, Pencil, Clock, RefreshCw } from 'lucide-react';
+import { Eye, Plus, Shield, Trash2, X, Save, Users, ChevronDown, ChevronRight, AppWindow, Pencil, Clock, RefreshCw, Layers3 } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import UserAvatar from '../components/UserAvatar';
@@ -19,14 +19,17 @@ export default function AdminGroups() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedGroup, setExpandedGroup] = useState(null);
+  const [scrollTargetGroupId, setScrollTargetGroupId] = useState(null);
   const [groupDetail, setGroupDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const groupRowRefs = useRef(new Map());
 
   const [pageNotice, setPageNotice] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [groupSearch, setGroupSearch] = useState('');
+  const [activeGroupPanel, setActiveGroupPanel] = useState('members');
 
   useEffect(() => {
     if (!pageNotice) return undefined;
@@ -67,6 +70,12 @@ export default function AdminGroups() {
   const [allUsers, setAllUsers] = useState([]);
   const [memberSearch, setMemberSearch] = useState('');
 
+  // Add linked groups modal
+  const [showAddGroups, setShowAddGroups] = useState(false);
+  const [groupLinkSearch, setGroupLinkSearch] = useState('');
+  const [selectedLinkedGroupIds, setSelectedLinkedGroupIds] = useState([]);
+  const [selectedLinkedEntraGroupIds, setSelectedLinkedEntraGroupIds] = useState([]);
+
   // Add apps modal
   const [showAddApps, setShowAddApps] = useState(false);
   const [allApps, setAllApps] = useState([]);
@@ -90,6 +99,13 @@ export default function AdminGroups() {
 
   const groupLabel = (group) => group.entra_display_name || group.name;
   const isEntraGroup = (group) => group.source === 'entra';
+  const setGroupRowRef = useCallback((groupId) => (node) => {
+    if (!node) {
+      groupRowRefs.current.delete(groupId);
+      return;
+    }
+    groupRowRefs.current.set(groupId, node);
+  }, []);
 
   const loadGroups = useCallback(async () => {
     try {
@@ -133,6 +149,16 @@ export default function AdminGroups() {
     navigate(location.pathname, { replace: true, state: null });
   }, [location.state, location.pathname, navigate]);
   useEffect(() => {
+    if (!scrollTargetGroupId || expandedGroup !== scrollTargetGroupId) return undefined;
+    const node = groupRowRefs.current.get(scrollTargetGroupId);
+    if (!node) return undefined;
+    const timer = window.setTimeout(() => {
+      node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setScrollTargetGroupId(null);
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [expandedGroup, groupDetail, groupSearch, scrollTargetGroupId]);
+  useEffect(() => {
     if (!showCreateMenu) return undefined;
     const closeMenu = () => setShowCreateMenu(false);
     document.addEventListener('click', closeMenu);
@@ -160,6 +186,13 @@ export default function AdminGroups() {
       setMemberSearch('');
       return;
     }
+    if (showAddGroups) {
+      setShowAddGroups(false);
+      setGroupLinkSearch('');
+      setSelectedLinkedGroupIds([]);
+      setSelectedLinkedEntraGroupIds([]);
+      return;
+    }
     if (showAddApps) {
       setShowAddApps(false);
       setAllApps([]);
@@ -173,17 +206,18 @@ export default function AdminGroups() {
       ? 'entraImport'
       : showAddMembers
         ? 'addMembers'
-        : showAddApps
+        : showAddGroups
+          ? 'addGroups'
+          : showAddApps
           ? 'addApps'
           : null;
 
-  const activeModalDirty = activeModal === 'create'
-    ? Boolean(newName.trim() || newDesc.trim())
-    : activeModal === 'entraImport'
-      ? selectedEntraGroups.length > 0
-    : activeModal === 'addMembers'
-        ? false
-        : false;
+  const activeModalDirty = (() => {
+    if (activeModal === 'create') return Boolean(newName.trim() || newDesc.trim());
+    if (activeModal === 'entraImport') return selectedEntraGroups.length > 0;
+    if (activeModal === 'addGroups') return selectedLinkedGroupIds.length > 0 || selectedLinkedEntraGroupIds.length > 0;
+    return false;
+  })();
 
   useEffect(() => {
     if (!activeModal || confirmDialog) return undefined;
@@ -205,7 +239,7 @@ export default function AdminGroups() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeModal, activeModalDirty, confirmDialog, showCreate, showEntraImport, showAddMembers, showAddApps, newName, newDesc, selectedEntraGroups.length]);
+  }, [activeModal, activeModalDirty, confirmDialog, showCreate, showEntraImport, showAddMembers, showAddGroups, showAddApps, newName, newDesc, selectedEntraGroups.length, selectedLinkedGroupIds.length, selectedLinkedEntraGroupIds.length]);
 
   const loadGroupDetail = async (groupId) => {
     setDetailLoading(true);
@@ -225,8 +259,19 @@ export default function AdminGroups() {
       setEditingGroup(null);
     } else {
       setExpandedGroup(groupId);
+      setActiveGroupPanel('members');
       setEditingGroup(null);
       await loadGroupDetail(groupId);
+    }
+  };
+
+  const openGroupAndScroll = async (groupId) => {
+    if (!filteredGroups.some((group) => group.id === groupId) && groupSearch.trim()) {
+      setGroupSearch('');
+    }
+    setScrollTargetGroupId(groupId);
+    if (expandedGroup !== groupId) {
+      await toggleExpand(groupId);
     }
   };
 
@@ -305,6 +350,18 @@ export default function AdminGroups() {
     );
   };
 
+  const toggleLinkedGroupSelection = (groupId) => {
+    setSelectedLinkedGroupIds((prev) =>
+      prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]
+    );
+  };
+
+  const toggleLinkedEntraGroupSelection = (groupId) => {
+    setSelectedLinkedEntraGroupIds((prev) =>
+      prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]
+    );
+  };
+
   const selectVisibleEntraGroups = () => {
     const visibleIds = filteredEntraCandidates
       .filter((group) => !group.is_imported)
@@ -317,7 +374,9 @@ export default function AdminGroups() {
     setImportingEntra(true);
     try {
       const res = await api.post('/groups/entra/import', { groupIds: selectedEntraGroups });
-      showToast(res.data.message || g.entraGroupsImported);
+      const importedGroups = Number(res.data.importedGroups ?? selectedEntraGroups.length);
+      const importMessage = importedGroups === 1 ? g.entraGroupImported : g.entraGroupsImported;
+      showToast(importMessage);
       setShowEntraImport(false);
       setSelectedEntraGroups([]);
       await loadGroups();
@@ -364,13 +423,38 @@ export default function AdminGroups() {
 
   const clearSelection = () => setSelectedGroupIds([]);
 
-  const selectAllDeletableGroups = () => {
-    setSelectedGroupIds(deletableGroups.map((group) => group.id));
+  const selectAllGroups = () => {
+    const groupIds = groups
+      .filter((group) => group.id !== DEFAULT_GROUP_ID)
+      .map((group) => group.id);
+    setSelectedGroupIds((prev) => Array.from(new Set([...prev, ...groupIds])));
+  };
+
+  const selectVisibleGroups = () => {
+    const visibleIds = visibleGroups
+      .filter((group) => group.id !== DEFAULT_GROUP_ID)
+      .map((group) => group.id);
+    setSelectedGroupIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+  };
+
+  const selectAllEntraGroups = () => {
+    const entraIds = groups
+      .filter((group) => group.source === 'entra' && group.id !== DEFAULT_GROUP_ID)
+      .map((group) => group.id);
+    setSelectedGroupIds((prev) => Array.from(new Set([...prev, ...entraIds])));
+  };
+
+  const selectAllLocalGroups = () => {
+    const localIds = groups
+      .filter((group) => group.source !== 'entra' && group.id !== DEFAULT_GROUP_ID)
+      .map((group) => group.id);
+    setSelectedGroupIds((prev) => Array.from(new Set([...prev, ...localIds])));
   };
 
   const invertSelection = () => {
     setSelectedGroupIds((prev) => {
-      const next = deletableGroups
+      const next = groups
+        .filter((group) => group.id !== DEFAULT_GROUP_ID)
         .map((group) => group.id)
         .filter((groupId) => !prev.includes(groupId));
       return next.length === 0 ? [] : next;
@@ -412,9 +496,6 @@ export default function AdminGroups() {
   const selectedCount = selectedGroupIds.length;
   const selectedLocalCount = groups.filter((group) => selectedGroupIds.includes(group.id) && group.source !== 'entra').length;
   const selectedEntraCount = groups.filter((group) => selectedGroupIds.includes(group.id) && group.source === 'entra').length;
-  const deletableGroups = groups.filter((group) => group.id !== DEFAULT_GROUP_ID);
-  const allDeletableSelected = deletableGroups.length > 0 && selectedCount === deletableGroups.length;
-
   // --- Edit group ---
   const startEdit = (group) => {
     setEditingGroup(group.id);
@@ -455,6 +536,18 @@ export default function AdminGroups() {
     }
   };
 
+  const openAddGroups = async () => {
+    if (!canEdit) {
+      showToast(t.readOnly, 'error');
+      return;
+    }
+    setGroupLinkSearch('');
+    setSelectedLinkedGroupIds([]);
+    setSelectedLinkedEntraGroupIds([]);
+    setShowAddGroups(true);
+    await loadEntraCandidates();
+  };
+
   const addMember = async (userId) => {
     if (!canEdit) {
       showToast(t.readOnly, 'error');
@@ -490,6 +583,48 @@ export default function AdminGroups() {
     });
   };
 
+  const addLinkedGroups = async () => {
+    if (!canEdit) {
+      showToast(t.readOnly, 'error');
+      return;
+    }
+    if (selectedLinkedGroupIds.length === 0 && selectedLinkedEntraGroupIds.length === 0) return;
+    try {
+      if (selectedLinkedGroupIds.length > 0) {
+        await api.post(`/groups/${expandedGroup}/groups`, { groupIds: selectedLinkedGroupIds });
+      }
+      if (selectedLinkedEntraGroupIds.length > 0) {
+        await api.post(`/groups/${expandedGroup}/entra-groups`, { entraGroupIds: selectedLinkedEntraGroupIds });
+      }
+      closeCurrentModal();
+      await loadGroupDetail(expandedGroup);
+      await loadGroups();
+    } catch (err) {
+      showToast(err.response?.data?.error || t.errorSaving, 'error');
+    }
+  };
+
+  const removeLinkedGroup = async (childGroupId, childGroupName) => {
+    if (!canEdit) {
+      showToast(t.readOnly, 'error');
+      return;
+    }
+    openConfirm({
+      title: g.removeLinkedGroupTitle.replace('{name}', childGroupName || g.thisGroup),
+      message: g.removeLinkedGroupMessage,
+      confirmLabel: g.removeLinkedGroup,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/groups/${expandedGroup}/groups/${childGroupId}`);
+          await loadGroupDetail(expandedGroup);
+          await loadGroups();
+        } catch (err) {
+          showToast(err.response?.data?.error || t.errorSaving, 'error');
+        }
+      },
+    });
+  };
+
   // --- Apps ---
   const openAddApps = async () => {
     if (!canEdit) {
@@ -513,6 +648,21 @@ export default function AdminGroups() {
     }
     try {
       await api.post(`/groups/${expandedGroup}/apps`, { appIds: [appId] });
+      await loadGroupDetail(expandedGroup);
+      await loadGroups();
+    } catch (err) {
+      showToast(err.response?.data?.error || t.errorSaving, 'error');
+    }
+  };
+
+  const removeLinkedEntraGroup = async (entraGroupId, groupName) => {
+    if (!canEdit) {
+      showToast(t.readOnly, 'error');
+      return;
+    }
+    try {
+      await api.delete(`/groups/${expandedGroup}/entra-groups/${entraGroupId}`);
+      showToast(g.linkedEntraGroupRemoved.replace('{name}', groupName));
       await loadGroupDetail(expandedGroup);
       await loadGroups();
     } catch (err) {
@@ -558,6 +708,54 @@ export default function AdminGroups() {
     return a.name.toLowerCase().includes(appSearch.toLowerCase());
   });
 
+  const linkedGroups = groupDetail?.childGroups || [];
+  const linkedGroupIds = new Set(linkedGroups.map((group) => group.id));
+  const linkedEntraGroups = groupDetail?.childEntraGroups || [];
+  const linkedEntraGroupIds = new Set(linkedEntraGroups.map((group) => group.entra_group_id));
+  const totalLinkedGroupCount = Number(groupDetail?.childGroups?.length || 0) + Number(groupDetail?.childEntraGroups?.length || 0);
+  const linkableGroups = groups.filter((group) => {
+    if (!expandedGroup || group.id === expandedGroup) return false;
+    if (group.id === DEFAULT_GROUP_ID) return false;
+    if (linkedGroupIds.has(group.id)) return false;
+    return true;
+  });
+  const filteredLinkableGroups = linkableGroups.filter((group) => {
+    if (!groupLinkSearch.trim()) return true;
+    const q = groupLinkSearch.toLowerCase();
+    return [
+      groupLabel(group),
+      group.description || '',
+      group.entra_display_name || '',
+      group.entra_group_id || '',
+    ].join(' ').toLowerCase().includes(q);
+  });
+  const hasGroupLinkSearch = groupLinkSearch.trim().length > 0;
+
+  const entraLinkableGroups = entraCandidates.filter((group) => {
+    if (!expandedGroup) return false;
+    if (group.is_imported) return false;
+    if (linkedEntraGroupIds.has(group.entra_group_id)) return false;
+    return true;
+  });
+  const filteredLinkableEntraGroups = entraLinkableGroups.filter((group) => {
+    if (!groupLinkSearch.trim()) return true;
+    const q = groupLinkSearch.toLowerCase();
+    return [
+      group.display_name || '',
+      group.description || '',
+      group.entra_group_id || '',
+    ].join(' ').toLowerCase().includes(q);
+  });
+  const selectVisibleLinkedGroups = () => {
+    const visibleIds = filteredLinkableGroups.map((group) => group.id);
+    setSelectedLinkedGroupIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+  };
+
+  const selectVisibleLinkedEntraGroups = () => {
+    const visibleIds = filteredLinkableEntraGroups.map((group) => group.entra_group_id);
+    setSelectedLinkedEntraGroupIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+  };
+
   const filteredEntraCandidates = entraCandidates.filter((group) => {
     if (!entraSearch.trim()) return true;
     const q = entraSearch.toLowerCase();
@@ -578,26 +776,28 @@ export default function AdminGroups() {
         group.description || '',
         group.source || '',
         group.app_search_text || '',
+        group.group_search_text || '',
       ].join(' ').toLowerCase();
       return searchable.includes(q);
     });
   }, [groups, groupSearch]);
   const groupsWithoutApps = useMemo(
-    () => groups.filter((group) => Number(group.app_count || 0) === 0),
+    () => groups.filter((group) => Number(group.app_count || 0) === 0 && Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) === 0),
     [groups],
   );
   const groupsWithoutMembers = useMemo(
-    () => groups.filter((group) => Number(group.member_count || 0) === 0),
+    () => groups.filter((group) => Number(group.member_count || 0) === 0 && Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) === 0),
     [groups],
   );
   const problemGroups = useMemo(
-    () => groups.filter((group) => Number(group.app_count || 0) === 0 || Number(group.member_count || 0) === 0),
+    () => groups.filter((group) => Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) === 0 && (Number(group.app_count || 0) === 0 || Number(group.member_count || 0) === 0)),
     [groups],
   );
   const hasIncompleteGroupsNotice = problemGroups.length > 0;
   const visibleGroups = showOnlyProblemGroups
-    ? filteredGroups.filter((group) => Number(group.app_count || 0) === 0 || Number(group.member_count || 0) === 0)
+    ? filteredGroups.filter((group) => Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) === 0 && (Number(group.app_count || 0) === 0 || Number(group.member_count || 0) === 0))
     : filteredGroups;
+  const hasGroupFilter = groupSearch.trim().length > 0 || showOnlyProblemGroups;
 
   useEffect(() => {
     if (showOnlyProblemGroups && problemGroups.length === 0) {
@@ -626,7 +826,7 @@ export default function AdminGroups() {
                 disabled={!canEdit}
                 className="text-red-600 hover:underline font-medium disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {t.cancel}
+                {ui.common.cancel}
               </button>
               <button
                 onClick={deleteSelectedGroups}
@@ -741,7 +941,7 @@ export default function AdminGroups() {
                       <button
                         key={`no-apps-${group.id}`}
                         type="button"
-                        onClick={() => toggleExpand(group.id)}
+                        onClick={() => { void openGroupAndScroll(group.id); }}
                         className="inline-flex items-center rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100"
                       >
                         {groupLabel(group)}
@@ -761,7 +961,7 @@ export default function AdminGroups() {
                       <button
                         key={`no-members-${group.id}`}
                         type="button"
-                        onClick={() => toggleExpand(group.id)}
+                        onClick={() => { void openGroupAndScroll(group.id); }}
                         className="inline-flex items-center rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100"
                       >
                         {groupLabel(group)}
@@ -789,38 +989,48 @@ export default function AdminGroups() {
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="flex items-center justify-between px-1 text-xs text-gray-500">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={allDeletableSelected}
-                disabled={!canEdit}
-                onChange={() => {
-                  if (allDeletableSelected) {
-                    clearSelection();
-                  } else {
-                    selectAllDeletableGroups();
-                  }
-                }}
-                className="rounded border-gray-300 text-dark focus:ring-accent disabled:opacity-40 disabled:cursor-not-allowed"
-              />
-              <span>{g.selectAllDeletable}</span>
-            </label>
-            <div className="flex items-center gap-3">
-              <span>{deletableGroups.length} {g.deletableGroups}</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1 text-xs text-gray-500">
+            <div className="flex-1" />
+            <div className="flex flex-wrap items-center justify-end gap-3">
               <button
                 type="button"
-                onClick={selectAllDeletableGroups}
-                disabled={!canEdit}
-                className="font-medium text-accent-dark hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={selectAllGroups}
+                disabled={!canEdit || groups.filter((group) => group.id !== DEFAULT_GROUP_ID).length === 0}
+                className="font-medium text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {g.selectAll}
+              </button>
+              {hasGroupFilter && (
+                <button
+                  type="button"
+                  onClick={selectVisibleGroups}
+                  disabled={!canEdit || visibleGroups.filter((group) => group.id !== DEFAULT_GROUP_ID).length === 0}
+                  className="font-medium text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {g.selectAllFiltered}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={selectAllEntraGroups}
+                disabled={!canEdit || groups.filter((group) => group.source === 'entra' && group.id !== DEFAULT_GROUP_ID).length === 0}
+                className="font-medium text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {g.selectAllEntraGroups}
+              </button>
+              <button
+                type="button"
+                onClick={selectAllLocalGroups}
+                disabled={!canEdit || groups.filter((group) => group.source !== 'entra' && group.id !== DEFAULT_GROUP_ID).length === 0}
+                className="font-medium text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {g.selectAllLocalGroups}
               </button>
               <button
                 type="button"
                 onClick={clearSelection}
                 disabled={!canEdit}
-                className="font-medium text-gray-500 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                className="font-medium text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {g.deselectAll}
               </button>
@@ -828,7 +1038,7 @@ export default function AdminGroups() {
                 type="button"
                 onClick={invertSelection}
                 disabled={!canEdit}
-                className="font-medium text-gray-500 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                className="font-medium text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {g.invertSelection}
               </button>
@@ -836,7 +1046,7 @@ export default function AdminGroups() {
           </div>
 
           {visibleGroups.map((group) => (
-            <div key={group.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden transition-colors">
+            <div key={group.id} ref={setGroupRowRef(group.id)} className="bg-white rounded-2xl border border-gray-100 overflow-hidden transition-colors">
               {/* Group row */}
               <div
                 className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50/50"
@@ -862,8 +1072,17 @@ export default function AdminGroups() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="truncate font-semibold text-sm text-dark">{groupLabel(group)}</span>
+                      {group.source !== 'entra' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-medium">{g.localBadge}</span>
+                      )}
                       {group.source === 'entra' && (
                         <span className="inline-flex items-center gap-1 text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                      )}
+                      {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-accent/10 text-accent-dark px-1.5 py-0.5 rounded font-medium">
+                          <Layers3 className="w-3 h-3" />
+                          {g.compositeBadge}
+                        </span>
                       )}
                       {group.id === DEFAULT_GROUP_ID && (
                         <span className="inline-flex items-center gap-1 text-[10px] bg-accent/30 text-dark px-1.5 py-0.5 rounded-full font-medium">{g.defaultBadge}</span>
@@ -879,6 +1098,11 @@ export default function AdminGroups() {
                   <span className="flex items-center gap-1 text-xs text-gray-400">
                     <AppWindow className="w-3.5 h-3.5 flex-shrink-0" /> {group.app_count}
                   </span>
+                  {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) > 0 && (
+                    <span className="flex items-center gap-1 text-xs text-gray-400">
+                      <Layers3 className="w-3.5 h-3.5 flex-shrink-0" /> {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0)}
+                    </span>
+                  )}
                   {group.id !== DEFAULT_GROUP_ID && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(group); }}
@@ -956,89 +1180,243 @@ export default function AdminGroups() {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Members */}
-                        <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
-                              {t.members} ({groupDetail.members.length})
-                            </h3>
-                            <button
-                              onClick={openAddMembers}
-                              disabled={!canEdit || isEntraGroup(group)}
-                              className={`text-xs font-medium transition-colors ${
-                                !canEdit || isEntraGroup(group)
-                                  ? 'text-gray-300 cursor-not-allowed'
-                                  : 'text-accent-dark hover:underline'
-                              }`}
+                      <div className={`grid grid-cols-1 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] gap-6 ${isEntraGroup(group) ? 'xl:items-stretch' : ''}`}>
+                        <div className={`flex flex-col gap-3 xl:min-h-0 ${isEntraGroup(group) ? 'xl:h-auto' : 'xl:h-[560px]'}`}>
+                          {!isEntraGroup(group) && (
+                            <section
+                            className={`rounded-2xl border border-gray-100 p-4 transition-all duration-300 xl:flex xl:flex-col xl:min-h-0 ${
+                              activeGroupPanel === 'linked'
+                                ? 'xl:flex-[1.35] bg-white'
+                                : 'xl:flex-[0.34] bg-white/80'
+                            }`}
+                          >
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setActiveGroupPanel('linked')}
+                              className="flex w-full items-center justify-between gap-3 text-left cursor-pointer"
                             >
-                              + {t.add}
-                            </button>
-                          </div>
-                          {groupDetail.members.length === 0 ? (
-                            <div className="text-center py-6 text-gray-300">
-                              <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                              <p className="text-sm">{t.noMembers}</p>
-                              <p className="text-xs mt-1">{t.memberAssignedHelp}</p>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-3">
+                                  <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
+                                    {g.linkedGroups} ({totalLinkedGroupCount})
+                                  </h3>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openAddGroups();
+                                    }}
+                                    disabled={!canEdit || isEntraGroup(group) || group.id === DEFAULT_GROUP_ID}
+                                    className={`text-xs font-semibold transition-colors ${
+                                      !canEdit || isEntraGroup(group) || group.id === DEFAULT_GROUP_ID
+                                        ? 'text-gray-300 cursor-not-allowed'
+                                        : 'text-accent-dark hover:text-accent-dark'
+                                    }`}
+                                  >
+                                    + {t.add}
+                                  </button>
+                                </div>
+                                <p className="text-xs text-sky-600 mt-1">{g.linkedGroupsHelp}</p>
+                              </div>
+                              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${activeGroupPanel === 'linked' ? 'rotate-180 text-dark' : ''}`} />
                             </div>
-                          ) : (
-                            <div className="space-y-2 max-h-64 overflow-y-auto pr-3 [scrollbar-gutter:stable]">
-                              {groupDetail.members.map((m) => (
-                                <div key={m.id} className="flex items-center justify-between py-1.5">
-                                  <div className="flex items-center gap-2">
-                                    <UserAvatar
-                                      userId={m.id}
-                                      displayName={m.display_name}
-                                      email={m.email}
-                                      avatarColor={m.avatar_color}
-                                      className="w-7 h-7"
-                                      initialsClassName="text-[10px]"
-                                    />
-                                    <div>
-                                      <span className="text-sm text-dark">{m.display_name || m.email}</span>
-                                      {m.role === 'owner' && (
-                                        <span className="ml-1.5 text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-medium">{g.ownerBadge}</span>
-                                      )}
-                                      {m.role === 'admin' && (
-                                        <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-                                          <Shield className="w-3 h-3" />
-                                          {g.adminBadge}
-                                        </span>
-                                      )}
-                                      {m.role === 'admin_readonly' && (
-                                      <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-medium">
-                                        <Eye className="w-3 h-3" />
-                                        {t.readOnlyRole}
-                                      </span>
-                                      )}
-                                      {!m.last_login && (
-                                        <span className="ml-1.5 text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium inline-flex items-center gap-0.5">
-                                          <Clock className="w-3 h-3" />{t.noLogin}
-                                        </span>
-                                      )}
+                            <div className={`overflow-hidden transition-all duration-300 ${activeGroupPanel === 'linked' ? 'mt-4 max-h-[430px] opacity-100 xl:flex-1 xl:min-h-0' : 'max-h-0 opacity-0'}`}>
+                              {totalLinkedGroupCount === 0 ? (
+                                <div className="flex flex-col items-center justify-center text-center py-6 text-gray-300 min-h-[140px]">
+                                  <Layers3 className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                                  <p className="text-sm">{g.noLinkedGroups}</p>
+                                  <p className="text-xs mt-1">{g.linkedGroupsHint}</p>
+                                </div>
+                              ) : (
+                                <div className="space-y-2 overflow-y-auto pr-3 [scrollbar-gutter:stable] xl:h-full">
+                                  {linkedGroups.map((childGroup) => (
+                                    <div key={childGroup.id} className="flex items-center justify-between py-1.5">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <Layers3 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-sm text-dark truncate">{groupLabel(childGroup)}</span>
+                                            {childGroup.source === 'entra' && (
+                                              <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                                            )}
+                                          </div>
+                                          {childGroup.description && (
+                                            <p className="text-xs text-gray-400 truncate">{childGroup.description}</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => removeLinkedGroup(childGroup.id, groupLabel(childGroup))}
+                                        disabled={!canEdit}
+                                        className="text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        title={g.removeLinkedGroup}
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
                                     </div>
-                                  </div>
-                                  {!isEntraGroup(group) && (
-                                    <button
-                                      onClick={() => removeMember(m.id, m.display_name)}
-                                      disabled={!canEdit}
-                                      className="text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                      title={t.removeFromGroup}
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
+                                  ))}
+                                  {linkedEntraGroups.length > 0 && (
+                                    <div className="pt-3">
+                                      <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                                        <Layers3 className="w-3.5 h-3.5" />
+                                        {g.linkedEntraGroups}
+                                      </div>
+                                      <div className="space-y-2">
+                                        {linkedEntraGroups.map((childGroup) => (
+                                          <div key={childGroup.entra_group_id} className="flex items-center justify-between py-1.5">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                              <Layers3 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                              <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                  <span className="text-sm text-dark truncate">{childGroup.display_name || childGroup.entra_group_id}</span>
+                                                  <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                                                </div>
+                                                {childGroup.description && (
+                                                  <p className="text-xs text-gray-400 truncate">{childGroup.description}</p>
+                                                )}
+                                              </div>
+                                            </div>
+                                            <button
+                                              onClick={() => removeLinkedEntraGroup(childGroup.entra_group_id, childGroup.display_name || childGroup.entra_group_id)}
+                                              disabled={!canEdit}
+                                              className="text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                              title={g.removeLinkedGroup}
+                                            >
+                                              <X className="w-4 h-4" />
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
                                   )}
                                 </div>
-                              ))}
+                              )}
                             </div>
+                            </section>
                           )}
-                          {isEntraGroup(group) && (
-                            <p className="mt-2 text-xs text-sky-600">{t.syncedFromEntra}</p>
-                          )}
+
+                          <section
+                            className={`rounded-2xl border border-gray-100 p-4 transition-all duration-300 ${
+                              isEntraGroup(group)
+                                ? 'xl:flex xl:flex-col bg-white'
+                                : 'xl:flex xl:flex-col xl:min-h-0 ' + (activeGroupPanel === 'members' ? 'xl:flex-[1.35] bg-white' : 'xl:flex-[0.34] bg-white/80')
+                            }`}
+                          >
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setActiveGroupPanel('members')}
+                              className="flex w-full items-center justify-between gap-3 text-left cursor-pointer"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-3">
+                                  <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
+                                    {t.members} ({groupDetail.members.length})
+                                  </h3>
+                                  {isEntraGroup(group) ? (
+                                    <span className="text-xs font-semibold text-gray-300 cursor-not-allowed select-none">
+                                      + {t.add}
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openAddMembers();
+                                      }}
+                                      disabled={!canEdit || group.id === DEFAULT_GROUP_ID}
+                                    className={`text-xs font-semibold transition-colors ${
+                                      !canEdit || group.id === DEFAULT_GROUP_ID
+                                        ? 'text-gray-300 cursor-not-allowed'
+                                        : 'text-accent-dark hover:text-accent-dark'
+                                    }`}
+                                  >
+                                    + {t.add}
+                                  </button>
+                                  )}
+                                </div>
+                                <p className="text-xs text-sky-600 mt-1">
+                                  {groupDetail.members.length === 0
+                                    ? (!isEntraGroup(group) && totalLinkedGroupCount > 0 ? g.linkedGroupsHint : t.memberAssignedHelp)
+                                    : t.memberAssignedHelp}
+                                </p>
+                              </div>
+                              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${activeGroupPanel === 'members' ? 'rotate-180 text-dark' : ''}`} />
+                            </div>
+                            <div className={`overflow-hidden transition-all duration-300 ${isEntraGroup(group)
+                              ? 'mt-4 opacity-100'
+                              : activeGroupPanel === 'members'
+                                ? 'mt-4 opacity-100 xl:flex-1 xl:min-h-0'
+                                : 'max-h-0 opacity-0'
+                            }`}>
+                              {groupDetail.members.length === 0 ? (
+                                <div className={`flex flex-col items-center justify-center text-center py-6 text-gray-300 ${
+                                  isEntraGroup(group) ? 'min-h-[140px]' : 'min-h-[140px]'
+                                }`}>
+                                  <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                                  <p className="text-sm">{t.noMembers}</p>
+                                  <p className="text-xs mt-1">{!isEntraGroup(group) && totalLinkedGroupCount > 0 ? g.linkedGroupsHint : t.memberAssignedHelp}</p>
+                                </div>
+                              ) : (
+                                <div className={`space-y-2 overflow-y-auto pr-3 [scrollbar-gutter:stable] ${isEntraGroup(group) ? 'max-h-[260px]' : 'xl:h-full'}`}>
+                                  {groupDetail.members.map((m) => (
+                                    <div key={m.id} className="flex items-center justify-between py-1.5">
+                                      <div className="flex items-center gap-2">
+                                        <UserAvatar
+                                          userId={m.id}
+                                          displayName={m.display_name}
+                                          email={m.email}
+                                          avatarColor={m.avatar_color}
+                                          className="w-7 h-7"
+                                          initialsClassName="text-[10px]"
+                                        />
+                                        <div>
+                                          <span className="text-sm text-dark">{m.display_name || m.email}</span>
+                                          {m.role === 'owner' && (
+                                            <span className="ml-1.5 text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-medium">{g.ownerBadge}</span>
+                                          )}
+                                          {m.role === 'admin' && (
+                                            <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                                              <Shield className="w-3 h-3" />
+                                              {g.adminBadge}
+                                            </span>
+                                          )}
+                                          {m.role === 'admin_readonly' && (
+                                            <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-medium">
+                                              <Eye className="w-3 h-3" />
+                                              {t.readOnlyRole}
+                                            </span>
+                                          )}
+                                          {!m.last_login && (
+                                            <span className="ml-1.5 text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium inline-flex items-center gap-0.5">
+                                              <Clock className="w-3 h-3" />{t.noLogin}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {!isEntraGroup(group) && (
+                                        <button
+                                          onClick={() => removeMember(m.id, m.display_name)}
+                                          disabled={!canEdit}
+                                          className="text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                          title={t.removeFromGroup}
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {isEntraGroup(group) && (
+                                <p className="mt-2 text-xs text-sky-600">{t.syncedFromEntra}</p>
+                              )}
+                            </div>
+                          </section>
                         </div>
 
-                        {/* Apps */}
-                        <div>
+                        <section className={`rounded-2xl border border-gray-100 p-4 xl:min-h-0 xl:flex xl:flex-col ${isEntraGroup(group) ? 'xl:h-auto' : 'xl:h-[560px]'}`}>
                           <div className="flex items-center justify-between mb-3">
                             <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
                               {t.visibleApps} ({groupDetail.apps.length})
@@ -1046,19 +1424,19 @@ export default function AdminGroups() {
                             <button
                               onClick={openAddApps}
                               disabled={!canEdit}
-                              className="text-xs font-medium text-accent-dark hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="text-xs font-semibold text-accent-dark hover:text-accent-dark disabled:text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               + {t.add}
                             </button>
                           </div>
                           {groupDetail.apps.length === 0 ? (
-                            <div className="text-center py-6 text-gray-300">
+                            <div className={`flex flex-col items-center justify-center text-center py-6 text-gray-300 ${isEntraGroup(group) ? 'min-h-[140px]' : 'flex-1 min-h-[140px]'}`}>
                               <AppWindow className="w-8 h-8 mx-auto mb-2 opacity-40" />
                               <p className="text-sm">{t.noAppsAssigned}</p>
-                              <p className="text-xs mt-1">{t.appAssignedHelp}</p>
+                              <p className="text-xs mt-1">{(linkedGroups.length + linkedEntraGroups.length) > 0 ? g.linkedGroupsHelp : t.appAssignedHelp}</p>
                             </div>
                           ) : (
-                            <div className="space-y-2 max-h-64 overflow-y-auto pr-3 [scrollbar-gutter:stable]">
+                            <div className={`space-y-2 overflow-y-auto pr-3 [scrollbar-gutter:stable] ${isEntraGroup(group) ? 'max-h-[260px]' : 'xl:flex-1 xl:min-h-0'}`}>
                               {groupDetail.apps.map((a) => (
                                 <div key={a.id} className="flex items-center justify-between py-1.5">
                                   <div className="flex items-center gap-2">
@@ -1077,7 +1455,7 @@ export default function AdminGroups() {
                               ))}
                             </div>
                           )}
-                        </div>
+                        </section>
                       </div>
                     </>
                   ) : null}
@@ -1125,7 +1503,7 @@ export default function AdminGroups() {
             </div>
             <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-100">
                 <button onClick={() => setShowCreate(false)} className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-dark hover:bg-gray-100 rounded-xl transition-colors">
-                {t.cancel}
+                {ui.common.cancel}
               </button>
               <button
                 onClick={handleCreate}
@@ -1163,6 +1541,7 @@ export default function AdminGroups() {
                   onChange={setEntraSearch}
                   placeholder={g.searchEntraPlaceholder}
                   clearLabel={ui.common.clearSearch}
+                  autoFocus
                 />
               </div>
 
@@ -1293,6 +1672,127 @@ export default function AdminGroups() {
                   </button>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add linked groups modal */}
+      {showAddGroups && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={closeCurrentModal}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-dark">{g.addLinkedGroupsTitle}</h2>
+                <p className="text-sm text-gray-500 mt-1">{g.linkedGroupsHelp}</p>
+              </div>
+              <button onClick={closeCurrentModal} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <ClearableSearchField
+              value={groupLinkSearch}
+              onChange={setGroupLinkSearch}
+              placeholder={g.linkedGroupsSearchPlaceholder}
+              className="mb-3"
+              clearLabel={ui.common.clearSearch}
+            />
+            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+              <span>
+                {g.groupsFound.replace('{count}', filteredLinkableGroups.length + filteredLinkableEntraGroups.length)} · {g.selectedCount.replace('{count}', selectedLinkedGroupIds.length + selectedLinkedEntraGroupIds.length)}
+              </span>
+              {hasGroupLinkSearch && (
+                <button
+                  onClick={() => {
+                    selectVisibleLinkedGroups();
+                    selectVisibleLinkedEntraGroups();
+                  }}
+                  className="font-medium text-accent-dark hover:underline"
+                >
+                  {g.selectAllFiltered}
+                </button>
+              )}
+            </div>
+            <div className="max-h-72 overflow-y-auto space-y-1">
+              {filteredLinkableGroups.length === 0 && filteredLinkableEntraGroups.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">{g.noGroupsAvailable}</p>
+              ) : (
+                <>
+                  {filteredLinkableGroups.length > 0 && (
+                    <div className="space-y-1">
+                      {filteredLinkableGroups.map((group) => (
+                        <label
+                          key={group.id}
+                          className="w-full flex items-start gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 text-left transition-colors cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedLinkedGroupIds.includes(group.id)}
+                            onChange={() => toggleLinkedGroupSelection(group.id)}
+                            className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-medium text-dark truncate">{groupLabel(group)}</span>
+                              {group.source === 'entra' && (
+                                <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-400 font-mono truncate">{group.id}</div>
+                            {group.description && <div className="text-xs text-gray-500 truncate">{group.description}</div>}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {filteredLinkableEntraGroups.length > 0 && (
+                    <div className="pt-2">
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                        {g.linkedEntraGroups}
+                      </div>
+                      <div className="space-y-1">
+                        {filteredLinkableEntraGroups.map((group) => (
+                          <label
+                            key={group.entra_group_id}
+                            className="w-full flex items-start gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 text-left transition-colors cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedLinkedEntraGroupIds.includes(group.entra_group_id)}
+                              onChange={() => toggleLinkedEntraGroupSelection(group.entra_group_id)}
+                              className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium text-dark truncate">{group.display_name || group.entra_group_id}</span>
+                                <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                              </div>
+                              <div className="text-xs text-gray-400 font-mono truncate">{group.entra_group_id}</div>
+                              {group.description && <div className="text-xs text-gray-500 truncate">{group.description}</div>}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-100">
+              <button
+                onClick={closeCurrentModal}
+                className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-dark hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                {ui.common.cancel}
+              </button>
+              <button
+                onClick={addLinkedGroups}
+                disabled={selectedLinkedGroupIds.length === 0 && selectedLinkedEntraGroupIds.length === 0}
+                className="flex items-center gap-2 px-5 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40"
+              >
+                <Plus className="w-4 h-4" />
+                {g.addLinkedGroupsConfirm}
+              </button>
             </div>
           </div>
         </div>
