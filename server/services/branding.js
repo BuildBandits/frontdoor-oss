@@ -5,9 +5,13 @@ import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { DEFAULT_LANGUAGE, isSupportedLanguage } from '../../shared/languages.js';
 import { archiveMediaAsset } from './mediaAssets.js';
+import { applySvgSafeHeaders, isSvgContentType, sanitizeSvgBuffer } from './svgSanitize.js';
+import { UserFacingError } from './errors.js';
 
 const BRANDING_ID = 'default';
-const BRANDING_ASSET_DIR = process.env.BRANDING_ASSET_DIR || path.join(process.cwd(), 'data', 'branding');
+// path.resolve() normalizes a relative env value to an absolute path so
+// res.sendFile() in serveBrandingLogo accepts it without throwing.
+const BRANDING_ASSET_DIR = path.resolve(process.env.BRANDING_ASSET_DIR || path.join(process.cwd(), 'data', 'branding'));
 const DEFAULT_BRANDING = {
   heroTitleLine1: 'Your apps,',
   heroTitleLine2: 'all in one place.',
@@ -122,18 +126,18 @@ function buildBrandingAuditDetails(currentRow, nextBranding, input = {}) {
 
 function parseLogoDataUrl(dataUrl) {
   if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
-    throw new Error('logo must be a base64 data URL');
+    throw new UserFacingError('logo must be a base64 data URL');
   }
 
   const match = dataUrl.match(/^data:(image\/(?:png|jpeg|jpg|webp|gif|svg\+xml));base64,(.+)$/i);
   if (!match) {
-    throw new Error('logo must be a PNG, JPEG, WEBP, GIF, or SVG image');
+    throw new UserFacingError('logo must be a PNG, JPEG, WEBP, GIF, or SVG image');
   }
 
   const contentType = match[1].toLowerCase().replace('jpg', 'jpeg');
   const buffer = Buffer.from(match[2], 'base64');
   if (!buffer.length) {
-    throw new Error('logo image is empty');
+    throw new UserFacingError('logo image is empty');
   }
 
   return { contentType, buffer };
@@ -148,7 +152,14 @@ function extensionFromContentType(contentType) {
 }
 
 async function saveLogo(dataUrl, { dbHandle = db } = {}) {
-  const { contentType, buffer } = parseLogoDataUrl(dataUrl);
+  let { contentType, buffer } = parseLogoDataUrl(dataUrl);
+  if (isSvgContentType(contentType)) {
+    const sanitized = sanitizeSvgBuffer(buffer);
+    if (!sanitized) {
+      throw new UserFacingError('logo SVG is not valid');
+    }
+    buffer = sanitized;
+  }
   const extension = extensionFromContentType(contentType);
   const fileName = `company-logo.${Date.now()}.${uuidv4().slice(0, 8)}.${extension}`;
   const filePath = path.join(BRANDING_ASSET_DIR, fileName);
@@ -311,7 +322,11 @@ export async function serveBrandingLogo(res) {
 
   const contentType = getBrandingLogoContentType() || 'image/png';
   res.setHeader('Cache-Control', 'private, max-age=86400, stale-while-revalidate=604800');
-  res.setHeader('Content-Type', contentType);
+  if (isSvgContentType(contentType)) {
+    applySvgSafeHeaders(res, path.basename(logoPath));
+  } else {
+    res.setHeader('Content-Type', contentType);
+  }
   res.sendFile(logoPath);
 }
 

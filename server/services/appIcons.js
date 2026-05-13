@@ -4,8 +4,11 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { archiveMediaAsset } from './mediaAssets.js';
+import { applySvgSafeHeaders, isSvgBuffer, isSvgContentType, sanitizeSvgBuffer } from './svgSanitize.js';
 
-const DEFAULT_CACHE_DIR = process.env.APP_ICON_CACHE_DIR || path.join(process.cwd(), 'data', 'app-icon-cache');
+// path.resolve() normalizes a relative env value (e.g. "./data/app-icon-cache")
+// to an absolute path so res.sendFile() in serveAppIconForApp does not reject it.
+const DEFAULT_CACHE_DIR = path.resolve(process.env.APP_ICON_CACHE_DIR || path.join(process.cwd(), 'data', 'app-icon-cache'));
 
 function ensureCacheDir() {
   if (!fs.existsSync(DEFAULT_CACHE_DIR)) {
@@ -144,14 +147,24 @@ export async function readAppIconAssetDataUrl(app, { cacheDir = DEFAULT_CACHE_DI
 export function parseAppIconPayload({ iconDataUrl, iconSvgText }) {
   const svgText = typeof iconSvgText === 'string' ? iconSvgText.trim() : '';
   if (/<svg[\s>]/i.test(svgText)) {
+    const sanitized = sanitizeSvgBuffer(Buffer.from(svgText, 'utf8'));
+    if (!sanitized) return null;
     return {
-      buffer: Buffer.from(svgText, 'utf8'),
+      buffer: sanitized,
       contentType: 'image/svg+xml',
     };
   }
 
   const parsed = parseDataUrl(iconDataUrl);
   if (parsed?.buffer) {
+    if (isSvgContentType(parsed.contentType) || isSvgBuffer(parsed.buffer)) {
+      const sanitized = sanitizeSvgBuffer(parsed.buffer);
+      if (!sanitized) return null;
+      return {
+        buffer: sanitized,
+        contentType: 'image/svg+xml',
+      };
+    }
     return {
       buffer: parsed.buffer,
       contentType: parsed.contentType,
@@ -172,8 +185,13 @@ export async function serveAppIconForApp(app, res, { cacheDir = DEFAULT_CACHE_DI
   }
 
   const extension = path.extname(app.icon_file_name).slice(1);
-  res.type(contentTypeFromExtension(extension));
+  const contentType = contentTypeFromExtension(extension);
   res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  if (isSvgContentType(contentType)) {
+    applySvgSafeHeaders(res, app.icon_file_name);
+  } else {
+    res.type(contentType);
+  }
   return res.sendFile(absolutePath);
 }
 

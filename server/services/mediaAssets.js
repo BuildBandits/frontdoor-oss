@@ -4,9 +4,12 @@ import fsp from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
+import { applySvgSafeHeaders, isSvgBuffer, isSvgContentType, sanitizeSvgBuffer } from './svgSanitize.js';
 
-const APP_ICON_CACHE_DIR = process.env.APP_ICON_CACHE_DIR || path.join(process.cwd(), 'data', 'app-icon-cache');
-const BRANDING_ASSET_DIR = process.env.BRANDING_ASSET_DIR || path.join(process.cwd(), 'data', 'branding');
+// path.resolve() ensures the configured dir is absolute even when the env var
+// uses a relative form like "./data/branding" — required by res.sendFile().
+const APP_ICON_CACHE_DIR = path.resolve(process.env.APP_ICON_CACHE_DIR || path.join(process.cwd(), 'data', 'app-icon-cache'));
+const BRANDING_ASSET_DIR = path.resolve(process.env.BRANDING_ASSET_DIR || path.join(process.cwd(), 'data', 'branding'));
 
 function extensionFromContentType(contentType) {
   const normalized = (contentType || '').toLowerCase();
@@ -89,14 +92,24 @@ function parseDataUrl(dataUrl) {
 export function parseMediaAssetPayload({ dataUrl, svgText }) {
   const svg = typeof svgText === 'string' ? svgText.trim() : '';
   if (/<svg[\s>]/i.test(svg)) {
+    const sanitized = sanitizeSvgBuffer(Buffer.from(svg, 'utf8'));
+    if (!sanitized) return null;
     return {
-      buffer: Buffer.from(svg, 'utf8'),
+      buffer: sanitized,
       contentType: 'image/svg+xml',
     };
   }
 
   const parsed = parseDataUrl(dataUrl);
   if (parsed?.buffer) {
+    if (isSvgContentType(parsed.contentType) || isSvgBuffer(parsed.buffer)) {
+      const sanitized = sanitizeSvgBuffer(parsed.buffer);
+      if (!sanitized) return null;
+      return {
+        buffer: sanitized,
+        contentType: 'image/svg+xml',
+      };
+    }
     return {
       buffer: parsed.buffer,
       contentType: parsed.contentType,
@@ -490,6 +503,11 @@ export async function serveMediaAsset(asset, res, {
   }
 
   res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-  res.setHeader('Content-Type', asset.content_type || contentTypeFromFilename(asset.stored_file_name));
+  const contentType = asset.content_type || contentTypeFromFilename(asset.stored_file_name);
+  if (isSvgContentType(contentType)) {
+    applySvgSafeHeaders(res, asset.stored_file_name);
+  } else {
+    res.setHeader('Content-Type', contentType);
+  }
   res.sendFile(absolutePath);
 }

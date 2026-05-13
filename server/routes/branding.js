@@ -4,6 +4,7 @@ import { logRbacAudit } from '../db.js';
 import { clearAvatarCache, getAvatarCacheStats } from '../services/avatars.js';
 import { cleanupAppIconCache, getAppIconCacheStats } from '../services/appIcons.js';
 import { getBrandingSettings, serveBrandingLogo, updateBrandingSettings } from '../services/branding.js';
+import { respondWithError } from '../services/errors.js';
 
 const router = express.Router();
 
@@ -18,7 +19,7 @@ router.put('/', authenticate, isOwner, async (req, res) => {
     res.json({ message: 'Changes saved', branding });
   } catch (error) {
     console.error('Branding update failed:', error.message);
-    res.status(400).json({ error: error.message || 'Failed to update branding' });
+    respondWithError(res, error, { status: 500, message: 'Failed to update branding' });
   }
 });
 

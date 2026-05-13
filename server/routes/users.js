@@ -54,7 +54,7 @@ router.get('/:id/avatar', authenticate, async (req, res) => {
     await ensureAvatarCached(user);
     await serveAvatarForUser(user, res);
   } catch (error) {
-    console.error(`Avatar serve failed for ${user.email}:`, error.message);
+    console.error(`Avatar serve failed for user ${user.id}:`, error.message);
     res.status(404).end();
   }
 });

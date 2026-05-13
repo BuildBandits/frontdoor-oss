@@ -5,6 +5,7 @@ import db from '../db.js';
 import { AVATAR_CACHE_DIR } from './avatars.js';
 import { BRANDING_ASSET_DIR } from './branding.js';
 import { APP_ICON_CACHE_DIR } from './appIcons.js';
+import { UserFacingError } from './errors.js';
 
 const BACKUP_VERSION = 1;
 const BACKUP_PROGRESS_STAGES = ['database', 'app-icons', 'branding', 'avatars'];
@@ -159,19 +160,19 @@ export async function createBackupArchive({
 
 function normalizeBackupSnapshot(payload) {
   if (!payload || typeof payload !== 'object') {
-    throw new Error('Invalid backup file');
+    throw new UserFacingError('Invalid backup file');
   }
 
   if (payload.version !== BACKUP_VERSION) {
-    throw new Error(`Unsupported backup version: ${payload.version ?? 'missing'}`);
+    throw new UserFacingError(`Unsupported backup version: ${payload.version ?? 'missing'}`);
   }
 
   if (!payload.database || !Array.isArray(payload.database.tables)) {
-    throw new Error('Backup database payload is missing');
+    throw new UserFacingError('Backup database payload is missing');
   }
 
   if (!Array.isArray(payload.buckets)) {
-    throw new Error('Backup files payload is missing');
+    throw new UserFacingError('Backup files payload is missing');
   }
 
   return payload;
@@ -230,7 +231,7 @@ async function clearBucketDirectory(bucketDir) {
 async function restoreBucketFiles(bucket, files) {
   for (const file of files || []) {
     if (typeof file.path !== 'string' || !file.path || file.path.includes('..') || path.isAbsolute(file.path)) {
-      throw new Error(`Invalid backup file path in bucket ${bucket.key}`);
+      throw new UserFacingError(`Invalid backup file path in bucket ${bucket.key}`);
     }
   }
 
@@ -254,17 +255,23 @@ export async function restoreBackupArchive(buffer, {
   avatarCacheDir = AVATAR_CACHE_DIR,
 } = {}) {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
-    throw new Error('Backup file is empty');
+    throw new UserFacingError('Backup file is empty');
   }
 
-  const json = zlib.gunzipSync(buffer).toString('utf8');
-  const snapshot = normalizeBackupSnapshot(JSON.parse(json));
+  let parsed;
+  try {
+    const json = zlib.gunzipSync(buffer).toString('utf8');
+    parsed = JSON.parse(json);
+  } catch {
+    throw new UserFacingError('Backup file is not a valid gzipped JSON archive');
+  }
+  const snapshot = normalizeBackupSnapshot(parsed);
   const dbTables = new Map(snapshot.database.tables.map((table) => [table.name, table]));
 
   for (const bucket of snapshot.buckets) {
     for (const file of bucket.files || []) {
       if (typeof file.path !== 'string' || !file.path || file.path.includes('..') || path.isAbsolute(file.path)) {
-        throw new Error(`Invalid backup file path in bucket ${bucket.key}`);
+        throw new UserFacingError(`Invalid backup file path in bucket ${bucket.key}`);
       }
     }
   }

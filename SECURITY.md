@@ -1,80 +1,79 @@
-# Security Audit Report — Frontdoor
+# Security Policy
 
-**Audit date:** 2026-03-30
-**Auditor:** Claude Code + manual review
+FrontDoor sits in front of internal applications and handles authentication. We take security reports seriously.
 
-## Summary
+## Supported versions
 
-| # | Severity | Finding | Status |
-|---|----------|---------|--------|
-| 1 | CRITICAL | Open Redirect in Login.jsx | FIXED |
-| 2 | HIGH | JWT in localStorage exposed to XSS | FIXED |
-| 3 | HIGH | No URL/SSRF validation on target_url | FIXED |
-| 4 | HIGH | Admin email hardcoded in source | FIXED |
-| 5 | MODERATE | Missing `.dockerignore` | FIXED |
-| 6 | MODERATE | Rate limiting too permissive on auth | FIXED |
-| 7 | MODERATE | Sensitive data in logs (emails) | FIXED |
-| 8 | MODERATE | Silent catch on access_logs | FIXED |
-| 9 | MODERATE | Incorrect slug validation regex | FIXED |
-| 10 | MODERATE | XSS in proxy 404 page (unescaped appSlug) | FIXED |
-| 11 | LOW | CSP with `unsafe-inline` on scriptSrc | ACCEPTED |
-| 12 | LOW | npm audit: esbuild/vite moderate | TODO |
+| Version | Supported |
+|---------|-----------|
+| `1.x` (current `main`) | Yes |
+| Older releases | No — please upgrade |
 
----
+We currently support only the latest minor release on `main`. There are no LTS branches.
 
-## Detailed Findings
+## Reporting a vulnerability
 
-### 1. [CRITICAL] Open Redirect in Login.jsx
+**Please do not open a public GitHub issue for security vulnerabilities.**
 
-**File:** `src/pages/Login.jsx:28-29`
-**Description:** The `redirect` URL parameter was used directly in `window.location.href` without validation.
-**Fix:** Validation that redirect is a valid subdomain slug. Only alphanumeric slugs accepted, domain is reconstructed client-side.
+Send a private report to:
 
-### 2. [HIGH] JWT in localStorage exposed to XSS
+`<security@TBD>` *(this address will be set when the project is migrated to its permanent home; until then, contact a maintainer directly via GitHub)*
 
-**File:** `src/stores/authStore.js:4,9-10`, `src/services/api.js:9`
-**Description:** JWT was stored in both httpOnly cookie (secure) and localStorage (readable by JS).
-**Fix:** Token is no longer saved in localStorage. Only user profile data (non-sensitive) remains in localStorage for UI. API calls use the httpOnly cookie with `withCredentials: true`.
+Include in your report:
 
-### 3. [HIGH] No URL/SSRF validation on target_url
+- A description of the issue and the impact you observed.
+- Steps to reproduce, or a minimal proof of concept.
+- The affected version or commit SHA.
+- Your assessment of severity, if you have one.
 
-**File:** `server/routes/apps.js:35-55`
-**Description:** Admin could insert any URL as `target_url`, including private IPs.
-**Fix:** Protocol validation (http/https only), private IP blocking, URL validation with `new URL()`.
+If you prefer encrypted communication, request a PGP key in your first message.
 
-### 4. [HIGH] Admin email hardcoded in source
+## What to expect
 
-**Description:** Admin email was hardcoded in source for auto-promotion.
-**Fix:** Moved to `ADMIN_EMAILS` environment variable (comma-separated).
+| Stage | Target |
+|-------|--------|
+| Acknowledgement of report | within **72 hours** |
+| Initial severity assessment | within **7 days** |
+| Fix for critical issues | within **30 days** of confirmation |
+| Coordinated public disclosure | after a fix is released, or by mutual agreement |
 
-### 5. [MODERATE] Missing `.dockerignore`
+We will keep you informed throughout the process. If we determine the report is not a security issue, we will explain why and, if relevant, redirect it to the regular issue tracker.
 
-**Fix:** Created `.dockerignore` with appropriate exclusions.
+## Disclosure
 
-### 6. [MODERATE] Rate limiting too permissive on auth
+We follow coordinated disclosure. Once a fix is released, we publish a brief advisory describing the issue, affected versions, and the fix. Reporters are credited unless they prefer to remain anonymous.
 
-**Fix:** Separate rate limit on `/api/auth/microsoft` (10 requests per 15 minutes).
+## Scope
 
-### 7-10. Various moderate fixes
+In scope:
 
-All addressed. See git history for details.
+- The FrontDoor server (`server/`) and frontend (`src/`).
+- Default Docker image and deployment configuration.
+- Authentication, authorization, RBAC, and audit-log handling.
+- HTML sanitization paths and input validation.
 
-### 11. [LOW] CSP with `unsafe-inline` — ACCEPTED
+Out of scope:
 
-Required for Vite/React production build. Risk mitigated by no user-content HTML rendering.
+- Issues that require physical access to the server.
+- Self-XSS that requires the victim to paste attacker-controlled content into devtools.
+- Vulnerabilities in third-party dependencies that are already publicly tracked and pending an upstream fix — we still want to know, but they will be handled as regular dependency updates.
+- Findings limited to the development environment (e.g. dev-only npm dependencies flagged by `npm audit` with no production exposure).
 
-### 12. [LOW] npm audit: esbuild/vite — TODO
+## Security audit log
 
-Moderate vulnerabilities in esbuild via vite. Dev-only, does not affect production.
+Substantial security work on FrontDoor — formal audits, large hardening passes, post-incident reviews — is recorded in the [`security/`](security/) folder as a dated markdown file (`security-audit-YYYYMMDD.md` or `security-incident-YYYYMMDD-<slug>.md`). Each file should capture, at minimum:
 
----
+- Date, scope, and trigger of the work (scheduled audit, pre-release pass, response to a report).
+- Findings with severity, current status (fixed / mitigated / accepted / open), and the commit SHAs that resolve them.
+- What was verified empirically vs. what was reasoned statically.
+- Open items left to follow-up, so the next audit has a clear starting point.
 
-## Already Secure
+Small, day-to-day security fixes do not need a dedicated file — a clear commit message under `Security` in `CHANGELOG.md` is enough. The `security/` folder is for work whose scope spans multiple files or commits and is worth being able to point to as a single artifact.
 
-- **SQL injection**: all queries parameterized with `?`
-- **Cookie security**: httpOnly, secure in prod, sameSite lax
-- **CSRF on SSO**: state parameter with Map + cleanup
-- **Helmet**: security headers present
-- **Secrets**: all in env vars
-- **Static files**: `dotfiles: 'deny'` on express.static
-- **Body parsing**: `express.json({ limit: '1mb' })`
+## Safe-harbor
+
+Good-faith security research aligned with this policy will not be pursued legally. Please:
+
+- Avoid degrading service for other users.
+- Avoid accessing, modifying, or exfiltrating data that is not your own.
+- Give us reasonable time to fix the issue before public disclosure.

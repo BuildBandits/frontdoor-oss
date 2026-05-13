@@ -1284,6 +1284,11 @@ export default function Admin() {
                       <option value="GET">GET</option>
                       <option value="POST">POST</option>
                     </select>
+                    {form.sso_method === 'GET' && (
+                      <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2 leading-relaxed">
+                        ⚠️ {a.ssoMethodGetWarning}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

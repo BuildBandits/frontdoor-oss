@@ -1,6 +1,12 @@
 # Frontdoor
 
-Open-source authentication gateway and app catalog. Authenticates users via Microsoft SSO and provides a single entry point to access all your internal applications, with RBAC-based visibility control.
+**Your apps, all in one place.**
+
+Frontdoor is a self-hosted, open-source homepage for the internal tools your team uses every day. Sign in once with Microsoft SSO, see exactly the apps you are authorized to use, and launch them in one click — no juggling bookmarks, no "which subdomain was it?", no stale sessions. Admins manage who sees what through groups and per-group visibility, and can tailor the homepage's look and branding from the UI.
+
+Built for IT teams who got tired of intranet wikis full of half-broken links.
+
+![Frontdoor home page](docs/screenshot-home.png)
 
 ## Architecture
 
@@ -37,6 +43,8 @@ Each app in the catalog is accessible via its target URL. The gateway handles au
 
 ## Features
 
+See [FEATURES.md](FEATURES.md) for the full capability map. Highlights:
+
 - Microsoft SSO authentication
 - App catalog with search, tags, favorites
 - Group-by-tag view
@@ -61,13 +69,29 @@ npm install
 
 # 2. Configure environment
 cp .env.example.node .env
-# Edit .env with your Azure AD credentials
+# Edit .env with your Azure AD credentials (or use DEV_LOGIN, see below)
 
 # 3. Start in dev mode (Vite + Express in parallel)
 npm run dev
 ```
 
 Frontend: http://localhost:5173 | API: http://localhost:3001
+
+### Dev Login (no Azure required)
+
+To run Frontdoor locally without an Azure AD app registration, enable the dev login mode:
+
+```bash
+DEV_LOGIN=true
+```
+
+When `DEV_LOGIN=true` and `NODE_ENV` is not `production`:
+- Azure AD credentials are **not required** — the server starts without them
+- A `JWT_SECRET` fallback is generated automatically if not set
+- The login page shows a **Dev Login** panel where you can pick a role (`owner`, `admin`, `admin_readonly`, `user`) and enter immediately
+- A local dev user is created in the database on first use
+
+This is the recommended way to explore and develop on Frontdoor without configuring Microsoft Entra. The dev login is completely disabled in production (`NODE_ENV=production`) regardless of the `DEV_LOGIN` value.
 
 ## Quick Start (Docker)
 
@@ -90,6 +114,7 @@ App: http://localhost:3001
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `DEV_LOGIN` | Enable local dev login without Azure SSO (ignored in production) | `false` |
 | `PORT` | Express server port | `3001` |
 | `DATABASE_PATH` | SQLite file path | `./frontdoor.db` |
 | `AVATAR_CACHE_DIR` | Disk cache for user avatars and metadata | `./data/avatar-cache` |
@@ -397,6 +422,18 @@ SQLite with 9 tables:
 
 On first startup with an empty DB, example apps are seeded automatically.
 
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, the pull-request workflow, and the **DCO sign-off** requirement. Project governance, maintainers, and the decision process are documented in [GOVERNANCE.md](GOVERNANCE.md). All participants are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+For vulnerability reports, please follow the private disclosure process described in [SECURITY.md](SECURITY.md). Do not open a public GitHub issue for security findings.
+
+## Brand and trademark
+
+**FrontDoor™** is an unregistered trademark claimed by the project's original authors. The MIT license covers the source code; it does not grant rights to use the FrontDoor name, logo, or brand identity. See [TRADEMARK.md](TRADEMARK.md) for fair-use guidance and how to request permission.
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE). The MIT license covers the source code; for the **FrontDoor™** name and brand see [TRADEMARK.md](TRADEMARK.md).

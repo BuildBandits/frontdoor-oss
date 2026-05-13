@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, X, Star, List, AlignJustify, Rows3, AppWindow } from 'lucide-react';
+import { Search, X, Star, LayoutGrid, List, Rows3, AppWindow } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -436,7 +436,7 @@ export default function Home() {
               } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
               title={groupByTag ? ui.home.gridViewTitle : ui.home.groupByTitle}
             >
-              {groupByTag ? <AppWindow className="w-4 h-4" /> : <AlignJustify className="w-4 h-4" />}
+              {groupByTag ? <AppWindow className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
               <span className="hidden sm:inline">{ui.home.groupBy}</span>
             </button>
 

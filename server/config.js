@@ -1,7 +1,22 @@
 const REDACTED = '[set]';
 
+// Secrets that ship as placeholders in .env.example files and MUST NOT be used
+// in a real deployment. If startup detects one of these we fail fast instead of
+// signing tokens with a publicly known value.
+const JWT_SECRET_PLACEHOLDERS = new Set([
+  'change-this-in-production',
+  'your-jwt-secret',
+  'changeme',
+  'frontdoor-dev-secret-do-not-use-in-production',
+]);
+
 function isSet(value) {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isPlaceholderJwtSecret(value) {
+  if (!isSet(value)) return false;
+  return JWT_SECRET_PLACEHOLDERS.has(value.trim().toLowerCase());
 }
 
 function isValidHttpUrl(value) {
@@ -42,6 +57,7 @@ export function getStartupConfig() {
     BASE_DOMAIN: baseDomain,
     FRONTEND_URL: frontendUrl,
     TIMEZONE: timezone,
+    DEV_LOGIN: isDevLoginEnabled() ? 'enabled' : 'disabled',
     AZURE_CLIENT_ID: isSet(azureClientId) ? REDACTED : '[missing]',
     AZURE_CLIENT_SECRET: isSet(azureClientSecret) ? REDACTED : '[missing]',
     AZURE_TENANT_ID: isSet(azureTenantId) ? REDACTED : '[missing]',
@@ -51,18 +67,32 @@ export function getStartupConfig() {
   };
 }
 
+export function isDevLoginEnabled() {
+  return process.env.DEV_LOGIN === 'true' && process.env.NODE_ENV !== 'production';
+}
+
 export function validateStartupEnv() {
-  const missing = [
-    'AZURE_CLIENT_ID',
-    'AZURE_CLIENT_SECRET',
-    'AZURE_TENANT_ID',
-    'AZURE_REDIRECT_URI',
-    'JWT_SECRET',
-  ].filter((name) => !isSet(process.env[name]));
+  const devLogin = isDevLoginEnabled();
+
+  // In dev-login mode Azure credentials are not required; a local JWT_SECRET
+  // fallback is generated automatically so the only hard requirement disappears.
+  const requiredKeys = devLogin
+    ? []
+    : ['AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TENANT_ID', 'AZURE_REDIRECT_URI', 'JWT_SECRET'];
+
+  const missing = requiredKeys.filter((name) => !isSet(process.env[name]));
 
   const warnings = [];
   const errors = [];
 
+  if (devLogin) {
+    warnings.push('DEV_LOGIN is enabled — using local dev auth, no Azure SSO required. Do NOT use in production.');
+    // Provide a fallback JWT_SECRET so the server can sign tokens without .env config
+    if (!isSet(process.env.JWT_SECRET)) {
+      process.env.JWT_SECRET = 'frontdoor-dev-secret-do-not-use-in-production';
+      warnings.push('JWT_SECRET not set, using insecure dev fallback');
+    }
+  }
   if (!isSet(process.env.BASE_DOMAIN)) {
     warnings.push('BASE_DOMAIN is not set, defaulting to frontdoor.local');
   }
@@ -82,7 +112,14 @@ export function validateStartupEnv() {
     errors.push('AZURE_REDIRECT_URI must be a valid http or https URL');
   }
   if (isSet(process.env.JWT_SECRET) && process.env.JWT_SECRET.trim().length < 32) {
-    warnings.push('JWT_SECRET is shorter than 32 characters; use a longer random secret in production');
+    if (devLogin) {
+      warnings.push('JWT_SECRET is shorter than 32 characters; use a longer random secret in production');
+    } else {
+      errors.push('JWT_SECRET must be at least 32 characters in production (set DEV_LOGIN=true for local development)');
+    }
+  }
+  if (isPlaceholderJwtSecret(process.env.JWT_SECRET) && !devLogin) {
+    errors.push('JWT_SECRET is set to a known placeholder value; generate a unique secret before starting the server');
   }
   if (!isSet(process.env.ADMIN_EMAILS)) {
     warnings.push('ADMIN_EMAILS is empty; no user will be auto-promoted to owner on first login');

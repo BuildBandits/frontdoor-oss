@@ -7,6 +7,7 @@ import { forceSyncAllEntraUsers, importEntraGroups, listDiscoveredEntraGroups } 
 import { getDescendantGroupIds } from '../services/groupHierarchy.js';
 import { transferGroupApps } from '../services/groupAppTransfer.js';
 import { iconUrlForApp } from '../services/appIcons.js';
+import { respondWithError } from '../services/errors.js';
 
 const router = express.Router();
 
@@ -101,7 +102,8 @@ router.post('/entra/import', authenticate, isAdminEditor, (req, res) => {
       ...result,
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    console.error('Entra import failed:', error.message);
+    respondWithError(res, error, { status: 500, message: 'Failed to import Entra groups' });
   }
 });
 
@@ -119,10 +121,8 @@ router.post('/entra/force-sync', authenticate, isAdminEditor, async (req, res) =
       ...result,
     });
   } catch (error) {
-    res.status(400).json({
-      error: error.message,
-      ...(error.hint ? { hint: error.hint } : {}),
-    });
+    console.error('Entra force-sync failed:', error.message);
+    respondWithError(res, error, { status: 500, message: 'Failed to sync Entra users' });
   }
 });
 

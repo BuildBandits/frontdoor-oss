@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticate, isOwner } from '../middleware/auth.js';
 import { createBackupArchive, restoreBackupArchive } from '../services/backup.js';
 import { getBackupExportJob, getBackupExportJobArchive, startBackupExportJob, subscribeBackupExportJob } from '../services/backupJobs.js';
+import { respondWithError } from '../services/errors.js';
 
 const router = express.Router();
 
@@ -112,7 +113,7 @@ router.post(
       });
     } catch (error) {
       console.error('Backup restore failed:', error.message);
-      res.status(400).json({ error: error.message || 'Failed to restore backup' });
+      respondWithError(res, error, { status: 500, message: 'Failed to restore backup' });
     }
   }
 );

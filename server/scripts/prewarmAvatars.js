@@ -50,14 +50,14 @@ async function main() {
       const result = await prewarmAvatarCacheForUser(user, accessToken);
       if (result) {
         cached += 1;
-        console.log(`[${user.email}] cached from ${result.source}`);
+        console.log(`[${user.id}] cached from ${result.source}`);
       } else {
         skipped += 1;
-        console.log(`[${user.email}] no avatar found`);
+        console.log(`[${user.id}] no avatar found`);
       }
     } catch (error) {
       failed += 1;
-      console.error(`[${user.email}] failed: ${error.message}`);
+      console.error(`[${user.id}] failed: ${error.message}`);
     }
   }
 

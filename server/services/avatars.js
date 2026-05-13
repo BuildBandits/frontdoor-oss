@@ -4,7 +4,9 @@ import path from 'path';
 import crypto from 'crypto';
 import { ConfidentialClientApplication } from '@azure/msal-node';
 
-const DEFAULT_CACHE_DIR = process.env.AVATAR_CACHE_DIR || path.join(process.cwd(), 'data', 'avatar-cache');
+// path.resolve() normalizes a relative env value to an absolute path so
+// res.sendFile() in serveAvatarForUser accepts it without throwing.
+const DEFAULT_CACHE_DIR = path.resolve(process.env.AVATAR_CACHE_DIR || path.join(process.cwd(), 'data', 'avatar-cache'));
 const DEFAULT_TTL_DAYS = Number(process.env.AVATAR_CACHE_TTL_DAYS || 14);
 const NONE_TTL_DAYS = Number(process.env.AVATAR_CACHE_MISS_TTL_DAYS || 30);
 const GRAPH_APP_SCOPES = ['https://graph.microsoft.com/.default'];

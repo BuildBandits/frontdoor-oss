@@ -30,6 +30,13 @@ COPY server/ ./server/
 COPY shared/ ./shared/
 COPY --from=builder /app/dist ./dist/
 
+RUN groupadd --system --gid 1001 frontdoor \
+    && useradd --system --uid 1001 --gid frontdoor --home-dir /app --shell /sbin/nologin frontdoor \
+    && mkdir -p /data \
+    && chown -R frontdoor:frontdoor /app /data
+
+USER frontdoor
+
 ENV NODE_ENV=production
 EXPOSE 3001
 

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and general discussion
+    url: https://github.com/discussions
+    about: Please ask and answer questions in GitHub Discussions instead of opening an issue.
+  - name: Security vulnerability
+    url: https://github.com/.github/blob/main/SECURITY.md
+    about: Do not open a public issue for security reports. See SECURITY.md for the private reporting process.

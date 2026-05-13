@@ -1,6 +1,7 @@
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
+import { UserFacingError } from './errors.js';
 
 const DEFAULT_SCOPES = ['User.Read', 'openid', 'profile', 'email'];
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0';
@@ -69,7 +70,7 @@ function getGraphClient() {
 async function acquireGraphAppToken() {
   const client = getGraphClient();
   if (!client) {
-    throw new Error('Microsoft Graph app credentials are not configured');
+    throw new UserFacingError('Microsoft Graph app credentials are not configured', { statusCode: 400 });
   }
 
   const response = await client.acquireTokenByClientCredential({
@@ -77,7 +78,7 @@ async function acquireGraphAppToken() {
   });
 
   if (!response?.accessToken) {
-    throw new Error('Microsoft Graph app token could not be acquired');
+    throw new UserFacingError('Microsoft Graph app token could not be acquired', { statusCode: 502 });
   }
 
   return response.accessToken;
@@ -408,7 +409,7 @@ export function importEntraGroups(groupIds) {
     for (const entraGroupId of uniqueGroupIds) {
       const cacheRow = cacheLookup.get(entraGroupId);
       if (!cacheRow) {
-        throw new Error(`Entra group ${entraGroupId} is not in the discovery cache`);
+        throw new UserFacingError(`Entra group ${entraGroupId} is not in the discovery cache`, { statusCode: 400 });
       }
 
       const existing = existingByEntraId.get(entraGroupId) || null;

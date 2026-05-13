@@ -442,6 +442,7 @@
       "entraApp": "Entra App",
       "ssoEndpointLabel": "SSO endpoint",
       "ssoMethodLabel": "Method",
+      "ssoMethodGetWarning": "Warning: GET appends the SSO token to the URL. The token (5-min lifetime) can leak via Referer headers, browser history, and server access logs. Prefer POST when the target app supports it.",
       "nameLabel": "Name",
       "nameExample": "Outlook (WebMail)",
       "slugLabel": "Slug (unique identifier)",

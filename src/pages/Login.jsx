@@ -12,6 +12,9 @@ export default function Login() {
   const { isAuthenticated, loginWithToken } = useAuthStore();
   const [branding, setBranding] = useState(null);
   const [brandingLoading, setBrandingLoading] = useState(true);
+  const [devLogin, setDevLogin] = useState(false);
+  const [devRole, setDevRole] = useState('owner');
+  const [devLoading, setDevLoading] = useState(false);
   const error = searchParams.get('error');
   const language = normalizeLanguage(branding?.defaultLanguage);
   const ui = getUiStrings(language);
@@ -21,6 +24,9 @@ export default function Login() {
       .then((res) => setBranding(res.data.branding || null))
       .catch(() => setBranding(null))
       .finally(() => setBrandingLoading(false));
+    api.get('/auth/dev-status')
+      .then((res) => setDevLogin(res.data.devLogin === true))
+      .catch(() => setDevLogin(false));
   }, []);
 
   useEffect(() => {
@@ -58,6 +64,17 @@ export default function Login() {
 
   const handleSSOLogin = () => {
     window.location.href = '/api/auth/microsoft';
+  };
+
+  const handleDevLogin = async () => {
+    setDevLoading(true);
+    try {
+      const res = await api.post('/auth/dev-login', { role: devRole });
+      loginWithToken(null, res.data.user);
+      navigate('/', { replace: true });
+    } catch {
+      setDevLoading(false);
+    }
   };
 
   return (
@@ -104,6 +121,34 @@ export default function Login() {
               </svg>
               {ui.login.signIn}
             </button>
+          )}
+
+          {devLogin && (
+            <div className="mt-6 p-4 bg-amber-50 border border-amber-300 rounded-xl">
+              <p className="text-amber-800 text-xs font-semibold uppercase tracking-wide mb-3">Dev Login</p>
+              <div className="flex gap-2 mb-3">
+                {['owner', 'admin', 'admin_readonly', 'user'].map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setDevRole(r)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
+                      devRole === r
+                        ? 'bg-amber-600 text-white border-amber-600'
+                        : 'bg-white text-amber-800 border-amber-300 hover:bg-amber-100'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={handleDevLogin}
+                disabled={devLoading}
+                className="w-full px-4 py-2.5 bg-amber-600 text-white rounded-lg font-semibold text-sm hover:bg-amber-700 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {devLoading ? 'Logging in...' : `Enter as ${devRole}`}
+              </button>
+            </div>
           )}
         </div>
       </div>

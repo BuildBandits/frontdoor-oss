@@ -142,7 +142,18 @@ export default function Layout({ children }) {
   };
 
   const handleHomeViewChange = async (nextView) => {
-    if (homeViewSaving || user?.homeDesktopView === nextView) return;
+    if (homeViewSaving) return;
+    if (nextView === defaultHomeDesktopView) {
+      if (user?.homeDesktopView == null) return;
+      setHomeViewSaving(true);
+      try {
+        await resetHomeDesktopView();
+      } finally {
+        setHomeViewSaving(false);
+      }
+      return;
+    }
+    if (user?.homeDesktopView === nextView) return;
     setHomeViewSaving(true);
     try {
       await updateHomeDesktopView(nextView);
@@ -162,7 +173,18 @@ export default function Layout({ children }) {
   };
 
   const handlePreferredLanguageChange = async (nextLanguage) => {
-    if (languageSaving || user?.preferredLanguage === nextLanguage) return;
+    if (languageSaving) return;
+    if (nextLanguage === brandingLanguage) {
+      if (user?.preferredLanguage == null) return;
+      setLanguageSaving(true);
+      try {
+        await resetPreferredLanguage();
+      } finally {
+        setLanguageSaving(false);
+      }
+      return;
+    }
+    if (user?.preferredLanguage === nextLanguage) return;
     setLanguageSaving(true);
     try {
       await updatePreferredLanguage(nextLanguage);
@@ -195,9 +217,10 @@ export default function Layout({ children }) {
   };
 
   const effectiveHomeView = user?.homeDesktopView ?? defaultHomeDesktopView;
-  const hasHomeViewOverride = user?.homeDesktopView != null;
+  const hasHomeViewOverride = user?.homeDesktopView != null && user.homeDesktopView !== defaultHomeDesktopView;
   const effectiveLanguage = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
-  const hasPreferredLanguageOverride = user?.preferredLanguage != null;
+  const hasPreferredLanguageOverride = user?.preferredLanguage != null
+    && normalizeLanguage(user.preferredLanguage) !== normalizeLanguage(brandingLanguage);
   const hasAppOrderOverride = Array.isArray(user?.appOrder) && user.appOrder.length > 0;
   const appOrderSavedLabel = hasAppOrderOverride
     ? formatOrderTimestamp(user.appOrderUpdatedAt)
@@ -315,21 +338,18 @@ export default function Layout({ children }) {
                           </button>
                         )}
                       </div>
-                      <div className="rounded-2xl border border-gray-200 bg-white p-1.5 shadow-sm">
+                      <div>
                         <label className="sr-only" htmlFor="personal-home-view-select">{ui.layout.personalHomeView}</label>
-                        <div className="relative">
-                          <Home className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                          <select
-                            id="personal-home-view-select"
-                            value={effectiveHomeView}
-                            onChange={(event) => handleHomeViewChange(event.target.value)}
-                            disabled={homeViewSaving}
-                            className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-8 text-sm font-medium text-dark transition focus:border-accent focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
-                          >
-                            <option value="cards">{ui.layout.homeViewCards}</option>
-                            <option value="compact">{ui.layout.homeViewCompact}</option>
-                          </select>
-                        </div>
+                        <select
+                          id="personal-home-view-select"
+                          value={effectiveHomeView}
+                          onChange={(event) => handleHomeViewChange(event.target.value)}
+                          disabled={homeViewSaving}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                        >
+                          <option value="cards">{ui.layout.homeViewCards}</option>
+                          <option value="compact">{ui.layout.homeViewCompact}</option>
+                        </select>
                       </div>
                     </div>
                     <div className="px-1 py-2">
@@ -349,22 +369,19 @@ export default function Layout({ children }) {
                           </button>
                         )}
                       </div>
-                      <div className="rounded-2xl border border-gray-200 bg-white p-1.5 shadow-sm">
+                      <div>
                         <label className="sr-only" htmlFor="personal-language-select">{ui.common.language}</label>
-                        <div className="relative">
-                          <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                          <select
-                            id="personal-language-select"
-                            value={effectiveLanguage}
-                            onChange={(event) => handlePreferredLanguageChange(event.target.value)}
-                            disabled={languageSaving}
-                            className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-8 text-sm font-medium text-dark transition focus:border-accent focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
-                          >
-                            {languageOptions.map((language) => (
-                              <option key={language.code} value={language.code}>{language.label}</option>
-                            ))}
-                          </select>
-                        </div>
+                        <select
+                          id="personal-language-select"
+                          value={effectiveLanguage}
+                          onChange={(event) => handlePreferredLanguageChange(event.target.value)}
+                          disabled={languageSaving}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                        >
+                          {languageOptions.map((language) => (
+                            <option key={language.code} value={language.code}>{language.label}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                     {hasAppOrderOverride && (

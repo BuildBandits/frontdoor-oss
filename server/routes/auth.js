@@ -6,7 +6,7 @@ import { ConfidentialClientApplication } from '@azure/msal-node';
 import db from '../db.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
-import { getRequiredEnv } from '../config.js';
+import { getRequiredEnv, isDevLoginEnabled } from '../config.js';
 import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, refreshGroupCacheFromTenant, syncUserEntraGroups } from '../services/entraGroups.js';
 import { ensureAvatarCached } from '../services/avatars.js';
 import { verifySsoTokenChain } from '../services/verifySsoToken.js';
@@ -30,9 +30,19 @@ const msalClient = process.env.AZURE_CLIENT_ID
   ? new ConfidentialClientApplication(msalConfig)
   : null;
 
-// CSRF state store — in-memory, suitable for single-instance deployments only.
-// For multi-replica/horizontal-scaling deployments, replace with a shared store (e.g. Redis).
-const pendingAuthStates = new Map();
+// CSRF state store — persisted in SQLite so the callback can validate the state
+// even when it lands on a different replica than the one that emitted it. TTL is
+// enforced at validation time (10 min) and old rows are swept opportunistically
+// on each new state insert.
+const AUTH_STATE_TTL_MINUTES = 10;
+const insertAuthState = db.prepare('INSERT INTO auth_pending_states (state) VALUES (?)');
+const cleanupAuthStates = db.prepare(
+  `DELETE FROM auth_pending_states WHERE datetime(created_at) < datetime('now', '-${AUTH_STATE_TTL_MINUTES} minutes')`
+);
+const consumeAuthState = db.prepare(
+  `DELETE FROM auth_pending_states
+   WHERE state = ? AND datetime(created_at) > datetime('now', '-${AUTH_STATE_TTL_MINUTES} minutes')`
+);
 
 const parseStoredAppOrder = (value) => {
   if (!value) return null;
@@ -70,12 +80,8 @@ router.get('/microsoft', async (req, res) => {
 
   try {
     const state = uuidv4();
-    pendingAuthStates.set(state, Date.now());
-
-    // Clean up old states (> 10 min)
-    for (const [key, ts] of pendingAuthStates) {
-      if (Date.now() - ts > 600000) pendingAuthStates.delete(key);
-    }
+    cleanupAuthStates.run();
+    insertAuthState.run(state);
 
     const authUrl = await msalClient.getAuthCodeUrl({
       scopes: authScopes,
@@ -107,10 +113,9 @@ router.get('/microsoft/callback', async (req, res) => {
     return res.redirect(`${frontendUrl}/login?error=sso_denied`);
   }
 
-  if (!state || !pendingAuthStates.has(state)) {
+  if (!state || consumeAuthState.run(state).changes === 0) {
     return res.redirect(`${frontendUrl}/login?error=invalid_state`);
   }
-  pendingAuthStates.delete(state);
 
   try {
     const perUserMsalClient = new ConfidentialClientApplication(msalConfig);
@@ -334,6 +339,66 @@ const ssoTokenIntrospectionLimiter = rateLimit({
   message: { error: 'too_many_requests' },
   standardHeaders: true,
   legacyHeaders: false,
+});
+
+// Dev login status — tells the frontend whether the dev login button should be shown.
+router.get('/dev-status', (_req, res) => {
+  res.json({ devLogin: isDevLoginEnabled() });
+});
+
+// Dev login — creates (or reuses) a local dev user and issues a JWT cookie.
+// Only available when DEV_LOGIN=true and NODE_ENV !== 'production'.
+router.post('/dev-login', (req, res) => {
+  if (!isDevLoginEnabled()) {
+    return res.status(404).json({ error: 'Dev login is not enabled' });
+  }
+
+  const role = ['owner', 'admin', 'admin_readonly', 'user'].includes(req.body?.role)
+    ? req.body.role
+    : 'owner';
+
+  const devEmail = `dev-${role}@frontdoor.local`;
+  const devDisplayName = `Dev ${role.charAt(0).toUpperCase() + role.slice(1)}`;
+
+  let user = db.prepare('SELECT * FROM users WHERE email = ?').get(devEmail);
+
+  if (!user) {
+    const userId = uuidv4();
+    const avatarColor = '#6366f1';
+    db.prepare(`
+      INSERT INTO users (id, email, display_name, role, avatar_color, is_active, last_login)
+      VALUES (?, ?, ?, ?, ?, 1, datetime('now'))
+    `).run(userId, devEmail, devDisplayName, role, avatarColor);
+
+    // Add to default group
+    db.prepare('INSERT OR IGNORE INTO user_group_members (user_id, group_id) VALUES (?, ?)').run(userId, DEFAULT_GROUP_ID);
+
+    user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  } else {
+    // Update role if it changed and refresh last_login
+    db.prepare(`UPDATE users SET role = ?, display_name = ?, last_login = datetime('now'), updated_at = datetime('now') WHERE id = ?`)
+      .run(role, devDisplayName, user.id);
+    user = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+  }
+
+  const jwtSecret = process.env.JWT_SECRET;
+  const token = jwt.sign(
+    { userId: user.id, email: user.email, name: user.display_name, role: user.role },
+    jwtSecret,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d', issuer: process.env.JWT_ISSUER || 'frontdoor' }
+  );
+
+  const baseDomain = process.env.BASE_DOMAIN || 'frontdoor.local';
+  res.cookie('frontdoor_token', token, {
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax',
+    domain: baseDomain === 'localhost' ? undefined : `.${baseDomain}`,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  console.log(`Dev login: ${devEmail} (${role})`);
+  res.json({ user: serializeCurrentUser(user) });
 });
 
 router.post('/verify-sso-token', ssoTokenIntrospectionLimiter, (req, res) => {

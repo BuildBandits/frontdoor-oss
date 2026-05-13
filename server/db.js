@@ -160,7 +160,13 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS auth_pending_states (
+    state TEXT PRIMARY KEY,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   -- Secondary indexes for RBAC join performance
+  CREATE INDEX IF NOT EXISTS idx_auth_pending_states_created ON auth_pending_states(created_at);
   CREATE INDEX IF NOT EXISTS idx_user_group_members_group ON user_group_members(group_id);
   CREATE INDEX IF NOT EXISTS idx_app_permissions_group ON app_permissions(group_id);
   CREATE INDEX IF NOT EXISTS idx_app_permissions_app ON app_permissions(app_id);

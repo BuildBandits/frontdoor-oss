@@ -442,6 +442,7 @@
       "entraApp": "Entra App",
       "ssoEndpointLabel": "Endpoint SSO",
       "ssoMethodLabel": "Metodo",
+      "ssoMethodGetWarning": "Attenzione: GET appende il token SSO alla URL. Il token (valido 5 minuti) può finire negli header Referer, nella cronologia del browser e nei log di accesso del server. Usa POST quando l'app destinazione lo supporta.",
       "nameLabel": "Nome",
       "nameExample": "Outlook (WebMail)",
       "slugLabel": "Slug (identificativo unico)",
