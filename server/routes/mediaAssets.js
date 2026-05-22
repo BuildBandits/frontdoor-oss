@@ -40,7 +40,7 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
       return res.status(404).json({ error: 'Media asset not found' });
     }
 
-    return res.json({ message: 'Media asset removed from index' });
+    return res.json({ removed: true });
   } catch (error) {
     if (error?.statusCode === 409) {
       return res.status(409).json({

@@ -4,6 +4,7 @@ import { useAuthStore } from './stores/authStore';
 import Layout from './components/Layout';
 import api from './services/api';
 import { getUiStrings, normalizeLanguage } from './i18n';
+import { useColorScheme } from './hooks/useColorScheme';
 
 const Login = lazy(() => import('./pages/Login'));
 const Home = lazy(() => import('./pages/Home'));
@@ -32,6 +33,7 @@ function ProtectedRoute({ children, adminOnly = false, adminEditorOnly = false, 
 export default function App() {
   const { isAuthenticated, user, updateUser } = useAuthStore();
   const ui = getUiStrings(normalizeLanguage('en'));
+  useColorScheme(user?.preferredColorScheme);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return undefined;
@@ -51,7 +53,7 @@ export default function App() {
   }, [isAuthenticated, user?.id, updateUser]);
 
   return (
-    <Suspense fallback={<div className="p-8 text-sm text-gray-500">{ui.common.loading}</div>}>
+    <Suspense fallback={<div className="p-8 text-sm text-gray-500 dark:text-gray-400">{ui.common.loading}</div>}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route

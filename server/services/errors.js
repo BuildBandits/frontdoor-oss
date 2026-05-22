@@ -12,12 +12,12 @@ export class UserFacingError extends Error {
   }
 }
 
-export function respondWithError(res, error, fallback = { status: 500, message: 'Internal server error' }) {
+export function respondWithError(res, error, fallback = { status: 500, code: 'internal_server_error' }) {
   if (error?.expose && error.statusCode) {
     const body = { error: error.message };
     if (error.hint) body.hint = error.hint;
     if (error.code) body.code = error.code;
     return res.status(error.statusCode).json(body);
   }
-  return res.status(fallback.status || 500).json({ error: fallback.message });
+  return res.status(fallback.status || 500).json({ error: fallback.code || 'internal_server_error' });
 }

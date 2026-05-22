@@ -59,11 +59,11 @@ router.get('/:slug/sso-redirect', authenticate, (req, res) => {
     .prepare('SELECT * FROM apps WHERE slug = ? AND is_active = 1')
     .get(req.params.slug);
 
-  if (!app || app.mode !== 'redirect') {
-    return res.status(404).json({ error: 'Redirect app not found' });
+  if (!app) {
+    return res.status(404).json({ error: 'App not found' });
   }
 
-  // RBAC check: user must have group permission
+  // RBAC check: user must have group permission (applies to every mode)
   const accessibleGroupIds = getAccessibleGroupIdsForUser(req.user.id);
   const hasAccess = accessibleGroupIds.length > 0
     ? db.prepare(`
@@ -73,13 +73,23 @@ router.get('/:slug/sso-redirect', authenticate, (req, res) => {
     : null;
   if (!hasAccess) return res.status(403).json({ error: 'Access denied' });
 
-  // Log access
+  // Log access (every mode)
   try {
     db.prepare(
       'INSERT INTO access_logs (user_id, app_id, ip_address, user_agent) VALUES (?, ?, ?, ?)'
     ).run(req.user.id, app.id, req.ip, req.get('user-agent'));
   } catch (e) {
     console.error('Access log write failed:', e.message);
+  }
+
+  // Non-redirect apps (shared-cookie / redirect-plain) don't need an SSO POST:
+  // the wildcard frontdoor_token cookie already authenticates them. Redirect
+  // straight to the target_url — same destination the catalog home links to.
+  // This makes the launcher universal so callers (e.g. the Login SPA deep-link
+  // after SSO) can always route through /sso-redirect without 404-ing on
+  // non-redirect apps.
+  if (app.mode !== 'redirect') {
+    return res.redirect(app.target_url);
   }
 
   // Generate a short-lived JWT with user info for the target app
@@ -272,10 +282,7 @@ router.post('/restore-defaults', authenticate, isAdminEditor, (req, res) => {
   try {
     const result = restoreDefaultDemoApps(db, DEFAULT_GROUP_ID);
     logRbacAudit(req.user.id, 'restore', 'app', null, result);
-    res.json({
-      message: 'Default demo apps restored',
-      ...result,
-    });
+    res.json(result);
   } catch (error) {
     console.error('Restore default demo apps failed:', error.message);
     res.status(500).json({ error: 'Failed to restore default demo apps' });
@@ -590,7 +597,7 @@ router.post('/:id/groups', authenticate, isAdminEditor, (req, res) => {
     : [];
 
   if (normalizedGroupIds.length === 0) {
-    return res.json({ message: 'No groups selected', added: 0 });
+    return res.json({ added: 0 });
   }
 
   const placeholders = normalizedGroupIds.map(() => '?').join(', ');
@@ -614,7 +621,7 @@ router.post('/:id/groups', authenticate, isAdminEditor, (req, res) => {
     logRbacAudit(req.user.id, 'add_apps', 'permission', id, { groupIds: normalizedGroupIds, appIds: [id], added });
   }
 
-  res.json({ message: `${added} group permissions added`, added });
+  res.json({ added });
 });
 
 // Delete app (admin only)
@@ -633,7 +640,7 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   deleteAll();
   removeAppIconAsset(id).catch((error) => console.error('App icon cleanup failed:', error.message));
   logRbacAudit(req.user.id, 'delete', 'app', id, { name: existing.name, slug: existing.slug, mode: existing.mode });
-  res.json({ message: 'App deleted' });
+  res.json({ deleted: true });
 });
 
 // Shared API-key guard for bulk endpoints (CLI/automation/server-to-server sync)

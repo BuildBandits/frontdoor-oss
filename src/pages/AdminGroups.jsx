@@ -809,8 +809,8 @@ export default function AdminGroups() {
     <div>
       <div className="flex items-center justify-between gap-4 mb-8 max-sm:flex-col max-sm:items-stretch max-sm:gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark">{ui.admin.groups.pageTitle}</h1>
-          <p className="text-gray-500 mt-1">{ui.admin.groups.subtitle}</p>
+          <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{ui.admin.groups.pageTitle}</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">{ui.admin.groups.subtitle}</p>
         </div>
         <div className="flex items-center gap-3 max-sm:flex-col max-sm:items-stretch">
           {selectedCount > 0 && (
@@ -850,7 +850,7 @@ export default function AdminGroups() {
 
             {showCreateMenu && (
               <div
-                className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden"
+                className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
@@ -859,7 +859,7 @@ export default function AdminGroups() {
                     setShowCreate(true);
                   }}
                   disabled={!canEdit}
-                  className="w-full px-4 py-3 text-left text-sm text-dark hover:bg-gray-50 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 text-left text-sm text-dark dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-4 h-4" />
                   {g.newLocalGroup}
@@ -867,7 +867,7 @@ export default function AdminGroups() {
                 <button
                   onClick={() => openEntraImport()}
                   disabled={!canEdit}
-                  className="w-full px-4 py-3 text-left text-sm text-dark hover:bg-gray-50 flex items-center gap-2 border-t border-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 text-left text-sm text-dark dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 border-t border-gray-100 dark:border-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Users className="w-4 h-4" />
                   {g.newEntraGroup}
@@ -879,7 +879,7 @@ export default function AdminGroups() {
             <button
               onClick={handleForceSyncGroups}
               disabled={forceSyncing || !canEdit}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-200 text-dark rounded-xl font-semibold text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed max-sm:w-full"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-200 dark:border-gray-700 text-dark dark:text-gray-100 rounded-xl font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed max-sm:w-full"
             >
             <RefreshCw className={`w-4 h-4 ${forceSyncing ? 'animate-spin' : ''}`} />
             {g.syncGroups}
@@ -888,7 +888,7 @@ export default function AdminGroups() {
       </div>
 
       {!canEdit && (
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <div className="mb-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
           {t.readOnly}
         </div>
       )}
@@ -904,7 +904,7 @@ export default function AdminGroups() {
         </div>
       )}
 
-      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-4">
+      <div className="mb-6 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-[240px]">
             <ClearableSearchField
@@ -912,9 +912,10 @@ export default function AdminGroups() {
               onChange={setGroupSearch}
               placeholder={ui.admin.groups.searchPlaceholder}
               clearLabel={ui.common.clearSearch}
+              tabIndex={1}
             />
           </div>
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-400 dark:text-gray-500">
             {visibleGroups.length} {ui.nav.groups.toLowerCase()} {t.of} {groups.length}
           </div>
         </div>
@@ -942,7 +943,7 @@ export default function AdminGroups() {
                         key={`no-apps-${group.id}`}
                         type="button"
                         onClick={() => { void openGroupAndScroll(group.id); }}
-                        className="inline-flex items-center rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100"
+                        className="inline-flex items-center rounded-full border border-amber-200 bg-white dark:bg-gray-900 px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100"
                       >
                         {groupLabel(group)}
                       </button>
@@ -962,7 +963,7 @@ export default function AdminGroups() {
                         key={`no-members-${group.id}`}
                         type="button"
                         onClick={() => { void openGroupAndScroll(group.id); }}
-                        className="inline-flex items-center rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100"
+                        className="inline-flex items-center rounded-full border border-amber-200 bg-white dark:bg-gray-900 px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100"
                       >
                         {groupLabel(group)}
                       </button>
@@ -978,25 +979,25 @@ export default function AdminGroups() {
       {loading ? (
         <div className="animate-pulse space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-16 bg-white rounded-xl border border-gray-100" />
+            <div key={i} className="h-16 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800" />
           ))}
         </div>
       ) : groups.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
+        <div className="text-center py-16 text-gray-400 dark:text-gray-500">
           <Users className="w-12 h-12 mx-auto mb-3 opacity-40" />
           <p className="text-lg font-medium">{g.noGroups}</p>
           <p className="text-sm mt-1">{g.firstGroupHelp}</p>
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-1 text-xs text-gray-500">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1 text-xs text-gray-500 dark:text-gray-400">
             <div className="flex-1" />
             <div className="flex flex-wrap items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={selectAllGroups}
                 disabled={!canEdit || groups.filter((group) => group.id !== DEFAULT_GROUP_ID).length === 0}
-                className="font-medium text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                className="font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {g.selectAll}
               </button>
@@ -1005,7 +1006,7 @@ export default function AdminGroups() {
                   type="button"
                   onClick={selectVisibleGroups}
                   disabled={!canEdit || visibleGroups.filter((group) => group.id !== DEFAULT_GROUP_ID).length === 0}
-                  className="font-medium text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {g.selectAllFiltered}
                 </button>
@@ -1014,7 +1015,7 @@ export default function AdminGroups() {
                 type="button"
                 onClick={selectAllEntraGroups}
                 disabled={!canEdit || groups.filter((group) => group.source === 'entra' && group.id !== DEFAULT_GROUP_ID).length === 0}
-                className="font-medium text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                className="font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {g.selectAllEntraGroups}
               </button>
@@ -1022,7 +1023,7 @@ export default function AdminGroups() {
                 type="button"
                 onClick={selectAllLocalGroups}
                 disabled={!canEdit || groups.filter((group) => group.source !== 'entra' && group.id !== DEFAULT_GROUP_ID).length === 0}
-                className="font-medium text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                className="font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {g.selectAllLocalGroups}
               </button>
@@ -1030,7 +1031,7 @@ export default function AdminGroups() {
                 type="button"
                 onClick={clearSelection}
                 disabled={!canEdit}
-                className="font-medium text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                className="font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {g.deselectAll}
               </button>
@@ -1038,7 +1039,7 @@ export default function AdminGroups() {
                 type="button"
                 onClick={invertSelection}
                 disabled={!canEdit}
-                className="font-medium text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                className="font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {g.invertSelection}
               </button>
@@ -1046,10 +1047,14 @@ export default function AdminGroups() {
           </div>
 
           {visibleGroups.map((group) => (
-            <div key={group.id} ref={setGroupRowRef(group.id)} className="bg-white rounded-2xl border border-gray-100 overflow-hidden transition-colors">
+            <div key={group.id} ref={setGroupRowRef(group.id)} className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden transition-colors">
               {/* Group row */}
               <div
-                className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50/50"
+                className={`flex items-center justify-between px-5 py-3.5 cursor-pointer transition-colors ${
+                  expandedGroup === group.id
+                    ? 'bg-gray-50/90 dark:bg-gray-800/50 dark:hover:bg-gray-800/70'
+                    : 'hover:bg-gray-50/90 dark:hover:bg-gray-800/50'
+                }`}
                 onClick={() => toggleExpand(group.id)}
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -1063,43 +1068,43 @@ export default function AdminGroups() {
                         toggleGroupSelection(group.id);
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="rounded border-gray-300 text-dark focus:ring-accent"
+                      className="rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                     />
                   )}
                   {expandedGroup === group.id
-                    ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                    : <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+                    ? <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                    : <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-semibold text-sm text-dark">{groupLabel(group)}</span>
+                      <span className="truncate font-semibold text-sm text-dark dark:text-gray-100">{groupLabel(group)}</span>
                       {group.source !== 'entra' && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-medium">{g.localBadge}</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-medium">{g.localBadge}</span>
                       )}
                       {group.source === 'entra' && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
                       )}
                       {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) > 0 && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-accent/10 text-accent-dark px-1.5 py-0.5 rounded font-medium">
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-accent/10 dark:bg-accent-dark/20 text-accent-dark dark:text-gray-100 px-1.5 py-0.5 rounded font-medium">
                           <Layers3 className="w-3 h-3" />
                           {g.compositeBadge}
                         </span>
                       )}
                       {group.id === DEFAULT_GROUP_ID && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-accent/30 text-dark px-1.5 py-0.5 rounded-full font-medium">{g.defaultBadge}</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-accent/30 text-dark dark:text-gray-100 px-1.5 py-0.5 rounded-full font-medium">{g.defaultBadge}</span>
                       )}
                     </div>
-                    {group.description && <p className="mt-0.5 truncate text-xs text-gray-400">{group.description}</p>}
+                    {group.description && <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">{group.description}</p>}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  <span className="flex items-center gap-1 text-xs text-gray-400">
+                  <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
                     <Users className="w-3.5 h-3.5 flex-shrink-0" /> {group.member_count}
                   </span>
-                  <span className="flex items-center gap-1 text-xs text-gray-400">
+                  <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
                     <AppWindow className="w-3.5 h-3.5 flex-shrink-0" /> {group.app_count}
                   </span>
                   {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) > 0 && (
-                    <span className="flex items-center gap-1 text-xs text-gray-400">
+                    <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
                       <Layers3 className="w-3.5 h-3.5 flex-shrink-0" /> {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0)}
                     </span>
                   )}
@@ -1107,7 +1112,7 @@ export default function AdminGroups() {
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(group); }}
                       disabled={!canEdit}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/35 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       title={g.deleteGroupTooltip}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1118,41 +1123,41 @@ export default function AdminGroups() {
 
               {/* Expanded detail */}
               {expandedGroup === group.id && (
-                <div className="border-t border-gray-100 px-6 py-5">
+                <div className="border-t border-gray-100 dark:border-gray-800 px-6 py-5">
                   {detailLoading ? (
                     <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-dark rounded-full" />
+                      <div className="animate-spin w-6 h-6 border-2 border-gray-300 dark:border-gray-600 border-t-dark rounded-full" />
                     </div>
                   ) : groupDetail ? (
                     <>
                       {/* Edit group info */}
-                      <div className="mb-5 pb-5 border-b border-gray-100">
+                      <div className="mb-5 pb-5 border-b border-gray-100 dark:border-gray-800">
                         {editingGroup === group.id ? (
                           <div className="flex flex-col sm:flex-row gap-3">
                             <div className="flex-1">
-                              <label className="block text-xs font-medium text-gray-500 mb-1">{g.groupNameLabel}</label>
+                              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{g.groupNameLabel}</label>
                               <input
                                 type="text"
                                 value={editName}
                                 onChange={(e) => setEditName(e.target.value)}
                                 disabled={group.id === DEFAULT_GROUP_ID || isEntraGroup(group)}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-gray-50 disabled:text-gray-400"
+                                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-gray-50 disabled:text-gray-400"
                               />
                             </div>
                             <div className="flex-1">
-                              <label className="block text-xs font-medium text-gray-500 mb-1">{g.groupDescriptionLabel}</label>
+                              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{g.groupDescriptionLabel}</label>
                               <input
                                 type="text"
                                 value={editDesc}
                                 onChange={(e) => setEditDesc(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                               />
                             </div>
                             <div className="flex items-end gap-2">
                               <button onClick={saveEdit} className="px-3 py-2 bg-dark text-white rounded-lg text-sm font-medium hover:bg-gray-800">
                                 <Save className="w-4 h-4" />
                               </button>
-                              <button onClick={() => setEditingGroup(null)} className="px-3 py-2 text-gray-500 hover:bg-gray-100 rounded-lg text-sm">
+                              <button onClick={() => setEditingGroup(null)} className="px-3 py-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-sm">
                                 <X className="w-4 h-4" />
                               </button>
                             </div>
@@ -1160,8 +1165,8 @@ export default function AdminGroups() {
                         ) : (
                           <div className="flex items-center justify-between">
                             <div>
-                              <span className="text-sm text-gray-500">
-                                {groupDetail.group?.description || <span className="italic text-gray-300">{t.noDescription}</span>}
+                              <span className="text-sm text-gray-500 dark:text-gray-400">
+                                {groupDetail.group?.description || <span className="italic text-gray-300 dark:text-gray-600">{t.noDescription}</span>}
                               </span>
                             </div>
                             <button
@@ -1169,8 +1174,8 @@ export default function AdminGroups() {
                               disabled={!canEdit || isEntraGroup(group)}
                               className={`flex items-center gap-1 text-xs transition-colors ${
                                 !canEdit || isEntraGroup(group)
-                                  ? 'text-gray-300 cursor-not-allowed'
-                                  : 'text-gray-400 hover:text-dark'
+                                  ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                                  : 'text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white'
                               }`}
                             >
                               <Pencil className="w-3 h-3" />
@@ -1184,10 +1189,10 @@ export default function AdminGroups() {
                         <div className={`flex flex-col gap-3 xl:min-h-0 ${isEntraGroup(group) ? 'xl:h-auto' : 'xl:h-[560px]'}`}>
                           {!isEntraGroup(group) && (
                             <section
-                            className={`rounded-2xl border border-gray-100 p-4 transition-all duration-300 xl:flex xl:flex-col xl:min-h-0 ${
+                            className={`rounded-2xl border border-gray-100 dark:border-gray-800 p-4 transition-all duration-300 xl:flex xl:flex-col xl:min-h-0 ${
                               activeGroupPanel === 'linked'
-                                ? 'xl:flex-[1.35] bg-white'
-                                : 'xl:flex-[0.34] bg-white/80'
+                                ? 'xl:flex-[1.35] bg-white dark:bg-gray-900'
+                                : 'xl:flex-[0.34] bg-white/80 dark:bg-gray-950/50'
                             }`}
                           >
                             <div
@@ -1198,7 +1203,7 @@ export default function AdminGroups() {
                             >
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-3">
-                                  <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
+                                  <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                                     {g.linkedGroups} ({totalLinkedGroupCount})
                                   </h3>
                                   <button
@@ -1210,20 +1215,20 @@ export default function AdminGroups() {
                                     disabled={!canEdit || isEntraGroup(group) || group.id === DEFAULT_GROUP_ID}
                                     className={`text-xs font-semibold transition-colors ${
                                       !canEdit || isEntraGroup(group) || group.id === DEFAULT_GROUP_ID
-                                        ? 'text-gray-300 cursor-not-allowed'
+                                        ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                                         : 'text-accent-dark hover:text-accent-dark'
                                     }`}
                                   >
                                     + {t.add}
                                   </button>
                                 </div>
-                                <p className="text-xs text-sky-600 mt-1">{g.linkedGroupsHelp}</p>
+                                <p className="text-xs text-sky-600 dark:text-sky-400 mt-1">{g.linkedGroupsHelp}</p>
                               </div>
-                              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${activeGroupPanel === 'linked' ? 'rotate-180 text-dark' : ''}`} />
+                              <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-300 ${activeGroupPanel === 'linked' ? 'rotate-180 text-dark dark:text-gray-100' : ''}`} />
                             </div>
                             <div className={`overflow-hidden transition-all duration-300 ${activeGroupPanel === 'linked' ? 'mt-4 max-h-[430px] opacity-100 xl:flex-1 xl:min-h-0' : 'max-h-0 opacity-0'}`}>
                               {totalLinkedGroupCount === 0 ? (
-                                <div className="flex flex-col items-center justify-center text-center py-6 text-gray-300 min-h-[140px]">
+                                <div className="flex flex-col items-center justify-center text-center py-6 text-gray-300 dark:text-gray-600 min-h-[140px]">
                                   <Layers3 className="w-8 h-8 mx-auto mb-2 opacity-40" />
                                   <p className="text-sm">{g.noLinkedGroups}</p>
                                   <p className="text-xs mt-1">{g.linkedGroupsHint}</p>
@@ -1233,23 +1238,23 @@ export default function AdminGroups() {
                                   {linkedGroups.map((childGroup) => (
                                     <div key={childGroup.id} className="flex items-center justify-between py-1.5">
                                       <div className="flex items-center gap-2 min-w-0">
-                                        <Layers3 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                        <Layers3 className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                                         <div className="min-w-0">
                                           <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-sm text-dark truncate">{groupLabel(childGroup)}</span>
+                                            <span className="text-sm text-dark dark:text-gray-100 truncate">{groupLabel(childGroup)}</span>
                                             {childGroup.source === 'entra' && (
-                                              <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                                              <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
                                             )}
                                           </div>
                                           {childGroup.description && (
-                                            <p className="text-xs text-gray-400 truncate">{childGroup.description}</p>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{childGroup.description}</p>
                                           )}
                                         </div>
                                       </div>
                                       <button
                                         onClick={() => removeLinkedGroup(childGroup.id, groupLabel(childGroup))}
                                         disabled={!canEdit}
-                                        className="text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className="text-gray-300 dark:text-gray-600 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                         title={g.removeLinkedGroup}
                                       >
                                         <X className="w-4 h-4" />
@@ -1258,7 +1263,7 @@ export default function AdminGroups() {
                                   ))}
                                   {linkedEntraGroups.length > 0 && (
                                     <div className="pt-3">
-                                      <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                                      <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                                         <Layers3 className="w-3.5 h-3.5" />
                                         {g.linkedEntraGroups}
                                       </div>
@@ -1266,21 +1271,21 @@ export default function AdminGroups() {
                                         {linkedEntraGroups.map((childGroup) => (
                                           <div key={childGroup.entra_group_id} className="flex items-center justify-between py-1.5">
                                             <div className="flex items-center gap-2 min-w-0">
-                                              <Layers3 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                              <Layers3 className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                                               <div className="min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                  <span className="text-sm text-dark truncate">{childGroup.display_name || childGroup.entra_group_id}</span>
-                                                  <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                                                  <span className="text-sm text-dark dark:text-gray-100 truncate">{childGroup.display_name || childGroup.entra_group_id}</span>
+                                                  <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
                                                 </div>
                                                 {childGroup.description && (
-                                                  <p className="text-xs text-gray-400 truncate">{childGroup.description}</p>
+                                                  <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{childGroup.description}</p>
                                                 )}
                                               </div>
                                             </div>
                                             <button
                                               onClick={() => removeLinkedEntraGroup(childGroup.entra_group_id, childGroup.display_name || childGroup.entra_group_id)}
                                               disabled={!canEdit}
-                                              className="text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                              className="text-gray-300 dark:text-gray-600 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                               title={g.removeLinkedGroup}
                                             >
                                               <X className="w-4 h-4" />
@@ -1297,10 +1302,10 @@ export default function AdminGroups() {
                           )}
 
                           <section
-                            className={`rounded-2xl border border-gray-100 p-4 transition-all duration-300 ${
+                            className={`rounded-2xl border border-gray-100 dark:border-gray-800 p-4 transition-all duration-300 ${
                               isEntraGroup(group)
-                                ? 'xl:flex xl:flex-col bg-white'
-                                : 'xl:flex xl:flex-col xl:min-h-0 ' + (activeGroupPanel === 'members' ? 'xl:flex-[1.35] bg-white' : 'xl:flex-[0.34] bg-white/80')
+                                ? 'xl:flex xl:flex-col bg-white dark:bg-gray-900'
+                                : 'xl:flex xl:flex-col xl:min-h-0 ' + (activeGroupPanel === 'members' ? 'xl:flex-[1.35] bg-white dark:bg-gray-900' : 'xl:flex-[0.34] bg-white/80 dark:bg-gray-950/50')
                             }`}
                           >
                             <div
@@ -1311,11 +1316,11 @@ export default function AdminGroups() {
                             >
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-3">
-                                  <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
+                                  <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                                     {t.members} ({groupDetail.members.length})
                                   </h3>
                                   {isEntraGroup(group) ? (
-                                    <span className="text-xs font-semibold text-gray-300 cursor-not-allowed select-none">
+                                    <span className="text-xs font-semibold text-gray-300 dark:text-gray-600 cursor-not-allowed select-none">
                                       + {t.add}
                                     </span>
                                   ) : (
@@ -1328,7 +1333,7 @@ export default function AdminGroups() {
                                       disabled={!canEdit || group.id === DEFAULT_GROUP_ID}
                                     className={`text-xs font-semibold transition-colors ${
                                       !canEdit || group.id === DEFAULT_GROUP_ID
-                                        ? 'text-gray-300 cursor-not-allowed'
+                                        ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                                         : 'text-accent-dark hover:text-accent-dark'
                                     }`}
                                   >
@@ -1336,13 +1341,13 @@ export default function AdminGroups() {
                                   </button>
                                   )}
                                 </div>
-                                <p className="text-xs text-sky-600 mt-1">
+                                <p className="text-xs text-sky-600 dark:text-sky-400 mt-1">
                                   {groupDetail.members.length === 0
                                     ? (!isEntraGroup(group) && totalLinkedGroupCount > 0 ? g.linkedGroupsHint : t.memberAssignedHelp)
                                     : t.memberAssignedHelp}
                                 </p>
                               </div>
-                              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${activeGroupPanel === 'members' ? 'rotate-180 text-dark' : ''}`} />
+                              <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-300 ${activeGroupPanel === 'members' ? 'rotate-180 text-dark dark:text-gray-100' : ''}`} />
                             </div>
                             <div className={`overflow-hidden transition-all duration-300 ${isEntraGroup(group)
                               ? 'mt-4 opacity-100'
@@ -1351,7 +1356,7 @@ export default function AdminGroups() {
                                 : 'max-h-0 opacity-0'
                             }`}>
                               {groupDetail.members.length === 0 ? (
-                                <div className={`flex flex-col items-center justify-center text-center py-6 text-gray-300 ${
+                                <div className={`flex flex-col items-center justify-center text-center py-6 text-gray-300 dark:text-gray-600 ${
                                   isEntraGroup(group) ? 'min-h-[140px]' : 'min-h-[140px]'
                                 }`}>
                                   <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
@@ -1372,7 +1377,7 @@ export default function AdminGroups() {
                                           initialsClassName="text-[10px]"
                                         />
                                         <div>
-                                          <span className="text-sm text-dark">{m.display_name || m.email}</span>
+                                          <span className="text-sm text-dark dark:text-gray-100">{m.display_name || m.email}</span>
                                           {m.role === 'owner' && (
                                             <span className="ml-1.5 text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-medium">{g.ownerBadge}</span>
                                           )}
@@ -1383,7 +1388,7 @@ export default function AdminGroups() {
                                             </span>
                                           )}
                                           {m.role === 'admin_readonly' && (
-                                            <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-medium">
+                                            <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-medium">
                                               <Eye className="w-3 h-3" />
                                               {t.readOnlyRole}
                                             </span>
@@ -1399,7 +1404,7 @@ export default function AdminGroups() {
                                         <button
                                           onClick={() => removeMember(m.id, m.display_name)}
                                           disabled={!canEdit}
-                                          className="text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                          className="text-gray-300 dark:text-gray-600 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                           title={t.removeFromGroup}
                                         >
                                           <X className="w-4 h-4" />
@@ -1410,15 +1415,15 @@ export default function AdminGroups() {
                                 </div>
                               )}
                               {isEntraGroup(group) && (
-                                <p className="mt-2 text-xs text-sky-600">{t.syncedFromEntra}</p>
+                                <p className="mt-2 text-xs text-sky-600 dark:text-sky-400">{t.syncedFromEntra}</p>
                               )}
                             </div>
                           </section>
                         </div>
 
-                        <section className={`rounded-2xl border border-gray-100 p-4 xl:min-h-0 xl:flex xl:flex-col ${isEntraGroup(group) ? 'xl:h-auto' : 'xl:h-[560px]'}`}>
+                        <section className={`rounded-2xl border border-gray-100 dark:border-gray-800 p-4 xl:min-h-0 xl:flex xl:flex-col ${isEntraGroup(group) ? 'xl:h-auto' : 'xl:h-[560px]'}`}>
                           <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
+                            <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                               {t.visibleApps} ({groupDetail.apps.length})
                             </h3>
                             <button
@@ -1430,7 +1435,7 @@ export default function AdminGroups() {
                             </button>
                           </div>
                           {groupDetail.apps.length === 0 ? (
-                            <div className={`flex flex-col items-center justify-center text-center py-6 text-gray-300 ${isEntraGroup(group) ? 'min-h-[140px]' : 'flex-1 min-h-[140px]'}`}>
+                            <div className={`flex flex-col items-center justify-center text-center py-6 text-gray-300 dark:text-gray-600 ${isEntraGroup(group) ? 'min-h-[140px]' : 'flex-1 min-h-[140px]'}`}>
                               <AppWindow className="w-8 h-8 mx-auto mb-2 opacity-40" />
                               <p className="text-sm">{t.noAppsAssigned}</p>
                               <p className="text-xs mt-1">{(linkedGroups.length + linkedEntraGroups.length) > 0 ? g.linkedGroupsHelp : t.appAssignedHelp}</p>
@@ -1441,12 +1446,12 @@ export default function AdminGroups() {
                                 <div key={a.id} className="flex items-center justify-between py-1.5">
                                   <div className="flex items-center gap-2">
                                     <AppIcon app={a} className="w-6 h-6" textClassName="text-lg" />
-                                    <span className="text-sm text-dark">{a.name}</span>
+                                    <span className="text-sm text-dark dark:text-gray-100">{a.name}</span>
                                   </div>
                                   <button
                                     onClick={() => removeApp(a.id, a.name)}
                                     disabled={!canEdit}
-                                    className="text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="text-gray-300 dark:text-gray-600 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                     title={g.removeAppFromGroup}
                                   >
                                     <X className="w-4 h-4" />
@@ -1469,40 +1474,40 @@ export default function AdminGroups() {
       {/* Create group modal */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setShowCreate(false)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-dark">{g.newLocalGroup}</h2>
-              <button onClick={() => setShowCreate(false)} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100">
+              <h2 className="text-xl font-bold text-dark dark:text-gray-100">{g.newLocalGroup}</h2>
+              <button onClick={() => setShowCreate(false)} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">{g.groupNameLabel}</label>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{g.groupNameLabel}</label>
                 <input
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                   placeholder={g.groupNameExample}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">{g.groupDescriptionLabel}</label>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{g.groupDescriptionLabel}</label>
                 <input
                   type="text"
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                   placeholder={g.optional}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-100">
-                <button onClick={() => setShowCreate(false)} className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-dark hover:bg-gray-100 rounded-xl transition-colors">
+            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
+                <button onClick={() => setShowCreate(false)} className="px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
                 {ui.common.cancel}
               </button>
               <button
@@ -1521,15 +1526,15 @@ export default function AdminGroups() {
       {/* Import Entra group modal */}
       {showEntraImport && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setShowEntraImport(false)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-2xl shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-xl font-bold text-dark">{g.newEntraGroup}</h2>
-                <p className="text-sm text-gray-500 mt-1">
+                <h2 className="text-xl font-bold text-dark dark:text-gray-100">{g.newEntraGroup}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   {t.entraHelp}
                 </p>
               </div>
-              <button onClick={() => setShowEntraImport(false)} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100">
+              <button onClick={() => setShowEntraImport(false)} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1545,7 +1550,7 @@ export default function AdminGroups() {
                 />
               </div>
 
-              <div className="flex items-center justify-between text-xs text-gray-500">
+              <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                 <span>
                   {g.groupsFound.replace('{count}', filteredEntraCandidates.length)} · {g.selectedCount.replace('{count}', selectedEntraGroups.length)}
                 </span>
@@ -1561,23 +1566,23 @@ export default function AdminGroups() {
 
               {entraCandidatesLoading ? (
                 <div className="flex items-center justify-center py-10">
-                  <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-dark rounded-full" />
+                  <div className="animate-spin w-6 h-6 border-2 border-gray-300 dark:border-gray-600 border-t-dark rounded-full" />
                 </div>
               ) : filteredEntraCandidates.length === 0 ? (
-                <div className="text-center py-10 text-gray-400 border border-dashed border-gray-200 rounded-xl">
+                <div className="text-center py-10 text-gray-400 dark:text-gray-500 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
                   <Users className="w-10 h-10 mx-auto mb-2 opacity-40" />
                   <p className="text-sm font-medium">{g.noEntraGroupsDetected}</p>
                   <p className="text-xs mt-1">{g.noEntraGroupsHelp}</p>
                 </div>
               ) : (
-                <div className="max-h-80 overflow-y-auto space-y-2 border border-gray-100 rounded-xl p-2">
+                <div className="max-h-80 overflow-y-auto space-y-2 border border-gray-100 dark:border-gray-800 rounded-xl p-2">
                   {filteredEntraCandidates.map((group) => {
                     const selected = selectedEntraGroups.includes(group.entra_group_id);
                     return (
                       <label
                         key={group.entra_group_id}
                         className={`flex items-start gap-3 px-3 py-3 rounded-lg border transition-colors ${
-                          group.is_imported ? 'bg-gray-50 border-gray-200 opacity-70' : 'hover:bg-gray-50 border-transparent'
+                          group.is_imported ? 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 opacity-70' : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-transparent'
                         }`}
                       >
                         <input
@@ -1585,20 +1590,20 @@ export default function AdminGroups() {
                           checked={selected || group.is_imported}
                           disabled={group.is_imported}
                           onChange={() => toggleEntraGroupSelection(group.entra_group_id)}
-                          className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                          className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium text-dark truncate">{group.display_name}</span>
-                            <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                            <span className="text-sm font-medium text-dark dark:text-gray-100 truncate">{group.display_name}</span>
+                            <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
                             {group.is_imported ? (
                               <span className="text-[10px] bg-accent/10 text-accent-dark px-1.5 py-0.5 rounded font-medium">{g.alreadyImported}</span>
                             ) : (
                               <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">{g.onlyEntraDetected}</span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-400 mt-0.5 truncate">{group.entra_group_id}</p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">{group.entra_group_id}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             {g.knownMembersInCatalog.replace('{count}', group.synced_member_count)} · {group.local_name ? g.localNamePrefix.replace('{name}', group.local_name) : g.notYetImported}
                           </p>
                         </div>
@@ -1609,10 +1614,10 @@ export default function AdminGroups() {
               )}
             </div>
 
-            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-100">
+            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
               <button
                 onClick={() => setShowEntraImport(false)}
-                className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-dark hover:bg-gray-100 rounded-xl transition-colors"
+                className="px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
               >
                 {ui.common.cancel}
               </button>
@@ -1632,14 +1637,14 @@ export default function AdminGroups() {
       {/* Add members modal */}
       {showAddMembers && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setShowAddMembers(false)}>
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-dark">{g.addMembersTitle}</h2>
-              <button onClick={() => setShowAddMembers(false)} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100">
+              <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.addMembersTitle}</h2>
+              <button onClick={() => setShowAddMembers(false)} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">{g.memberExisting}</p>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{g.memberExisting}</p>
             <ClearableSearchField
               value={memberSearch}
               onChange={setMemberSearch}
@@ -1649,13 +1654,13 @@ export default function AdminGroups() {
             />
             <div className="max-h-72 overflow-y-auto space-y-1">
               {filteredUsers.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-4">{g.noUsersAvailable}</p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">{g.noUsersAvailable}</p>
               ) : (
                 filteredUsers.map((u) => (
                   <button
                     key={u.id}
                     onClick={() => addMember(u.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 text-left transition-colors"
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-left transition-colors"
                   >
                     <UserAvatar
                       userId={u.id}
@@ -1666,8 +1671,8 @@ export default function AdminGroups() {
                       initialsClassName="text-[10px]"
                     />
                     <div>
-                      <div className="text-sm font-medium text-dark">{u.display_name || u.email}</div>
-                      <div className="text-xs text-gray-400">{u.email}</div>
+                      <div className="text-sm font-medium text-dark dark:text-gray-100">{u.display_name || u.email}</div>
+                      <div className="text-xs text-gray-400 dark:text-gray-500">{u.email}</div>
                     </div>
                   </button>
                 ))
@@ -1680,13 +1685,13 @@ export default function AdminGroups() {
       {/* Add linked groups modal */}
       {showAddGroups && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={closeCurrentModal}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-bold text-dark">{g.addLinkedGroupsTitle}</h2>
-                <p className="text-sm text-gray-500 mt-1">{g.linkedGroupsHelp}</p>
+                <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.addLinkedGroupsTitle}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{g.linkedGroupsHelp}</p>
               </div>
-              <button onClick={closeCurrentModal} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100">
+              <button onClick={closeCurrentModal} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1697,7 +1702,7 @@ export default function AdminGroups() {
               className="mb-3"
               clearLabel={ui.common.clearSearch}
             />
-            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
               <span>
                 {g.groupsFound.replace('{count}', filteredLinkableGroups.length + filteredLinkableEntraGroups.length)} · {g.selectedCount.replace('{count}', selectedLinkedGroupIds.length + selectedLinkedEntraGroupIds.length)}
               </span>
@@ -1715,7 +1720,7 @@ export default function AdminGroups() {
             </div>
             <div className="max-h-72 overflow-y-auto space-y-1">
               {filteredLinkableGroups.length === 0 && filteredLinkableEntraGroups.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4">{g.noGroupsAvailable}</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">{g.noGroupsAvailable}</p>
               ) : (
                 <>
                   {filteredLinkableGroups.length > 0 && (
@@ -1723,23 +1728,23 @@ export default function AdminGroups() {
                       {filteredLinkableGroups.map((group) => (
                         <label
                           key={group.id}
-                          className="w-full flex items-start gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 text-left transition-colors cursor-pointer"
+                          className="w-full flex items-start gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-left transition-colors cursor-pointer"
                         >
                           <input
                             type="checkbox"
                             checked={selectedLinkedGroupIds.includes(group.id)}
                             onChange={() => toggleLinkedGroupSelection(group.id)}
-                            className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                            className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-medium text-dark truncate">{groupLabel(group)}</span>
+                              <span className="text-sm font-medium text-dark dark:text-gray-100 truncate">{groupLabel(group)}</span>
                               {group.source === 'entra' && (
-                                <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                                <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
                               )}
                             </div>
-                            <div className="text-xs text-gray-400 font-mono truncate">{group.id}</div>
-                            {group.description && <div className="text-xs text-gray-500 truncate">{group.description}</div>}
+                            <div className="text-xs text-gray-400 dark:text-gray-500 font-mono truncate">{group.id}</div>
+                            {group.description && <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{group.description}</div>}
                           </div>
                         </label>
                       ))}
@@ -1747,28 +1752,28 @@ export default function AdminGroups() {
                   )}
                   {filteredLinkableEntraGroups.length > 0 && (
                     <div className="pt-2">
-                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                         {g.linkedEntraGroups}
                       </div>
                       <div className="space-y-1">
                         {filteredLinkableEntraGroups.map((group) => (
                           <label
                             key={group.entra_group_id}
-                            className="w-full flex items-start gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 text-left transition-colors cursor-pointer"
+                            className="w-full flex items-start gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-left transition-colors cursor-pointer"
                           >
                             <input
                               type="checkbox"
                               checked={selectedLinkedEntraGroupIds.includes(group.entra_group_id)}
                               onChange={() => toggleLinkedEntraGroupSelection(group.entra_group_id)}
-                              className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                              className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                             />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-medium text-dark truncate">{group.display_name || group.entra_group_id}</span>
-                                <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                                <span className="text-sm font-medium text-dark dark:text-gray-100 truncate">{group.display_name || group.entra_group_id}</span>
+                                <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
                               </div>
-                              <div className="text-xs text-gray-400 font-mono truncate">{group.entra_group_id}</div>
-                              {group.description && <div className="text-xs text-gray-500 truncate">{group.description}</div>}
+                              <div className="text-xs text-gray-400 dark:text-gray-500 font-mono truncate">{group.entra_group_id}</div>
+                              {group.description && <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{group.description}</div>}
                             </div>
                           </label>
                         ))}
@@ -1778,10 +1783,10 @@ export default function AdminGroups() {
                 </>
               )}
             </div>
-            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-100">
+            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
               <button
                 onClick={closeCurrentModal}
-                className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-dark hover:bg-gray-100 rounded-xl transition-colors"
+                className="px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
               >
                 {ui.common.cancel}
               </button>
@@ -1801,10 +1806,10 @@ export default function AdminGroups() {
       {/* Add apps modal */}
       {showAddApps && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setShowAddApps(false)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-dark">{g.addAppTitle}</h2>
-              <button onClick={() => setShowAddApps(false)} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100">
+              <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.addAppTitle}</h2>
+              <button onClick={() => setShowAddApps(false)} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1813,23 +1818,22 @@ export default function AdminGroups() {
               onChange={setAppSearch}
               placeholder={g.searchAppsPlaceholder}
               className="mb-3"
-              autoFocus
               clearLabel={ui.common.clearSearch}
             />
             <div className="max-h-72 overflow-y-auto space-y-1">
               {filteredApps.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4">{g.noAppsAvailable}</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">{g.noAppsAvailable}</p>
               ) : (
                 filteredApps.map((a) => (
                   <button
                     key={a.id}
                     onClick={() => addApp(a.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 text-left transition-colors"
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-left transition-colors"
                   >
                     <AppIcon app={a} className="w-6 h-6" textClassName="text-lg" />
                     <div>
-                      <div className="text-sm font-medium text-dark">{a.name}</div>
-                      <div className="text-xs text-gray-400 font-mono">{a.slug}</div>
+                      <div className="text-sm font-medium text-dark dark:text-gray-100">{a.name}</div>
+                      <div className="text-xs text-gray-400 dark:text-gray-500 font-mono">{a.slug}</div>
                     </div>
                   </button>
                 ))

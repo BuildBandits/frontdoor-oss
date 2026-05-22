@@ -82,16 +82,66 @@
     "removeFavorite": "Rimuovi dai preferiti",
     "dragToReorder": "Trascina per riordinare",
     "entraBadgeShort": "Entra",
-    "externalBadgeShort": "Ext"
+    "externalBadgeShort": "Ext",
+    "ssoBadgeShort": "SSO",
+    "tour": {
+      "skip": "Salta tour",
+      "previous": "Indietro",
+      "next": "Avanti",
+      "done": "Fine",
+      "progress": "Tour {current}/{total}",
+      "reopenHint": "Puoi riaprire questo tour in qualsiasi momento dal menu personale in alto a destra.",
+      "steps": {
+        "welcome": {
+          "title": "Inizia da qui, scopri Frontdoor",
+          "body": "Questa è la tua Home, il punto di partenza. Da qui puoi cercare, sfogliare e aprire strumenti e servizi messi a tua disposizione."
+        },
+        "search": {
+          "title": "Trova le app velocemente",
+          "body": "Usa la ricerca per filtrare per nome, descrizione o tag. I pulsanti preferiti, raggruppamento e vista ti aiutano a modellare il catalogo in base ai tuoi gusti ed esigenze."
+        },
+        "catalog": {
+          "title": "Sfoglia il catalogo",
+          "body": "Apri un'app con un clic sul titolo, sull'icona o sulla descrizione. Metti tra i preferiti quelle che usi di più."
+        },
+        "appCards": {
+          "title": "Preferiti e informazioni",
+          "body": "Su ogni applicazione trovi l'icona della stella per aggiungerla ai preferiti e la \"i\" quando ci sono informazioni aggiuntive da leggere. Usa la stella per salvare le app che usi di più e la \"i\" per scoprire dettagli utili."
+        },
+        "reorder": {
+          "title": "Riordina le schede",
+          "body": "Quando sei nella vista a card puoi trascinare ogni scheda dall'icona in alto a sinistra per riordinarla come preferisci. In vista compatta il riordino personalizzato non è disponibile: passa alla vista card, ordina le app, poi se vuoi torna alla vista compatta. L'ordine personalizzato viene salvato nel tuo profilo."
+        },
+        "menu": {
+          "title": "Il tuo menu personale",
+          "body": "Apri questo menu per personalizzare la vista Home predefinita, la lingua, il tema e, quando presente, anche l'ordine personalizzato delle app. Se cambi idea, da qui puoi ripristinare ogni impostazione."
+        },
+        "homepage": {
+          "title": "Porta Frontdoor con te",
+          "body": "Per averlo sempre a portata di mano puoi impostare Frontdoor come home page oppure aggiungerlo ai preferiti del browser. Qui sotto trovi la guida giusta per il browser che stai usando."
+        }
+      },
+      "browserDocsTitle": "Guide browser",
+      "browserDocsHint": "Abbiamo messo prima la guida del browser che stai usando.",
+      "browserDocsPrimary": "Consigliata per il tuo browser",
+      "browserDocsSecondary": "Altra guida utile"
+    }
   },
   "layout": {
     "personalHomeView": "Vista Home personale",
     "personalHomeViewShort": "Vista Home",
+    "takeTour": "Tour guidato",
     "appOrder": "Ordine app",
     "savedOrderOn": "Ordine personalizzato salvato il {date}",
     "restoreView": "Ripristina vista",
     "restoreOrder": "Ripristina ordine",
     "restoreLanguage": "Ripristina lingua",
+    "restoreColorScheme": "Ripristina tema",
+    "colorScheme": "Tema",
+    "colorSchemeLight": "Chiaro",
+    "colorSchemeDark": "Scuro",
+    "colorSchemeAuto": "Auto",
+    "beta": "Beta",
     "homeViewCards": "Card",
     "homeViewCompact": "Compatta",
     "homeViewCardsTitle": "Vista a card",
@@ -171,6 +221,14 @@
       "accessLogReloadNotice": "La scheda Log sarà vuota al prossimo refresh.",
       "languageTitle": "Lingua predefinita di Frontdoor",
       "languageHelp": "Scegli la lingua predefinita dell'intera web app.",
+      "darkModeBetaTitle": "Abilita dark mode",
+      "darkModeBetaHelp": "Funzione in beta. Quando attiva, puoi scegliere qui sotto il tema predefinito e ogni utente vede un selettore Tema nel proprio menu. Quando disattiva, Frontdoor resta in light mode per tutti, a prescindere dalle preferenze già salvate.",
+      "betaBadge": "Beta",
+      "colorSchemeTitle": "Tema predefinito",
+      "colorSchemeHelp": "Scegli il tema predefinito per tutti. Gli utenti possono comunque sovrascriverlo dal proprio menu.",
+      "colorSchemeLight": "Chiaro",
+      "colorSchemeDark": "Scuro",
+      "colorSchemeAuto": "Segui le impostazioni del sistema",
       "timeFormatTitle": "Formato orario 24h nei menu",
       "timeFormatHelp": "Se attivo, gli orari mostrati nei menu usano il formato 24 ore; il dato salvato non cambia.",
       "timeFormatLabel": "Usa orario 24h",
@@ -497,6 +555,7 @@
       "restoreDemoTitle": "Ripristinare le applicazioni dimostrative?",
       "restoreDemoMessage": "Le app demo mancanti verranno aggiunte di nuovo. Quelle già presenti con lo stesso slug verranno aggiornate senza essere sostituite.",
       "restoreDemoConfirm": "Ripristina",
+      "restoreDemoSuccess": "Applicazioni dimostrative ripristinate",
       "restoreDemoSummary": "Create: {created}, aggiornate: {updated}",
       "iconAssetRequired": "Carica o incolla un'immagine/SVG per l'icona, oppure torna alla modalità emoji",
       "assignedToGroups": "{name} aggiunta a {count} gruppi",

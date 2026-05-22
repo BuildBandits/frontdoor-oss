@@ -21,7 +21,7 @@ export const authenticate = (req, res, next) => {
 
     const user = db
       .prepare(`
-        SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, app_order, app_order_updated_at
+        SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at
         FROM users
         WHERE id = ? AND is_active = 1
       `)

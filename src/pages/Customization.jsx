@@ -16,6 +16,8 @@ const emptyBranding = {
   defaultHomeDesktopView: 'cards',
   defaultCompactView: false,
   defaultLanguage: 'en',
+  defaultColorScheme: 'light',
+  enableDarkModeBeta: false,
   useEuropeanDateFormat: false,
   use24hTimeFormat: false,
   logRetentionDays: 90,
@@ -35,6 +37,8 @@ const brandingKeys = [
   'defaultHomeDesktopView',
   'defaultCompactView',
   'defaultLanguage',
+  'defaultColorScheme',
+  'enableDarkModeBeta',
   'useEuropeanDateFormat',
   'use24hTimeFormat',
   'logRetentionDays',
@@ -263,6 +267,8 @@ export default function Customization() {
         defaultHomeDesktopView: branding.defaultHomeDesktopView,
         defaultCompactView: branding.defaultCompactView,
         defaultLanguage: branding.defaultLanguage,
+        defaultColorScheme: branding.defaultColorScheme,
+        enableDarkModeBeta: branding.enableDarkModeBeta,
         useEuropeanDateFormat: branding.useEuropeanDateFormat,
         use24hTimeFormat: branding.use24hTimeFormat,
         logRetentionDays: branding.logRetentionDays,
@@ -335,16 +341,16 @@ export default function Customization() {
   ];
 
   const renderSaveStatusBar = (key) => (
-    <div key={key} className="mt-6 rounded-2xl border border-gray-200 bg-gray-50/80 px-4 py-3">
+    <div key={key} className="mt-6 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-950/50 px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-dark">{ui.common.changeStatus}</p>
+          <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.common.changeStatus}</p>
           {saveNotice ? (
             <p className={`text-xs font-medium ${saveNotice.type === 'error' ? 'text-red-600' : 'text-accent-dark'}`}>
               {saveNotice.message}
             </p>
           ) : (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               {isDirty ? ui.common.unsavedChanges : ui.common.noPendingChanges}
             </p>
           )}
@@ -366,8 +372,8 @@ export default function Customization() {
     <div className="pb-24">
       <div className="flex items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark">{ui.customization.title}</h1>
-          <p className="text-gray-500 mt-1">{ui.customization.subtitle}</p>
+          <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{ui.customization.title}</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">{ui.customization.subtitle}</p>
         </div>
       </div>
 
@@ -376,7 +382,7 @@ export default function Customization() {
           className={`mb-8 flex items-start gap-3 rounded-2xl border px-4 py-3 ${
             pageNotice.type === 'error'
               ? 'border-red-200 bg-red-50 text-red-700'
-              : 'border-accent/30 bg-accent/10 text-dark'
+              : 'border-accent/30 bg-accent/10 text-dark dark:text-gray-100'
           }`}
         >
           {pageNotice.type === 'error' ? (
@@ -390,10 +396,10 @@ export default function Customization() {
 
       <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
         <aside className="hidden xl:block xl:sticky xl:top-24 h-fit">
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm">
             <div className="mb-4">
-              <h2 className="text-sm font-bold text-dark">{ui.customization.navigationTitle}</h2>
-              <p className="text-xs text-gray-500">{ui.customization.navigationSubtitle}</p>
+              <h2 className="text-sm font-bold text-dark dark:text-gray-100">{ui.customization.navigationTitle}</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{ui.customization.navigationSubtitle}</p>
             </div>
             <div className="flex xl:flex-col gap-2 overflow-x-auto pb-1 xl:pb-0">
               {sectionNav.map((item) => {
@@ -403,13 +409,13 @@ export default function Customization() {
                     key={item.label}
                     type="button"
                     onClick={() => jumpTo(item.id, item.ref)}
-                    className="inline-flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-white min-w-[170px] xl:min-w-0"
+                    className="inline-flex items-center justify-between gap-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors hover:border-gray-300 dark:hover:border-gray-600 hover:bg-white dark:hover:bg-gray-900 min-w-[170px] xl:min-w-0"
                   >
                     <span className="flex items-center gap-2">
-                      <Icon className="w-4 h-4 text-gray-500" />
+                      <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                       {item.label}
                     </span>
-                    <ChevronRight className="w-4 h-4 text-gray-300 hidden xl:block" />
+                    <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 hidden xl:block" />
                   </button>
                 );
               })}
@@ -418,10 +424,10 @@ export default function Customization() {
         </aside>
 
         <div className="flex flex-col gap-4">
-          <div className="xl:hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="xl:hidden rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm">
             <div className="mb-3">
-              <h2 className="text-sm font-bold text-dark">{ui.customization.goToSection}</h2>
-              <p className="text-xs text-gray-500">{ui.customization.navigationSubtitle}</p>
+              <h2 className="text-sm font-bold text-dark dark:text-gray-100">{ui.customization.goToSection}</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{ui.customization.navigationSubtitle}</p>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {sectionNav.map((item) => {
@@ -431,9 +437,9 @@ export default function Customization() {
                     key={item.label}
                     type="button"
                     onClick={() => jumpTo(item.id, item.ref)}
-                    className="inline-flex w-full items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-white"
+                    className="inline-flex w-full items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-left text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors hover:border-gray-300 dark:hover:border-gray-600 hover:bg-white dark:hover:bg-gray-900"
                   >
-                    <Icon className="w-4 h-4 text-gray-500" />
+                    <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                     {item.label}
                   </button>
                 );
@@ -441,114 +447,114 @@ export default function Customization() {
             </div>
           </div>
 
-          <section id="login" ref={homeOptionsSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
+          <section id="login" ref={homeOptionsSectionRef} className="scroll-mt-32 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6">
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center">
-                <LogIn className="w-5 h-5 text-rose-600" />
+              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/50 flex items-center justify-center">
+                <LogIn className="w-5 h-5 text-rose-600 dark:text-rose-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-dark">{ui.customization.login.title}</h2>
-                <p className="text-sm text-gray-500">{ui.customization.login.subtitle}</p>
+                <h2 className="text-lg font-bold text-dark dark:text-gray-100">{ui.customization.login.title}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{ui.customization.login.subtitle}</p>
               </div>
             </div>
 
-            <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+            <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
               <input
                 type="checkbox"
                 checked={branding.hideLoginPage === true}
                 onChange={(e) => setBranding({ ...branding, hideLoginPage: e.target.checked })}
-                className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
               />
               <span>
-                <span className="block text-sm font-medium text-gray-700">{ui.customization.login.hideLoginPageLabel}</span>
-                <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.login.hideLoginPageHelp}</span>
+                <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.login.hideLoginPageLabel}</span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.login.hideLoginPageHelp}</span>
               </span>
             </label>
 
             {renderSaveStatusBar('login')}
           </section>
 
-          <section id="home" ref={brandingSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
+          <section id="home" ref={brandingSectionRef} className="scroll-mt-32 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6">
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
-                <Home className="w-5 h-5 text-accent-dark" />
+              <div className="w-10 h-10 rounded-xl bg-accent/10 dark:bg-accent-dark/25 flex items-center justify-center">
+                <Home className="w-5 h-5 text-accent-dark dark:text-gray-100" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-dark">{ui.customization.home.title}</h2>
-                <p className="text-sm text-gray-500">{ui.customization.home.subtitle}</p>
+                <h2 className="text-lg font-bold text-dark dark:text-gray-100">{ui.customization.home.title}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{ui.customization.home.subtitle}</p>
               </div>
             </div>
 
             <div className="space-y-6">
               <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-                <div className="rounded-2xl border border-gray-100 bg-gray-50/50 p-6">
+                <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/45 p-6">
                   <div className="flex items-center gap-2 mb-5">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                      <Type className="w-5 h-5 text-blue-600" />
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center">
+                      <Type className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-dark">{ui.customization.home.textsTitle}</h3>
-                      <p className="text-sm text-gray-500">{ui.customization.home.textsSubtitle}</p>
+                      <h3 className="text-lg font-bold text-dark dark:text-gray-100">{ui.customization.home.textsTitle}</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{ui.customization.home.textsSubtitle}</p>
                     </div>
                   </div>
 
                   {brandingLoading ? (
                     <div className="space-y-3 animate-pulse">
-                      <div className="h-10 bg-gray-100 rounded-xl" />
-                      <div className="h-10 bg-gray-100 rounded-xl" />
-                      <div className="h-24 bg-gray-100 rounded-xl" />
+                      <div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-xl" />
+                      <div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-xl" />
+                      <div className="h-24 bg-gray-100 dark:bg-gray-800 rounded-xl" />
                     </div>
                   ) : (
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1">{ui.customization.hero.line1}</label>
+                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{ui.customization.hero.line1}</label>
                         <input
                           type="text"
                           value={branding.heroTitleLine1}
                           onChange={(e) => setBranding({ ...branding, heroTitleLine1: e.target.value })}
-                          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
+                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1">{ui.customization.hero.line2}</label>
+                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{ui.customization.hero.line2}</label>
                         <input
                           type="text"
                           value={branding.heroTitleLine2}
                           onChange={(e) => setBranding({ ...branding, heroTitleLine2: e.target.value })}
-                          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
+                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1">{ui.customization.hero.subtitle}</label>
+                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{ui.customization.hero.subtitle}</label>
                         <textarea
                           rows="3"
                           value={branding.heroSubtitle}
                           onChange={(e) => setBranding({ ...branding, heroSubtitle: e.target.value })}
-                          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500 resize-none"
                         />
                       </div>
                     </div>
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-gray-100 bg-gray-50/50 p-6">
+                <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/45 p-6">
                   <div className="flex items-center gap-2 mb-5">
-                    <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
-                      <Image className="w-5 h-5 text-amber-600" />
+                    <div className="w-10 h-10 rounded-xl border border-amber-100/80 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center">
+                      <Image className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-dark">{ui.customization.home.logoTitle}</h3>
-                      <p className="text-sm text-gray-500">{ui.customization.home.logoSubtitle}</p>
+                      <h3 className="text-lg font-bold text-dark dark:text-gray-100">{ui.customization.home.logoTitle}</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{ui.customization.home.logoSubtitle}</p>
                     </div>
                   </div>
 
                   {brandingLoading ? (
                     <div className="space-y-3 animate-pulse">
-                      <div className="h-12 bg-gray-100 rounded-xl" />
-                      <div className="h-24 bg-gray-100 rounded-2xl" />
-                      <div className="h-10 bg-gray-100 rounded-xl" />
+                      <div className="h-12 bg-gray-100 dark:bg-gray-800 rounded-xl" />
+                      <div className="h-24 bg-gray-100 dark:bg-gray-800 rounded-2xl" />
+                      <div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-xl" />
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -563,19 +569,19 @@ export default function Customization() {
                         <button
                           type="button"
                           onClick={() => brandingLogoInputRef.current?.click()}
-                          className="inline-flex items-center justify-center rounded-xl bg-accent/20 px-4 py-2.5 text-sm font-semibold text-dark transition-colors hover:bg-accent/30"
+                          className="inline-flex items-center justify-center rounded-xl bg-accent/20 dark:bg-accent-dark/25 px-4 py-2.5 text-sm font-semibold text-dark dark:text-gray-100 transition-colors hover:bg-accent/30 dark:hover:bg-accent-dark/40"
                         >
                           {ui.customization.home.chooseFile}
                         </button>
-                        <span className="text-sm text-gray-500">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
                           {brandingLogoFileName || ui.customization.home.noFileSelected}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
                         {ui.customization.preferences.assetFileHint}
                       </p>
 
-                      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 min-h-[150px] flex items-center justify-center">
+                      <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 min-h-[150px] flex items-center justify-center">
                         {brandingLogoPreview ? (
                           <img
                             src={brandingLogoPreview}
@@ -583,7 +589,7 @@ export default function Customization() {
                             className="max-h-24 max-w-[220px] object-contain"
                           />
                         ) : (
-                          <div className="text-center text-gray-400">
+                          <div className="text-center text-gray-400 dark:text-gray-500">
                             <Image className="w-8 h-8 mx-auto mb-2" />
                             <p className="text-xs">{ui.customization.hero.noLogo}</p>
                           </div>
@@ -599,12 +605,12 @@ export default function Customization() {
                             setBrandingLogoPreview(null);
                             setBrandingLogoFileName('');
                           }}
-                          className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-xl font-semibold text-sm hover:bg-red-100 transition-colors"
+                          className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300 rounded-xl font-semibold text-sm hover:bg-red-100 dark:hover:bg-red-900/45 transition-colors"
                         >
                           {ui.customization.hero.removeLogo}
                         </button>
                         {branding.logoUrl && !removeBrandingLogo && (
-                          <span className="text-xs text-gray-400">{ui.customization.hero.currentLogoActive}</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">{ui.customization.hero.currentLogoActive}</span>
                         )}
                       </div>
                     </div>
@@ -612,28 +618,28 @@ export default function Customization() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-gray-100 bg-gray-50/50 p-6">
+              <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/45 p-6">
                 <div className="flex items-center gap-2 mb-5">
-                  <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
-                    <Eye className="w-5 h-5 text-purple-600" />
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 flex items-center justify-center">
+                    <Eye className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-dark">{ui.customization.home.previewTitle}</h2>
-                    <p className="text-sm text-gray-500">{ui.customization.home.previewSubtitle}</p>
+                    <h2 className="text-lg font-bold text-dark dark:text-gray-100">{ui.customization.home.previewTitle}</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{ui.customization.home.previewSubtitle}</p>
                   </div>
                 </div>
 
                 {brandingLoading ? (
-                  <div className="h-[220px] rounded-2xl bg-gray-100 animate-pulse" />
+                  <div className="h-[220px] rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
                 ) : (
-                  <div className="rounded-2xl bg-gradient-to-br from-accent/20 via-white to-white p-4">
-                    <div className="rounded-2xl bg-white/90 border border-white/80 p-4 md:p-5 min-h-[220px] flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                  <div className="rounded-2xl bg-gradient-to-br from-accent/20 via-white to-white dark:from-accent-dark/20 dark:via-gray-900 dark:to-gray-950 p-4">
+                    <div className="rounded-2xl bg-white/90 border border-white/80 dark:bg-gray-900/95 dark:border-gray-700 p-4 md:p-5 min-h-[220px] flex flex-col md:flex-row md:items-center md:justify-between gap-5">
                       <div className="min-w-0">
-                        <div className="text-2xl md:text-3xl font-extrabold text-dark leading-tight">
+                        <div className="text-2xl md:text-3xl font-extrabold text-dark dark:text-gray-100 leading-tight">
                           {branding.heroTitleLine1}<br />
-                          <span className="text-dark/70">{branding.heroTitleLine2}</span>
+                          <span className="text-dark/70 dark:text-gray-400">{branding.heroTitleLine2}</span>
                         </div>
-                        <p className="text-sm text-gray-500 mt-3 max-w-lg">{branding.heroSubtitle}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-3 max-w-lg">{branding.heroSubtitle}</p>
                       </div>
                       <div className="flex items-center justify-center md:justify-end min-w-[160px]">
                         {brandingLogoPreview ? (
@@ -643,7 +649,7 @@ export default function Customization() {
                             className="max-h-24 max-w-[180px] object-contain"
                           />
                         ) : (
-                          <div className="w-28 h-28 rounded-2xl border border-dashed border-gray-200 flex items-center justify-center text-gray-300">
+                          <div className="w-28 h-28 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-300 dark:text-gray-600">
                             <Image className="w-8 h-8" />
                           </div>
                         )}
@@ -654,36 +660,36 @@ export default function Customization() {
               </div>
 
               <div className="space-y-3">
-                <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
+                <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
                   <input
                     type="checkbox"
                     checked={branding.showHomeHero !== false}
                     onChange={(e) => setBranding({ ...branding, showHomeHero: e.target.checked })}
-                    className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                    className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                   />
                   <span>
-                    <span className="block text-sm font-medium text-gray-700">{ui.customization.home.heroLabel}</span>
-                    <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.home.heroHelp}</span>
+                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.home.heroLabel}</span>
+                    <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.home.heroHelp}</span>
                   </span>
                 </label>
 
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4">
+                <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-4">
                   <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-gray-900/5 flex items-center justify-center">
-                      <Eye className="w-4 h-4 text-gray-600" />
+                    <div className="w-9 h-9 rounded-xl bg-gray-900/5 dark:bg-white/10 flex items-center justify-center">
+                      <Eye className="w-4 h-4 text-gray-600 dark:text-gray-300" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <label htmlFor="home-desktop-view" className="block text-sm font-medium text-gray-700">
+                      <label htmlFor="home-desktop-view" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                         {ui.customization.home.desktopViewLabel}
                       </label>
-                      <p className="text-xs text-gray-500 mt-0.5">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                         {ui.customization.home.desktopViewHelp}
                       </p>
                       <select
                         id="home-desktop-view"
                         value={branding.defaultHomeDesktopView}
                         onChange={(e) => setBranding({ ...branding, defaultHomeDesktopView: e.target.value })}
-                        className="mt-3 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-accent focus:ring-accent disabled:opacity-60"
+                        className="mt-3 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent disabled:opacity-60"
                       >
                         <option value="cards">{ui.customization.home.cards}</option>
                         <option value="compact">{ui.customization.home.compact}</option>
@@ -697,67 +703,67 @@ export default function Customization() {
             </div>
           </section>
 
-          <section id="apps" ref={appOptionsSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
+          <section id="apps" ref={appOptionsSectionRef} className="scroll-mt-32 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6">
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center">
-                <Settings className="w-5 h-5 text-violet-600" />
+              <div className="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-950/50 flex items-center justify-center">
+                <Settings className="w-5 h-5 text-violet-600 dark:text-violet-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-dark">{ui.customization.apps.title}</h2>
-                <p className="text-sm text-gray-500">{ui.customization.apps.subtitle}</p>
+                <h2 className="text-lg font-bold text-dark dark:text-gray-100">{ui.customization.apps.title}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{ui.customization.apps.subtitle}</p>
               </div>
             </div>
 
-            <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+            <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
               <input
                 type="checkbox"
                 checked={branding.showAppModeBadges !== false}
                 onChange={(e) => setBranding({ ...branding, showAppModeBadges: e.target.checked })}
-                className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
               />
               <span>
-                <span className="block text-sm font-medium text-gray-700">{ui.customization.apps.badgesLabel}</span>
-                <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.apps.badgesHelp}</span>
+                <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.apps.badgesLabel}</span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.apps.badgesHelp}</span>
               </span>
             </label>
 
             <div className="mt-3 grid gap-3 lg:grid-cols-3">
-              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
                 <input
                   type="checkbox"
                   checked={branding.showSharedCookieMode !== false}
                   onChange={(e) => setBranding({ ...branding, showSharedCookieMode: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-gray-700">{ui.customization.apps.sharedCookieLabel}</span>
-                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.apps.sharedCookieHelp}</span>
+                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.apps.sharedCookieLabel}</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.apps.sharedCookieHelp}</span>
                 </span>
               </label>
 
-              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
                 <input
                   type="checkbox"
                   checked={branding.showRedirectSsoMode !== false}
                   onChange={(e) => setBranding({ ...branding, showRedirectSsoMode: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-gray-700">{ui.customization.apps.redirectLabel}</span>
-                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.apps.redirectHelp}</span>
+                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.apps.redirectLabel}</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.apps.redirectHelp}</span>
                 </span>
               </label>
 
-              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
                 <input
                   type="checkbox"
                   checked={branding.showEntraAppMode !== false}
                   onChange={(e) => setBranding({ ...branding, showEntraAppMode: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-gray-700">{ui.customization.apps.entraLabel}</span>
-                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.apps.entraHelp}</span>
+                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.apps.entraLabel}</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.apps.entraHelp}</span>
                 </span>
               </label>
             </div>
@@ -765,28 +771,28 @@ export default function Customization() {
             {renderSaveStatusBar('app')}
           </section>
 
-          <section id="preferences" ref={preferencesSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
+          <section id="preferences" ref={preferencesSectionRef} className="scroll-mt-32 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6">
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
-                <SlidersHorizontal className="w-5 h-5 text-slate-600" />
+              <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                <SlidersHorizontal className="w-5 h-5 text-slate-600 dark:text-slate-300" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-dark">{ui.customization.preferences.title}</h2>
-                <p className="text-sm text-gray-500">{ui.customization.preferences.subtitle}</p>
+                <h2 className="text-lg font-bold text-dark dark:text-gray-100">{ui.customization.preferences.title}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{ui.customization.preferences.subtitle}</p>
               </div>
             </div>
 
             <div className="space-y-3">
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-dark">{ui.customization.preferences.languageTitle}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{ui.customization.preferences.languageHelp}</p>
+                    <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.preferences.languageTitle}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.preferences.languageHelp}</p>
                   </div>
                   <select
                     value={branding.defaultLanguage || 'en'}
                     onChange={(e) => setBranding({ ...branding, defaultLanguage: normalizeLanguage(e.target.value) })}
-                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-accent focus:ring-accent lg:w-72"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent lg:w-72"
                   >
                     {languageOptions.map((language) => (
                       <option key={language.code} value={language.code}>{language.label}</option>
@@ -795,42 +801,79 @@ export default function Customization() {
                 </div>
               </div>
 
-              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="rounded-2xl border border-amber-200 dark:border-amber-800/55 bg-amber-50/70 dark:bg-amber-950/25 px-4 py-3 space-y-3">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={branding.enableDarkModeBeta === true}
+                    onChange={(e) => setBranding({ ...branding, enableDarkModeBeta: e.target.checked })}
+                    className="mt-1 rounded border-amber-300 dark:border-amber-700 text-amber-600 focus:ring-amber-400"
+                  />
+                  <span className="min-w-0">
+                    <span className="inline-flex items-center gap-2 text-sm font-semibold text-dark dark:text-gray-100">
+                      {ui.customization.preferences.darkModeBetaTitle}
+                      <span className="inline-flex items-center rounded-full bg-amber-200 dark:bg-amber-900/55 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-200">
+                        {ui.customization.preferences.betaBadge}
+                      </span>
+                    </span>
+                    <span className="block text-xs text-gray-600 dark:text-gray-400 mt-1">{ui.customization.preferences.darkModeBetaHelp}</span>
+                  </span>
+                </label>
+
+                <div className={`flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between rounded-xl border border-amber-100 dark:border-amber-900/40 bg-white/70 dark:bg-gray-900/60 px-4 py-3 transition-opacity ${branding.enableDarkModeBeta ? '' : 'opacity-50 pointer-events-none'}`}>
+                  <div>
+                    <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.preferences.colorSchemeTitle}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.preferences.colorSchemeHelp}</p>
+                  </div>
+                  <select
+                    value={branding.defaultColorScheme || 'light'}
+                    onChange={(e) => setBranding({ ...branding, defaultColorScheme: e.target.value })}
+                    disabled={!branding.enableDarkModeBeta}
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent lg:w-72 disabled:cursor-not-allowed"
+                  >
+                    <option value="light">{ui.customization.preferences.colorSchemeLight}</option>
+                    <option value="dark">{ui.customization.preferences.colorSchemeDark}</option>
+                    <option value="auto">{ui.customization.preferences.colorSchemeAuto}</option>
+                  </select>
+                </div>
+              </div>
+
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
                 <input
                   type="checkbox"
                   checked={branding.use24hTimeFormat === true}
                   onChange={(e) => setBranding({ ...branding, use24hTimeFormat: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span className="min-w-0">
-                  <span className="block text-sm font-medium text-gray-700">{ui.customization.preferences.timeFormatTitle}</span>
-                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.preferences.timeFormatHelp}</span>
+                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.preferences.timeFormatTitle}</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.preferences.timeFormatHelp}</span>
                 </span>
               </label>
 
-              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
                 <input
                   type="checkbox"
                   checked={branding.useEuropeanDateFormat === true}
                   onChange={(e) => setBranding({ ...branding, useEuropeanDateFormat: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span className="min-w-0">
-                  <span className="block text-sm font-medium text-gray-700">{ui.customization.preferences.dateFormatTitle}</span>
-                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.preferences.dateFormatHelp}</span>
+                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.preferences.dateFormatTitle}</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.preferences.dateFormatHelp}</span>
                 </span>
               </label>
 
-              <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-5">
+              <div className="rounded-2xl border border-amber-100 dark:border-amber-800/55 bg-amber-50/50 dark:bg-amber-950/30 p-5">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <p className="text-sm font-semibold text-dark">{ui.customization.preferences.logRetentionTitle}</p>
-                      <div className={`rounded-full px-3 py-1 text-xs font-semibold ${branding.logRetentionDays === 0 ? 'bg-red-100 text-red-700' : 'bg-white text-amber-700'}`}>
+                      <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.preferences.logRetentionTitle}</p>
+                      <div className={`rounded-full px-3 py-1 text-xs font-semibold ${branding.logRetentionDays === 0 ? 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300' : 'bg-white dark:bg-gray-900 text-amber-700 dark:text-amber-300'}`}>
                         {branding.logRetentionDays === 0 ? ui.customization.preferences.logless : `${branding.logRetentionDays} ${ui.common.days}`}
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">{ui.customization.preferences.logRetentionHelp}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{ui.customization.preferences.logRetentionHelp}</p>
                   </div>
                 </div>
 
@@ -843,20 +886,20 @@ export default function Customization() {
                       step="1"
                       value={branding.logRetentionDays ?? 90}
                       onChange={(e) => setBranding({ ...branding, logRetentionDays: parseInt(e.target.value, 10) })}
-                      className="w-full accent-amber-500"
+                      className="w-full accent-amber-500 dark:accent-amber-400"
                     />
 
-                    <div className="flex items-center justify-between text-xs text-gray-500">
+                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                       <span>0 = {ui.customization.preferences.logless}</span>
                       <span>90 = {ui.customization.preferences.recommended}</span>
                     </div>
 
-                    <p className="rounded-xl border border-amber-200 bg-white px-4 py-3 text-sm text-amber-800 leading-6">
+                    <p className="rounded-xl border border-amber-200 dark:border-amber-800/50 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 leading-6">
                       {ui.customization.preferences.logRetentionNotice}
                     </p>
                   </div>
                 ) : (
-                  <div className="mt-4 h-24 rounded-2xl bg-gray-100 animate-pulse" />
+                  <div className="mt-4 h-24 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
                 )}
               </div>
             </div>
@@ -864,41 +907,41 @@ export default function Customization() {
             {renderSaveStatusBar('preferences')}
           </section>
 
-          <section id="mobile" ref={mobileOptionsSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
+          <section id="mobile" ref={mobileOptionsSectionRef} className="scroll-mt-32 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6">
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center">
-                <Smartphone className="w-5 h-5 text-cyan-600" />
+              <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 flex items-center justify-center">
+                <Smartphone className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-dark">{ui.customization.mobile.title}</h2>
-                <p className="text-sm text-gray-500">{ui.customization.mobile.subtitle}</p>
+                <h2 className="text-lg font-bold text-dark dark:text-gray-100">{ui.customization.mobile.title}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{ui.customization.mobile.subtitle}</p>
               </div>
             </div>
 
             <div className="space-y-3">
-              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
                 <input
                   type="checkbox"
                   checked={branding.defaultCompactView === true}
                   onChange={(e) => setBranding({ ...branding, defaultCompactView: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-gray-700">{ui.customization.mobile.compactLabel}</span>
-                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.mobile.compactHelp}</span>
+                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.mobile.compactLabel}</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.mobile.compactHelp}</span>
                 </span>
               </label>
 
-              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
                 <input
                   type="checkbox"
                   checked={branding.hideHomeHeroOnMobile === true}
                   onChange={(e) => setBranding({ ...branding, hideHomeHeroOnMobile: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-gray-700">{ui.customization.mobile.hideHeroLabel}</span>
-                  <span className="block text-xs text-gray-500 mt-0.5">{ui.customization.mobile.hideHeroHelp}</span>
+                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.mobile.hideHeroLabel}</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.mobile.hideHeroHelp}</span>
                 </span>
               </label>
             </div>
@@ -906,24 +949,24 @@ export default function Customization() {
             {renderSaveStatusBar('mobile')}
           </section>
 
-          <section id="maintenance" ref={maintenanceSectionRef} className="scroll-mt-32 bg-white rounded-2xl border border-gray-100 p-6">
+          <section id="maintenance" ref={maintenanceSectionRef} className="scroll-mt-32 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6">
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
-                <Wrench className="w-5 h-5 text-amber-600" />
+              <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center">
+                <Wrench className="w-5 h-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-dark">{ui.customization.maintenance.title}</h2>
-                <p className="text-sm text-gray-500">{ui.customization.maintenance.subtitle}</p>
+                <h2 className="text-lg font-bold text-dark dark:text-gray-100">{ui.customization.maintenance.title}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{ui.customization.maintenance.subtitle}</p>
               </div>
             </div>
 
             <div className="space-y-3">
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-dark">{ui.customization.maintenance.avatarCacheTitle}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{ui.customization.maintenance.avatarCacheHelp}</p>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.maintenance.avatarCacheTitle}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.maintenance.avatarCacheHelp}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                       {cacheStatsLoading ? ui.common.loading : `${cacheStats?.avatarCache?.files || 0} ${ui.customization.maintenance.cacheFiles} · ${formatBytes(cacheStats?.avatarCache?.bytes || 0)}`}
                     </p>
                   </div>
@@ -946,12 +989,12 @@ export default function Customization() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-dark">{ui.customization.maintenance.appIconCacheTitle}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{ui.customization.maintenance.appIconCacheHelp}</p>
-                    <p className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs text-gray-400">
+                    <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.maintenance.appIconCacheTitle}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.maintenance.appIconCacheHelp}</p>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs text-gray-400 dark:text-gray-500">
                       <span>
                         {cacheStatsLoading
                           ? ui.common.loading
@@ -959,7 +1002,7 @@ export default function Customization() {
                       </span>
                       <a
                         href="/admin/icons"
-                        className="font-semibold text-dark underline decoration-accent decoration-2 underline-offset-2 transition-colors hover:text-accent-dark hover:decoration-accent-dark"
+                        className="font-semibold text-dark dark:text-gray-100 underline decoration-accent decoration-2 underline-offset-2 transition-colors hover:text-accent-dark hover:decoration-accent-dark"
                       >
                         {ui.customization.maintenance.openMediaLibrary}
                       </a>
@@ -984,11 +1027,11 @@ export default function Customization() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-red-100 bg-red-50/50 p-5">
+              <div className="rounded-2xl border border-red-100 dark:border-red-900/55 bg-red-50/50 dark:bg-red-950/30 p-5">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-dark">{ui.customization.maintenance.accessLogCleanupTitle}</p>
-                  <p className="text-xs text-gray-500 mt-1">{ui.customization.maintenance.accessLogCleanupHelp}</p>
+                  <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.maintenance.accessLogCleanupTitle}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{ui.customization.maintenance.accessLogCleanupHelp}</p>
                 </div>
                   <div className="flex items-start lg:shrink-0">
                     <button
@@ -1010,11 +1053,11 @@ export default function Customization() {
               </div>
             </div>
 
-            <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <div className="mt-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-dark">{ui.customization.maintenance.backupRestoreTitle}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{ui.customization.maintenance.backupRestoreHelp}</p>
+                  <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.maintenance.backupRestoreTitle}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.maintenance.backupRestoreHelp}</p>
                 </div>
                 <RouterLink
                   to="/admin/backup"

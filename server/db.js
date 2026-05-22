@@ -27,6 +27,7 @@ db.exec(`
     preferred_language TEXT,
     app_order TEXT,
     app_order_updated_at TEXT,
+    home_tour_seen_at TEXT,
     is_active INTEGER DEFAULT 1,
     last_login TEXT,
     created_at TEXT DEFAULT (datetime('now')),
@@ -199,8 +200,10 @@ ensureColumn('user_groups', 'entra_synced_at', 'entra_synced_at TEXT');
 ensureColumn('apps', 'icon_file_name', 'icon_file_name TEXT');
 ensureColumn('users', 'home_desktop_view', "home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact'))");
 ensureColumn('users', 'preferred_language', 'preferred_language TEXT');
+ensureColumn('users', 'preferred_color_scheme', "preferred_color_scheme TEXT CHECK(preferred_color_scheme IN ('light', 'dark', 'auto'))");
 ensureColumn('users', 'app_order', 'app_order TEXT');
 ensureColumn('users', 'app_order_updated_at', 'app_order_updated_at TEXT');
+ensureColumn('users', 'home_tour_seen_at', 'home_tour_seen_at TEXT');
 ensureColumn('branding_settings', 'show_app_mode_badges', 'show_app_mode_badges INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'default_home_desktop_view', "default_home_desktop_view TEXT DEFAULT 'cards' CHECK(default_home_desktop_view IN ('cards', 'compact'))");
 ensureColumn('branding_settings', 'default_compact_view', 'default_compact_view INTEGER DEFAULT 0');
@@ -214,6 +217,8 @@ ensureColumn('branding_settings', 'hide_login_page', 'hide_login_page INTEGER DE
 ensureColumn('branding_settings', 'show_shared_cookie_mode', 'show_shared_cookie_mode INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'show_redirect_sso_mode', 'show_redirect_sso_mode INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'show_entra_app_mode', 'show_entra_app_mode INTEGER DEFAULT 1');
+ensureColumn('branding_settings', 'default_color_scheme', "default_color_scheme TEXT DEFAULT 'light' CHECK(default_color_scheme IN ('light', 'dark', 'auto'))");
+ensureColumn('branding_settings', 'enable_dark_mode_beta', 'enable_dark_mode_beta INTEGER DEFAULT 0');
 ensureColumn('entra_group_cache', 'description', 'description TEXT');
 ensureColumn('media_assets', 'app_name', 'app_name TEXT');
 ensureColumn('media_assets', 'app_slug', 'app_slug TEXT');
@@ -260,16 +265,18 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         avatar_color TEXT,
         home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact')),
         preferred_language TEXT,
+        preferred_color_scheme TEXT CHECK(preferred_color_scheme IN ('light', 'dark', 'auto')),
         app_order TEXT,
         app_order_updated_at TEXT,
+        home_tour_seen_at TEXT,
         is_active INTEGER DEFAULT 1,
         last_login TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       );
-      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, app_order, app_order_updated_at, is_active, last_login, created_at, updated_at)
+      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at, is_active, last_login, created_at, updated_at)
       SELECT id, email, display_name, microsoft_id, ${normalizeRoleSql},
-        avatar_color, COALESCE(home_desktop_view, 'cards'), preferred_language, app_order, app_order_updated_at, is_active, last_login, created_at, updated_at
+        avatar_color, COALESCE(home_desktop_view, 'cards'), preferred_language, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at, is_active, last_login, created_at, updated_at
       FROM users;
       DROP TABLE users;
       ALTER TABLE users_new RENAME TO users;
@@ -307,15 +314,17 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         avatar_color TEXT,
         home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact')),
         preferred_language TEXT,
+        preferred_color_scheme TEXT CHECK(preferred_color_scheme IN ('light', 'dark', 'auto')),
         app_order TEXT,
         app_order_updated_at TEXT,
+        home_tour_seen_at TEXT,
         is_active INTEGER DEFAULT 1,
         last_login TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       );
-      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, app_order, app_order_updated_at, is_active, last_login, created_at, updated_at)
-      SELECT id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, app_order, app_order_updated_at, is_active, last_login, created_at, updated_at
+      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at, is_active, last_login, created_at, updated_at)
+      SELECT id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at, is_active, last_login, created_at, updated_at
       FROM users;
       DROP TABLE users;
       ALTER TABLE users_new RENAME TO users;

@@ -2,19 +2,19 @@ import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 
 const noticeStyles = {
   success: {
-    wrapper: 'border-accent/30 bg-accent/10 text-dark',
+    wrapper: 'border-accent/30 bg-accent/10 text-dark dark:text-gray-100',
     icon: CheckCircle2,
   },
   error: {
-    wrapper: 'border-red-200 bg-red-50 text-red-800',
+    wrapper: 'border-red-200 bg-red-50 text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200',
     icon: AlertTriangle,
   },
   warning: {
-    wrapper: 'border-amber-200 bg-amber-50 text-amber-900',
+    wrapper: 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200',
     icon: AlertTriangle,
   },
   info: {
-    wrapper: 'border-sky-200 bg-sky-50 text-sky-800',
+    wrapper: 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-200',
     icon: Info,
   },
 };

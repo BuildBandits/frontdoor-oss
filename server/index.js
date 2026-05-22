@@ -45,6 +45,8 @@ function logDatabaseBackedSettings() {
     const branding = getBrandingSettings();
     const databaseBackedSettings = {
       defaultLanguage: branding.defaultLanguage,
+      defaultColorScheme: branding.defaultColorScheme,
+      enableDarkModeBeta: branding.enableDarkModeBeta,
       defaultHomeDesktopView: branding.defaultHomeDesktopView,
       defaultCompactView: branding.defaultCompactView,
       showHomeHero: branding.showHomeHero,

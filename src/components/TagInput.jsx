@@ -84,19 +84,19 @@ export default function TagInput({
   return (
     <div className="relative">
       <div
-        className="flex flex-wrap items-center gap-1.5 min-h-[44px] px-3 py-2 border border-gray-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-accent focus-within:border-transparent transition cursor-text"
+        className="flex flex-wrap items-center gap-1.5 min-h-[44px] px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus-within:ring-2 focus-within:ring-accent dark:focus-within:ring-gray-500 focus-within:border-transparent transition cursor-text"
         onClick={() => inputRef.current?.focus()}
       >
         {normalizeValue(value).map((tag) => (
           <span
             key={tag}
-            className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-100 text-purple-700 text-xs font-semibold uppercase tracking-wider rounded-full"
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-100 text-purple-700 dark:bg-purple-950/55 dark:text-purple-300 text-xs font-semibold uppercase tracking-wider rounded-full"
           >
             {tag}
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); removeTag(tag); }}
-              className="text-purple-400 hover:text-purple-700 transition-colors"
+              className="text-purple-400 hover:text-purple-700 dark:text-purple-500 dark:hover:text-purple-300 transition-colors"
             >
               <X className="w-3 h-3" />
             </button>
@@ -114,13 +114,13 @@ export default function TagInput({
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           placeholder={value.length === 0 ? placeholder : ''}
-          className="flex-1 min-w-[100px] text-sm outline-none bg-transparent py-0.5"
+          className="flex-1 min-w-[100px] text-sm outline-none bg-transparent py-0.5 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
         />
       </div>
 
       {showSuggestions && normalizedSuggestions.length > 0 && (
-        <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
-          <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 border-b border-gray-100">
+        <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden">
+          <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-800">
             {input.trim() ? suggestionsLabel : availableTagsLabel}
           </div>
           <div className="max-h-48 overflow-y-auto py-1">
@@ -134,10 +134,10 @@ export default function TagInput({
                   setShowSuggestions(false);
                   inputRef.current?.focus();
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-center justify-between gap-3"
+                className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-purple-950/35 transition-colors flex items-center justify-between gap-3"
               >
                 <span className="font-medium">{tag}</span>
-                <span className="text-[11px] text-gray-400">{useSuggestionLabel}</span>
+                <span className="text-[11px] text-gray-400 dark:text-gray-500">{useSuggestionLabel}</span>
               </button>
             ))}
           </div>

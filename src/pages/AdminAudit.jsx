@@ -128,13 +128,13 @@ export default function AdminAudit() {
       <div className="mb-6">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl font-extrabold text-dark">{ui.admin.audit.pageTitle}</h1>
-            <p className="text-gray-500 mt-1">{ui.admin.audit.subtitle}</p>
+            <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{ui.admin.audit.pageTitle}</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">{ui.admin.audit.subtitle}</p>
           </div>
         </div>
       </div>
 
-      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-4">
+      <div className="mb-6 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-[240px]">
             <ClearableSearchField
@@ -142,14 +142,15 @@ export default function AdminAudit() {
               onChange={setSearch}
               placeholder={ui.admin.audit.searchPlaceholder}
               clearLabel={ui.common.clearSearch}
+              tabIndex={1}
             />
           </div>
-          <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-            <span className="text-gray-400">{ui.admin.audit.admin}</span>
+          <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
+            <span className="text-gray-400 dark:text-gray-500">{ui.admin.audit.admin}</span>
             <select
               value={selectedActorId}
               onChange={(e) => setSelectedActorId(e.target.value)}
-              className="bg-transparent text-sm font-medium text-dark focus:outline-none max-w-[220px]"
+              className="bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none max-w-[220px]"
             >
               <option value="">{ui.admin.audit.allAdmins}</option>
               {adminUsers.map((user) => (
@@ -159,13 +160,13 @@ export default function AdminAudit() {
               ))}
             </select>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-            <Filter className="w-4 h-4 text-gray-400" />
+          <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
+            <Filter className="w-4 h-4 text-gray-400 dark:text-gray-500" />
             <span>{ui.admin.audit.period}</span>
             <select
               value={retentionDays}
               onChange={(e) => setRetentionDays(parseInt(e.target.value, 10))}
-              className="bg-transparent text-sm font-medium text-dark focus:outline-none"
+              className="bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none"
             >
               {periodOptions.map((days) => (
                 <option key={days} value={days}>
@@ -174,12 +175,12 @@ export default function AdminAudit() {
               ))}
             </select>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-            <span className="text-gray-400">{ui.admin.audit.rows}</span>
+          <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
+            <span className="text-gray-400 dark:text-gray-500">{ui.admin.audit.rows}</span>
             <select
               value={pageSize}
               onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
-              className="bg-transparent text-sm font-medium text-dark focus:outline-none"
+              className="bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none"
             >
               <option value={50}>50</option>
               <option value={100}>100</option>
@@ -191,15 +192,15 @@ export default function AdminAudit() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
         {loading ? (
           <div className="animate-pulse p-6 space-y-3">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-10 bg-gray-50 rounded-lg" />
+              <div key={i} className="h-10 bg-gray-50 dark:bg-gray-900 rounded-lg" />
             ))}
           </div>
         ) : logs.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
+          <div className="text-center py-16 text-gray-400 dark:text-gray-500">
             <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-40" />
             <p className="text-lg font-medium">{ui.admin.audit.emptyTitle}</p>
             <p className="text-sm mt-1">{ui.admin.audit.emptyBody}</p>
@@ -209,18 +210,18 @@ export default function AdminAudit() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{ui.common.date}</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{ui.admin.audit.admin}</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{ui.admin.audit.action}</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{ui.admin.audit.target}</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">{ui.admin.audit.details}</th>
+                  <tr className="border-b border-gray-100 dark:border-gray-800">
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.common.date}</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.audit.admin}</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.audit.action}</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.audit.target}</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hidden lg:table-cell">{ui.admin.audit.details}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {logs.map((log) => (
                     <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="px-5 py-3 text-xs text-gray-500 whitespace-nowrap">{log.created_at_local || formatDate(log.created_at)}</td>
+                      <td className="px-5 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{log.created_at_local || formatDate(log.created_at)}</td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
                           <UserAvatar
@@ -232,24 +233,24 @@ export default function AdminAudit() {
                             initialsClassName="text-[10px]"
                           />
                           <div className="min-w-0">
-                            <p className="text-dark font-medium truncate text-xs">{log.actor_name || 'Utente rimosso'}</p>
-                            <p className="text-gray-400 truncate text-[11px]">{log.actor_email || '-'}</p>
+                            <p className="text-dark dark:text-gray-100 font-medium truncate text-xs">{log.actor_name || 'Utente rimosso'}</p>
+                            <p className="text-gray-400 dark:text-gray-500 truncate text-[11px]">{log.actor_email || '-'}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-5 py-3">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
                           {log.action}
                         </span>
                       </td>
                       <td className="px-5 py-3">
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-dark">{log.target_type}</span>
-                          <span className="text-[11px] text-gray-400 font-mono break-all">{log.target_id || '-'}</span>
+                          <span className="text-xs font-medium text-dark dark:text-gray-100">{log.target_type}</span>
+                          <span className="text-[11px] text-gray-400 dark:text-gray-500 font-mono break-all">{log.target_id || '-'}</span>
                         </div>
                       </td>
                       <td className="px-5 py-3 hidden lg:table-cell">
-                        <pre className="max-w-[420px] whitespace-pre-wrap break-words text-[11px] text-gray-500 font-mono">
+                        <pre className="max-w-[420px] whitespace-pre-wrap break-words text-[11px] text-gray-500 dark:text-gray-400 font-mono">
                           {renderDetails(log.details)}
                         </pre>
                       </td>
@@ -260,22 +261,22 @@ export default function AdminAudit() {
             </div>
 
             {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
-                <p className="text-xs text-gray-400">
+              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-gray-800">
+                <p className="text-xs text-gray-400 dark:text-gray-500">
                   Pagina {pagination.page} di {pagination.pages} &middot; {pagination.total} eventi totali
                 </p>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={pagination.page <= 1}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-dark hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setPage((p) => Math.min(pagination.pages, p + 1))}
                     disabled={pagination.page >= pagination.pages}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-dark hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>

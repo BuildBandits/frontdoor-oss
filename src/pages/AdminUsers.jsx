@@ -124,8 +124,8 @@ export default function AdminUsers() {
   const roleBadgeClass = (role) => {
     if (role === 'owner') return 'bg-rose-100 text-rose-700';
     if (role === 'admin') return 'bg-amber-100 text-amber-700';
-    if (role === 'admin_readonly') return 'bg-slate-100 text-slate-700';
-    return 'bg-gray-100 text-gray-600';
+    if (role === 'admin_readonly') return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
+    return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300';
   };
   const RoleBadgeIcon = ({ role, className = 'w-3 h-3' }) => {
     if (role === 'admin') return <Shield className={className} />;
@@ -224,16 +224,16 @@ export default function AdminUsers() {
   const detectedEntraGroups = userDetail?.entraGroups || [];
   const visibleApps = userDetail?.visibleApps || [];
   const appModeLabel = (mode) => {
-    if (mode === 'redirect') return 'SSO';
-    if (mode === 'shared-cookie') return 'cookie';
-    if (mode === 'entra-app') return 'entra';
-    return 'link';
+    if (mode === 'redirect') return t.redirectSso;
+    if (mode === 'shared-cookie') return t.sharedCookie;
+    if (mode === 'entra-app') return t.entraApp;
+    return t.link;
   };
   const appModeBadgeClass = (mode) => {
     if (mode === 'redirect') return 'bg-blue-100 text-blue-700';
     if (mode === 'shared-cookie') return 'bg-accent/10 text-accent-dark';
     if (mode === 'entra-app') return 'bg-violet-100 text-violet-700';
-    return 'bg-gray-100 text-gray-600';
+    return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300';
   };
   const formatDate = (iso) => {
     if (!iso) return t.noLogin;
@@ -254,14 +254,14 @@ export default function AdminUsers() {
           role: 'admin',
           label: t.roleAdminFull,
           icon: Shield,
-          className: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
+          className: 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/45 dark:text-amber-300 dark:hover:bg-amber-900/50',
           confirmText: t.roleAdminFullConfirm,
         },
         {
           role: 'admin_readonly',
           label: t.roleAdminReadonly,
           icon: Eye,
-          className: 'bg-slate-50 text-slate-700 hover:bg-slate-100',
+          className: 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800',
           confirmText: t.roleAdminReadonlyConfirm,
         }
       );
@@ -271,14 +271,14 @@ export default function AdminUsers() {
           role: 'admin',
           label: t.roleAdminFull,
           icon: Shield,
-          className: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
+          className: 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/45 dark:text-amber-300 dark:hover:bg-amber-900/50',
           confirmText: t.roleAdminFullConfirm,
         },
         {
           role: 'user',
           label: t.roleRemove,
           icon: ShieldOff,
-          className: 'bg-blue-50 text-blue-700 hover:bg-blue-100',
+          className: 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/45 dark:text-blue-300 dark:hover:bg-blue-900/50',
           confirmText: t.roleRemoveConfirm,
         }
       );
@@ -288,14 +288,14 @@ export default function AdminUsers() {
           role: 'admin_readonly',
           label: t.roleAdminReadonly,
           icon: Eye,
-          className: 'bg-slate-50 text-slate-700 hover:bg-slate-100',
+          className: 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800',
           confirmText: t.roleAdminReadonlyConfirm,
         },
         {
           role: 'user',
           label: t.roleRemove,
           icon: ShieldOff,
-          className: 'bg-blue-50 text-blue-700 hover:bg-blue-100',
+          className: 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/45 dark:text-blue-300 dark:hover:bg-blue-900/50',
           confirmText: t.roleRemoveConfirm,
         }
       );
@@ -305,21 +305,21 @@ export default function AdminUsers() {
           role: 'admin',
           label: t.roleAdminFull,
           icon: Shield,
-          className: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
+          className: 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/45 dark:text-amber-300 dark:hover:bg-amber-900/50',
           confirmText: t.roleAdminFullConfirm,
         },
         {
           role: 'admin_readonly',
           label: t.roleAdminReadonly,
           icon: Eye,
-          className: 'bg-slate-50 text-slate-700 hover:bg-slate-100',
+          className: 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800',
           confirmText: t.roleAdminReadonlyConfirm,
         },
         {
           role: 'user',
           label: t.roleRemove,
           icon: ShieldOff,
-          className: 'bg-blue-50 text-blue-700 hover:bg-blue-100',
+          className: 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/45 dark:text-blue-300 dark:hover:bg-blue-900/50',
           confirmText: t.roleRemoveConfirm,
         }
       );
@@ -335,15 +335,15 @@ export default function AdminUsers() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark">{ui.admin.users.pageTitle}</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{ui.admin.users.pageTitle}</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
           {users.length} {ui.nav.users.toLowerCase()} {t.total} &middot; {activeCount} {t.active} &middot; {adminCount} {t.privileged}
         </p>
       </div>
       </div>
 
       {!canEditUsers && (
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <div className="mb-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
           {t.readOnly}
         </div>
       )}
@@ -360,7 +360,7 @@ export default function AdminUsers() {
       )}
 
       {/* Filters */}
-      <div className="mb-8 rounded-2xl border border-gray-100 bg-white p-4">
+      <div className="mb-8 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-[200px]">
             <ClearableSearchField
@@ -368,12 +368,13 @@ export default function AdminUsers() {
               onChange={setSearch}
               placeholder={ui.admin.users.searchPlaceholder}
               clearLabel={ui.common.clearSearch}
+              tabIndex={1}
             />
           </div>
           <select
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
-            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent"
+            className="px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="all">{t.allRoles}</option>
             <option value="owner">{u.ownerBadge}</option>
@@ -384,7 +385,7 @@ export default function AdminUsers() {
           <select
             value={filterActive}
             onChange={(e) => setFilterActive(e.target.value)}
-            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent"
+            className="px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="all">{t.allStatuses}</option>
             <option value="active">{t.activeOnly}</option>
@@ -396,11 +397,11 @@ export default function AdminUsers() {
       {loading ? (
         <div className="animate-pulse space-y-3">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-16 bg-white rounded-xl border border-gray-100" />
+            <div key={i} className="h-16 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
+        <div className="text-center py-16 text-gray-400 dark:text-gray-500">
           <Users className="w-12 h-12 mx-auto mb-3 opacity-40" />
           <p className="text-lg font-medium">{t.noUsersFound}</p>
           {search && <p className="text-sm mt-1">{ui.admin.users.noUsersFoundHelp}</p>}
@@ -408,18 +409,18 @@ export default function AdminUsers() {
       ) : (
         <div className="space-y-2">
           {filtered.map((user) => (
-            <div key={user.id} className={`bg-white rounded-2xl border overflow-hidden transition-colors ${
-              user.is_active ? 'border-gray-100' : 'border-red-100 bg-red-50/30'
+            <div key={user.id} className={`bg-white dark:bg-gray-900 rounded-2xl border overflow-hidden transition-colors ${
+              user.is_active ? 'border-gray-100 dark:border-gray-800' : 'border-red-100 dark:border-red-900/50 bg-red-50/30 dark:bg-red-950/25'
             }`}>
               {/* User row */}
               <div
-                className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50/50"
+                className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50/90 dark:hover:bg-gray-800/50 transition-colors"
                 onClick={() => toggleExpand(user.id)}
               >
                 <div className="flex items-center gap-3">
                   {expandedUser === user.id
-                    ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                    : <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+                    ? <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                    : <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />}
                   <UserAvatar
                     userId={user.id}
                     displayName={user.display_name}
@@ -430,14 +431,14 @@ export default function AdminUsers() {
                   />
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className={`font-semibold text-sm ${user.is_active ? 'text-dark' : 'text-gray-400 line-through'}`}>
+                      <span className={`font-semibold text-sm ${user.is_active ? 'text-dark dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 line-through'}`}>
                         {user.display_name || user.email}
                       </span>
                       <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium ${roleBadgeClass(user.role)}`}>
                         {roleBadgeContent(user.role)}
                       </span>
                       {isComposeLockedAdmin(user) && (
-                        <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">{u.composeBadge}</span>
+                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded font-medium">{u.composeBadge}</span>
                       )}
                       {!user.last_login && (
                         <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5">
@@ -448,14 +449,14 @@ export default function AdminUsers() {
                         <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">{t.inactive}</span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user.email}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400 hidden sm:block">
+                  <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">
                     {user.group_count} {t.groups}
                   </span>
-                  <span className="text-xs text-gray-400 hidden md:block">
+                  <span className="text-xs text-gray-400 dark:text-gray-500 hidden md:block">
                     {t.lastLogin}: {formatDate(user.last_login)}
                   </span>
                 </div>
@@ -463,55 +464,55 @@ export default function AdminUsers() {
 
               {/* Expanded detail */}
               {expandedUser === user.id && (
-                <div className="border-t border-gray-100 px-5 py-5">
+                <div className="border-t border-gray-100 dark:border-gray-800 px-5 py-5">
                   {detailLoading ? (
                     <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-dark rounded-full" />
+                      <div className="animate-spin w-6 h-6 border-2 border-gray-300 dark:border-gray-600 border-t-dark rounded-full" />
                     </div>
                   ) : userDetail ? (
                     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.3fr)_minmax(0,0.88fr)] gap-6 lg:min-h-[460px]">
                       {/* Info */}
                       <div>
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{t.info}</h3>
+                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">{t.info}</h3>
                         <dl className="space-y-2 text-sm">
                           <div>
-                            <dt className="text-gray-400">{u.emailLabel}</dt>
-                            <dd className="text-dark font-medium">{userDetail.user.email}</dd>
+                            <dt className="text-gray-400 dark:text-gray-500">{u.emailLabel}</dt>
+                            <dd className="text-dark dark:text-gray-100 font-medium">{userDetail.user.email}</dd>
                           </div>
                           <div>
-                            <dt className="text-gray-400">{t.role}</dt>
-                            <dd className="inline-flex items-center gap-1 text-dark font-medium">
+                            <dt className="text-gray-400 dark:text-gray-500">{t.role}</dt>
+                            <dd className="inline-flex items-center gap-1 text-dark dark:text-gray-100 font-medium">
                               {roleBadgeContent(userDetail.user.role)}
                             </dd>
                           </div>
                           <div>
-                          <dt className="text-gray-400">{t.status}</dt>
+                          <dt className="text-gray-400 dark:text-gray-500">{t.status}</dt>
                           <dd className={userDetail.user.is_active ? 'text-accent-dark font-medium' : 'text-red-500 font-medium'}>
                               {userDetail.user.is_active ? t.active : t.inactive}
                           </dd>
                         </div>
                         <div>
-                            <dt className="text-gray-400">{t.registered}</dt>
-                            <dd className="text-dark">{formatDate(userDetail.user.created_at)}</dd>
+                            <dt className="text-gray-400 dark:text-gray-500">{t.registered}</dt>
+                            <dd className="text-dark dark:text-gray-100">{formatDate(userDetail.user.created_at)}</dd>
                         </div>
                         <div>
-                            <dt className="text-gray-400">{t.lastLogin}</dt>
-                            <dd className="text-dark">{formatDate(userDetail.user.last_login)}</dd>
+                            <dt className="text-gray-400 dark:text-gray-500">{t.lastLogin}</dt>
+                            <dd className="text-dark dark:text-gray-100">{formatDate(userDetail.user.last_login)}</dd>
                         </div>
                           <div>
-                            <dt className="text-gray-400">{t.visibleApps}</dt>
+                            <dt className="text-gray-400 dark:text-gray-500">{t.visibleApps}</dt>
                             <dd>
                               {userDetail.visibleAppCount > 0 ? (
                                 <button
                                   type="button"
                                   onClick={() => setShowVisibleApps(true)}
-                                  className="inline-flex items-center gap-1 text-dark font-medium hover:text-accent-dark hover:underline"
+                                  className="inline-flex items-center gap-1 text-dark dark:text-gray-100 font-medium hover:text-accent-dark hover:underline"
                                 >
                                   {userDetail.visibleAppCount}
-                                  <Info className="w-3.5 h-3.5 text-gray-400" />
+                                  <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
                                 </button>
                               ) : (
-                                <span className="text-dark font-medium">0</span>
+                                <span className="text-dark dark:text-gray-100 font-medium">0</span>
                               )}
                             </dd>
                           </div>
@@ -520,28 +521,28 @@ export default function AdminUsers() {
 
                       {/* Groups */}
                       <div>
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
                           {t.frontdoorGroups} ({userDetail.groups.length})
                         </h3>
 
                         <div className="space-y-5 h-full overflow-y-auto pr-1 lg:max-h-[390px]">
                           <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
                               {t.localGroups} ({localGroups.length})
                             </p>
                             <p className="mb-2 text-xs text-sky-600">
                               {t.localGroupsInfo}
                             </p>
                             {localGroups.length === 0 ? (
-                            <p className="text-sm text-gray-300 italic">{t.noLocalGroups}</p>
+                            <p className="text-sm text-gray-300 dark:text-gray-600 italic">{t.noLocalGroups}</p>
                             ) : (
                               <div className="space-y-1.5">
                                 {localGroups.map((g) => (
                                   <div key={g.id} className="flex items-center gap-2 py-1">
-                                    <Users className="w-3.5 h-3.5 text-gray-400" />
-                                    <span className="text-sm text-dark">{g.name}</span>
+                                    <Users className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                                    <span className="text-sm text-dark dark:text-gray-100">{g.name}</span>
                                     {g.description && (
-                                      <span className="text-xs text-gray-400 truncate max-w-[150px]">{g.description}</span>
+                                      <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[150px]">{g.description}</span>
                                     )}
                                   </div>
                                 ))}
@@ -550,23 +551,23 @@ export default function AdminUsers() {
                           </div>
 
                           <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
                               {t.importedEntraGroups} ({entraGroups.length})
                             </p>
                             <p className="mb-2 text-xs text-sky-600">{t.entraGroupsInfo}</p>
                             {entraGroups.length === 0 ? (
-                              <p className="text-sm text-gray-300 italic">{t.noImportedEntraGroups}</p>
+                              <p className="text-sm text-gray-300 dark:text-gray-600 italic">{t.noImportedEntraGroups}</p>
                             ) : (
                               <div className="space-y-1.5">
                                 {entraGroups.map((g) => (
                                   <div key={g.id} className="flex items-center gap-2 py-1">
-                                    <Users className="w-3.5 h-3.5 text-gray-400" />
-                                    <span className="text-sm text-dark">{groupLabel(g)}</span>
+                                    <Users className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                                    <span className="text-sm text-dark dark:text-gray-100">{groupLabel(g)}</span>
                                     <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">
                                       {u.entraBadge}
                                     </span>
                                     {g.description && (
-                                      <span className="text-xs text-gray-400 truncate max-w-[150px]">{g.description}</span>
+                                      <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[150px]">{g.description}</span>
                                     )}
                                   </div>
                                 ))}
@@ -577,14 +578,14 @@ export default function AdminUsers() {
                       </div>
 
                       <div>
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
                           {t.detectedEntraGroups} ({detectedEntraGroups.length})
                         </h3>
                         <p className="mb-2 text-xs text-sky-600">
                           {t.detectedGroupsInfo}
                         </p>
                         {detectedEntraGroups.length === 0 ? (
-                          <p className="text-sm text-gray-300 italic">{t.noDetectedEntraGroups}</p>
+                          <p className="text-sm text-gray-300 dark:text-gray-600 italic">{t.noDetectedEntraGroups}</p>
                         ) : (
                           <div className="space-y-1.5 h-full overflow-y-auto pr-1 lg:max-h-[390px]">
                             {detectedEntraGroups.map((group) => (
@@ -605,8 +606,8 @@ export default function AdminUsers() {
                                   group.is_imported ? 'cursor-default opacity-80' : 'rounded-lg px-2 -mx-2 hover:bg-sky-50 transition-colors'
                                 }`}
                               >
-                                <Users className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                <span className="text-sm text-dark">{group.display_name}</span>
+                                <Users className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" />
+                                <span className="text-sm text-dark dark:text-gray-100">{group.display_name}</span>
                                 {group.is_imported ? (
                                   <span className="text-[10px] bg-accent/10 text-accent-dark px-1.5 py-0.5 rounded font-medium">
                                     {u.importedBadge}
@@ -624,10 +625,10 @@ export default function AdminUsers() {
 
                       {/* Actions */}
                       <div>
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{t.actions}</h3>
+                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">{t.actions}</h3>
                         <div className="space-y-2 lg:sticky lg:top-4">
                           {!canEditUsers && (
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
                               {u.readOnlyUsersMessage}
                             </div>
                           )}
@@ -651,10 +652,10 @@ export default function AdminUsers() {
                             disabled={!canEditUsers || isComposeLockedAdmin(user)}
                             className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                               !canEditUsers || isComposeLockedAdmin(user)
-                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                                 : user.is_active
-                                  ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                                  : 'bg-accent/10 text-accent-dark hover:bg-accent/20'
+                                  ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/45'
+                                  : 'bg-accent/10 text-accent-dark hover:bg-accent/20 dark:bg-accent-dark/25 dark:text-gray-100 dark:hover:bg-accent-dark/35'
                             }`}
                           >
                             {!canEditUsers || isComposeLockedAdmin(user) ? (
@@ -665,19 +666,19 @@ export default function AdminUsers() {
                               <><UserCheck className="w-4 h-4" /> {u.reactivateUser}</>
                             )}
                           </button>
-                          <div className="border-t border-gray-100 pt-2 mt-1">
+                          <div className="border-t border-gray-100 dark:border-gray-800 pt-2 mt-1">
                             <button
                               onClick={!canEditUsers || isComposeLockedAdmin(user) ? undefined : () => deleteUser(user)}
                               disabled={!canEditUsers || isComposeLockedAdmin(user)}
                               className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                                 !canEditUsers || isComposeLockedAdmin(user)
-                                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                  : 'bg-red-50 text-red-700 hover:bg-red-200'
+                                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                                  : 'bg-red-50 text-red-700 hover:bg-red-200 dark:bg-red-950/45 dark:text-red-300 dark:hover:bg-red-900/55'
                               }`}
                             >
                               <Trash2 className="w-4 h-4" /> {!canEditUsers || isComposeLockedAdmin(user) ? u.deleteBlocked : u.deleteUser}
                             </button>
-                            <p className="text-[11px] text-gray-400 mt-1 px-1">{u.removeUserSummary}</p>
+                            <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 px-1">{u.removeUserSummary}</p>
                             {isComposeLockedAdmin(user) && (
                               <p className="text-[11px] text-slate-400 mt-2 px-1">{u.composeWarning}</p>
                             )}
@@ -695,19 +696,19 @@ export default function AdminUsers() {
 
       {showVisibleApps && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setShowVisibleApps(false)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-bold text-dark">{t.visibleApps}</h2>
-                <p className="text-sm text-gray-500 mt-1">{visibleApps.length} {t.appVisibleCount}</p>
+                <h2 className="text-lg font-bold text-dark dark:text-gray-100">{t.visibleApps}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{visibleApps.length} {t.appVisibleCount}</p>
               </div>
-              <button onClick={() => setShowVisibleApps(false)} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100">
+              <button onClick={() => setShowVisibleApps(false)} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {visibleApps.length === 0 ? (
-              <div className="text-center py-10 text-gray-400">
+              <div className="text-center py-10 text-gray-400 dark:text-gray-500">
                 <Users className="w-10 h-10 mx-auto mb-2 opacity-40" />
                 <p className="text-sm font-medium">{t.noVisibleApps}</p>
               </div>
@@ -721,17 +722,17 @@ export default function AdminUsers() {
                       setShowVisibleApps(false);
                       navigate(`/admin?edit=${encodeURIComponent(app.slug)}`);
                     }}
-                    className="w-full flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left hover:border-accent hover:bg-accent/5 transition-colors"
+                    className="w-full flex items-center gap-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-left hover:border-accent hover:bg-accent/5 transition-colors"
                   >
                     <AppIcon app={app} className="w-8 h-8" textClassName="text-xl" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-dark truncate">{app.name}</span>
+                        <span className="text-sm font-medium text-dark dark:text-gray-100 truncate">{app.name}</span>
                         <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${appModeBadgeClass(app.mode)}`}>
                           {appModeLabel(app.mode)}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-400 truncate">{app.description}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{app.description}</p>
                     </div>
                   </button>
                 ))}

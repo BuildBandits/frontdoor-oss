@@ -4,6 +4,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { DEFAULT_LANGUAGE, isSupportedLanguage } from '../../shared/languages.js';
+import { DEFAULT_COLOR_SCHEME, normalizeColorScheme } from '../../shared/colorSchemes.js';
 import { archiveMediaAsset } from './mediaAssets.js';
 import { applySvgSafeHeaders, isSvgContentType, sanitizeSvgBuffer } from './svgSanitize.js';
 import { UserFacingError } from './errors.js';
@@ -22,6 +23,8 @@ const DEFAULT_BRANDING = {
   defaultHomeDesktopView: 'cards',
   defaultCompactView: false,
   defaultLanguage: DEFAULT_LANGUAGE,
+  defaultColorScheme: DEFAULT_COLOR_SCHEME,
+  enableDarkModeBeta: false,
   useEuropeanDateFormat: false,
   use24hTimeFormat: false,
   logRetentionDays: 90,
@@ -72,6 +75,8 @@ function toPublicBranding(row) {
     defaultHomeDesktopView: row?.default_home_desktop_view === 'compact' ? 'compact' : 'cards',
     defaultCompactView: row?.default_compact_view !== 0,
     defaultLanguage: normalizeLanguage(row?.default_language || DEFAULT_BRANDING.defaultLanguage),
+    defaultColorScheme: normalizeColorScheme(row?.default_color_scheme || DEFAULT_BRANDING.defaultColorScheme),
+    enableDarkModeBeta: row?.enable_dark_mode_beta === 1,
     useEuropeanDateFormat: row?.use_european_date_format === 1,
     use24hTimeFormat: row?.use_24h_time_format === 1,
     logRetentionDays: normalizeRetentionDays(row?.log_retention_days, DEFAULT_BRANDING.logRetentionDays),
@@ -96,6 +101,8 @@ function buildBrandingAuditDetails(currentRow, nextBranding, input = {}) {
     'defaultHomeDesktopView',
     'defaultCompactView',
     'defaultLanguage',
+    'defaultColorScheme',
+    'enableDarkModeBeta',
     'useEuropeanDateFormat',
     'use24hTimeFormat',
     'logRetentionDays',
@@ -210,6 +217,12 @@ export async function updateBrandingSettings(input = {}) {
   const defaultLanguage = input.defaultLanguage === undefined
     ? normalizeLanguage(current?.default_language || DEFAULT_BRANDING.defaultLanguage)
     : normalizeLanguage(input.defaultLanguage);
+  const defaultColorScheme = input.defaultColorScheme === undefined
+    ? normalizeColorScheme(current?.default_color_scheme || DEFAULT_BRANDING.defaultColorScheme)
+    : normalizeColorScheme(input.defaultColorScheme);
+  const enableDarkModeBeta = input.enableDarkModeBeta === undefined
+    ? (current?.enable_dark_mode_beta ?? 0)
+    : (input.enableDarkModeBeta ? 1 : 0);
   const useEuropeanDateFormat = input.useEuropeanDateFormat === undefined
     ? (current?.use_european_date_format ?? 0)
     : (input.useEuropeanDateFormat ? 1 : 0);
@@ -246,9 +259,9 @@ export async function updateBrandingSettings(input = {}) {
 
   db.prepare(`
     INSERT INTO branding_settings (
-      id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type, updated_at
+      id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, default_color_scheme, enable_dark_mode_beta, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       hero_title_line1 = excluded.hero_title_line1,
       hero_title_line2 = excluded.hero_title_line2,
@@ -259,6 +272,8 @@ export async function updateBrandingSettings(input = {}) {
       default_home_desktop_view = excluded.default_home_desktop_view,
       default_compact_view = excluded.default_compact_view,
       default_language = excluded.default_language,
+      default_color_scheme = excluded.default_color_scheme,
+      enable_dark_mode_beta = excluded.enable_dark_mode_beta,
       use_european_date_format = excluded.use_european_date_format,
       use_24h_time_format = excluded.use_24h_time_format,
       log_retention_days = excluded.log_retention_days,
@@ -280,6 +295,8 @@ export async function updateBrandingSettings(input = {}) {
     defaultHomeDesktopView,
     defaultCompactView,
     defaultLanguage,
+    defaultColorScheme,
+    enableDarkModeBeta,
     useEuropeanDateFormat,
     use24hTimeFormat,
     logRetentionDays,

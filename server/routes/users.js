@@ -166,7 +166,7 @@ router.put('/:id/role', authenticate, isAdminEditor, (req, res) => {
 
   db.prepare('UPDATE users SET role = ?, updated_at = datetime(\'now\') WHERE id = ?').run(normalizedRole, id);
   logRbacAudit(req.user.id, 'update', 'role', id, { email: user.email, from: user.role, to: normalizedRole });
-  res.json({ message: 'Role updated' });
+  res.json({ role: normalizedRole });
 });
 
 // Activate/deactivate user (editor roles only)
@@ -201,7 +201,7 @@ router.put('/:id/active', authenticate, isAdminEditor, (req, res) => {
 
   db.prepare('UPDATE users SET is_active = ?, updated_at = datetime(\'now\') WHERE id = ?').run(activeValue, id);
   logRbacAudit(req.user.id, activeValue ? 'activate' : 'deactivate', 'user_status', id, { email: user.email, role: user.role });
-  res.json({ message: is_active ? 'User activated' : 'User deactivated' });
+  res.json({ is_active: activeValue });
 });
 
 // Delete user permanently (editor roles only) — cascades membership and access logs
@@ -236,7 +236,7 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   deleteAll();
   logRbacAudit(req.user.id, 'delete', 'user_status', id, { email: user.email, role: user.role });
 
-  res.json({ message: 'User deleted' });
+  res.json({ deleted: true });
 });
 
 export default router;

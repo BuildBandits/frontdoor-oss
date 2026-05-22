@@ -256,8 +256,8 @@ export default function AdminBackup() {
     <div className="pb-24">
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="mt-3 text-2xl font-extrabold text-dark">{copy.pageTitle}</h1>
-          <p className="mt-1 max-w-3xl text-gray-500">{copy.subtitle}</p>
+          <h1 className="mt-3 text-2xl font-extrabold text-dark dark:text-gray-100">{copy.pageTitle}</h1>
+          <p className="mt-1 max-w-3xl text-gray-500 dark:text-gray-400">{copy.subtitle}</p>
         </div>
       </div>
 
@@ -292,27 +292,27 @@ export default function AdminBackup() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
-        <section className="flex h-full flex-col rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+        <section className="flex h-full flex-col rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white">
               <Download className="h-5 w-5" />
             </div>
             <div className="flex-1">
-              <h2 className="text-lg font-bold text-dark">{copy.exportTitle}</h2>
-              <p className="mt-1 text-sm text-gray-500">{copy.exportHelp}</p>
+              <h2 className="text-lg font-bold text-dark dark:text-gray-100">{copy.exportTitle}</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{copy.exportHelp}</p>
             </div>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-dark">{copy.includesTitle}</p>
-            <ul className="mt-3 space-y-2 text-sm text-gray-600">
+          <div className="mt-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-4">
+            <p className="text-sm font-semibold text-dark dark:text-gray-100">{copy.includesTitle}</p>
+            <ul className="mt-3 space-y-2 text-sm text-gray-600 dark:text-gray-300">
               {backupSnapshotSteps.map((item) => {
                 const isCompleted = completedStages.includes(item.stage);
                 const isActive = downloadBusy && downloadStage === item.stage && !isCompleted;
 
                 return (
-                  <li key={item.stage} className={`flex items-start gap-2 ${isCompleted ? 'text-gray-700' : 'text-gray-400'}`}>
-                    <CheckCircle2 className={`mt-0.5 h-4 w-4 shrink-0 transition-colors ${isCompleted ? 'text-emerald-600' : isActive ? 'text-amber-400' : 'text-gray-300'}`} />
+                  <li key={item.stage} className={`flex items-start gap-2 ${isCompleted ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}>
+                    <CheckCircle2 className={`mt-0.5 h-4 w-4 shrink-0 transition-colors ${isCompleted ? 'text-emerald-600' : isActive ? 'text-amber-400' : 'text-gray-300 dark:text-gray-600'}`} />
                     <span>{item.label}</span>
                   </li>
                 );
@@ -322,11 +322,11 @@ export default function AdminBackup() {
 
           {(downloadBusy || downloadProgress > 0) && (
             <div className="mt-6 space-y-2">
-              <div className="flex items-center justify-between gap-3 text-xs font-medium text-gray-500">
+              <div className="flex items-center justify-between gap-3 text-xs font-medium text-gray-500 dark:text-gray-400">
                 <span>{backupSnapshotSteps.find((item) => item.stage === downloadStage)?.label || copy.exportBusy}</span>
                 <span>{downloadProgress >= 100 ? '100%' : `${downloadProgress}%`}</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-gray-200" aria-hidden="true">
+              <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700" aria-hidden="true">
                 <div
                   className="h-full rounded-full bg-slate-900 transition-all duration-200 ease-out"
                   style={{ width: `${downloadProgress}%` }}
@@ -346,14 +346,14 @@ export default function AdminBackup() {
           </button>
         </section>
 
-        <section className="flex h-full flex-col rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+        <section className="flex h-full flex-col rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500 text-white">
               <Upload className="h-5 w-5" />
             </div>
             <div className="flex-1">
-              <h2 className="text-lg font-bold text-dark">{copy.restoreTitle}</h2>
-              <p className="mt-1 text-sm text-gray-500">{copy.restoreHelp}</p>
+              <h2 className="text-lg font-bold text-dark dark:text-gray-100">{copy.restoreTitle}</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{copy.restoreHelp}</p>
             </div>
           </div>
 
@@ -362,25 +362,25 @@ export default function AdminBackup() {
           </div>
 
           <div className="mt-6 space-y-3">
-            <label className="block text-sm font-medium text-gray-700">{copy.restoreSelectLabel}</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">{copy.restoreSelectLabel}</label>
             <input
               ref={fileInputRef}
               type="file"
               accept=".json.gz,application/gzip,application/x-gzip"
               onChange={handleRestoreFile}
-              className="block w-full cursor-pointer rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:bg-gray-100"
+              className="block w-full cursor-pointer rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm text-gray-600 dark:text-gray-300 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
             />
-            <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+            <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
               {selectedFile ? (
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-dark">{selectedFile.name}</p>
-                    <p className="text-xs text-gray-500">{formatBytes(selectedFile.size)}</p>
+                    <p className="truncate font-medium text-dark dark:text-gray-100">{selectedFile.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{formatBytes(selectedFile.size)}</p>
                   </div>
                   <button
                     type="button"
                     onClick={clearSelectedFile}
-                    className="text-sm font-medium text-slate-700 hover:text-slate-900"
+                    className="text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900"
                   >
                     {copy.clearFile}
                   </button>

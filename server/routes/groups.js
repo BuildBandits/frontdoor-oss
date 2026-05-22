@@ -95,15 +95,10 @@ router.post('/entra/import', authenticate, isAdminEditor, (req, res) => {
       importedGroups: result.importedGroups,
       skippedGroups: result.skippedGroups,
     });
-    res.json({
-      message: result.importedGroups === 1
-        ? '1 Entra group imported'
-        : `${result.importedGroups} Entra groups imported`,
-      ...result,
-    });
+    res.json(result);
   } catch (error) {
     console.error('Entra import failed:', error.message);
-    respondWithError(res, error, { status: 500, message: 'Failed to import Entra groups' });
+    respondWithError(res, error, { status: 500, code: 'failed_to_import_entra_groups' });
   }
 });
 
@@ -116,13 +111,10 @@ router.post('/entra/force-sync', authenticate, isAdminEditor, async (req, res) =
       discoveredGroups: result.discoveredGroups,
       errors: result.errors,
     });
-    res.json({
-      message: `Synced ${result.usersSynced} users from Microsoft Entra`,
-      ...result,
-    });
+    res.json(result);
   } catch (error) {
     console.error('Entra force-sync failed:', error.message);
-    respondWithError(res, error, { status: 500, message: 'Failed to sync Entra users' });
+    respondWithError(res, error, { status: 500, code: 'failed_to_sync_entra_users' });
   }
 });
 
@@ -279,7 +271,7 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   deleteAll();
   logRbacAudit(req.user.id, 'delete', 'group', req.params.id, { name: group.name });
 
-  res.json({ message: 'Group deleted' });
+  res.json({ deleted: true });
 });
 
 // Link child groups to a parent group
@@ -417,7 +409,7 @@ router.delete('/:id/groups/:childGroupId', authenticate, isAdminEditor, (req, re
 
   if (result.changes === 0) return res.status(404).json({ error: 'Linked group not found' });
   logRbacAudit(req.user.id, 'remove_linked_group', 'group', req.params.id, { childGroupId: req.params.childGroupId });
-  res.json({ message: 'Linked group removed' });
+  res.json({ removed: true });
 });
 
 router.delete('/:id/entra-groups/:entraGroupId', authenticate, isAdminEditor, (req, res) => {
@@ -434,7 +426,7 @@ router.delete('/:id/entra-groups/:entraGroupId', authenticate, isAdminEditor, (r
 
   if (result.changes === 0) return res.status(404).json({ error: 'Linked Entra group not found' });
   logRbacAudit(req.user.id, 'remove_linked_entra_group', 'group', req.params.id, { entraGroupId: req.params.entraGroupId });
-  res.json({ message: 'Linked Entra group removed' });
+  res.json({ removed: true });
 });
 
 // --- Membership ---
@@ -502,7 +494,7 @@ router.delete('/:id/members/:userId', authenticate, isAdminEditor, (req, res) =>
 
   if (result.changes === 0) return res.status(404).json({ error: 'Membership not found' });
   logRbacAudit(req.user.id, 'remove_member', 'membership', req.params.id, { userId: req.params.userId });
-  res.json({ message: 'Member removed' });
+  res.json({ removed: true });
 });
 
 // --- App permissions ---
@@ -536,7 +528,7 @@ router.post('/:id/apps', authenticate, isAdminEditor, (req, res) => {
   const added = addAll();
   if (added > 0) logRbacAudit(req.user.id, 'add_apps', 'permission', req.params.id, { appIds, added });
 
-  res.json({ message: `${added} app permissions added` });
+  res.json({ added });
 });
 
 // Remove app from group
@@ -549,7 +541,7 @@ router.delete('/:id/apps/:appId', authenticate, isAdminEditor, (req, res) => {
 
   if (result.changes === 0) return res.status(404).json({ error: 'Permission not found' });
   logRbacAudit(req.user.id, 'remove_app', 'permission', req.params.id, { appId: req.params.appId });
-  res.json({ message: 'App permission removed' });
+  res.json({ removed: true });
 });
 
 // Copy or move all app permissions from one group to another

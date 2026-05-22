@@ -519,7 +519,10 @@ export default function Admin() {
         try {
           const res = await api.post('/apps/restore-defaults');
           loadApps();
-          pushNotice('success', `${res.data.message}. ${a.restoreDemoSummary.replace('{created}', res.data.created).replace('{updated}', res.data.updated)}`);
+          pushNotice(
+            'success',
+            `${a.restoreDemoSuccess}. ${a.restoreDemoSummary.replace('{created}', res.data.created).replace('{updated}', res.data.updated)}`
+          );
         } catch (err) {
           pushNotice('error', err.response?.data?.error || t.errorSaving);
         } finally {
@@ -565,13 +568,13 @@ export default function Admin() {
   };
   const modeOptions = [
     { value: 'redirect-plain', label: a.externalLink, active: 'bg-dark text-white border-dark', alwaysVisible: true },
-    { value: 'shared-cookie', label: a.sharedCookie, active: 'bg-accent text-dark border-accent', visible: modeVisibility.showSharedCookieMode !== false },
+    { value: 'shared-cookie', label: a.sharedCookie, active: 'bg-accent text-dark dark:text-gray-100 border-accent', visible: modeVisibility.showSharedCookieMode !== false },
     { value: 'redirect', label: a.redirectSso, active: 'bg-blue-600 text-white border-blue-600', visible: modeVisibility.showRedirectSsoMode !== false },
     { value: 'entra-app', label: a.entraApp, active: 'bg-violet-600 text-white border-violet-600', visible: modeVisibility.showEntraAppMode !== false },
   ];
   const visibleModeOptions = modeOptions.filter((opt) => opt.alwaysVisible || opt.visible);
   const visibleModeFilterOptions = [
-    { value: 'all', label: a.allConnections, active: 'bg-gray-900 text-white border-gray-900' },
+    { value: 'all', label: a.allConnections, active: 'bg-gray-900 dark:bg-gray-100 text-white border-gray-900' },
     ...visibleModeOptions,
   ];
   const currentModeFilterOption = visibleModeFilterOptions.find((opt) => opt.value === appModeFilter) || visibleModeFilterOptions[0];
@@ -720,7 +723,9 @@ export default function Admin() {
       closeGroupAssignmentModal();
       pushNotice(
         'success',
-        res.data?.message || a.assignedToGroups.replace('{name}', pendingGroupAssignApp.name).replace('{count}', groupAssignSelection.length)
+        a.assignedToGroups
+          .replace('{name}', pendingGroupAssignApp.name)
+          .replace('{count}', String(res.data?.added ?? groupAssignSelection.length))
       );
     } catch (err) {
       pushNotice('error', err.response?.data?.error || a.groupAssignmentError);
@@ -733,8 +738,8 @@ export default function Admin() {
     <div>
       <div className="flex items-center justify-between gap-4 mb-4 max-sm:flex-col max-sm:items-stretch max-sm:gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark">{ui.admin.apps.pageTitle}</h1>
-          <p className="text-gray-500 mt-1">{ui.admin.apps.subtitle}</p>
+          <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{ui.admin.apps.pageTitle}</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">{ui.admin.apps.subtitle}</p>
         </div>
         <button
           onClick={openNew}
@@ -747,7 +752,7 @@ export default function Admin() {
       </div>
 
       {!canEdit && (
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <div className="mb-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
           {ui.admin.apps.readOnly}
         </div>
       )}
@@ -763,7 +768,7 @@ export default function Admin() {
         </div>
       )}
 
-      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-4">
+      <div className="mb-6 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-[220px]">
             <ClearableSearchField
@@ -771,22 +776,23 @@ export default function Admin() {
               onChange={setAppSearch}
               placeholder={ui.admin.apps.searchPlaceholder}
               clearLabel={ui.common.clearSearch}
+              tabIndex={1}
             />
           </div>
           <div className="relative" ref={modeFilterRef}>
             <button
               type="button"
               onClick={() => setModeFilterOpen((prev) => !prev)}
-              className="relative inline-flex min-w-[220px] items-center w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm text-left text-gray-600 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent"
+              className="relative inline-flex min-w-[220px] items-center w-full pl-10 pr-10 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-left text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900"
             >
-              <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
               <span className="truncate">{currentModeFilterOption.label}</span>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
             </button>
 
             {modeFilterOpen && (
-              <div className="absolute right-0 z-20 mt-2 min-w-[260px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
-                <div className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 border-b border-gray-100">
+              <div className="absolute right-0 z-20 mt-2 min-w-[260px] overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
+                <div className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-800">
                   {ui.admin.apps.modeFilter}
                 </div>
                 <div className="py-1">
@@ -801,12 +807,12 @@ export default function Admin() {
                           setModeFilterOpen(false);
                         }}
                         className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                          selected ? 'bg-gray-50 text-dark' : 'text-gray-600 hover:bg-gray-50'
+                          selected ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                         }`}
                       >
                         <span
                           className={`flex h-4 w-4 items-center justify-center rounded border ${
-                            selected ? 'border-dark bg-dark text-white' : 'border-gray-300 bg-white text-transparent'
+                            selected ? 'border-dark bg-dark text-white' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-transparent'
                           }`}
                           aria-hidden="true"
                         >
@@ -824,21 +830,21 @@ export default function Admin() {
             <button
               type="button"
               onClick={() => setShowOnlyUnlabeledApps((prev) => !prev)}
-              className={`inline-flex min-w-[220px] items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent ${
+              className={`inline-flex min-w-[220px] items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-amber-700 dark:focus-visible:ring-offset-gray-900 ${
                 showOnlyUnlabeledApps
-                  ? 'border-amber-300 bg-amber-100 text-amber-900'
-                  : 'border-amber-200 bg-white text-amber-900 hover:bg-amber-50'
+                  ? 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-600 dark:bg-amber-950/55 dark:text-amber-200'
+                  : 'border-amber-200 bg-white dark:border-amber-800/70 dark:bg-gray-900 text-amber-900 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/35'
               }`}
             >
               <span className="inline-flex items-center gap-2">
                 <span>{showOnlyUnlabeledApps ? a.showAllApps : a.showOnlyUnlabeled}</span>
-                <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-semibold text-amber-900 dark:bg-amber-800/85 dark:text-amber-100">
                   {unlabeledApps.length}
                 </span>
               </span>
             </button>
           )}
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-400 dark:text-gray-500">
             {filteredApps.length} {ui.nav.apps.toLowerCase()} {t.of} {apps.length}
           </div>
         </div>
@@ -859,7 +865,7 @@ export default function Admin() {
                   key={app.id}
                   type="button"
                   onClick={() => openEdit(app)}
-                  className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100"
+                  className="inline-flex items-center gap-2 rounded-full border border-amber-200 dark:border-amber-800/70 bg-white dark:bg-gray-900 px-2.5 py-1 text-xs font-medium text-amber-900 dark:text-amber-200 transition-colors hover:bg-amber-100 dark:hover:bg-amber-950/45"
                   title={a.unassignedAppOpen}
                 >
                   <AppIcon app={app} className="h-4 w-4" textClassName="text-[10px]" />
@@ -875,59 +881,59 @@ export default function Admin() {
       {loading ? (
         <div className="animate-pulse space-y-3">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-16 bg-white rounded-xl border border-gray-100" />
+            <div key={i} className="h-16 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800" />
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-100">
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    <button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
+              <tr className="border-b border-gray-100 dark:border-gray-800">
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                    <button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark dark:hover:text-white">
                     <span>{ui.nav.apps}</span> {sortIndicator('name')}
                     </button>
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    <button type="button" onClick={() => toggleSort('slug')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                    <button type="button" onClick={() => toggleSort('slug')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark dark:hover:text-white">
                       <span>{a.sortBySlug}</span> {sortIndicator('slug')}
                     </button>
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    <button type="button" onClick={() => toggleSort('target_url')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                    <button type="button" onClick={() => toggleSort('target_url')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark dark:hover:text-white">
                       <span>{a.sortByTargetUrl}</span> {sortIndicator('target_url')}
                     </button>
                   </th>
-                  <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                    <button type="button" onClick={() => toggleSort('mode')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
+                  <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    <button type="button" onClick={() => toggleSort('mode')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark dark:hover:text-white">
                     <span>{ui.admin.common.appMode}</span> {sortIndicator('mode')}
                     </button>
                   </th>
-                  <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    <button type="button" onClick={() => toggleSort('is_active')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark">
+                  <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                    <button type="button" onClick={() => toggleSort('is_active')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark dark:hover:text-white">
                     <span>{ui.admin.common.active}</span> {sortIndicator('is_active')}
                     </button>
                   </th>
-                <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{t.actions}</th>
+                <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{t.actions}</th>
               </tr>
             </thead>
             <tbody>
               {filteredApps.map((app) => (
-                <tr key={app.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                <tr key={app.id} className="border-b border-gray-100 dark:border-gray-800 transition-colors hover:bg-gray-50/90 dark:hover:bg-gray-800/55">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <AppIcon app={app} className="w-8 h-8" textClassName="text-2xl" />
-                      <span className="font-semibold text-dark">{app.name}</span>
+                      <span className="font-semibold text-dark dark:text-gray-100">{app.name}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 font-mono">{app.slug}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500 truncate max-w-[200px]">{app.target_url}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 font-mono">{app.slug}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 truncate max-w-[200px]">{app.target_url}</td>
                   <td className="px-6 py-4 text-center whitespace-nowrap">
                     <span className={`inline-flex items-center text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ${
                       app.mode === 'redirect' ? 'bg-blue-100 text-blue-700'
                         : app.mode === 'shared-cookie' ? 'bg-accent/10 text-accent-dark'
                         : app.mode === 'entra-app' ? 'bg-violet-100 text-violet-700'
-                        : 'bg-gray-100 text-gray-600'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
                     }`}>
                       {app.mode === 'redirect' ? t.redirectSso : app.mode === 'shared-cookie' ? t.sharedCookie : app.mode === 'entra-app' ? t.entraApp : t.link}
                     </span>
@@ -937,12 +943,14 @@ export default function Admin() {
                       onClick={() => handleToggle(app)}
                       disabled={!canEdit}
                       className={`w-10 h-6 rounded-full transition-colors relative inline-flex items-center ${
-                        app.is_active ? 'bg-accent' : 'bg-gray-200'
+                        app.is_active ? 'bg-accent dark:bg-accent-dark' : 'bg-gray-200 dark:bg-gray-700'
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       <span
-                        className={`absolute w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                          app.is_active ? 'translate-x-5' : 'translate-x-1'
+                        className={`absolute w-4 h-4 rounded-full shadow transition-transform ${
+                          app.is_active
+                            ? 'translate-x-5 bg-white'
+                            : 'translate-x-1 bg-white dark:bg-gray-400'
                         }`}
                       />
                     </button>
@@ -952,7 +960,7 @@ export default function Admin() {
                       <button
                         onClick={() => jumpToGroupsForApp(app)}
                         disabled={!canEdit}
-                        className="p-2 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         title={a.goToGroupsSearch}
                       >
                         <Users className="w-4 h-4" />
@@ -960,14 +968,14 @@ export default function Admin() {
                       <button
                         onClick={() => openEdit(app)}
                         disabled={!canEdit}
-                        className="p-2 text-gray-400 hover:text-dark hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(app)}
                         disabled={!canEdit}
-                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -977,11 +985,11 @@ export default function Admin() {
               ))}
             </tbody>
           </table>
-          <div className="flex justify-end px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50/60">
+          <div className="flex justify-end px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-950/50">
             <button
               onClick={handleRestoreDefaults}
               disabled={restoringDefaults || !canEdit}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-gray-200 bg-white text-gray-600 text-xs font-semibold hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 text-xs font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <RotateCcw className={`w-3.5 h-3.5 ${restoringDefaults ? 'animate-spin' : ''}`} />
               {ui.admin.apps.restoreDemoApps}
@@ -993,26 +1001,26 @@ export default function Admin() {
       {/* Modal */}
       {editing !== null && (
         <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 px-4 py-6 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-6xl shadow-xl my-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-6xl shadow-xl my-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-dark">
+              <h2 className="text-xl font-bold text-dark dark:text-gray-100">
                 {editing === 'new' ? ui.admin.apps.newApp : ui.admin.apps.editApp}
               </h2>
-              <button onClick={close} className="p-2 text-gray-400 hover:text-dark rounded-lg hover:bg-gray-100">
+              <button onClick={close} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-4">
-              <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4 space-y-4">
+              <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-950/50 p-4 space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">{a.icon}</label>
-                    <p className="text-xs text-gray-400">
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.icon}</label>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
                       {a.iconHelp}
                     </p>
                   </div>
-                  <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1">
+                  <div className="flex items-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -1023,7 +1031,7 @@ export default function Admin() {
                         setRemoveIconAsset(Boolean(editing && editing !== 'new' && editing.iconUrl));
                       }}
                       className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                        iconMode === 'emoji' ? 'bg-dark text-white' : 'text-gray-500 hover:text-dark'
+                        iconMode === 'emoji' ? 'bg-dark text-white' : 'text-gray-500 dark:text-gray-400 hover:text-dark dark:hover:text-white'
                       }`}
                     >
                       {a.useEmoji}
@@ -1032,7 +1040,7 @@ export default function Admin() {
                       type="button"
                       onClick={() => setIconMode('asset')}
                       className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                        iconMode === 'asset' ? 'bg-dark text-white' : 'text-gray-500 hover:text-dark'
+                        iconMode === 'asset' ? 'bg-dark text-white' : 'text-gray-500 dark:text-gray-400 hover:text-dark dark:hover:text-white'
                       }`}
                     >
                       {a.useImage}
@@ -1042,17 +1050,17 @@ export default function Admin() {
 
                 {iconMode === 'emoji' ? (
                   <div className="grid gap-4 sm:grid-cols-[auto_1fr] items-center">
-                    <div className="w-16 h-16 rounded-2xl border border-gray-200 bg-white flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center justify-center">
                       <AppIcon app={{ icon: form.icon }} className="w-10 h-10" textClassName="text-3xl" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-1">{a.emojiOrSymbol}</label>
+                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.emojiOrSymbol}</label>
                       <input
                         type="text"
                         value={form.icon}
                         onChange={(e) => setForm({ ...form, icon: e.target.value })}
                         placeholder="📦"
-                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
+                        className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                       />
                     </div>
                   </div>
@@ -1075,9 +1083,9 @@ export default function Admin() {
                           iconFileInputRef.current?.click();
                         }
                       }}
-                      className="rounded-2xl border-2 border-dashed border-gray-200 bg-white px-4 py-4 text-center cursor-pointer hover:border-accent transition-colors outline-none min-h-[180px] flex flex-col items-center justify-center gap-3"
+                      className="rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-4 text-center cursor-pointer hover:border-accent transition-colors outline-none min-h-[180px] flex flex-col items-center justify-center gap-3"
                     >
-                      <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center overflow-hidden">
+                      <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center overflow-hidden">
                         {iconAssetPreview ? (
                           <img src={iconAssetPreview} alt={a.uploadedIconPreview} className="w-full h-full object-contain" />
                         ) : (
@@ -1085,8 +1093,8 @@ export default function Admin() {
                         )}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-dark">{a.iconUploadCta}</p>
-                        <p className="text-xs text-gray-400">{a.iconUploadHint}</p>
+                        <p className="text-sm font-medium text-dark dark:text-gray-100">{a.iconUploadCta}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">{a.iconUploadHint}</p>
                       </div>
                     </div>
 
@@ -1100,7 +1108,7 @@ export default function Admin() {
                       />
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1">{a.pasteSvgLabel}</label>
+                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.pasteSvgLabel}</label>
                         <textarea
                           value={iconSvgText}
                           onChange={(e) => {
@@ -1114,12 +1122,12 @@ export default function Admin() {
                           }}
                           placeholder={a.svgPlaceholder}
                           rows={4}
-                          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl font-mono text-xs focus:outline-none focus:ring-2 focus:ring-accent resize-y"
+                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500 resize-y"
                         />
                       </div>
 
                       {iconAssetPreview && (
-                        <div className="flex items-center justify-between gap-3 text-xs text-gray-400">
+                        <div className="flex items-center justify-between gap-3 text-xs text-gray-400 dark:text-gray-500">
                           <span>{a.uploadedIconPreview}</span>
                           <button
                             type="button"
@@ -1135,7 +1143,7 @@ export default function Admin() {
                           </button>
                         </div>
                       )}
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
                         {a.iconPasteHint}
                       </p>
                     </div>
@@ -1144,18 +1152,18 @@ export default function Admin() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">{a.nameLabel}</label>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.nameLabel}</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder={a.nameExample}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">{a.slugLabel}</label>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.slugLabel}</label>
                 <input
                   type="text"
                   value={form.slug}
@@ -1164,52 +1172,52 @@ export default function Admin() {
                     setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') });
                   }}
                   placeholder={a.slugExample}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                 />
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                   {a.slugHelp}
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">{a.descriptionLabel}</label>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.descriptionLabel}</label>
                 <input
                   type="text"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   placeholder={a.descriptionPlaceholder}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">{a.targetUrlLabel}</label>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.targetUrlLabel}</label>
                 <input
                   type="url"
                   value={form.target_url}
                   onChange={(e) => setForm({ ...form, target_url: e.target.value })}
                   placeholder={a.targetUrlExample}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl font-mono text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                 />
               </div>
 
                 {editing === 'new' && (
-                  <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
+                  <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-950/50 p-4">
                     <label className="flex items-start gap-3 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={includeDefaultGroup}
                         onChange={(e) => setIncludeDefaultGroup(e.target.checked)}
-                        className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                        className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                       />
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium text-dark">{a.addToDefaultGroup}</span>
-                          <span className="text-[10px] bg-accent/20 text-dark px-1.5 py-0.5 rounded font-medium">
+                          <span className="text-sm font-medium text-dark dark:text-gray-100">{a.addToDefaultGroup}</span>
+                          <span className="text-[10px] bg-accent/20 text-dark dark:text-gray-100 px-1.5 py-0.5 rounded font-medium">
                             {ui.common.defaultRecommended}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                           {a.defaultGroupIncludedHelp}
                         </p>
                       </div>
@@ -1218,7 +1226,7 @@ export default function Admin() {
                 )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">{a.connection}</label>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.connection}</label>
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                   {visibleModeOptions.map((opt) => (
                     <button
@@ -1226,7 +1234,7 @@ export default function Admin() {
                       type="button"
                       onClick={() => handleModeChange(opt.value)}
                       className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-                        form.mode === opt.value ? opt.active : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                        form.mode === opt.value ? opt.active : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
                     >
                       {opt.label}
@@ -1234,15 +1242,15 @@ export default function Admin() {
                   ))}
                 </div>
                 {currentModeOption && !visibleModeOptions.some((opt) => opt.value === form.mode) && (
-                  <p className="text-xs text-gray-400 mt-2">
-                    {a.currentMode}: <span className="font-semibold text-gray-500">{currentModeOption.label}</span>. {a.currentModeHelp}
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                    {a.currentMode}: <span className="font-semibold text-gray-500 dark:text-gray-400">{currentModeOption.label}</span>. {a.currentModeHelp}
                   </p>
                 )}
               </div>
 
               {form.mode === 'entra-app' && (
-                <div className="p-3 bg-violet-50 rounded-xl">
-                    <label className="block text-sm font-medium text-violet-700 mb-1">{ui.admin.apps.entraApplicationId}</label>
+                <div className="p-3 bg-violet-50 dark:bg-violet-950/40 rounded-xl border border-violet-100 dark:border-violet-900/50">
+                    <label className="block text-sm font-medium text-violet-700 dark:text-violet-300 mb-1">{ui.admin.apps.entraApplicationId}</label>
                   <input
                     type="text"
                     value={form.sso_endpoint}
@@ -1254,38 +1262,38 @@ export default function Admin() {
                       }
                     }}
                     placeholder={ui.admin.apps.enterApplicationId}
-                    className="w-full px-3 py-2 border border-violet-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                    className="w-full px-3 py-2 border border-violet-200 dark:border-violet-800 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 dark:focus-visible:ring-violet-600"
                   />
-                  <p className="text-xs text-violet-500 mt-1">
+                  <p className="text-xs text-violet-500 dark:text-violet-400 mt-1">
                     {ui.admin.apps.applicationIdHelp}
                   </p>
                 </div>
               )}
 
               {form.mode === 'redirect' && (
-                <div className="grid grid-cols-[1fr_auto] gap-4 p-3 bg-blue-50 rounded-xl">
+                <div className="grid grid-cols-[1fr_auto] gap-4 p-3 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-100 dark:border-blue-900/50">
                     <div>
-                    <label className="block text-sm font-medium text-blue-700 mb-1">{a.ssoEndpointLabel}</label>
+                    <label className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">{a.ssoEndpointLabel}</label>
                     <input
                       type="text"
                       value={form.sso_endpoint}
                       onChange={(e) => setForm({ ...form, sso_endpoint: e.target.value })}
                       placeholder="/sso"
-                      className="w-full px-3 py-2 border border-blue-200 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                      className="w-full px-3 py-2 border border-blue-200 dark:border-blue-800 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-blue-600"
                     />
                     </div>
                     <div>
-                    <label className="block text-sm font-medium text-blue-700 mb-1">{a.ssoMethodLabel}</label>
+                    <label className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">{a.ssoMethodLabel}</label>
                     <select
                       value={form.sso_method}
                       onChange={(e) => setForm({ ...form, sso_method: e.target.value })}
-                      className="px-3 py-2 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                      className="w-full px-3 py-2 border border-blue-200 dark:border-blue-800 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-blue-600"
                     >
                       <option value="GET">GET</option>
                       <option value="POST">POST</option>
                     </select>
                     {form.sso_method === 'GET' && (
-                      <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2 leading-relaxed">
+                      <p className="mt-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-md p-2 leading-relaxed">
                         ⚠️ {a.ssoMethodGetWarning}
                       </p>
                     )}
@@ -1295,7 +1303,7 @@ export default function Admin() {
 
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
                 <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">{a.tagsLabel}</label>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.tagsLabel}</label>
                   <TagInput
                     value={form.tags}
                     onChange={(tags) => setForm({ ...form, tags })}
@@ -1305,41 +1313,41 @@ export default function Admin() {
                     availableTagsLabel={a.availableTagsTitle}
                     useSuggestionLabel={a.useExistingTag}
                   />
-                  <p className="text-xs text-gray-400 mt-1">{ui.admin.apps.enterToAddTags}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{ui.admin.apps.enterToAddTags}</p>
                 </div>
 
                 <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">{a.sortOrderLabel}</label>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.sortOrderLabel}</label>
                   <input
                     type="number"
                     value={form.sort_order}
                     onChange={(e) => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">{a.longDescriptionLabel}</label>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.longDescriptionLabel}</label>
                 <textarea
                   value={form.long_description}
                   onChange={(e) => setForm({ ...form, long_description: e.target.value })}
                   placeholder={a.longDescriptionPlaceholder}
                   rows={4}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl font-mono text-xs focus:outline-none focus:ring-2 focus:ring-accent resize-y"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500 resize-y"
                 />
-                <p className="text-xs text-gray-400 mt-1">{a.longDescriptionHelp}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{a.longDescriptionHelp}</p>
               </div>
             </div>
 
-              <div className="flex flex-col gap-3 mt-6 pt-6 border-t border-gray-100 sm:flex-row sm:items-center sm:justify-end">
+              <div className="flex flex-col gap-3 mt-6 pt-6 border-t border-gray-100 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-end">
                 {editing !== 'new' && (
-                  <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-2">
+                  <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-2">
                     <button
                       type="button"
                       onClick={handleSaveAndAssignGroups}
                       disabled={saving || !form.name || !form.slug || !form.target_url}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-dark bg-accent hover:bg-accent/80 shadow-sm shadow-accent/20 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-dark dark:text-white bg-accent hover:bg-accent/80 dark:bg-accent-dark dark:hover:bg-accent-dark/90 shadow-sm shadow-accent/20 dark:shadow-black/30 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Users className="w-4 h-4" />
                       {saving ? a.saving : a.saveAndAssignGroups}
@@ -1359,7 +1367,7 @@ export default function Admin() {
                   <button
                     type="button"
                     onClick={close}
-                    className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-dark hover:bg-gray-100 rounded-xl transition-colors"
+                    className="px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
                   >
                     {ui.common.cancel}
                   </button>
@@ -1380,7 +1388,7 @@ export default function Admin() {
 
       {pendingGroupAssignApp && (
         <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/40 px-4 py-4">
-          <div className="relative w-full max-w-3xl max-h-[88vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-gray-100">
+          <div className="relative w-full max-w-3xl max-h-[88vh] overflow-y-auto rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-100 dark:border-gray-800">
             <button
               type="button"
               onClick={() => {
@@ -1395,7 +1403,7 @@ export default function Admin() {
                 }
                 closeGroupAssignmentModal();
               }}
-              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-dark hover:bg-gray-100 rounded-lg transition-colors"
+              className="absolute top-4 right-4 p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
               aria-label={a.closeGroupSelection}
             >
               <X className="w-4 h-4" />
@@ -1403,16 +1411,16 @@ export default function Admin() {
 
             <div className="p-6 sm:p-8">
               <div className="mb-6">
-                <h2 className="text-2xl font-extrabold text-dark">{a.addToGroupsTitle}</h2>
-                <p className="text-gray-500 mt-1">
+                <h2 className="text-2xl font-extrabold text-dark dark:text-gray-100">{a.addToGroupsTitle}</h2>
+                <p className="text-gray-500 dark:text-gray-400 mt-1">
                   {a.addToGroupsHelp}
                 </p>
                 {pendingGroupAssignApp?.defaultIncluded ? (
-                  <p className="text-xs text-gray-400 mt-2">
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                     {a.defaultGroupAlreadyCreated}
                   </p>
                 ) : (
-                  <p className="text-xs text-gray-400 mt-2">
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                     {a.defaultGroupMissingHelp}
                   </p>
                 )}
@@ -1425,7 +1433,7 @@ export default function Admin() {
                   placeholder={ui.admin.apps.searchGroupsPlaceholder}
                   clearLabel={ui.common.clearSearch}
                 />
-                <div className="mt-2 text-xs text-gray-400 flex items-center justify-between gap-3">
+                <div className="mt-2 text-xs text-gray-400 dark:text-gray-500 flex items-center justify-between gap-3">
                   <span>{groupAssignSelection.length} {a.selectedGroupSummary}</span>
                   <span>{filteredGroups.length} {t.groups}</span>
                 </div>
@@ -1446,11 +1454,11 @@ export default function Admin() {
               {groupsLoading ? (
                 <div className="animate-pulse grid gap-2 sm:grid-cols-2">
                   {[...Array(6)].map((_, i) => (
-                    <div key={i} className="h-16 rounded-xl bg-white border border-gray-100" />
+                    <div key={i} className="h-16 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800" />
                   ))}
                 </div>
               ) : filteredGroups.length === 0 ? (
-                <div className="text-sm text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200 px-3 py-4">
+                <div className="text-sm text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-900 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-3 py-4">
                   {ui.admin.apps.noGroupsFound}
                 </div>
               ) : (
@@ -1462,29 +1470,29 @@ export default function Admin() {
                       <label
                         key={group.id}
                         className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${
-                          selected ? 'border-accent bg-accent/5' : 'border-gray-200 bg-white hover:border-gray-300'
+                          selected ? 'border-accent bg-accent/5' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={selected}
                           onChange={() => toggleGroupAssignment(group.id)}
-                          className="mt-1 rounded border-gray-300 text-dark focus:ring-accent"
+                          className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium text-dark truncate">{groupLabel(group)}</span>
-                            <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">
+                            <span className="text-sm font-medium text-dark dark:text-gray-100 truncate">{groupLabel(group)}</span>
+                            <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded font-medium">
                               {groupSourceLabel}
                             </span>
                             {group.id === DEFAULT_GROUP_ID && (
-                              <span className="text-[10px] bg-accent/30 text-dark px-1.5 py-0.5 rounded font-medium">
+                              <span className="text-[10px] bg-accent/30 text-dark dark:text-gray-100 px-1.5 py-0.5 rounded font-medium">
                                 default
                               </span>
                             )}
                           </div>
                           {group.description && (
-                            <p className="text-xs text-gray-400 mt-0.5 truncate">{group.description}</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">{group.description}</p>
                           )}
                         </div>
                       </label>
@@ -1493,11 +1501,11 @@ export default function Admin() {
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3 mt-6 pt-6 border-t border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3 mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
                 <button
                   type="button"
                   onClick={closeGroupAssignmentModal}
-                  className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-dark hover:bg-gray-100 rounded-xl transition-colors"
+                  className="px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
                 >
                   Salta
                 </button>

@@ -271,10 +271,7 @@ router.get('/', authenticate, isOwner, loadAccessLogs);
 router.post('/clear-access', authenticate, isOwner, (req, res) => {
   try {
     const { accessRemoved } = purgeAccessLogs();
-    res.json({
-      message: 'Access log cleared',
-      accessRemoved,
-    });
+    res.json({ accessRemoved });
   } catch (error) {
     console.error(`Access log purge failed: ${error.message}`);
     res.status(500).json({ error: 'Access log purge failed' });

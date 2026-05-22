@@ -15,7 +15,7 @@ RUN npm run build
 FROM node:22-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 make g++ \
+    python3 make g++ gosu \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -29,15 +29,17 @@ RUN apt-get purge -y python3 make g++ && apt-get autoremove -y
 COPY server/ ./server/
 COPY shared/ ./shared/
 COPY --from=builder /app/dist ./dist/
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 RUN groupadd --system --gid 1001 frontdoor \
     && useradd --system --uid 1001 --gid frontdoor --home-dir /app --shell /sbin/nologin frontdoor \
     && mkdir -p /data \
     && chown -R frontdoor:frontdoor /app /data
 
-USER frontdoor
-
 ENV NODE_ENV=production
 EXPOSE 3001
 
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "server/index.js"]

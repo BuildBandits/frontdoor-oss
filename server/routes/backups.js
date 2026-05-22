@@ -107,13 +107,10 @@ router.post(
     try {
       const buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || []);
       const { snapshot: _snapshot, ...result } = await restoreBackupArchive(buffer);
-      res.json({
-        message: 'Backup restored',
-        ...result,
-      });
+      res.json(result);
     } catch (error) {
       console.error('Backup restore failed:', error.message);
-      respondWithError(res, error, { status: 500, message: 'Failed to restore backup' });
+      respondWithError(res, error, { status: 500, code: 'failed_to_restore_backup' });
     }
   }
 );

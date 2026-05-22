@@ -16,10 +16,10 @@ router.put('/', authenticate, isOwner, async (req, res) => {
   try {
     const { branding, auditDetails } = await updateBrandingSettings(req.body || {});
     logRbacAudit(req.user.id, 'update', 'branding', 'default', auditDetails);
-    res.json({ message: 'Changes saved', branding });
+    res.json({ branding });
   } catch (error) {
     console.error('Branding update failed:', error.message);
-    respondWithError(res, error, { status: 500, message: 'Failed to update branding' });
+    respondWithError(res, error, { status: 500, code: 'failed_to_update_branding' });
   }
 });
 
@@ -30,10 +30,7 @@ router.post('/avatars/refresh', authenticate, isOwner, async (req, res) => {
       removedFiles: result.removed,
       scope: 'avatars',
     });
-    res.json({
-      message: 'Avatar cache cleared',
-      ...result,
-    });
+    res.json(result);
   } catch (error) {
     console.error('Avatar cache refresh failed:', error.message);
     res.status(500).json({ error: 'Failed to refresh avatar cache' });
@@ -61,10 +58,7 @@ router.post('/app-icons/cleanup', authenticate, isOwner, async (req, res) => {
       removedBytes: result.removedBytes,
       scope: 'app-icons',
     });
-    res.json({
-      message: 'App icon cache cleaned',
-      ...result,
-    });
+    res.json(result);
   } catch (error) {
     console.error('App icon cache cleanup failed:', error.message);
     res.status(500).json({ error: 'Failed to clean app icon cache' });

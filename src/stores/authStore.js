@@ -69,7 +69,15 @@ export const useAuthStore = create((set, get) => ({
 
   resetPreferredLanguage: async () => get().savePreferences({ preferredLanguage: null }),
 
+  updatePreferredColorScheme: async (preferredColorScheme) => get().savePreferences({ preferredColorScheme }),
+
+  resetPreferredColorScheme: async () => get().savePreferences({ preferredColorScheme: null }),
+
   updateAppOrder: async (appOrder) => get().savePreferences({ appOrder }),
 
   resetAppOrder: async () => get().savePreferences({ appOrder: null }),
+
+  markHomeTourSeen: async () => get().savePreferences({ homeTourSeenAt: new Date().toISOString() }),
+
+  resetHomeTourSeen: async () => get().savePreferences({ homeTourSeenAt: null }),
 }));

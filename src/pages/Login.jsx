@@ -18,6 +18,10 @@ export default function Login() {
   const error = searchParams.get('error');
   const language = normalizeLanguage(branding?.defaultLanguage);
   const ui = getUiStrings(language);
+  const redirect = searchParams.get('redirect');
+  const validRedirect = redirect && /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(redirect)
+    ? redirect
+    : null;
 
   useEffect(() => {
     api.get('/branding')
@@ -30,9 +34,14 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
-    // If already authenticated, redirect to home
+    // If already authenticated, continue through the server-side app launcher.
+    // For mode=redirect apps, the backend reads target_url and emits the SSO POST.
     if (isAuthenticated) {
-      navigate('/', { replace: true });
+      if (validRedirect) {
+        window.location.href = `/api/apps/${validRedirect}/sso-redirect`;
+      } else {
+        navigate('/', { replace: true });
+      }
       return;
     }
 
@@ -43,11 +52,10 @@ export default function Login() {
       api.get('/auth/me').then((res) => {
         loginWithToken(null, res.data.user);
 
-        // Check for redirect to a specific app subdomain (validated: only alphanumeric slugs)
-        const redirect = searchParams.get('redirect');
-        if (redirect && /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(redirect)) {
-          const baseDomain = window.location.hostname;
-          window.location.href = `${window.location.protocol}//${redirect}.${baseDomain}`;
+        // Continue through the server-side app launcher: it resolves the app
+        // target_url from the catalog and handles Redirect SSO/POST correctly.
+        if (validRedirect) {
+          window.location.href = `/api/apps/${validRedirect}/sso-redirect`;
         } else {
           navigate('/', { replace: true });
         }
@@ -58,12 +66,16 @@ export default function Login() {
     }
 
     if (!brandingLoading && branding?.hideLoginPage && !error && !ssoOk) {
-      window.location.href = '/api/auth/microsoft';
+      window.location.href = validRedirect
+        ? `/api/auth/microsoft?redirect=${encodeURIComponent(validRedirect)}`
+        : '/api/auth/microsoft';
     }
-  }, [searchParams, error, isAuthenticated, loginWithToken, navigate, branding, brandingLoading]);
+  }, [searchParams, error, isAuthenticated, loginWithToken, navigate, branding, brandingLoading, validRedirect]);
 
   const handleSSOLogin = () => {
-    window.location.href = '/api/auth/microsoft';
+    window.location.href = validRedirect
+      ? `/api/auth/microsoft?redirect=${encodeURIComponent(validRedirect)}`
+      : '/api/auth/microsoft';
   };
 
   const handleDevLogin = async () => {
@@ -78,7 +90,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAFAFA]">
+    <div className="min-h-screen flex flex-col bg-[#FAFAFA] dark:bg-gray-950">
       <div className="flex-1 flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-md">
           {/* Logo/Brand */}
@@ -86,7 +98,7 @@ export default function Login() {
             <div className="inline-flex mb-6">
               <BrandMark size="lg" />
             </div>
-            <h1 className="text-4xl font-extrabold text-dark tracking-tight">
+            <h1 className="text-4xl font-extrabold text-dark dark:text-gray-100 tracking-tight">
               {ui.login.title}
             </h1>
             {/*
@@ -96,7 +108,7 @@ export default function Login() {
           </div>
 
           {brandingLoading && (
-            <div className="mb-6 p-4 bg-white border border-gray-200 rounded-xl text-gray-500 text-sm text-center">
+            <div className="mb-6 p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-500 dark:text-gray-400 text-sm text-center">
               {ui.login.loadingAuth}
             </div>
           )}
@@ -134,7 +146,7 @@ export default function Login() {
                     className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
                       devRole === r
                         ? 'bg-amber-600 text-white border-amber-600'
-                        : 'bg-white text-amber-800 border-amber-300 hover:bg-amber-100'
+                        : 'bg-white dark:bg-gray-900 text-amber-800 border-amber-300 hover:bg-amber-100'
                     }`}
                   >
                     {r}

@@ -200,8 +200,8 @@ export default function AdminGroupTransfer() {
     <div>
       <div className="mb-6 flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-stretch">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark">{g.transferAppsPageTitle}</h1>
-          <p className="mt-1 text-gray-500">{g.transferAppsPageSubtitle}</p>
+          <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{g.transferAppsPageTitle}</h1>
+          <p className="mt-1 text-gray-500 dark:text-gray-400">{g.transferAppsPageSubtitle}</p>
         </div>
         <div className="inline-flex items-center gap-2 self-start rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 max-sm:self-stretch max-sm:justify-center">
           <ShieldAlert className="h-4 w-4" />
@@ -228,27 +228,28 @@ export default function AdminGroupTransfer() {
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="space-y-6">
-          <div className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
             <div className="mb-4">
-              <h2 className="text-lg font-bold text-dark">{g.transferAppsSelectionTitle}</h2>
-              <p className="mt-1 text-sm text-gray-500">{g.transferAppsSelectionHelp}</p>
+              <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.transferAppsSelectionTitle}</h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{g.transferAppsSelectionHelp}</p>
             </div>
 
             <div className="space-y-4">
-              <ClearableSearchField
-                value={groupSearch}
-                onChange={setGroupSearch}
-                placeholder={g.transferAppsSearchPlaceholder}
-                clearLabel={ui.common.clearSearch}
-              />
+            <ClearableSearchField
+              value={groupSearch}
+              onChange={setGroupSearch}
+              placeholder={g.transferAppsSearchPlaceholder}
+              clearLabel={ui.common.clearSearch}
+              tabIndex={1}
+            />
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-gray-600">{g.sourceGroupLabel}</span>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{g.sourceGroupLabel}</span>
                   <select
                     value={sourceGroupId}
                     onChange={(e) => setSourceGroupId(e.target.value)}
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-dark focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-dark dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
                     disabled={loadingGroups}
                   >
                     <option value="">{g.selectGroupPlaceholder}</option>
@@ -261,11 +262,11 @@ export default function AdminGroupTransfer() {
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-gray-600">{g.targetGroupLabel}</span>
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{g.targetGroupLabel}</span>
                   <select
                     value={targetGroupId}
                     onChange={(e) => setTargetGroupId(e.target.value)}
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-dark focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-dark dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
                     disabled={loadingGroups}
                   >
                     <option value="">{g.selectGroupPlaceholder}</option>
@@ -278,12 +279,12 @@ export default function AdminGroupTransfer() {
                 </label>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-100 bg-gray-50 p-2">
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-2">
                 <button
                   type="button"
                   onClick={() => setMode('copy')}
                   className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
-                    mode === 'copy' ? 'bg-dark text-white' : 'text-gray-500 hover:bg-white hover:text-dark'
+                    mode === 'copy' ? 'bg-dark text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-900 hover:text-dark dark:hover:text-white'
                   }`}
                 >
                   <Copy className="h-4 w-4" />
@@ -293,7 +294,7 @@ export default function AdminGroupTransfer() {
                   type="button"
                   onClick={() => setMode('move')}
                   className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
-                    mode === 'move' ? 'bg-dark text-white' : 'text-gray-500 hover:bg-white hover:text-dark'
+                    mode === 'move' ? 'bg-dark text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-900 hover:text-dark dark:hover:text-white'
                   }`}
                 >
                   <MoveRight className="h-4 w-4" />
@@ -303,18 +304,18 @@ export default function AdminGroupTransfer() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-dark">{g.transferAppsSummaryTitle}</h2>
+          <div className="rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+            <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.transferAppsSummaryTitle}</h2>
             {sourceGroup ? (
               <div className="mt-3 space-y-3">
-                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">{g.sourceGroupLabel}</p>
-                      <p className="mt-1 text-sm font-semibold text-dark">{groupLabel(sourceGroup)}</p>
-                      <p className="text-xs text-gray-500">{sourceGroup.description || g.noDescription}</p>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{g.sourceGroupLabel}</p>
+                      <p className="mt-1 text-sm font-semibold text-dark dark:text-gray-100">{groupLabel(sourceGroup)}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{sourceGroup.description || g.noDescription}</p>
                     </div>
-                    <div className="text-right text-xs text-gray-500">
+                    <div className="text-right text-xs text-gray-500 dark:text-gray-400">
                       <div>{sourceGroup.app_count || 0} {g.appsCountSuffix}</div>
                       <div>{sourceGroup.member_count || 0} {g.membersCountSuffix}</div>
                     </div>
@@ -322,31 +323,31 @@ export default function AdminGroupTransfer() {
                 </div>
 
                 {loadingSourceDetail ? (
-                  <div className="flex items-center gap-2 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-500">
+                  <div className="flex items-center gap-2 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                     <RefreshCw className="h-4 w-4 animate-spin" />
                     {ui.common.loading}
                   </div>
                 ) : transferCount === 0 ? (
                   <PageNotice type="info" message={g.noAppsToTransfer} />
                 ) : (
-                  <div className="rounded-2xl border border-gray-100 p-4">
+                  <div className="rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
+                      <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                         {g.transferAppsPreviewTitle} ({transferCount})
                       </h3>
-                      <span className="text-xs text-gray-400">{mode === 'move' ? g.moveModeLabel : g.copyModeLabel}</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{mode === 'move' ? g.moveModeLabel : g.copyModeLabel}</span>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {previewApps.map((app) => (
                         <span
                           key={app.id}
-                          className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700"
+                          className="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200"
                         >
                           {app.name}
                         </span>
                       ))}
                       {transferCount > previewApps.length && (
-                        <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-500">
+                        <span className="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
                           +{transferCount - previewApps.length}
                         </span>
                       )}
@@ -361,9 +362,9 @@ export default function AdminGroupTransfer() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-dark">{g.transferAppsActionTitle}</h2>
-            <div className="mt-4 space-y-3 text-sm text-gray-600">
+          <div className="rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+            <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.transferAppsActionTitle}</h2>
+            <div className="mt-4 space-y-3 text-sm text-gray-600 dark:text-gray-300">
               <div className="flex items-start gap-3">
                 <ArrowRightLeft className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-dark" />
                 <p>{g.transferAppsActionHelp}</p>
@@ -384,7 +385,7 @@ export default function AdminGroupTransfer() {
                 <ActionIcon className="h-4 w-4" />
                 {actionLabel}
               </button>
-              <div className="text-xs text-gray-400">
+              <div className="text-xs text-gray-400 dark:text-gray-500">
                 {!sourceGroupId || !targetGroupId
                   ? g.transferSelectionHelp
                   : sourceGroupId === targetGroupId
@@ -397,12 +398,12 @@ export default function AdminGroupTransfer() {
           </div>
 
           {targetGroup ? (
-            <div className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-bold text-dark">{g.targetGroupLabel}</h2>
-              <div className="mt-3 rounded-2xl border border-gray-100 bg-gray-50 p-4">
-                <p className="text-sm font-semibold text-dark">{groupLabel(targetGroup)}</p>
-                <p className="text-xs text-gray-500">{targetGroup.description || g.noDescription}</p>
-                <div className="mt-3 text-xs text-gray-500">
+            <div className="rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+              <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.targetGroupLabel}</h2>
+              <div className="mt-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4">
+                <p className="text-sm font-semibold text-dark dark:text-gray-100">{groupLabel(targetGroup)}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{targetGroup.description || g.noDescription}</p>
+                <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
                   {targetGroup.app_count || 0} {g.appsCountSuffix}
                 </div>
               </div>

@@ -12,6 +12,7 @@ import { ensureAvatarCached } from '../services/avatars.js';
 import { verifySsoTokenChain } from '../services/verifySsoToken.js';
 import { logRbacAudit } from '../db.js';
 import { isSupportedLanguage } from '../../shared/languages.js';
+import { isSupportedColorScheme, normalizeOptionalColorScheme } from '../../shared/colorSchemes.js';
 
 const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 const authScopes = getAuthScopes();
@@ -68,11 +69,36 @@ const serializeCurrentUser = (user) => ({
     ? (user.home_desktop_view === 'compact' ? 'compact' : 'cards')
     : null,
   preferredLanguage: normalizePreferredLanguage(user.preferred_language),
+  preferredColorScheme: normalizeOptionalColorScheme(user.preferred_color_scheme),
   appOrder: parseStoredAppOrder(user.app_order),
   appOrderUpdatedAt: user.app_order_updated_at || null,
+  homeTourSeenAt: user.home_tour_seen_at || null,
 });
 
-// Initiate SSO login
+// Initiate SSO login.
+//
+// Optional `?redirect=<app-slug>` query param: stored in a short-lived
+// httpOnly cookie so it survives the Microsoft OAuth roundtrip without
+// adding noise to the CSRF `state` param. The Login SPA already supports
+// `?redirect=<slug>` to deep-link the user to that app subdomain after
+// login completes — this just plumbs the value through.
+//
+// We don't pass `redirect` via Microsoft's `state` because state is also
+// our CSRF nonce (UUID looked up in `auth_pending_states`); mixing concerns
+// would force every consumer to parse the composite value. Instead we
+// bind the cookie value to the state (`<slug>.<stateUuid>`) and verify
+// the binding at callback time, which gives us cryptographic single-use
+// semantics: any cookie left over from an aborted OAuth flow carries a
+// stale state that won't match the next legitimate callback's `req.query.state`.
+const SSO_REDIRECT_SLUG_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+const SSO_REDIRECT_COOKIE = 'frontdoor_sso_redirect';
+const SSO_REDIRECT_COOKIE_OPTS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  path: '/api/auth',
+};
+
 router.get('/microsoft', async (req, res) => {
   if (!msalClient) {
     return res.status(501).json({ error: 'Microsoft SSO not configured' });
@@ -82,6 +108,23 @@ router.get('/microsoft', async (req, res) => {
     const state = uuidv4();
     cleanupAuthStates.run();
     insertAuthState.run(state);
+
+    // Cookie binding strategy:
+    // - if a valid `?redirect=<slug>` was provided → write `<slug>.<state>` so
+    //   only the matching callback (same `state` in query) can consume it.
+    // - otherwise → CLEAR any leftover cookie from a previous aborted OAuth
+    //   flow. Without this, a user who interrupted a flow (close tab, MFA
+    //   timeout) and starts a new one without `?redirect=` would be silently
+    //   redirected to the stale target.
+    const requestedRedirect = req.query.redirect;
+    if (typeof requestedRedirect === 'string' && SSO_REDIRECT_SLUG_RE.test(requestedRedirect)) {
+      res.cookie(SSO_REDIRECT_COOKIE, `${requestedRedirect}.${state}`, {
+        ...SSO_REDIRECT_COOKIE_OPTS,
+        maxAge: 10 * 60 * 1000, // 10 min — covers OAuth roundtrip incl. MFA + buffer
+      });
+    } else {
+      res.clearCookie(SSO_REDIRECT_COOKIE, SSO_REDIRECT_COOKIE_OPTS);
+    }
 
     const authUrl = await msalClient.getAuthCodeUrl({
       scopes: authScopes,
@@ -237,7 +280,26 @@ router.get('/microsoft/callback', async (req, res) => {
     // Token is in httpOnly cookie — no user data in the URL to avoid leaking PII via
     // browser history, server access logs, or Referer headers. The frontend will call
     // /api/auth/me to retrieve the user profile after the redirect.
-    const redirectParam = req.query.redirect ? `&redirect=${encodeURIComponent(req.query.redirect)}` : '';
+    //
+    // Recover the optional `redirect` slug from the short-lived cookie set by
+    // /api/auth/microsoft (Microsoft doesn't propagate custom query params).
+    // The cookie value is `<slug>.<stateUuid>`: we accept it only if the embedded
+    // state matches the CSRF state we just consumed from `req.query.state`. This
+    // gives single-use semantics — stale cookies from aborted flows can't redirect
+    // a later, unrelated login. Re-validate slug regex as defense-in-depth.
+    const redirectCookie = req.cookies?.[SSO_REDIRECT_COOKIE];
+    res.clearCookie(SSO_REDIRECT_COOKIE, SSO_REDIRECT_COOKIE_OPTS);
+    let redirectParam = '';
+    if (typeof redirectCookie === 'string') {
+      const dot = redirectCookie.lastIndexOf('.');
+      if (dot > 0) {
+        const cookieSlug = redirectCookie.slice(0, dot);
+        const cookieState = redirectCookie.slice(dot + 1);
+        if (cookieState === state && SSO_REDIRECT_SLUG_RE.test(cookieSlug)) {
+          redirectParam = `&redirect=${encodeURIComponent(cookieSlug)}`;
+        }
+      }
+    }
     res.redirect(`${frontendUrl}/login?sso=ok${redirectParam}`);
   } catch (error) {
     console.error('SSO callback error:', error.message);
@@ -274,6 +336,15 @@ router.put('/me/preferences', authenticate, (req, res) => {
     values.push(preferredLanguage);
   }
 
+  if (Object.prototype.hasOwnProperty.call(req.body, 'preferredColorScheme')) {
+    const { preferredColorScheme } = req.body;
+    if (preferredColorScheme !== null && !isSupportedColorScheme(preferredColorScheme)) {
+      return res.status(400).json({ error: 'preferredColorScheme must be light, dark, auto, or null' });
+    }
+    updates.push('preferred_color_scheme = ?');
+    values.push(preferredColorScheme);
+  }
+
   if (Object.prototype.hasOwnProperty.call(req.body, 'appOrder')) {
     const { appOrder } = req.body;
     if (appOrder !== null && !Array.isArray(appOrder)) {
@@ -295,6 +366,15 @@ router.put('/me/preferences', authenticate, (req, res) => {
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(req.body, 'homeTourSeenAt')) {
+    const { homeTourSeenAt } = req.body;
+    if (homeTourSeenAt !== null && typeof homeTourSeenAt !== 'string') {
+      return res.status(400).json({ error: 'homeTourSeenAt must be a string or null' });
+    }
+    updates.push('home_tour_seen_at = ?');
+    values.push(homeTourSeenAt || null);
+  }
+
   if (updates.length === 0) {
     return res.status(400).json({ error: 'No preference updates provided' });
   }
@@ -306,10 +386,9 @@ router.put('/me/preferences', authenticate, (req, res) => {
      WHERE id = ?`
   ).run(...values, req.user.id);
 
-  const user = db.prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, app_order, app_order_updated_at FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at FROM users WHERE id = ?').get(req.user.id);
 
   res.json({
-    message: 'Preferenze aggiornate',
     user: serializeCurrentUser(user),
   });
 });
@@ -318,7 +397,7 @@ router.put('/me/preferences', authenticate, (req, res) => {
 router.post('/logout', (req, res) => {
   const baseDomain = process.env.BASE_DOMAIN || 'frontdoor.local';
   res.clearCookie('frontdoor_token', { domain: `.${baseDomain}` });
-  res.json({ message: 'Logged out' });
+  res.json({ ok: true });
 });
 
 // SSO token introspection — RFC 7662-inspired endpoint for satellite apps in

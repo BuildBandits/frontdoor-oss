@@ -82,16 +82,66 @@
     "removeFavorite": "Remove from favorites",
     "dragToReorder": "Drag to reorder",
     "entraBadgeShort": "Entra",
-    "externalBadgeShort": "Ext"
+    "externalBadgeShort": "Ext",
+    "ssoBadgeShort": "SSO",
+    "tour": {
+      "skip": "Skip tour",
+      "previous": "Back",
+      "next": "Next",
+      "done": "Done",
+      "progress": "Tour {current}/{total}",
+      "reopenHint": "You can restart this tour anytime from your profile menu in the top right.",
+      "steps": {
+        "welcome": {
+          "title": "Welcome to Frontdoor",
+          "body": "This is your Home page, your starting point. From here, you can search for, browse, and access the tools and services available to you."
+        },
+        "search": {
+          "title": "Find apps quickly",
+          "body": "Use the search function to filter by name, description, or tag. The Favorites, Grouping, and View buttons help you customize the catalog to suit your tastes and needs."
+        },
+        "catalog": {
+          "title": "Browse the catalog",
+          "body": "Open an app by clicking on its title, icon, or description. Add the ones you use most often to your favorites."
+        },
+        "appCards": {
+          "title": "Favorites and details",
+          "body": "Each app card includes a star icon for your favorites and an info icon when there are extra details to read. Use the star to save the apps you use most and the info icon to discover helpful details."
+        },
+        "reorder": {
+          "title": "Reorder the cards",
+          "body": "When you're in card view, you can drag each card from the icon in the top-left corner to reorder it however you like. In compact view, custom reordering is not available: switch to card view, sort your apps, then switch back to compact if you want. Your custom order is saved to your profile."
+        },
+        "menu": {
+          "title": "Your personal menu",
+          "body": "Open this menu to customize the default Home view, language, theme, and, when available, your custom app order too. If you change your mind, you can restore each setting from here."
+        },
+        "homepage": {
+          "title": "Bring Frontdoor with you",
+          "body": "To keep it close at hand, you can set Frontdoor as your homepage or bookmark it in your browser. The right guide is listed below for the browser you're using."
+        }
+      },
+      "browserDocsTitle": "Browser guides",
+      "browserDocsHint": "We put the guide for the browser you're using first.",
+      "browserDocsPrimary": "Recommended for your browser",
+      "browserDocsSecondary": "Another useful guide"
+    }
   },
   "layout": {
     "personalHomeView": "Personal Home view",
     "personalHomeViewShort": "Home view",
+    "takeTour": "Take a tour",
     "appOrder": "App order",
     "savedOrderOn": "Custom order saved on {date}",
     "restoreView": "Restore view",
     "restoreOrder": "Restore order",
     "restoreLanguage": "Restore language",
+    "restoreColorScheme": "Restore theme",
+    "colorScheme": "Theme",
+    "colorSchemeLight": "Light",
+    "colorSchemeDark": "Dark",
+    "colorSchemeAuto": "Auto",
+    "beta": "Beta",
     "homeViewCards": "Card",
     "homeViewCompact": "Compact",
     "homeViewCardsTitle": "Card view",
@@ -171,6 +221,14 @@
       "accessLogReloadNotice": "The Log page will be empty on the next refresh.",
       "languageTitle": "Default Frontdoor language",
       "languageHelp": "Choose the default UI language for the whole web app.",
+      "darkModeBetaTitle": "Enable dark mode",
+      "darkModeBetaHelp": "Beta feature. When enabled, you can pick a default theme below and every user gets a Theme switcher in their account menu. When disabled, Frontdoor stays in light mode for everyone regardless of saved preferences.",
+      "betaBadge": "Beta",
+      "colorSchemeTitle": "Default theme",
+      "colorSchemeHelp": "Pick the default theme for everyone. Users can still override their own preference.",
+      "colorSchemeLight": "Light",
+      "colorSchemeDark": "Dark",
+      "colorSchemeAuto": "Follow system preference",
       "timeFormatTitle": "24-hour time format in menus",
       "timeFormatHelp": "If enabled, times shown in menus use the 24-hour format; the stored data does not change.",
       "timeFormatLabel": "Use 24-hour time",
@@ -497,6 +555,7 @@
       "restoreDemoTitle": "Restore demo apps?",
       "restoreDemoMessage": "Missing demo apps will be added again. Existing apps with the same slug will be updated without being replaced.",
       "restoreDemoConfirm": "Restore",
+      "restoreDemoSuccess": "Demo apps restored",
       "restoreDemoSummary": "Created: {created}, updated: {updated}",
       "iconAssetRequired": "Upload or paste an image/SVG for the icon, or switch back to emoji mode",
       "assignedToGroups": "{name} added to {count} groups",
