@@ -22,6 +22,8 @@ import TagGroupCard from '../components/TagGroupCard';
 import ClearableSearchField from '../components/ClearableSearchField';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, resolveAppLanguage } from '../i18n';
+import PluginSurface from '../pluginHost/PluginSurface';
+import { PLUGIN_SURFACES } from '../pluginHost/constants';
 import {
   HOME_TOUR_REPLAY_EVENT,
   requestHomeTourAccountMenuClose,
@@ -715,32 +717,31 @@ export default function Home() {
         </div>
       )}
 
+      <PluginSurface surface={PLUGIN_SURFACES.HOME_HERO_AFTER} variant="stack" className="mb-8" />
+
       {/* Search + toggles + tag filters */}
       <div
         ref={controlsRef}
-        className="mb-8 space-y-3"
+        className="mb-8 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm"
       >
-        <div className="flex items-stretch gap-3 min-w-0 overflow-x-auto pb-1">
-          <div className="flex min-w-0 h-14 flex-1 items-center gap-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4">
-            <ClearableSearchField
-              value={search}
-              onChange={setSearch}
-              placeholder={ui.home.searchPlaceholder}
-              onKeyDown={handleSearchKeyDown}
-              clearLabel={ui.common.clearSearch}
-              tabIndex={1}
-              className="flex-1 min-w-0"
-              inputClassName="h-11 text-base"
-            />
-
-            <span className="text-sm font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+        <div className="flex items-stretch gap-3 min-w-0">
+          <ClearableSearchField
+            value={search}
+            onChange={setSearch}
+            placeholder={ui.home.searchPlaceholder}
+            onKeyDown={handleSearchKeyDown}
+            clearLabel={ui.common.clearSearch}
+            searchShortcutTarget="primary"
+            searchShortcutLabel={ui.common.searchShortcut}
+            className="flex-1 min-w-0"
+          />
+          <div className="flex shrink-0 items-stretch gap-2 sm:gap-3 overflow-x-auto">
+            <div className="flex h-12 shrink-0 items-center rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
               {appCountLabel}
-            </span>
-          </div>
-          <div className="flex shrink-0 items-stretch gap-2 sm:gap-3">
+            </div>
             <button
               onClick={() => setShowFavorites((v) => !v)}
-              className={`flex h-14 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
+              className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
                 showFavorites
                   ? 'bg-yellow-50 border-yellow-300 text-yellow-700 dark:bg-yellow-950/50 dark:border-yellow-600 dark:text-yellow-300'
                   : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
@@ -754,7 +755,7 @@ export default function Home() {
             <button
               onClick={handleToggleGroupByTag}
               disabled={mobileCompactViewForced}
-              className={`flex h-14 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
+              className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
                 groupByTag
                   ? 'bg-purple-50 border-purple-300 text-purple-700 dark:bg-purple-950/50 dark:border-purple-600 dark:text-purple-300'
                   : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
@@ -768,7 +769,7 @@ export default function Home() {
             <button
               onClick={handleToggleCompactView}
               disabled={mobileCompactViewForced}
-              className={`flex h-14 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
+              className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
                 compactView
                   ? 'bg-gradient-to-br from-sky-50 via-cyan-50 to-indigo-50 dark:from-sky-900/40 dark:via-cyan-900/30 dark:to-indigo-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 shadow-sm shadow-sky-200/50'
                   : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
@@ -780,37 +781,41 @@ export default function Home() {
             </button>
           </div>
         </div>
-
-        {allTags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {allTags.map((tag) => {
-              const active = selectedTags.includes(tag);
-              return (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-colors ${
-                    active
-                      ? 'bg-purple-600 text-white dark:bg-purple-500 dark:text-white'
-                      : 'bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-950/55 dark:text-purple-300 dark:hover:bg-purple-900/55'
-                  }`}
-                >
-                  {tag}
-                  {active && <X className="w-3 h-3" />}
-                </button>
-              );
-            })}
-            {selectedTags.length > 0 && (
-              <button
-                onClick={() => setSelectedTags([])}
-                className="px-3 py-1.5 rounded-full text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-              >
-                {ui.home.allTags}
-              </button>
-            )}
-          </div>
-        )}
       </div>
+
+      <PluginSurface surface={PLUGIN_SURFACES.HOME_CONTROLS_AFTER} variant="stack" className="mb-8" />
+
+      {allTags.length > 0 && (
+        <div className="mb-8 flex flex-wrap gap-2">
+          {allTags.map((tag) => {
+            const active = selectedTags.includes(tag);
+            return (
+              <button
+                key={tag}
+                onClick={() => toggleTag(tag)}
+                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-colors ${
+                  active
+                    ? 'bg-purple-600 text-white dark:bg-purple-500 dark:text-white'
+                    : 'bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-950/55 dark:text-purple-300 dark:hover:bg-purple-900/55'
+                }`}
+              >
+                {tag}
+                {active && <X className="w-3 h-3" />}
+              </button>
+            );
+          })}
+          {selectedTags.length > 0 && (
+            <button
+              onClick={() => setSelectedTags([])}
+              className="px-3 py-1.5 rounded-full text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            >
+              {ui.home.allTags}
+            </button>
+          )}
+        </div>
+      )}
+
+      <PluginSurface surface={PLUGIN_SURFACES.HOME_CATALOG_BEFORE} variant="stack" className="mb-8" />
 
       {/* App grid */}
       <div
@@ -872,8 +877,10 @@ export default function Home() {
         </div>
       ) : (
         renderAppGrid(filtered)
-      )}
+        )}
       </div>
+
+      <PluginSurface surface={PLUGIN_SURFACES.HOME_CATALOG_AFTER} variant="stack" className="mt-8" />
 
       {tourOpen && (
         <div className="fixed inset-0 z-50">

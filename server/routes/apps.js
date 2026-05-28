@@ -10,6 +10,7 @@ import { restoreDefaultDemoApps } from '../services/demoApps.js';
 import { getAccessibleGroupIdsForUser } from '../services/groupHierarchy.js';
 import { iconUrlForApp, parseAppIconPayload, readAppIconAssetDataUrl, removeAppIconAsset, saveAppIconAsset, serveAppIconForApp } from '../services/appIcons.js';
 import { getBrandingSettings } from '../services/branding.js';
+import { dispatchPluginEvent } from '../services/plugins.js';
 import { isValidEntraApplicationId, normalizeEntraApplicationId } from '../../shared/entra.js';
 import { normalizeAppSlug } from '../../shared/appSlug.js';
 
@@ -81,6 +82,25 @@ router.get('/:slug/sso-redirect', authenticate, (req, res) => {
   } catch (e) {
     console.error('Access log write failed:', e.message);
   }
+
+  void dispatchPluginEvent('app.access', {
+    app: {
+      id: app.id,
+      slug: app.slug,
+      name: app.name,
+      mode: app.mode,
+    },
+    user: {
+      id: req.user.id,
+      email: req.user.email,
+      role: req.user.role,
+    },
+    channel: 'sso-redirect',
+  }, {
+    actorId: req.user.id,
+    source: 'apps.sso-redirect',
+    appId: app.id,
+  });
 
   // Non-redirect apps (shared-cookie / redirect-plain) don't need an SSO POST:
   // the wildcard frontdoor_token cookie already authenticates them. Redirect
@@ -173,6 +193,25 @@ router.get('/:slug/entra-redirect', authenticate, (req, res) => {
     console.error('Access log write failed:', e.message);
   }
 
+  void dispatchPluginEvent('app.access', {
+    app: {
+      id: app.id,
+      slug: app.slug,
+      name: app.name,
+      mode: app.mode,
+    },
+    user: {
+      id: req.user.id,
+      email: req.user.email,
+      role: req.user.role,
+    },
+    channel: 'entra-redirect',
+  }, {
+    actorId: req.user.id,
+    source: 'apps.entra-redirect',
+    appId: app.id,
+  });
+
   const launcherUrl = `https://launcher.myapps.microsoft.com/api/signin/${app.sso_endpoint}?tenantId=${process.env.AZURE_TENANT_ID}`;
   res.redirect(launcherUrl);
 });
@@ -207,6 +246,23 @@ router.post('/:slug/track-access', authenticate, (req, res) => {
     console.error('Access log write failed:', e.message);
     return res.status(500).json({ error: 'Access log write failed' });
   }
+
+  void dispatchPluginEvent('app.access', {
+    app: {
+      id: app.id,
+      slug: req.params.slug,
+    },
+    user: {
+      id: req.user.id,
+      email: req.user.email,
+      role: req.user.role,
+    },
+    channel: 'track-access',
+  }, {
+    actorId: req.user.id,
+    source: 'apps.track-access',
+    appId: app.id,
+  });
 
   res.status(204).end();
 });

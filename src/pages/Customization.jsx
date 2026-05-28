@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, ChevronRight, Database, Eye, Home, Image, LogIn, Save, Settings, Smartphone, SlidersHorizontal, Trash2, Type, Wrench } from 'lucide-react';
+import { AlertCircle, BookOpen, CheckCircle2, ChevronRight, Database, Eye, Home, Image, LogIn, PlugZap, Save, Settings, ShieldCheck, Smartphone, SlidersHorizontal, Trash2, Type, Wrench } from 'lucide-react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useAuthStore } from '../stores/authStore';
 import { getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import PluginSurface from '../pluginHost/PluginSurface';
+import { PLUGIN_SURFACES } from '../pluginHost/constants';
 
 const emptyBranding = {
   heroTitleLine1: 'Your apps,',
@@ -25,6 +27,7 @@ const emptyBranding = {
   showSharedCookieMode: true,
   showRedirectSsoMode: true,
   showEntraAppMode: true,
+  pluginsEnabled: false,
 };
 
 const brandingKeys = [
@@ -46,6 +49,7 @@ const brandingKeys = [
   'showSharedCookieMode',
   'showRedirectSsoMode',
   'showEntraAppMode',
+  'pluginsEnabled',
 ];
 
 export default function Customization() {
@@ -78,6 +82,7 @@ export default function Customization() {
   const preferencesSectionRef = useRef(null);
   const mobileOptionsSectionRef = useRef(null);
   const maintenanceSectionRef = useRef(null);
+  const pluginsSectionRef = useRef(null);
   const brandingLogoInputRef = useRef(null);
   const ui = useMemo(() => getUiStrings(uiLanguage), [uiLanguage]);
   const languageOptions = useMemo(() => getSupportedLanguageOptions(ui), [ui]);
@@ -88,6 +93,7 @@ export default function Customization() {
     preferences: preferencesSectionRef,
     mobile: mobileOptionsSectionRef,
     maintenance: maintenanceSectionRef,
+    plugins: pluginsSectionRef,
   }), []);
 
   const pushNotice = (type, message) => {
@@ -276,6 +282,7 @@ export default function Customization() {
         showSharedCookieMode: branding.showSharedCookieMode,
         showRedirectSsoMode: branding.showRedirectSsoMode,
         showEntraAppMode: branding.showEntraAppMode,
+        pluginsEnabled: branding.pluginsEnabled,
         ...(removeBrandingLogo ? { removeLogo: true } : {}),
         ...(brandingLogoDataUrl ? { logoDataUrl: brandingLogoDataUrl } : {}),
       };
@@ -337,6 +344,7 @@ export default function Customization() {
     { id: 'apps', label: ui.customization.apps.title, ref: appOptionsSectionRef, icon: Settings },
     { id: 'preferences', label: ui.customization.preferences.title, ref: preferencesSectionRef, icon: SlidersHorizontal },
     { id: 'mobile', label: ui.customization.mobile.title, ref: mobileOptionsSectionRef, icon: Smartphone },
+    { id: 'plugins', label: ui.customization.plugins.title, ref: pluginsSectionRef, icon: PlugZap },
     { id: 'maintenance', label: ui.customization.maintenance.title, ref: maintenanceSectionRef, icon: Wrench },
   ];
 
@@ -393,6 +401,8 @@ export default function Customization() {
           <div className="text-sm font-medium">{pageNotice.message}</div>
         </div>
       )}
+
+      <PluginSurface surface={PLUGIN_SURFACES.CUSTOMIZATION_PAGE_TOP} variant="stack" className="mb-8" />
 
       <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
         <aside className="hidden xl:block xl:sticky xl:top-24 h-fit">
@@ -620,8 +630,8 @@ export default function Customization() {
 
               <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/45 p-6">
                 <div className="flex items-center gap-2 mb-5">
-                  <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 flex items-center justify-center">
-                    <Eye className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center">
+                    <Eye className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div>
                     <h2 className="text-lg font-bold text-dark dark:text-gray-100">{ui.customization.home.previewTitle}</h2>
@@ -660,7 +670,7 @@ export default function Customization() {
               </div>
 
               <div className="space-y-3">
-                <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+                <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
                   <input
                     type="checkbox"
                     checked={branding.showHomeHero !== false}
@@ -674,27 +684,24 @@ export default function Customization() {
                 </label>
 
                 <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-gray-900/5 dark:bg-white/10 flex items-center justify-center">
-                      <Eye className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                    </div>
-                    <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
                       <label htmlFor="home-desktop-view" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                         {ui.customization.home.desktopViewLabel}
                       </label>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                         {ui.customization.home.desktopViewHelp}
                       </p>
-                      <select
-                        id="home-desktop-view"
-                        value={branding.defaultHomeDesktopView}
-                        onChange={(e) => setBranding({ ...branding, defaultHomeDesktopView: e.target.value })}
-                        className="mt-3 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent disabled:opacity-60"
-                      >
-                        <option value="cards">{ui.customization.home.cards}</option>
-                        <option value="compact">{ui.customization.home.compact}</option>
-                      </select>
                     </div>
+                    <select
+                      id="home-desktop-view"
+                      value={branding.defaultHomeDesktopView}
+                      onChange={(e) => setBranding({ ...branding, defaultHomeDesktopView: e.target.value })}
+                      className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent lg:w-72 disabled:opacity-60"
+                    >
+                      <option value="cards">{ui.customization.home.cards}</option>
+                      <option value="compact">{ui.customization.home.compact}</option>
+                    </select>
                   </div>
                 </div>
 
@@ -705,8 +712,8 @@ export default function Customization() {
 
           <section id="apps" ref={appOptionsSectionRef} className="scroll-mt-32 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6">
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-950/50 flex items-center justify-center">
-                <Settings className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+              <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-950/50 flex items-center justify-center">
+                <Settings className="w-5 h-5 text-sky-600 dark:text-sky-400" />
               </div>
               <div>
                 <h2 className="text-lg font-bold text-dark dark:text-gray-100">{ui.customization.apps.title}</h2>
@@ -864,44 +871,6 @@ export default function Customization() {
                 </span>
               </label>
 
-              <div className="rounded-2xl border border-amber-100 dark:border-amber-800/55 bg-amber-50/50 dark:bg-amber-950/30 p-5">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.preferences.logRetentionTitle}</p>
-                      <div className={`rounded-full px-3 py-1 text-xs font-semibold ${branding.logRetentionDays === 0 ? 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300' : 'bg-white dark:bg-gray-900 text-amber-700 dark:text-amber-300'}`}>
-                        {branding.logRetentionDays === 0 ? ui.customization.preferences.logless : `${branding.logRetentionDays} ${ui.common.days}`}
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{ui.customization.preferences.logRetentionHelp}</p>
-                  </div>
-                </div>
-
-                {!brandingLoading ? (
-                  <div className="mt-4 space-y-4">
-                    <input
-                      type="range"
-                      min="0"
-                      max="90"
-                      step="1"
-                      value={branding.logRetentionDays ?? 90}
-                      onChange={(e) => setBranding({ ...branding, logRetentionDays: parseInt(e.target.value, 10) })}
-                      className="w-full accent-amber-500 dark:accent-amber-400"
-                    />
-
-                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                      <span>0 = {ui.customization.preferences.logless}</span>
-                      <span>90 = {ui.customization.preferences.recommended}</span>
-                    </div>
-
-                    <p className="rounded-xl border border-amber-200 dark:border-amber-800/50 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 leading-6">
-                      {ui.customization.preferences.logRetentionNotice}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="mt-4 h-24 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
-                )}
-              </div>
             </div>
 
             {renderSaveStatusBar('preferences')}
@@ -932,7 +901,7 @@ export default function Customization() {
                 </span>
               </label>
 
-              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
                 <input
                   type="checkbox"
                   checked={branding.hideHomeHeroOnMobile === true}
@@ -949,6 +918,141 @@ export default function Customization() {
             {renderSaveStatusBar('mobile')}
           </section>
 
+          <section id="plugins" ref={pluginsSectionRef} className="scroll-mt-32 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-950/50 flex items-center justify-center">
+                <PlugZap className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-dark dark:text-gray-100">{ui.customization.plugins.title}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{ui.customization.plugins.subtitle}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.plugins.killSwitchTitle}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.plugins.killSwitchHelp}</p>
+                  </div>
+                  <select
+                    value={branding.pluginsEnabled === true ? 'on' : 'off'}
+                    disabled
+                    onChange={(e) => setBranding({ ...branding, pluginsEnabled: e.target.value === 'on' })}
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent lg:w-72 disabled:cursor-not-allowed"
+                  >
+                    <option value="off">{ui.customization.plugins.killSwitchOff}</option>
+                    <option value="on">{ui.customization.plugins.killSwitchOn}</option>
+                  </select>
+                </div>
+              </div>
+
+              {branding.pluginsEnabled === true ? (
+                <RouterLink
+                  to="/admin/plugins"
+                  className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3 transition-colors hover:border-gray-300 dark:hover:border-gray-600 hover:bg-white dark:hover:bg-gray-800 block"
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.plugins.pluginTitle}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.plugins.openPluginsHelp}</p>
+                    </div>
+                    <div className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white">
+                      <PlugZap className="w-4 h-4" />
+                      {ui.customization.plugins.openPlugins}
+                    </div>
+                  </div>
+                </RouterLink>
+              ) : (
+                <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3 opacity-60">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.plugins.pluginTitle}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.plugins.openPluginsHelp}</p>
+                    </div>
+                    <div
+                      className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white"
+                      aria-disabled="true"
+                    >
+                      <PlugZap className="w-4 h-4" />
+                      {ui.customization.plugins.openPlugins}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {branding.pluginsEnabled === true ? (
+                <RouterLink
+                  to="/admin/plugins/audit"
+                  className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3 transition-colors hover:border-gray-300 dark:hover:border-gray-600 hover:bg-white dark:hover:bg-gray-800 block"
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.plugins.pluginAuditTitle}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.plugins.openPluginAuditHelp}</p>
+                    </div>
+                    <div className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white">
+                      <ShieldCheck className="w-4 h-4" />
+                      {ui.customization.plugins.openPluginAudit}
+                    </div>
+                  </div>
+                </RouterLink>
+              ) : (
+                <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3 opacity-60">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.plugins.pluginAuditTitle}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.plugins.openPluginAuditHelp}</p>
+                    </div>
+                    <div
+                      className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white"
+                      aria-disabled="true"
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      {ui.customization.plugins.openPluginAudit}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {branding.pluginsEnabled === true ? (
+                <RouterLink
+                  to="/admin/plugins/docs"
+                  className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3 transition-colors hover:border-gray-300 dark:hover:border-gray-600 hover:bg-white dark:hover:bg-gray-800 block"
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.plugins.pluginDocsTitle}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.plugins.openPluginDocsHelp}</p>
+                    </div>
+                    <div className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white">
+                      <BookOpen className="w-4 h-4" />
+                      {ui.customization.plugins.openPluginDocs}
+                    </div>
+                  </div>
+                </RouterLink>
+              ) : (
+                <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3 opacity-60">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.plugins.pluginDocsTitle}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.plugins.openPluginDocsHelp}</p>
+                    </div>
+                    <div
+                      className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white"
+                      aria-disabled="true"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      {ui.customization.plugins.openPluginDocs}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </section>
+
           <section id="maintenance" ref={maintenanceSectionRef} className="scroll-mt-32 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center">
@@ -961,6 +1065,22 @@ export default function Customization() {
             </div>
 
             <div className="space-y-3">
+              <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.maintenance.backupRestoreTitle}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.maintenance.backupRestoreHelp}</p>
+                  </div>
+                  <RouterLink
+                    to="/admin/backup"
+                    className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
+                  >
+                    <Database className="h-4 w-4" />
+                    {ui.customization.maintenance.openBackupRestore}
+                  </RouterLink>
+                </div>
+              </div>
+
               <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
@@ -1027,12 +1147,51 @@ export default function Customization() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-red-100 dark:border-red-900/55 bg-red-50/50 dark:bg-red-950/30 p-5">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.maintenance.accessLogCleanupTitle}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{ui.customization.maintenance.accessLogCleanupHelp}</p>
+              <div className="rounded-2xl border border-amber-100 dark:border-amber-800/55 bg-amber-50/50 dark:bg-amber-950/30 p-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.preferences.logRetentionTitle}</p>
+                      <div className={`rounded-full px-3 py-1 text-xs font-semibold ${branding.logRetentionDays === 0 ? 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300' : 'bg-white dark:bg-gray-900 text-amber-700 dark:text-amber-300'}`}>
+                        {branding.logRetentionDays === 0 ? ui.customization.preferences.logless : `${branding.logRetentionDays} ${ui.common.days}`}
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{ui.customization.preferences.logRetentionHelp}</p>
+                  </div>
                 </div>
+
+                {!brandingLoading ? (
+                  <div className="mt-4 space-y-4">
+                    <input
+                      type="range"
+                      min="0"
+                      max="90"
+                      step="1"
+                      value={branding.logRetentionDays ?? 90}
+                      onChange={(e) => setBranding({ ...branding, logRetentionDays: parseInt(e.target.value, 10) })}
+                      className="w-full accent-amber-500 dark:accent-amber-400"
+                    />
+
+                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                      <span>0 = {ui.customization.preferences.logless}</span>
+                      <span>90 = {ui.customization.preferences.recommended}</span>
+                    </div>
+
+                    <p className="rounded-xl border border-amber-200 dark:border-amber-800/50 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 leading-6">
+                      {ui.customization.preferences.logRetentionNotice}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-4 h-24 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-red-100 dark:border-red-900/55 bg-red-50/50 dark:bg-red-950/30 p-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.maintenance.accessLogCleanupTitle}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{ui.customization.maintenance.accessLogCleanupHelp}</p>
+                  </div>
                   <div className="flex items-start lg:shrink-0">
                     <button
                       type="button"
@@ -1053,25 +1212,12 @@ export default function Customization() {
               </div>
             </div>
 
-            <div className="mt-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.maintenance.backupRestoreTitle}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.maintenance.backupRestoreHelp}</p>
-                </div>
-                <RouterLink
-                  to="/admin/backup"
-                  className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
-                >
-                  <Database className="h-4 w-4" />
-                  {ui.customization.maintenance.openBackupRestore}
-                </RouterLink>
-              </div>
-            </div>
           </section>
 
         </div>
       </div>
+
+      <PluginSurface surface={PLUGIN_SURFACES.CUSTOMIZATION_PAGE_BOTTOM} variant="stack" className="mt-8" />
 
       <ConfirmDialog
         open={Boolean(confirmDialog)}

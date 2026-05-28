@@ -9,7 +9,8 @@ export default function ClearableSearchField({
   inputClassName = '',
   autoFocus = false,
   inputRef,
-  tabIndex,
+  searchShortcutTarget,
+  searchShortcutLabel,
   onKeyDown,
   clearLabel = 'Clear search',
 }) {
@@ -45,31 +46,43 @@ export default function ClearableSearchField({
   };
 
   return (
-    <div className={`relative ${className}`}>
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-      <input
-        type="text"
-        value={value}
-        ref={inputRef}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        autoFocus={autoFocus}
-        tabIndex={tabIndex}
-        className={`w-full pl-10 pr-10 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500 ${inputClassName}`}
-      />
-      {value && (
-        <button
-          type="button"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => onChange('')}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
-          aria-label={clearLabel}
-          title={clearLabel}
-        >
-          <X className="w-4 h-4" />
-        </button>
-      )}
+    <div className={className}>
+      <div className="flex w-full h-12 items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 text-sm text-gray-900 dark:text-gray-100 focus-within:ring-2 focus-within:ring-accent dark:focus-within:ring-gray-500">
+        <Search className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
+        <input
+          type="text"
+          value={value}
+          ref={inputRef}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          autoFocus={autoFocus}
+          data-frontdoor-search-target={searchShortcutTarget || undefined}
+          className={`min-w-0 flex-1 h-full border-0 bg-transparent p-0 text-sm leading-none text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 dark:text-gray-100 dark:placeholder:text-gray-500 ${inputClassName}`}
+        />
+        <div className="flex items-center gap-2 shrink-0">
+          {searchShortcutTarget && searchShortcutLabel && (
+            <span
+              className="hidden md:inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500"
+              aria-hidden="true"
+            >
+              {searchShortcutLabel}
+            </span>
+          )}
+          {value && (
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => onChange('')}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 dark:text-gray-500 transition-colors hover:bg-gray-100 hover:text-dark dark:hover:bg-gray-800 dark:hover:text-white"
+              aria-label={clearLabel}
+              title={clearLabel}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

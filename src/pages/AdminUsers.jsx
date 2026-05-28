@@ -368,13 +368,14 @@ export default function AdminUsers() {
               onChange={setSearch}
               placeholder={ui.admin.users.searchPlaceholder}
               clearLabel={ui.common.clearSearch}
-              tabIndex={1}
+              searchShortcutTarget="primary"
+              searchShortcutLabel={ui.common.searchShortcut}
             />
           </div>
           <select
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
-            className="px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-accent"
+            className="h-12 px-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="all">{t.allRoles}</option>
             <option value="owner">{u.ownerBadge}</option>
@@ -385,7 +386,7 @@ export default function AdminUsers() {
           <select
             value={filterActive}
             onChange={(e) => setFilterActive(e.target.value)}
-            className="px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-accent"
+            className="h-12 px-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="all">{t.allStatuses}</option>
             <option value="active">{t.activeOnly}</option>

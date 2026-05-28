@@ -280,7 +280,8 @@ export default function AdminIcons() {
               onChange={handleSearchChange}
               placeholder={ui.admin.icons.searchPlaceholder}
               clearLabel={ui.common.clearSearch}
-              tabIndex={1}
+              searchShortcutTarget="primary"
+              searchShortcutLabel={ui.common.searchShortcut}
             />
           </div>
 

@@ -32,6 +32,7 @@ const DEFAULT_BRANDING = {
   showSharedCookieMode: true,
   showRedirectSsoMode: true,
   showEntraAppMode: true,
+  pluginsEnabled: false,
   logoUrl: null,
 };
 
@@ -84,6 +85,7 @@ function toPublicBranding(row) {
     showSharedCookieMode: row?.show_shared_cookie_mode !== 0,
     showRedirectSsoMode: row?.show_redirect_sso_mode !== 0,
     showEntraAppMode: row?.show_entra_app_mode !== 0,
+    pluginsEnabled: row?.plugins_enabled === 1,
     logoUrl: row?.logo_file_name ? `/api/branding/logo?v=${logoVersion || Date.now()}` : null,
     updatedAt: row?.updated_at || null,
   };
@@ -110,6 +112,7 @@ function buildBrandingAuditDetails(currentRow, nextBranding, input = {}) {
     'showSharedCookieMode',
     'showRedirectSsoMode',
     'showEntraAppMode',
+    'pluginsEnabled',
   ];
 
   const changes = changedKeys
@@ -244,6 +247,7 @@ export async function updateBrandingSettings(input = {}) {
   const showEntraAppMode = input.showEntraAppMode === undefined
     ? (current?.show_entra_app_mode ?? 1)
     : (input.showEntraAppMode ? 1 : 0);
+  const pluginsEnabled = 0;
 
   let logoFileName = current?.logo_file_name || null;
   let logoContentType = current?.logo_content_type || null;
@@ -259,9 +263,9 @@ export async function updateBrandingSettings(input = {}) {
 
   db.prepare(`
     INSERT INTO branding_settings (
-      id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, default_color_scheme, enable_dark_mode_beta, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type, updated_at
+      id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, default_color_scheme, enable_dark_mode_beta, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, plugins_enabled, logo_file_name, logo_content_type, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       hero_title_line1 = excluded.hero_title_line1,
       hero_title_line2 = excluded.hero_title_line2,
@@ -281,6 +285,7 @@ export async function updateBrandingSettings(input = {}) {
       show_shared_cookie_mode = excluded.show_shared_cookie_mode,
       show_redirect_sso_mode = excluded.show_redirect_sso_mode,
       show_entra_app_mode = excluded.show_entra_app_mode,
+      plugins_enabled = excluded.plugins_enabled,
       logo_file_name = excluded.logo_file_name,
       logo_content_type = excluded.logo_content_type,
       updated_at = datetime('now')
@@ -304,6 +309,7 @@ export async function updateBrandingSettings(input = {}) {
     showSharedCookieMode,
     showRedirectSsoMode,
     showEntraAppMode,
+    pluginsEnabled,
     logoFileName,
     logoContentType
   );
@@ -348,3 +354,7 @@ export async function serveBrandingLogo(res) {
 }
 
 export { BRANDING_ASSET_DIR, DEFAULT_BRANDING };
+
+export function isPluginSystemEnabled() {
+  return getBrandingSettings().pluginsEnabled === true;
+}

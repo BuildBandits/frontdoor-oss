@@ -240,7 +240,8 @@ export default function AdminGroupTransfer() {
               onChange={setGroupSearch}
               placeholder={g.transferAppsSearchPlaceholder}
               clearLabel={ui.common.clearSearch}
-              tabIndex={1}
+              searchShortcutTarget="primary"
+              searchShortcutLabel={ui.common.searchShortcut}
             />
 
               <div className="grid gap-4 sm:grid-cols-2">

@@ -8,6 +8,8 @@ import AppFooter from './AppFooter';
 import UserAvatar from './UserAvatar';
 import api from '../services/api';
 import { getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import PluginSurface from '../pluginHost/PluginSurface';
+import { PLUGIN_SURFACES } from '../pluginHost/constants';
 import {
   HOME_TOUR_ACCOUNT_MENU_CLOSE_EVENT,
   HOME_TOUR_ACCOUNT_MENU_OPEN_EVENT,
@@ -70,6 +72,52 @@ export default function Layout({ children }) {
   useEffect(() => {
     setAccountMenuOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof HTMLElement
+        && activeElement !== document.body
+        && activeElement !== document.documentElement
+      ) {
+        activeElement.blur();
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      const isShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k';
+      if (!isShortcut) return;
+
+      const activeElement = document.activeElement;
+      const isTypingField = activeElement && (
+        activeElement.tagName === 'INPUT'
+        || activeElement.tagName === 'TEXTAREA'
+        || activeElement.tagName === 'SELECT'
+        || activeElement.isContentEditable
+      );
+
+      if (isTypingField && activeElement?.dataset?.frontdoorSearchTarget === 'primary') {
+        return;
+      }
+
+      const target = document.querySelector('[data-frontdoor-search-target="primary"]');
+      if (!(target instanceof HTMLElement)) return;
+
+      event.preventDefault();
+      target.focus();
+      if (typeof target.select === 'function') {
+        target.select();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -343,13 +391,13 @@ export default function Layout({ children }) {
                     <Settings className="w-4 h-4" />
                     {ui.nav.apps}
                   </Link>
-                  <Link to="/admin/groups" className={navLinkClass('/admin/groups')}>
-                    <Users className="w-4 h-4" />
-                    {ui.nav.groups}
-                  </Link>
                   <Link to="/admin/users" className={navLinkClass('/admin/users')}>
                     <UserCog className="w-4 h-4" />
                     {ui.nav.users}
+                  </Link>
+                  <Link to="/admin/groups" className={navLinkClass('/admin/groups')}>
+                    <Users className="w-4 h-4" />
+                    {ui.nav.groups}
                   </Link>
                   {isOwner && (
                     <Link to="/admin/logs" className={navLinkClass('/admin/logs')}>
@@ -371,6 +419,8 @@ export default function Layout({ children }) {
                   )}
                 </>
               )}
+
+              <PluginSurface surface={PLUGIN_SURFACES.LAYOUT_NAV_DESKTOP} variant="nav" />
 
               <div ref={accountMenuRef} className="relative ml-3 pl-3 border-l border-gray-100 dark:border-gray-800">
                 <button
@@ -542,6 +592,11 @@ export default function Layout({ children }) {
                         </div>
                       </>
                     )}
+                    <PluginSurface
+                      surface={PLUGIN_SURFACES.LAYOUT_ACCOUNT_MENU}
+                      variant="menu"
+                      className="px-1 py-1"
+                    />
                     <div className="my-1 h-px bg-gray-100 dark:bg-gray-800" />
                     <button
                       type="button"
@@ -589,17 +644,17 @@ export default function Layout({ children }) {
                       </div>
                       <span className="sr-only">{ui.nav.apps}</span>
                     </Link>
-                    <Link to="/admin/groups" className={mobileNavIconClass('/admin/groups')} aria-label={ui.nav.groups} title={ui.nav.groups}>
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
-                        <Users className="w-4 h-4" />
-                      </div>
-                      <span className="sr-only">{ui.nav.groups}</span>
-                    </Link>
                     <Link to="/admin/users" className={mobileNavIconClass('/admin/users')} aria-label={ui.nav.users} title={ui.nav.users}>
                       <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
                         <UserCog className="w-4 h-4" />
                       </div>
                       <span className="sr-only">{ui.nav.users}</span>
+                    </Link>
+                    <Link to="/admin/groups" className={mobileNavIconClass('/admin/groups')} aria-label={ui.nav.groups} title={ui.nav.groups}>
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <span className="sr-only">{ui.nav.groups}</span>
                     </Link>
                     {isOwner && (
                       <Link to="/admin/logs" className={mobileNavIconClass('/admin/logs')} aria-label={ui.nav.logs} title={ui.nav.logs}>
@@ -627,6 +682,8 @@ export default function Layout({ children }) {
                     )}
                   </>
                 )}
+
+                <PluginSurface surface={PLUGIN_SURFACES.LAYOUT_NAV_MOBILE} variant="mobile-nav" />
               </div>
 
               <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 space-y-3">

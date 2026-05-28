@@ -10,6 +10,7 @@ import { getRequiredEnv, isDevLoginEnabled } from '../config.js';
 import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, refreshGroupCacheFromTenant, syncUserEntraGroups } from '../services/entraGroups.js';
 import { ensureAvatarCached } from '../services/avatars.js';
 import { verifySsoTokenChain } from '../services/verifySsoToken.js';
+import { dispatchPluginEvent } from '../services/plugins.js';
 import { logRbacAudit } from '../db.js';
 import { isSupportedLanguage } from '../../shared/languages.js';
 import { isSupportedColorScheme, normalizeOptionalColorScheme } from '../../shared/colorSchemes.js';
@@ -202,6 +203,7 @@ router.get('/microsoft/callback', async (req, res) => {
 
     // Find or create user
     let user = db.prepare('SELECT * FROM users WHERE microsoft_id = ? AND is_active = 1').get(microsoftId);
+    let isNewUser = false;
 
     if (!user) {
       user = db.prepare('SELECT * FROM users WHERE email = ? AND is_active = 1').get(email);
@@ -229,6 +231,7 @@ router.get('/microsoft/callback', async (req, res) => {
       `).run(userId, email, displayName, microsoftId, role, avatarColor);
 
       user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+      isNewUser = true;
 
       // Auto-add to "default" group only for brand new users (not pre-registered)
       db.prepare('INSERT OR IGNORE INTO user_group_members (user_id, group_id) VALUES (?, ?)').run(userId, DEFAULT_GROUP_ID);
@@ -275,6 +278,23 @@ router.get('/microsoft/callback', async (req, res) => {
       sameSite: 'lax',
       domain: `.${baseDomain}`,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    void dispatchPluginEvent('auth.login', {
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        displayName: user.display_name,
+      },
+      auth: {
+        microsoftId: user.microsoft_id,
+        via: 'microsoft',
+        isNewUser,
+      },
+    }, {
+      actorId: user.id,
+      source: 'auth.microsoft.callback',
     });
 
     // Token is in httpOnly cookie — no user data in the URL to avoid leaking PII via
@@ -474,6 +494,21 @@ router.post('/dev-login', (req, res) => {
     sameSite: 'lax',
     domain: baseDomain === 'localhost' ? undefined : `.${baseDomain}`,
     maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  void dispatchPluginEvent('auth.devLogin', {
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      displayName: user.display_name,
+    },
+    auth: {
+      via: 'dev-login',
+    },
+  }, {
+    actorId: user.id,
+    source: 'auth.dev-login',
   });
 
   console.log(`Dev login: ${devEmail} (${role})`);

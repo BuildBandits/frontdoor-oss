@@ -11,12 +11,14 @@ import brandingRoutes from './routes/branding.js';
 import appsRoutes from './routes/apps.js';
 import backupsRoutes from './routes/backups.js';
 import mediaAssetsRoutes from './routes/mediaAssets.js';
+import pluginsRoutes from './routes/plugins.js';
 import usersRoutes from './routes/users.js';
 import groupsRoutes from './routes/groups.js';
 import logsRoutes, { purgeLogsOlderThan } from './routes/logs.js';
 import { getStartupConfig, validateStartupEnv } from './config.js';
-import { getBrandingSettings } from './services/branding.js';
+import { getBrandingSettings, isPluginSystemEnabled } from './services/branding.js';
 import { backfillMediaLibrary } from './services/mediaAssets.js';
+import { PLUGIN_ASSET_DIR } from './services/plugins.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -55,6 +57,7 @@ function logDatabaseBackedSettings() {
       showSharedCookieMode: branding.showSharedCookieMode,
       showRedirectSsoMode: branding.showRedirectSsoMode,
       showEntraAppMode: branding.showEntraAppMode,
+      pluginsEnabled: branding.pluginsEnabled,
       hideLoginPage: branding.hideLoginPage,
       useEuropeanDateFormat: branding.useEuropeanDateFormat,
       use24hTimeFormat: branding.use24hTimeFormat,
@@ -150,11 +153,18 @@ app.get('/api/health', (req, res) => {
 });
 
 // API routes
+app.use('/api/plugins/files', (req, res, next) => {
+  if (!isPluginSystemEnabled()) {
+    return res.status(404).end();
+  }
+  return express.static(PLUGIN_ASSET_DIR, { dotfiles: 'deny' })(req, res, next);
+});
 app.use('/api/auth', authRoutes);
 app.use('/api/branding', brandingRoutes);
 app.use('/api/apps', appsRoutes);
 app.use('/api/backups', backupsRoutes);
 app.use('/api/media-assets', mediaAssetsRoutes);
+app.use('/api/plugins', pluginsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/groups', groupsRoutes);
 app.use('/api/logs', logsRoutes);

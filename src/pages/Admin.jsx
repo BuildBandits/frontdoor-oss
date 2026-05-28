@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Pencil, Trash2, X, RotateCcw, Save, Copy, Users, ChevronDown, ChevronUp, Check, SlidersHorizontal } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import TagInput from '../components/TagInput';
@@ -11,6 +11,8 @@ import ClearableSearchField from '../components/ClearableSearchField';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { normalizeEntraApplicationId } from '../../shared/entra.js';
 import { normalizeAppSlug, suggestAppSlug } from '../../shared/appSlug.js';
+import PluginSurface from '../pluginHost/PluginSurface';
+import { PLUGIN_SURFACES } from '../pluginHost/constants';
 
 const emptyApp = { name: '', slug: '', description: '', long_description: '', icon: '📦', target_url: '', sort_order: 0, mode: 'redirect-plain', sso_endpoint: '', sso_method: 'GET', tags: [] };
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
@@ -749,6 +751,7 @@ export default function Admin() {
           <Plus className="w-4 h-4" />
           {ui.admin.apps.new}
         </button>
+        <PluginSurface surface={PLUGIN_SURFACES.ADMIN_HEADER_ACTIONS} variant="toolbar" className="justify-end max-sm:w-full" />
       </div>
 
       {!canEdit && (
@@ -768,6 +771,8 @@ export default function Admin() {
         </div>
       )}
 
+      <PluginSurface surface={PLUGIN_SURFACES.ADMIN_PAGE_TOP} variant="stack" className="mb-6" />
+
       <div className="mb-6 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-[220px]">
@@ -776,14 +781,15 @@ export default function Admin() {
               onChange={setAppSearch}
               placeholder={ui.admin.apps.searchPlaceholder}
               clearLabel={ui.common.clearSearch}
-              tabIndex={1}
+              searchShortcutTarget="primary"
+              searchShortcutLabel={ui.common.searchShortcut}
             />
           </div>
           <div className="relative" ref={modeFilterRef}>
             <button
               type="button"
               onClick={() => setModeFilterOpen((prev) => !prev)}
-              className="relative inline-flex min-w-[220px] items-center w-full pl-10 pr-10 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-left text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900"
+              className="relative inline-flex min-w-[220px] h-12 items-center w-full pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-left text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900"
             >
               <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
               <span className="truncate">{currentModeFilterOption.label}</span>
@@ -830,7 +836,7 @@ export default function Admin() {
             <button
               type="button"
               onClick={() => setShowOnlyUnlabeledApps((prev) => !prev)}
-              className={`inline-flex min-w-[220px] items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-amber-700 dark:focus-visible:ring-offset-gray-900 ${
+              className={`inline-flex h-12 min-w-[220px] items-center justify-center rounded-xl border px-4 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-amber-700 dark:focus-visible:ring-offset-gray-900 ${
                 showOnlyUnlabeledApps
                   ? 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-600 dark:bg-amber-950/55 dark:text-amber-200'
                   : 'border-amber-200 bg-white dark:border-amber-800/70 dark:bg-gray-900 text-amber-900 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/35'
@@ -997,6 +1003,8 @@ export default function Admin() {
           </div>
         </div>
       )}
+
+      <PluginSurface surface={PLUGIN_SURFACES.ADMIN_PAGE_BOTTOM} variant="stack" className="mt-6" />
 
       {/* Modal */}
       {editing !== null && (

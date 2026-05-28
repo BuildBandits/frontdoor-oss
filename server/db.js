@@ -69,6 +69,7 @@ db.exec(`
     show_shared_cookie_mode INTEGER DEFAULT 1,
     show_redirect_sso_mode INTEGER DEFAULT 1,
     show_entra_app_mode INTEGER DEFAULT 1,
+    plugins_enabled INTEGER DEFAULT 0,
     logo_file_name TEXT,
     logo_content_type TEXT,
     created_at TEXT DEFAULT (datetime('now')),
@@ -155,7 +156,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     actor_id TEXT NOT NULL,
     action TEXT NOT NULL,
-    target_type TEXT NOT NULL CHECK(target_type IN ('group', 'membership', 'permission', 'role', 'user_status', 'app', 'branding', 'auth')),
+    target_type TEXT NOT NULL CHECK(target_type IN ('group', 'membership', 'permission', 'role', 'user_status', 'app', 'branding', 'auth', 'plugin')),
     target_id TEXT,
     details TEXT,
     created_at TEXT DEFAULT (datetime('now'))
@@ -164,6 +165,28 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS auth_pending_states (
     state TEXT PRIMARY KEY,
     created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS plugin_registry (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    version TEXT DEFAULT '0.0.0',
+    source TEXT DEFAULT 'local',
+    entry TEXT,
+    manifest_json TEXT NOT NULL DEFAULT '{}',
+    permissions_json TEXT DEFAULT '[]',
+    roles_json TEXT,
+    backend_enabled INTEGER DEFAULT 0,
+    backend_url TEXT,
+    backend_secret TEXT,
+    event_subscriptions_json TEXT DEFAULT '[]',
+    approved INTEGER DEFAULT 0,
+    approved_by TEXT,
+    approved_at TEXT,
+    enabled INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
   );
 
   -- Secondary indexes for RBAC join performance
@@ -184,6 +207,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_rbac_audit_target ON rbac_audit_logs(target_type, target_id);
   CREATE INDEX IF NOT EXISTS idx_entra_group_cache_last_seen ON entra_group_cache(last_seen_at);
   CREATE INDEX IF NOT EXISTS idx_entra_user_group_memberships_group ON entra_user_group_memberships(entra_group_id);
+  CREATE INDEX IF NOT EXISTS idx_plugin_registry_enabled ON plugin_registry(enabled);
+  CREATE INDEX IF NOT EXISTS idx_plugin_registry_source ON plugin_registry(source);
 `);
 
 function ensureColumn(tableName, columnName, columnDefinition) {
@@ -217,6 +242,7 @@ ensureColumn('branding_settings', 'hide_login_page', 'hide_login_page INTEGER DE
 ensureColumn('branding_settings', 'show_shared_cookie_mode', 'show_shared_cookie_mode INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'show_redirect_sso_mode', 'show_redirect_sso_mode INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'show_entra_app_mode', 'show_entra_app_mode INTEGER DEFAULT 1');
+ensureColumn('branding_settings', 'plugins_enabled', 'plugins_enabled INTEGER DEFAULT 0');
 ensureColumn('branding_settings', 'default_color_scheme', "default_color_scheme TEXT DEFAULT 'light' CHECK(default_color_scheme IN ('light', 'dark', 'auto'))");
 ensureColumn('branding_settings', 'enable_dark_mode_beta', 'enable_dark_mode_beta INTEGER DEFAULT 0');
 ensureColumn('entra_group_cache', 'description', 'description TEXT');
@@ -224,6 +250,9 @@ ensureColumn('media_assets', 'app_name', 'app_name TEXT');
 ensureColumn('media_assets', 'app_slug', 'app_slug TEXT');
 ensureColumn('media_assets', 'app_target_url', 'app_target_url TEXT');
 ensureColumn('media_assets', 'app_mode', 'app_mode TEXT');
+ensureColumn('plugin_registry', 'approved', 'approved INTEGER DEFAULT 0');
+ensureColumn('plugin_registry', 'approved_by', 'approved_by TEXT');
+ensureColumn('plugin_registry', 'approved_at', 'approved_at TEXT');
 db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(app_slug);');
 
 // Migration: normalize user roles to owner/admin/admin_readonly/user on existing databases.
@@ -353,13 +382,14 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         show_shared_cookie_mode INTEGER DEFAULT 1,
         show_redirect_sso_mode INTEGER DEFAULT 1,
         show_entra_app_mode INTEGER DEFAULT 1,
+        plugins_enabled INTEGER DEFAULT 0,
         logo_file_name TEXT,
         logo_content_type TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       );
-      INSERT INTO branding_settings_new (id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type, created_at, updated_at)
-      SELECT id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type, created_at, updated_at
+      INSERT INTO branding_settings_new (id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, plugins_enabled, logo_file_name, logo_content_type, created_at, updated_at)
+      SELECT id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, COALESCE(plugins_enabled, 0), logo_file_name, logo_content_type, created_at, updated_at
       FROM branding_settings;
       DROP TABLE branding_settings;
       ALTER TABLE branding_settings_new RENAME TO branding_settings;
@@ -371,14 +401,14 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
 // Migration: expand RBAC audit target types on existing databases.
 {
   const auditSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='rbac_audit_logs'").get();
-  if (auditSchema && (!auditSchema.sql.includes("'app'") || !auditSchema.sql.includes("'branding'") || !auditSchema.sql.includes("'auth'"))) {
+  if (auditSchema && (!auditSchema.sql.includes("'app'") || !auditSchema.sql.includes("'branding'") || !auditSchema.sql.includes("'auth'") || !auditSchema.sql.includes("'plugin'"))) {
     db.pragma('foreign_keys = OFF');
     db.exec(`
       CREATE TABLE rbac_audit_logs_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         actor_id TEXT NOT NULL,
         action TEXT NOT NULL,
-        target_type TEXT NOT NULL CHECK(target_type IN ('group', 'membership', 'permission', 'role', 'user_status', 'app', 'branding', 'auth')),
+        target_type TEXT NOT NULL CHECK(target_type IN ('group', 'membership', 'permission', 'role', 'user_status', 'app', 'branding', 'auth', 'plugin')),
         target_id TEXT,
         details TEXT,
         created_at TEXT DEFAULT (datetime('now'))
@@ -439,6 +469,7 @@ db.exec('UPDATE branding_settings SET hide_login_page = COALESCE(hide_login_page
 db.exec('UPDATE branding_settings SET show_shared_cookie_mode = COALESCE(show_shared_cookie_mode, 1)');
 db.exec('UPDATE branding_settings SET show_redirect_sso_mode = COALESCE(show_redirect_sso_mode, 1)');
 db.exec('UPDATE branding_settings SET show_entra_app_mode = COALESCE(show_entra_app_mode, 1)');
+db.exec('UPDATE branding_settings SET plugins_enabled = COALESCE(plugins_enabled, 0)');
 
 db.exec("UPDATE user_groups SET source = 'local' WHERE source IS NULL OR source NOT IN ('local', 'entra');");
 db.exec("CREATE INDEX IF NOT EXISTS idx_user_groups_source ON user_groups(source);");
@@ -459,9 +490,9 @@ db.exec(`
 
 db.prepare(`
   INSERT OR IGNORE INTO branding_settings (
-    id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, logo_file_name, logo_content_type
+    id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, plugins_enabled, logo_file_name, logo_content_type
   )
-  VALUES (?, ?, ?, ?, 1, 0, 1, 'cards', 0, 'en', 0, 0, 90, 0, 1, 1, 1, NULL, NULL)
+  VALUES (?, ?, ?, ?, 1, 0, 1, 'cards', 0, 'en', 0, 0, 90, 0, 1, 1, 1, 0, NULL, NULL)
 `).run(
   'default',
   'Your apps,',

@@ -98,16 +98,17 @@ export default function AdminLogs() {
               onChange={setSearch}
               placeholder={ui.admin.logs.searchPlaceholder}
               clearLabel={ui.common.clearSearch}
-              tabIndex={1}
+              searchShortcutTarget="primary"
+              searchShortcutLabel={ui.common.searchShortcut}
             />
           </div>
-          <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
+          <div className="inline-flex h-12 items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 text-sm text-gray-600 dark:text-gray-300">
             <Filter className="w-4 h-4 text-gray-400 dark:text-gray-500" />
             <span>{ui.admin.logs.period}</span>
             <select
               value={retentionDays}
               onChange={(e) => setRetentionDays(parseInt(e.target.value, 10))}
-              className="bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none"
+              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none"
             >
               {periodOptions.map((days) => (
                 <option key={days} value={days}>
@@ -116,12 +117,12 @@ export default function AdminLogs() {
               ))}
             </select>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
+          <div className="inline-flex h-12 items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 text-sm text-gray-600 dark:text-gray-300">
             <span className="text-gray-400 dark:text-gray-500">{ui.admin.logs.rows}</span>
             <select
               value={pageSize}
               onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
-              className="bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none"
+              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none"
             >
               <option value={50}>50</option>
               <option value={100}>100</option>

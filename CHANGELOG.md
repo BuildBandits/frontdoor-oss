@@ -6,8 +6,40 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+- **Experimental plugin platform**: Frontdoor now has a real plugin host with runtime registration, shared APIs, extension surfaces, plugin routes, action injection, and a sample third-party-style plugin package. The host keeps the core app minimal while letting plugins extend navigation, account actions, admin surfaces and dedicated pages without touching core UI code.
+- **Plugin packaging**: the admin UI can now import and export plugins as a single JSON package or as a ZIP archive containing `manifest.json` and `module.mjs`. Packages are validated before approval, and the review flow shows permissions, roles, backend exposure and a raw payload preview.
+- **Plugin audit trail**: owner-only plugin approvals and revocations are now written to the RBAC audit log with `target_type = plugin`, and a dedicated `/admin/plugins/audit` page makes those events easy to review and filter.
+- **Plugin bundle persistence**: when a plugin is imported with module source, Frontdoor stores a local bundle and serves it back through the runtime loader instead of requiring a manual database edit.
+- **Search shortcut hint**: the shared search field now exposes a visible `CTRL+K / ⌘K` hint and supports a global `Ctrl/Cmd+K` shortcut that focuses the primary search input on pages that have one.
+
 ### Changed
-- **Home tour**: the onboarding flow now opens with a centered welcome step, then guides users through search, the catalog, app-card favorites/info icons, the personal menu, and a final step about setting Frontdoor as homepage or bookmarking it. The last step also suggests browser-specific help based on the detected browser.
+- **Plugin kill switch**: the plugin system now has a tenant-level checkbox in Personalizza. In 1.2.5 it is visible but locked off, so plugin runtime loading, plugin routes, plugin surfaces and plugin admin pages all stay unavailable until the future 1.3.0 work lands.
+- **Plugin administration flow**: the Plugins page now acts as an installation, review and approval console rather than a database-oriented maintenance screen. Owners can approve or revoke packages, export them again as JSON or ZIP, and jump straight to the plugin audit trail from the same view.
+- **Runtime filtering**: audit queries and plugin loading paths now distinguish plugin records explicitly, so operational logs, plugin approvals and runtime bundles stay separated from the rest of the admin audit history.
+- **Plugin safety**: plugin rendering, registration and review now fail closed. Invalid packages are rejected during validation, runtime errors are isolated to the plugin surface that triggered them, and approved bundles are the only ones mounted into the host runtime.
+- **Admin navigation**: the plugin area now exposes a direct owner-only link to the dedicated plugin audit view for quicker review of third-party changes.
+- **Personalizza layout**: the Plugins shortcuts now sit before Maintenance, the Backup and restore card is the first maintenance item, and the Home preview and Apps section icons no longer reuse the same violet accent. The plugin shortcuts also use dedicated plugin labels instead of maintenance copy.
+- **Personalizza polish**: the plugin shortcuts now use the violet accent again, and the Home desktop view selector no longer shows its standalone icon wrapper.
+- **Maintenance layout**: the Log retention control now lives in Maintenance above the access log cleanup card, and the section subtitles were updated to match the new organization.
+- **Maintenance ordering**: the Maintenance cards are now alphabetized as Backup and restore, Avatar cache, App icon cache, Log retention and Access log cleanup.
+- **Customization polish**: the mobile hero toggles now share the same card treatment, and the plugin shortcuts are rendered as stacked action rows closer to the maintenance cards.
+- **Customization copy**: plugin shortcut rows now have more descriptive helper text, and the mobile hero toggles were aligned so their cards share the same visual treatment.
+- **Customization surfaces**: the Home desktop view and mobile toggle cards were restored to the shared gray-50 card background used elsewhere in the page.
+- **Customization backgrounds**: the Home hero toggle and the two Mobile toggle rows now use the shared gray-50 card background again, matching the rest of the page chrome.
+- **Plugin shortcut labels**: the plugin rows now keep icons only in the action buttons, with shorter section titles and more explicit helper text in the left column.
+- **Plugin docs layout**: the standalone plugin documentation page is now a single vertical flow, and the redundant intro note has been removed so the examples read like one coherent reference instead of a split layout.
+- **Plugin admin crash**: restored the missing `FileJson` import on the plugin admin page so `/admin/plugins` no longer crashes on load with `ReferenceError: FileJson is not defined`.
+
+### Fixed
+- **Plugin registration diagnostics**: startup now reports when plugin bundles are discovered, loaded, served or fail to register, making it easier to diagnose why an approved plugin is not visible in the UI.
+- **Plugin approval auditability**: approval and revocation actions now capture the acting owner in the audit trail instead of relying on an implicit system entry.
+- **Audit visibility**: plugin-related audit rows are now filtered into a dedicated owner-only page, so they no longer need to be inferred from the generic audit stream.
+- **Plugin ZIP runtime import**: the shared ZIP helper now lives in the root `shared/` module set, so the server can load plugin archive support in container deployments without depending on a browser-only source path.
+- **Plugin page crash**: restored the missing `Sparkles` icon import on the admin Plugins page so the dashboard no longer boots to a white screen with `ReferenceError: Sparkles is not defined`.
+
+### Security
+- **Plugin capability boundary**: plugin packages now move through a constrained manifest/module contract and an owner approval step before they are mounted, reducing the chance of accidentally treating a third-party integration like a core feature.
 
 ## [1.2.1] — 2026-05-21
 
