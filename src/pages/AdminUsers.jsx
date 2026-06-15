@@ -219,6 +219,14 @@ export default function AdminUsers() {
   });
 
   const groupLabel = (group) => group.entra_display_name || group.name;
+  const openManagedGroup = (group) => {
+    navigate('/admin/groups', {
+      state: {
+        openGroupDetail: group.id,
+        groupSearch: groupLabel(group),
+      },
+    });
+  };
   const localGroups = userDetail?.groups?.filter((g) => g.source !== 'entra') || [];
   const entraGroups = userDetail?.groups?.filter((g) => g.source === 'entra') || [];
   const detectedEntraGroups = userDetail?.entraGroups || [];
@@ -539,13 +547,18 @@ export default function AdminUsers() {
                             ) : (
                               <div className="space-y-1.5">
                                 {localGroups.map((g) => (
-                                  <div key={g.id} className="flex items-center gap-2 py-1">
+                                  <button
+                                    key={g.id}
+                                    type="button"
+                                    onClick={() => openManagedGroup(g)}
+                                    className="w-full flex items-center gap-2 py-1 text-left rounded-lg px-2 -mx-2 hover:bg-sky-50 dark:hover:bg-sky-950/20 transition-colors cursor-pointer"
+                                  >
                                     <Users className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
                                     <span className="text-sm text-dark dark:text-gray-100">{g.name}</span>
                                     {g.description && (
                                       <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[150px]">{g.description}</span>
                                     )}
-                                  </div>
+                                  </button>
                                 ))}
                               </div>
                             )}
@@ -561,7 +574,12 @@ export default function AdminUsers() {
                             ) : (
                               <div className="space-y-1.5">
                                 {entraGroups.map((g) => (
-                                  <div key={g.id} className="flex items-center gap-2 py-1">
+                                  <button
+                                    key={g.id}
+                                    type="button"
+                                    onClick={() => openManagedGroup(g)}
+                                    className="w-full flex items-center gap-2 py-1 text-left rounded-lg px-2 -mx-2 hover:bg-sky-50 dark:hover:bg-sky-950/20 transition-colors cursor-pointer"
+                                  >
                                     <Users className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
                                     <span className="text-sm text-dark dark:text-gray-100">{groupLabel(g)}</span>
                                     <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">
@@ -570,7 +588,7 @@ export default function AdminUsers() {
                                     {g.description && (
                                       <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[150px]">{g.description}</span>
                                     )}
-                                  </div>
+                                  </button>
                                 ))}
                               </div>
                             )}

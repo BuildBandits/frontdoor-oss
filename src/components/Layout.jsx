@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowUp, Activity, ChevronDown, Home, LogOut, Menu, Monitor, Moon, Palette, RotateCcw, Settings, Sparkles, Sun, Users, UserCog, X, ShieldCheck } from 'lucide-react';
+import { ArrowUp, Activity, BookOpen, ChevronDown, Home, LogOut, Menu, Monitor, Moon, Palette, RotateCcw, Settings, Sparkles, Sun, Users, UserCog, X, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { DEFAULT_COLOR_SCHEME, normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
 import BrandMark from './BrandMark';
@@ -13,6 +13,7 @@ import { PLUGIN_SURFACES } from '../pluginHost/constants';
 import {
   HOME_TOUR_ACCOUNT_MENU_CLOSE_EVENT,
   HOME_TOUR_ACCOUNT_MENU_OPEN_EVENT,
+  requestHomeTourHomepageDocs,
   requestHomeTourReplay,
 } from '../utils/homeTour';
 
@@ -65,6 +66,16 @@ export default function Layout({ children }) {
     requestHomeTourReplay();
   };
 
+  const handleOpenHomepageGuide = () => {
+    setAccountMenuOpen(false);
+    setMobileMenuOpen(false);
+    if (location.pathname !== '/') {
+      navigate('/', { state: { openHomeTourHomepageDocs: true } });
+      return;
+    }
+    requestHomeTourHomepageDocs();
+  };
+
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
@@ -101,12 +112,15 @@ export default function Layout({ children }) {
         || activeElement.isContentEditable
       );
 
-      if (isTypingField && activeElement?.dataset?.frontdoorSearchTarget === 'primary') {
+      const targets = Array.from(document.querySelectorAll('[data-frontdoor-search-target="primary"]'));
+      const target = [...targets].reverse().find((element) => (
+        element instanceof HTMLElement && element.getClientRects().length > 0
+      ));
+      if (!(target instanceof HTMLElement)) return;
+
+      if (isTypingField && activeElement === target) {
         return;
       }
-
-      const target = document.querySelector('[data-frontdoor-search-target="primary"]');
-      if (!(target instanceof HTMLElement)) return;
 
       event.preventDefault();
       target.focus();
@@ -597,6 +611,15 @@ export default function Layout({ children }) {
                       variant="menu"
                       className="px-1 py-1"
                     />
+                    <div className="my-1 h-px bg-gray-100 dark:bg-gray-800" />
+                    <button
+                      type="button"
+                      onClick={handleOpenHomepageGuide}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-accent/10 hover:text-dark dark:hover:text-white"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      {ui.layout.openHomepageGuide}
+                    </button>
                     <div className="my-1 h-px bg-gray-100 dark:bg-gray-800" />
                     <button
                       type="button"

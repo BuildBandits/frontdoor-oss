@@ -8,6 +8,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Added
 - **Experimental plugin platform**: Frontdoor now has a real plugin host with runtime registration, shared APIs, extension surfaces, plugin routes, action injection, and a sample third-party-style plugin package. The host keeps the core app minimal while letting plugins extend navigation, account actions, admin surfaces and dedicated pages without touching core UI code.
+- **User detail group shortcuts**: the groups already managed in Frontdoor from the user detail panel are now clickable and jump straight to the matching group detail view, so you can inspect the linked apps without leaving the user card flow.
+- **Admin app quick duplicate action**: the Apps table now includes a one-click duplicate icon in the Actions column, reusing the existing clone flow from the app editor so admins can jump straight into editing the copied app.
+- **Home page guide shortcut**: the personal menu now includes a direct shortcut to the last Home tour popup, so users can jump straight to the homepage setup documentation without replaying the full tour.
+- **Home page guide shortcut**: the personal menu shortcut now opens the homepage docs in a tour-free view, hiding the step counter, back/next controls, and the reopen-tour hint so only the useful documentation remains.
 - **Plugin packaging**: the admin UI can now import and export plugins as a single JSON package or as a ZIP archive containing `manifest.json` and `module.mjs`. Packages are validated before approval, and the review flow shows permissions, roles, backend exposure and a raw payload preview.
 - **Plugin audit trail**: owner-only plugin approvals and revocations are now written to the RBAC audit log with `target_type = plugin`, and a dedicated `/admin/plugins/audit` page makes those events easy to review and filter.
 - **Plugin bundle persistence**: when a plugin is imported with module source, Frontdoor stores a local bundle and serves it back through the runtime loader instead of requiring a manual database edit.
@@ -32,6 +36,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Plugin admin crash**: restored the missing `FileJson` import on the plugin admin page so `/admin/plugins` no longer crashes on load with `ReferenceError: FileJson is not defined`.
 
 ### Fixed
+- **Admin app group modal search**: the "Manage groups" dialog now opens with focus already in the search field and accepts `Ctrl/Cmd+K` while the modal is open, so you can jump back to filtering without leaving the assignment flow.
+- **Group row expand state**: expanding a group in Gestione Gruppi no longer tints the title bar light gray in the light theme; the row now keeps the same neutral chrome and only the detail section changes.
+- **Admin app group modal**: the "Manage groups" dialog now synchronizes the full selected set, so deselecting an already-assigned group removes the app from that group instead of only adding new memberships. The title, helper text and action copy were updated to reflect the toggle-style workflow.
+- **Admin app group confirmation**: the group update button in the post-save flow now stays enabled even when the preselected groups are left unchanged, so duplicated apps can be confirmed without forcing a dummy selection change.
+- **Admin member badges**: the Owner, Admin and read-only badges in the group member list now align vertically with the member name instead of sitting slightly low on the text baseline.
+- **Admin group selector layout**: the app group assignment modal now gives the scrollable group grid a little less vertical room, keeping the footer buttons visible without a micro-scroll.
+- **Tag entry keyboard navigation**: the admin tag field now supports ArrowUp/ArrowDown to move through suggestions, plus Enter or Tab to choose the highlighted tag without reaching for the mouse.
 - **Plugin registration diagnostics**: startup now reports when plugin bundles are discovered, loaded, served or fail to register, making it easier to diagnose why an approved plugin is not visible in the UI.
 - **Plugin approval auditability**: approval and revocation actions now capture the acting owner in the audit trail instead of relying on an implicit system entry.
 - **Audit visibility**: plugin-related audit rows are now filtered into a dedicated owner-only page, so they no longer need to be inferred from the generic audit stream.

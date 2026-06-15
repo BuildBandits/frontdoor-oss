@@ -25,6 +25,7 @@ import { getUiStrings, resolveAppLanguage } from '../i18n';
 import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
 import {
+  HOME_TOUR_HOMEPAGE_DOCS_EVENT,
   HOME_TOUR_REPLAY_EVENT,
   requestHomeTourAccountMenuClose,
   requestHomeTourAccountMenuOpen,
@@ -75,6 +76,7 @@ export default function Home() {
   const [tourOpen, setTourOpen] = useState(false);
   const [tourDismissed, setTourDismissed] = useState(false);
   const [tourStep, setTourStep] = useState(0);
+  const [tourDocsOnly, setTourDocsOnly] = useState(false);
   const [spotlightRects, setSpotlightRects] = useState([]);
   const spotlightMaskId = 'home-tour-spotlight-mask';
   const heroRef = useRef(null);
@@ -204,14 +206,17 @@ export default function Home() {
   const closeTour = useCallback(() => {
     setTourDismissed(true);
     setTourOpen(false);
+    setTourDocsOnly(false);
     setSpotlightRects([]);
     void markHomeTourSeen?.();
   }, [markHomeTourSeen]);
 
-  const openTour = useCallback(() => {
-    setTourStep(0);
+  const openTour = useCallback((stepIndex = 0, { docsOnly = false } = {}) => {
+    const safeStepIndex = Math.max(0, Math.min(totalTourSteps - 1, stepIndex));
+    setTourDocsOnly(docsOnly);
+    setTourStep(safeStepIndex);
     setTourOpen(true);
-  }, []);
+  }, [totalTourSteps]);
 
   useEffect(() => {
     if (!user || !languageReady) return undefined;
@@ -236,11 +241,27 @@ export default function Home() {
   }, [openTour]);
 
   useEffect(() => {
-    if (!location.state?.replayHomeTour || !languageReady) return undefined;
+    const onHomepageDocs = () => {
+      openTour(totalTourSteps - 1, { docsOnly: true });
+    };
+    window.addEventListener(HOME_TOUR_HOMEPAGE_DOCS_EVENT, onHomepageDocs);
+    return () => window.removeEventListener(HOME_TOUR_HOMEPAGE_DOCS_EVENT, onHomepageDocs);
+  }, [openTour, totalTourSteps]);
+
+  useEffect(() => {
+    if (!languageReady) return undefined;
+
+    if (location.state?.openHomeTourHomepageDocs) {
+      openTour(totalTourSteps - 1, { docsOnly: true });
+      navigate(location.pathname, { replace: true, state: null });
+      return undefined;
+    }
+
+    if (!location.state?.replayHomeTour) return undefined;
     openTour();
     navigate(location.pathname, { replace: true, state: null });
     return undefined;
-  }, [languageReady, location.pathname, location.state, navigate, openTour]);
+  }, [languageReady, location.pathname, location.state, navigate, openTour, totalTourSteps]);
 
   useEffect(() => {
     if (!tourOpen) return undefined;
@@ -925,9 +946,11 @@ export default function Home() {
             <div className={`w-full ${isCenteredTourStep ? 'max-w-xl' : 'max-w-2xl'} rounded-3xl border border-white/15 bg-white dark:bg-gray-900 shadow-2xl shadow-black/30 p-5 sm:p-6 text-left`}>
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-accent-dark dark:text-accent">
-                    {tourProgressLabel}
-                  </p>
+                  {!tourDocsOnly && (
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-accent-dark dark:text-accent">
+                      {tourProgressLabel}
+                    </p>
+                  )}
                   <h2 className="mt-2 text-xl sm:text-2xl font-bold text-dark dark:text-gray-100">
                     {currentTourStep.title}
                   </h2>
@@ -978,41 +1001,45 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-                {!isLastTourStep ? (
-                  <button
-                    type="button"
-                    onClick={closeTour}
-                    className="inline-flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white"
-                  >
-                    {ui.home.tour.skip}
-                  </button>
-                ) : (
-                  <span />
-                )}
+              {!tourDocsOnly && (
+                <>
+                  <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    {!isLastTourStep ? (
+                      <button
+                        type="button"
+                        onClick={closeTour}
+                        className="inline-flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white"
+                      >
+                        {ui.home.tour.skip}
+                      </button>
+                    ) : (
+                      <span />
+                    )}
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleTourPrevious}
-                    disabled={tourStepIndex === 0}
-                    className="inline-flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white disabled:opacity-40 disabled:hover:bg-transparent"
-                  >
-                    {ui.home.tour.previous}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleTourNext}
-                    className="inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-dark transition-colors hover:bg-accent/90"
-                  >
-                    {tourStepIndex === totalTourSteps - 1 ? ui.home.tour.done : ui.home.tour.next}
-                  </button>
-                </div>
-              </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleTourPrevious}
+                        disabled={tourStepIndex === 0}
+                        className="inline-flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white disabled:opacity-40 disabled:hover:bg-transparent"
+                      >
+                        {ui.home.tour.previous}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleTourNext}
+                        className="inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-dark transition-colors hover:bg-accent/90"
+                      >
+                        {tourStepIndex === totalTourSteps - 1 ? ui.home.tour.done : ui.home.tour.next}
+                      </button>
+                    </div>
+                  </div>
 
-              <p className="mt-4 text-xs text-gray-400 dark:text-gray-500">
-                {ui.home.tour.reopenHint}
-              </p>
+                  <p className="mt-4 text-xs text-gray-400 dark:text-gray-500">
+                    {ui.home.tour.reopenHint}
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>

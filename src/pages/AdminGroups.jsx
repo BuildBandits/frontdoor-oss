@@ -144,8 +144,12 @@ export default function AdminGroups() {
   }, []);
   useEffect(() => {
     const incomingSearch = location.state?.groupSearch;
-    if (!incomingSearch) return;
-    setGroupSearch(incomingSearch);
+    const incomingGroupId = location.state?.openGroupDetail;
+    if (!incomingSearch && !incomingGroupId) return;
+    if (incomingSearch) setGroupSearch(incomingSearch);
+    if (incomingGroupId) {
+      void openGroupAndScroll(incomingGroupId, true);
+    }
     navigate(location.pathname, { replace: true, state: null });
   }, [location.state, location.pathname, navigate]);
   useEffect(() => {
@@ -157,7 +161,7 @@ export default function AdminGroups() {
       setScrollTargetGroupId(null);
     }, 50);
     return () => window.clearTimeout(timer);
-  }, [expandedGroup, groupDetail, groupSearch, scrollTargetGroupId]);
+  }, [expandedGroup, groupDetail, groupSearch, scrollTargetGroupId, groups.length]);
   useEffect(() => {
     if (!showCreateMenu) return undefined;
     const closeMenu = () => setShowCreateMenu(false);
@@ -265,8 +269,8 @@ export default function AdminGroups() {
     }
   };
 
-  const openGroupAndScroll = async (groupId) => {
-    if (!filteredGroups.some((group) => group.id === groupId) && groupSearch.trim()) {
+  const openGroupAndScroll = async (groupId, preserveSearch = false) => {
+    if (!preserveSearch && !filteredGroups.some((group) => group.id === groupId) && groupSearch.trim()) {
       setGroupSearch('');
     }
     setScrollTargetGroupId(groupId);
@@ -1053,7 +1057,7 @@ export default function AdminGroups() {
               <div
                 className={`flex items-center justify-between px-5 py-3.5 cursor-pointer transition-colors ${
                   expandedGroup === group.id
-                    ? 'bg-gray-50/90 dark:bg-gray-800/50 dark:hover:bg-gray-800/70'
+                    ? 'dark:hover:bg-gray-800/70'
                     : 'hover:bg-gray-50/90 dark:hover:bg-gray-800/50'
                 }`}
                 onClick={() => toggleExpand(group.id)}
@@ -1380,22 +1384,22 @@ export default function AdminGroups() {
                                         <div>
                                           <span className="text-sm text-dark dark:text-gray-100">{m.display_name || m.email}</span>
                                           {m.role === 'owner' && (
-                                            <span className="ml-1.5 text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-medium">{g.ownerBadge}</span>
+                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-medium">{g.ownerBadge}</span>
                                           )}
                                           {m.role === 'admin' && (
-                                            <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none gap-1 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
                                               <Shield className="w-3 h-3" />
                                               {g.adminBadge}
                                             </span>
                                           )}
                                           {m.role === 'admin_readonly' && (
-                                            <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-medium">
+                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-medium">
                                               <Eye className="w-3 h-3" />
                                               {t.readOnlyRole}
                                             </span>
                                           )}
                                           {!m.last_login && (
-                                            <span className="ml-1.5 text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium inline-flex items-center gap-0.5">
+                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none gap-0.5 text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium">
                                               <Clock className="w-3 h-3" />{t.noLogin}
                                             </span>
                                           )}

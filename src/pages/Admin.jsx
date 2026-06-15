@@ -40,6 +40,8 @@ export default function Admin() {
   const [pendingGroupAssignApp, setPendingGroupAssignApp] = useState(null);
   const [groupAssignSearch, setGroupAssignSearch] = useState('');
   const [groupAssignSelection, setGroupAssignSelection] = useState([]);
+  const [groupAssignInitialSelection, setGroupAssignInitialSelection] = useState([]);
+  const [groupAssignAllowNoChanges, setGroupAssignAllowNoChanges] = useState(false);
   const [assigningGroups, setAssigningGroups] = useState(false);
   const [appSearch, setAppSearch] = useState('');
   const [appModeFilter, setAppModeFilter] = useState('all');
@@ -90,6 +92,8 @@ export default function Admin() {
       setConfirmDialog(null);
     }
   };
+  const hasPendingGroupAssignmentChanges = groupAssignSelection.length !== groupAssignInitialSelection.length
+    || groupAssignSelection.some((groupId) => !groupAssignInitialSelection.includes(groupId));
 
   const loadApps = () => {
     api.get('/apps/all').then((res) => {
@@ -175,6 +179,33 @@ export default function Admin() {
     setEditing(app);
   };
 
+  const populateClonedApp = (cloned) => {
+    slugAutoFillRef.current = false;
+    setEditing('new');
+    setForm({
+      name: cloned.name || '',
+      slug: cloned.slug || '',
+      description: cloned.description || '',
+      icon: cloned.icon || '📦',
+      target_url: cloned.target_url || '',
+      sort_order: cloned.sort_order || 0,
+      mode: cloned.mode || 'redirect-plain',
+      sso_endpoint: cloned.mode === 'entra-app'
+        ? (cloned.sso_endpoint && cloned.sso_endpoint !== '/sso' ? cloned.sso_endpoint : '')
+        : (cloned.sso_endpoint || '/sso'),
+      sso_method: cloned.sso_method || 'GET',
+      long_description: cloned.long_description || '',
+      tags: Array.isArray(cloned.tags) ? cloned.tags : [],
+    });
+    setIconMode(cloned.iconDataUrl ? 'asset' : 'emoji');
+    setIconAssetDataUrl(cloned.iconDataUrl || '');
+    setIconAssetPreview(cloned.iconDataUrl || cloned.iconUrl || '');
+    setIconSvgText(cloned.iconSvgText || '');
+    setRemoveIconAsset(false);
+    setIncludeDefaultGroup(true);
+    setClonedGroupIds(Array.isArray(cloned.groupIds) ? cloned.groupIds : []);
+  };
+
   useEffect(() => {
     const editSlug = searchParams.get('edit');
     if (!editSlug || apps.length === 0) return;
@@ -197,30 +228,24 @@ export default function Admin() {
       const cloned = res.data?.app;
       if (!cloned) throw new Error(t.cloneDataMissing);
 
-      slugAutoFillRef.current = false;
-      setEditing('new');
-      setForm({
-        name: cloned.name || '',
-        slug: cloned.slug || '',
-        description: cloned.description || '',
-        icon: cloned.icon || '📦',
-        target_url: cloned.target_url || '',
-        sort_order: cloned.sort_order || 0,
-        mode: cloned.mode || 'redirect-plain',
-        sso_endpoint: cloned.mode === 'entra-app'
-          ? (cloned.sso_endpoint && cloned.sso_endpoint !== '/sso' ? cloned.sso_endpoint : '')
-          : (cloned.sso_endpoint || '/sso'),
-        sso_method: cloned.sso_method || 'GET',
-        long_description: cloned.long_description || '',
-        tags: Array.isArray(cloned.tags) ? cloned.tags : [],
-      });
-      setIconMode(cloned.iconDataUrl ? 'asset' : 'emoji');
-      setIconAssetDataUrl(cloned.iconDataUrl || '');
-      setIconAssetPreview(cloned.iconDataUrl || cloned.iconUrl || '');
-      setIconSvgText(cloned.iconSvgText || '');
-      setRemoveIconAsset(false);
-      setIncludeDefaultGroup(true);
-      setClonedGroupIds(Array.isArray(cloned.groupIds) ? cloned.groupIds : []);
+      populateClonedApp(cloned);
+      pushNotice('success', a.duplicateNotice);
+    } catch (err) {
+      pushNotice('error', err.response?.data?.error || err.message || t.cloneFailed);
+    }
+    setCloning(false);
+  };
+
+  const duplicateApp = async (app) => {
+    if (!canEdit || !app?.id) return;
+
+    setCloning(true);
+    try {
+      const res = await api.post(`/apps/${app.id}/clone`);
+      const cloned = res.data?.app;
+      if (!cloned) throw new Error(t.cloneDataMissing);
+
+      populateClonedApp(cloned);
       pushNotice('success', a.duplicateNotice);
     } catch (err) {
       pushNotice('error', err.response?.data?.error || err.message || t.cloneFailed);
@@ -325,7 +350,7 @@ export default function Admin() {
     const onKeyDown = (event) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
-      if (groupAssignSelection.length > 0) {
+      if (hasPendingGroupAssignmentChanges) {
         openConfirm({
           title: t.closeWithoutSavingTitle,
           message: t.closeWithoutSavingGroupsMessage,
@@ -338,7 +363,7 @@ export default function Admin() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [pendingGroupAssignApp, groupAssignSelection.length, confirmDialog]);
+  }, [pendingGroupAssignApp, hasPendingGroupAssignmentChanges, confirmDialog]);
 
   const applyIconAssetFile = (file) => {
     if (!file) return;
@@ -432,7 +457,7 @@ export default function Admin() {
           openGroupAssignmentModal({
             ...res.data?.app,
             defaultIncluded: false,
-          }, clonedGroupIds);
+          }, clonedGroupIds, false, true);
         }
       } else {
         await api.put(`/apps/${editing.id}`, {
@@ -454,7 +479,12 @@ export default function Admin() {
         pushNotice('success', a.appUpdated);
         if (openGroupAssignmentAfterSave) {
           close();
-          openGroupAssignmentModal(savedApp, savedApp.groupIds, savedApp.groupIds.includes(DEFAULT_GROUP_ID));
+          openGroupAssignmentModal(
+            savedApp,
+            savedApp.groupIds,
+            savedApp.groupIds.includes(DEFAULT_GROUP_ID),
+            true
+          );
         } else {
           close();
         }
@@ -672,10 +702,13 @@ export default function Admin() {
     }
   }, [showOnlyUnlabeledApps, unlabeledApps.length]);
 
-  const openGroupAssignmentModal = (app, selectedIds = [], defaultIncluded = false) => {
+  const openGroupAssignmentModal = (app, selectedIds = [], defaultIncluded = false, allowNoChanges = false) => {
+    const normalizedSelectedIds = [...new Set(selectedIds.filter(Boolean))];
     setPendingGroupAssignApp({ ...app, defaultIncluded });
-    setGroupAssignSelection(selectedIds);
+    setGroupAssignSelection(normalizedSelectedIds);
+    setGroupAssignInitialSelection(normalizedSelectedIds);
     setGroupAssignSearch('');
+    setGroupAssignAllowNoChanges(allowNoChanges);
   };
 
   const jumpToGroupsForApp = (app) => {
@@ -704,7 +737,9 @@ export default function Admin() {
   const closeGroupAssignmentModal = () => {
     setPendingGroupAssignApp(null);
     setGroupAssignSelection([]);
+    setGroupAssignInitialSelection([]);
     setGroupAssignSearch('');
+    setGroupAssignAllowNoChanges(false);
     setAssigningGroups(false);
   };
 
@@ -713,7 +748,11 @@ export default function Admin() {
       pushNotice('error', t.readOnly);
       return;
     }
-    if (!pendingGroupAssignApp || groupAssignSelection.length === 0) {
+    if (!pendingGroupAssignApp) {
+      closeGroupAssignmentModal();
+      return;
+    }
+    if (!hasPendingGroupAssignmentChanges && !groupAssignAllowNoChanges) {
       closeGroupAssignmentModal();
       return;
     }
@@ -727,7 +766,8 @@ export default function Admin() {
         'success',
         a.assignedToGroups
           .replace('{name}', pendingGroupAssignApp.name)
-          .replace('{count}', String(res.data?.added ?? groupAssignSelection.length))
+          .replace('{added}', String(res.data?.added ?? 0))
+          .replace('{removed}', String(res.data?.removed ?? 0))
       );
     } catch (err) {
       pushNotice('error', err.response?.data?.error || a.groupAssignmentError);
@@ -977,6 +1017,15 @@ export default function Admin() {
                         className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => duplicateApp(app)}
+                        disabled={!canEdit || cloning}
+                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={cloning ? a.duplicating : a.duplicate}
+                        aria-label={cloning ? a.duplicating : a.duplicate}
+                      >
+                        <Copy className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(app)}
@@ -1400,7 +1449,7 @@ export default function Admin() {
             <button
               type="button"
               onClick={() => {
-                if (groupAssignSelection.length > 0) {
+                if (hasPendingGroupAssignmentChanges) {
                   openConfirm({
                     title: t.closeWithoutSavingTitle,
                     message: t.closeWithoutSavingGroupsMessage,
@@ -1440,6 +1489,9 @@ export default function Admin() {
                   onChange={setGroupAssignSearch}
                   placeholder={ui.admin.apps.searchGroupsPlaceholder}
                   clearLabel={ui.common.clearSearch}
+                  autoFocus
+                  searchShortcutTarget="primary"
+                  searchShortcutLabel={ui.common.searchShortcut}
                 />
                 <div className="mt-2 text-xs text-gray-400 dark:text-gray-500 flex items-center justify-between gap-3">
                   <span>{groupAssignSelection.length} {a.selectedGroupSummary}</span>
@@ -1470,7 +1522,7 @@ export default function Admin() {
                   {ui.admin.apps.noGroupsFound}
                 </div>
               ) : (
-                <div className="grid gap-2 sm:grid-cols-2 max-h-[52vh] overflow-y-auto pr-1">
+                <div className="grid gap-2 sm:grid-cols-2 max-h-[48vh] overflow-y-auto pr-1">
                   {filteredGroups.map((group) => {
                     const selected = groupAssignSelection.includes(group.id);
                     const groupSourceLabel = group.source === 'entra' ? 'Entra' : 'Locale';
@@ -1520,7 +1572,7 @@ export default function Admin() {
                 <button
                   type="button"
                   onClick={saveGroupAssignment}
-                  disabled={assigningGroups || groupAssignSelection.length === 0}
+                  disabled={assigningGroups || (!hasPendingGroupAssignmentChanges && !groupAssignAllowNoChanges)}
                   className="flex items-center gap-2 px-5 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Save className="w-4 h-4" />

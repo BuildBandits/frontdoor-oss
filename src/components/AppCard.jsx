@@ -73,7 +73,7 @@ const AppCard = forwardRef(function AppCard(
               </span>
             </div>
             {app.description && (
-              <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{app.description}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 truncate" title={app.description}>{app.description}</p>
             )}
           </div>
 
@@ -210,7 +210,7 @@ const AppCard = forwardRef(function AppCard(
           <h3 className="text-lg font-bold text-dark dark:text-gray-100 mb-1.5 group-hover:text-dark/80 dark:group-hover:text-gray-200 transition-colors">
             {app.name}
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
+          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2" title={app.description}>
             {app.description}
           </p>
         </button>

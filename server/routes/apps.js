@@ -638,7 +638,7 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
   }
 });
 
-// Assign an existing app to one or more groups (admin only)
+// Sync an existing app group assignment set (admin only)
 router.post('/:id/groups', authenticate, isAdminEditor, (req, res) => {
   const { id } = req.params;
   const { groupIds } = req.body;
@@ -648,36 +648,57 @@ router.post('/:id/groups', authenticate, isAdminEditor, (req, res) => {
     return res.status(404).json({ error: 'App not found' });
   }
 
-  const normalizedGroupIds = Array.isArray(groupIds)
-    ? [...new Set(groupIds.filter((groupId) => typeof groupId === 'string' && groupId.trim()))]
-    : [];
-
-  if (normalizedGroupIds.length === 0) {
-    return res.json({ added: 0 });
+  if (!Array.isArray(groupIds)) {
+    return res.status(400).json({ error: 'groupIds must be an array' });
   }
 
+  const normalizedGroupIds = [...new Set(groupIds.filter((groupId) => typeof groupId === 'string' && groupId.trim()))];
+
   const placeholders = normalizedGroupIds.map(() => '?').join(', ');
-  const existingGroups = db.prepare(`SELECT id FROM user_groups WHERE id IN (${placeholders})`).all(...normalizedGroupIds);
+  const existingGroups = normalizedGroupIds.length > 0
+    ? db.prepare(`SELECT id FROM user_groups WHERE id IN (${placeholders})`).all(...normalizedGroupIds)
+    : [];
+
   if (existingGroups.length !== normalizedGroupIds.length) {
     return res.status(400).json({ error: 'One or more selected groups were not found' });
   }
 
+  const currentGroupIds = db.prepare('SELECT group_id FROM app_permissions WHERE app_id = ? ORDER BY group_id')
+    .all(id)
+    .map((row) => row.group_id);
+  const currentGroupIdSet = new Set(currentGroupIds);
+  const requestedGroupIdSet = new Set(normalizedGroupIds);
   const insertPermission = db.prepare('INSERT OR IGNORE INTO app_permissions (app_id, group_id) VALUES (?, ?)');
+  const removePermission = db.prepare('DELETE FROM app_permissions WHERE app_id = ? AND group_id = ?');
+
   let added = 0;
-  const addAppToGroups = db.transaction(() => {
+  let removed = 0;
+  const syncAppGroups = db.transaction(() => {
+    for (const currentGroupId of currentGroupIds) {
+      if (requestedGroupIdSet.has(currentGroupId)) continue;
+      const result = removePermission.run(id, currentGroupId);
+      removed += result.changes || 0;
+    }
+
     for (const groupId of normalizedGroupIds) {
+      if (currentGroupIdSet.has(groupId)) continue;
       const result = insertPermission.run(id, groupId);
       added += result.changes || 0;
     }
   });
 
-  addAppToGroups();
+  syncAppGroups();
 
-  if (added > 0) {
-    logRbacAudit(req.user.id, 'add_apps', 'permission', id, { groupIds: normalizedGroupIds, appIds: [id], added });
+  if (added > 0 || removed > 0) {
+    logRbacAudit(req.user.id, 'sync_apps', 'permission', id, {
+      appIds: [id],
+      groupIds: normalizedGroupIds,
+      added,
+      removed,
+    });
   }
 
-  res.json({ added });
+  res.json({ added, removed });
 });
 
 // Delete app (admin only)

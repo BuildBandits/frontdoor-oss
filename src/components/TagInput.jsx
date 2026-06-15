@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 
 export default function TagInput({
@@ -12,6 +12,7 @@ export default function TagInput({
 }) {
   const [input, setInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightedSuggestionIndex, setHighlightedSuggestionIndex] = useState(-1);
   const inputRef = useRef(null);
 
   const normalizeTag = (tag) => tag.trim().toLowerCase();
@@ -37,6 +38,7 @@ export default function TagInput({
       onChange(nextValue);
     }
     setInput('');
+    setHighlightedSuggestionIndex(-1);
   };
 
   const removeTag = (tag) => {
@@ -45,10 +47,49 @@ export default function TagInput({
   };
 
   const handleKeyDown = (e) => {
+    if (e.key === 'ArrowDown' && normalizedSuggestions.length > 0) {
+      e.preventDefault();
+      setShowSuggestions(true);
+      setHighlightedSuggestionIndex((current) => (current + 1) % normalizedSuggestions.length);
+      return;
+    }
+
+    if (e.key === 'ArrowUp' && normalizedSuggestions.length > 0) {
+      e.preventDefault();
+      setShowSuggestions(true);
+      setHighlightedSuggestionIndex((current) => {
+        if (current <= 0) return normalizedSuggestions.length - 1;
+        return current - 1;
+      });
+      return;
+    }
+
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      if (showSuggestions && highlightedSuggestionIndex >= 0 && normalizedSuggestions[highlightedSuggestionIndex]) {
+        e.preventDefault();
+        addTag(normalizedSuggestions[highlightedSuggestionIndex]);
+        setShowSuggestions(false);
+        return;
+      }
+      if (e.key === 'Tab' && input.trim()) {
+        addTag(input);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
       addTag(input);
+      setShowSuggestions(false);
+      return;
     }
+
+    if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setHighlightedSuggestionIndex(-1);
+      return;
+    }
+
     if (e.key === 'Backspace' && !input && value.length > 0) {
       removeTag(value[value.length - 1]);
     }
@@ -81,6 +122,14 @@ export default function TagInput({
       .slice(0, 6);
   }, [suggestions, input, value]);
 
+  useEffect(() => {
+    setHighlightedSuggestionIndex((current) => {
+      if (normalizedSuggestions.length === 0) return -1;
+      if (current < 0) return -1;
+      return Math.min(current, normalizedSuggestions.length - 1);
+    });
+  }, [normalizedSuggestions.length]);
+
   return (
     <div className="relative">
       <div
@@ -109,8 +158,12 @@ export default function TagInput({
           onChange={(e) => {
             setInput(e.target.value);
             setShowSuggestions(true);
+            setHighlightedSuggestionIndex(-1);
           }}
-          onFocus={() => setShowSuggestions(true)}
+          onFocus={() => {
+            setShowSuggestions(true);
+            setHighlightedSuggestionIndex(-1);
+          }}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           placeholder={value.length === 0 ? placeholder : ''}
@@ -128,13 +181,21 @@ export default function TagInput({
               <button
                 key={tag}
                 type="button"
+                onMouseEnter={() => {
+                  const index = normalizedSuggestions.indexOf(tag);
+                  setHighlightedSuggestionIndex(index);
+                }}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   addTag(tag);
                   setShowSuggestions(false);
                   inputRef.current?.focus();
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-purple-950/35 transition-colors flex items-center justify-between gap-3"
+                className={`w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-200 transition-colors flex items-center justify-between gap-3 ${
+                  normalizedSuggestions[highlightedSuggestionIndex] === tag
+                    ? 'bg-purple-50 dark:bg-purple-950/35'
+                    : 'hover:bg-purple-50 dark:hover:bg-purple-950/35'
+                }`}
               >
                 <span className="font-medium">{tag}</span>
                 <span className="text-[11px] text-gray-400 dark:text-gray-500">{useSuggestionLabel}</span>
