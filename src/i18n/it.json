@@ -62,7 +62,10 @@
     "favorites": "Preferiti",
     "favoritesTitle": "Solo preferiti",
     "groupBy": "Raggruppa",
-    "groupByTitle": "Raggruppa per tag",
+    "groupByTitle": "Raggruppa per etichette",
+    "refreshApps": "Aggiorna",
+    "refreshAppsBusy": "Aggiornamento...",
+    "refreshAppsTitle": "Ricarica il catalogo app senza aggiornare il browser",
     "showAll": "Mostra tutto",
     "gridViewTitle": "Vista griglia",
     "compactViewTitle": "Vista compatta",
@@ -100,7 +103,7 @@
         },
         "search": {
           "title": "Trova le app velocemente",
-          "body": "Usa la ricerca per filtrare per nome, descrizione o tag. I pulsanti preferiti, raggruppamento e vista ti aiutano a modellare il catalogo in base ai tuoi gusti ed esigenze."
+          "body": "Usa la ricerca per filtrare per nome, descrizione o etichette. I pulsanti preferiti, raggruppamento e vista ti aiutano a modellare il catalogo in base ai tuoi gusti ed esigenze."
         },
         "catalog": {
           "title": "Sfoglia il catalogo",
@@ -291,6 +294,14 @@
       "appIconCacheReloadNotice": "Le icone correnti restano al loro posto; sono stati rimossi solo i file non referenziati.",
       "cacheFiles": "file",
       "cacheOrphans": "orfani",
+      "storageSnapshotTitle": "Riepilogo spazio",
+      "storageSnapshotHelp": "Uno sguardo rapido allo spazio che Frontdoor sta usando in questo momento.",
+      "storageTotalLabel": "Totale usato",
+      "storageTotalHelp": "Database + cache",
+      "storageDatabaseLabel": "Database",
+      "storageDatabaseHelp": "File SQLite principale, WAL e SHM.",
+      "storageAvatarLabel": "Cache avatar",
+      "storageAppIconLabel": "Cache icone app",
       "accessLogCleanupTitle": "Pulizia log accessi",
       "accessLogCleanupHelp": "Svuota subito i dati della scheda Log senza toccare i log Audit.",
       "ownerOnly": "Solo Owner",
@@ -319,7 +330,7 @@
       "openPluginDocs": "Documentazione plugin",
       "openPluginDocsHelp": "Consulta il contratto del manifest, gli esempi di modulo e gli hint del loader senza toccare il flusso di installazione.",
       "killSwitchTitle": "Abilita i plugin per Frontdoor",
-      "killSwitchHelp": "Questa checkbox è visibile per lavori futuri, ma in 1.2.6 resta bloccata su OFF. Frontdoor core resta disponibile e non carica pagine, surface o hook dei plugin.",
+      "killSwitchHelp": "Questa checkbox è visibile per lavori futuri, ma in 1.2.7a resta bloccata su OFF. Frontdoor core resta disponibile e non carica pagine, surface o hook dei plugin.",
       "killSwitchOn": "Abilitati",
       "killSwitchOff": "Disabilitati"
     },
@@ -658,7 +669,7 @@
     },
     "apps": {
       "title": "App",
-      "subtitle": "Catalogo, permessi e impostazioni delle app.",
+      "subtitle": "Catalogo, permessi e impostazioni delle app",
       "new": "Nuova app",
       "duplicateNotice": "App duplicata: modifica solo i campi necessari",
       "duplicate": "Duplica",
@@ -672,8 +683,16 @@
       "showOnlyUnassigned": "Mostra app non assegnate",
       "showAllApps": "Mostra tutte le app",
       "showOnlyUnlabeled": "Mostra app senza etichette",
+      "tagFilterLabel": "Etichette",
+      "tagFilterAll": "Tutte le etichette",
+      "tagFilterSelected": "{count} selezionati",
+      "clearTagFilters": "Pulisci",
+      "appsWithoutTags": "Mostra app senza etichette",
+      "tagFilterSearchPlaceholder": "Cerca etichette...",
+      "noTagFilterMatches": "Nessuna etichetta corrisponde alla ricerca.",
       "allModes": "Tutte le modalità",
-      "modeFilter": "Filtro collegamento",
+      "modeFilterShort": "Collegamenti",
+      "modeFilter": "Tipo di collegamento",
       "restoreDemoApps": "Ripristina applicazioni dimostrative",
       "newApp": "Nuova app",
       "editApp": "Modifica app",
@@ -697,6 +716,8 @@
       "slugLabel": "Slug (identificativo unico)",
       "slugExample": "owa",
       "slugHelp": "Lo proponiamo dal nome dell'app finché non lo modifichi manualmente.",
+      "slugLimitHelp": "Massimo 63 caratteri.",
+      "slugTooLong": "Lo slug deve avere al massimo 63 caratteri.",
       "descriptionLabel": "Descrizione",
       "descriptionPlaceholder": "Accesso alla versione web di Outlook",
       "targetUrlLabel": "URL di destinazione",
@@ -763,7 +784,7 @@
       "actions": "Azioni",
       "tagSuggestionsTitle": "Suggerimenti",
       "availableTagsTitle": "Etichette disponibili",
-      "useExistingTag": "Usa tag esistente",
+      "useExistingTag": "Usa etichetta esistente",
       "goToGroupsSearch": "Vai a Gestione Gruppi con ricerca precompilata"
     },
     "icons": {
@@ -818,7 +839,7 @@
     },
     "groups": {
       "title": "Gruppi",
-      "subtitle": "Gruppi locali e sincronizzati da Entra.",
+      "subtitle": "Gruppi locali e sincronizzati da Entra",
       "pageTitle": "Gestione Gruppi",
       "searchPlaceholder": "Cerca gruppo, descrizione o membro...",
       "showOnlyProblemGroups": "Mostra gruppi problematici",
@@ -1025,6 +1046,7 @@
       "usersTotal": "totali",
       "usersActive": "attivi",
       "usersPrivileged": "con privilegi elevati",
+      "refresh": "Aggiorna utenti",
       "allStatusesLabel": "Tutti gli stati"
     },
     "logs": {

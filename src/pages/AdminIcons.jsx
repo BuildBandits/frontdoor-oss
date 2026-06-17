@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
+import Tooltip from '../components/Tooltip';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 
@@ -411,17 +412,18 @@ export default function AdminIcons() {
                     <p className="font-semibold uppercase tracking-wider text-accent-dark">{ui.admin.icons.linkedApp}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {asset.linkedApps.map((linkedApp) => (
-                        <button
-                          key={linkedApp.slug || linkedApp.id}
-                          type="button"
-                          onClick={() => linkedApp.slug && navigate(`/admin?edit=${encodeURIComponent(linkedApp.slug)}`)}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-white dark:bg-gray-900 px-3 py-1.5 font-semibold text-dark dark:text-gray-100 transition-colors hover:bg-accent/10"
-                          title={linkedApp.target_url || linkedApp.slug || linkedApp.name}
-                        >
-                          <span className="truncate max-w-[180px]">{linkedApp.name}</span>
-                          {linkedApp.slug && <span className="text-accent-dark">#{linkedApp.slug}</span>}
-                          {linkedApp.slug && <span className="sr-only">{ui.admin.icons.openAppEditor}</span>}
-                        </button>
+                        <Tooltip key={linkedApp.slug || linkedApp.id} content={linkedApp.target_url || linkedApp.slug || linkedApp.name}>
+                          <button
+                            type="button"
+                            onClick={() => linkedApp.slug && navigate(`/admin?edit=${encodeURIComponent(linkedApp.slug)}`)}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-white dark:bg-gray-900 px-3 py-1.5 font-semibold text-dark dark:text-gray-100 transition-colors hover:bg-accent/10"
+                            aria-label={linkedApp.target_url || linkedApp.slug || linkedApp.name}
+                          >
+                            <span className="truncate max-w-[180px]">{linkedApp.name}</span>
+                            {linkedApp.slug && <span className="text-accent-dark">#{linkedApp.slug}</span>}
+                            {linkedApp.slug && <span className="sr-only">{ui.admin.icons.openAppEditor}</span>}
+                          </button>
+                        </Tooltip>
                       ))}
                     </div>
                     {asset.duplicateCount > 1 && (
@@ -496,16 +498,18 @@ export default function AdminIcons() {
                     <ExternalLink className="w-3.5 h-3.5" />
                     {ui.admin.icons.openFile}
                   </a>
-                  <button
-                    type="button"
-                    onClick={() => deleteAsset(asset)}
-                    disabled={asset.inUse}
-                    title={asset.inUse ? ui.admin.icons.deleteBlockedTooltip : ui.admin.icons.deleteAsset}
-                    className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white dark:bg-gray-900 px-3 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-white"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    {asset.inUse ? ui.admin.icons.deleteBlockedByUsage : ui.admin.icons.deleteAsset}
-                  </button>
+                  <Tooltip content={asset.inUse ? ui.admin.icons.deleteBlockedTooltip : ui.admin.icons.deleteAsset}>
+                    <button
+                      type="button"
+                      onClick={() => deleteAsset(asset)}
+                      disabled={asset.inUse}
+                      aria-label={asset.inUse ? ui.admin.icons.deleteBlockedTooltip : ui.admin.icons.deleteAsset}
+                      className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white dark:bg-gray-900 px-3 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-white"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      {asset.inUse ? ui.admin.icons.deleteBlockedByUsage : ui.admin.icons.deleteAsset}
+                    </button>
+                  </Tooltip>
                   {asset.sha256 && (
                     <div className="inline-flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-900 px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
                       <Tag className="w-3.5 h-3.5" />

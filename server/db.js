@@ -548,5 +548,5 @@ function logRbacAudit(actorId, action, targetType, targetId, details = null) {
   }
 }
 
-export { DEFAULT_GROUP_ID, logRbacAudit };
+export { DEFAULT_GROUP_ID, logRbacAudit, dbPath };
 export default db;

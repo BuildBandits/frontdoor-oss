@@ -1,7 +1,11 @@
 .claude
+.git
+.github
+.idea
 .DS_Store
 .env
 .env.*
+coverage
 *.db
 *.key
 *.log

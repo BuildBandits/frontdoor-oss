@@ -2,10 +2,10 @@
 set -eu
 
 if [ "$(id -u)" = "0" ]; then
-  # Named volumes commonly start as root-owned; fix the runtime paths before
-  # dropping privileges so SQLite can create WAL/shm files and caches.
+  # Named volumes commonly start as root-owned; fix the writable runtime path
+  # before dropping privileges so SQLite can create WAL/shm files and caches.
   mkdir -p /data
-  chown -R frontdoor:frontdoor /app /data
+  chown -R frontdoor:frontdoor /data
   exec gosu frontdoor "$@"
 fi
 

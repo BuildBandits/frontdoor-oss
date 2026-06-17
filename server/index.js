@@ -176,6 +176,15 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
+app.use((error, req, res, next) => {
+  if (error instanceof URIError || error?.name === 'URIError') {
+    console.warn(`Frontdoor rejected malformed request path [${req.method} ${req.originalUrl}]: ${error.message}`);
+    return res.status(400).end();
+  }
+
+  return next(error);
+});
+
 try {
   const result = await backfillMediaLibrary();
   if (result.totalImported > 0) {

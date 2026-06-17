@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import Tooltip from '../components/Tooltip';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { usePluginRegistry } from '../pluginHost/registry';
@@ -876,16 +877,18 @@ export default function AdminPlugins() {
                 <FileJson className="h-4 w-4" />
                 {t.exportPackage}
               </button>
-              <button
-                type="button"
-                onClick={handleExportDraftZip}
-                disabled={!draftPackage.moduleSource}
-                title={!draftPackage.moduleSource ? t.zipNeedsModuleSource : undefined}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-violet-200 dark:border-violet-900/60 px-4 py-2.5 text-sm font-semibold text-violet-700 dark:text-violet-300 transition-colors hover:bg-violet-50 dark:hover:bg-violet-950/30 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Boxes className="h-4 w-4" />
-                {t.exportZip}
-              </button>
+              <Tooltip content={t.zipNeedsModuleSource} enabled={!draftPackage.moduleSource}>
+                <button
+                  type="button"
+                  onClick={handleExportDraftZip}
+                  disabled={!draftPackage.moduleSource}
+                  aria-label={t.exportZip}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-violet-200 dark:border-violet-900/60 px-4 py-2.5 text-sm font-semibold text-violet-700 dark:text-violet-300 transition-colors hover:bg-violet-50 dark:hover:bg-violet-950/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Boxes className="h-4 w-4" />
+                  {t.exportZip}
+                </button>
+              </Tooltip>
               <button
                 type="button"
                 onClick={() => openReviewWizard(draftPackage, {
@@ -1019,16 +1022,18 @@ export default function AdminPlugins() {
                     {t.revokeApproval}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => void handleTestBackend(plugin)}
-                  disabled={!plugin.backendEnabled || plugin.status !== 'approved' || busyId === `${plugin.id}:test`}
-                  title={plugin.status !== 'approved' ? t.testBackendDisabledTitle : undefined}
-                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {busyId === `${plugin.id}:test` ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
-                  {t.testBackend}
-                </button>
+                <Tooltip content={t.testBackendDisabledTitle} enabled={plugin.status !== 'approved'}>
+                  <button
+                    type="button"
+                    onClick={() => void handleTestBackend(plugin)}
+                    disabled={!plugin.backendEnabled || plugin.status !== 'approved' || busyId === `${plugin.id}:test`}
+                    aria-label={t.testBackend}
+                    className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {busyId === `${plugin.id}:test` ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
+                    {t.testBackend}
+                  </button>
+                </Tooltip>
                 <button
                   type="button"
                   onClick={() => void handleDelete(plugin)}

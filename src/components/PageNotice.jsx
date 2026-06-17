@@ -31,11 +31,13 @@ export default function PageNotice({
 }) {
   const config = noticeStyles[type] || noticeStyles.info;
   const Icon = config.icon;
+  const role = type === 'error' ? 'alert' : 'status';
+  const ariaLive = type === 'error' ? 'assertive' : 'polite';
 
   if (!title && !message && !children) return null;
 
   return (
-    <div className={`flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-sm ${config.wrapper}`} role="status" aria-live="polite">
+    <div className={`flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-sm ${config.wrapper}`} role={role} aria-live={ariaLive}>
       <Icon className="mt-0.5 h-5 w-5 flex-shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-4">

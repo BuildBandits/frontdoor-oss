@@ -1,6 +1,6 @@
 {
   "name": "oss-frontdoor",
-  "version": "1.2.6",
+  "version": "1.2.7a",
   "description": "Authentication gateway and app catalog for self-hosted projects",
   "type": "module",
   "scripts": {
@@ -15,7 +15,7 @@
     "avatars:prewarm": "node server/scripts/prewarmAvatars.js"
   },
   "dependencies": {
-    "@azure/msal-node": "^5.0.5",
+    "@azure/msal-node": "^5.1.5",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -24,9 +24,9 @@
     "clsx": "^2.1.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
-    "dompurify": "^3.4.3",
+    "dompurify": "^3.4.9",
     "dotenv": "^16.4.1",
-    "express": "^4.18.2",
+    "express": "^4.22.2",
     "express-rate-limit": "^7.1.5",
     "helmet": "^8.1.0",
     "jsdom": "^24.1.3",
@@ -34,9 +34,21 @@
     "lucide-react": "^0.323.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.0",
-    "uuid": "^9.0.1",
+    "react-router-dom": "^6.30.4",
+    "uuid": "^11.1.1",
     "zustand": "^4.5.0"
+  },
+  "overrides": {
+    "@azure/msal-node": {
+      "uuid": "^11.1.1"
+    },
+    "body-parser": "^1.20.5",
+    "dompurify": "^3.4.9",
+    "form-data": "^4.0.6",
+    "qs": "^6.15.2",
+    "react-router-dom": "^6.30.4",
+    "uuid": "^11.1.1",
+    "ws": "^8.21.0"
   },
   "license": "MIT",
   "repository": {

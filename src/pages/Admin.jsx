@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Pencil, Trash2, X, RotateCcw, Save, Copy, Users, ChevronDown, ChevronUp, Check, SlidersHorizontal } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, RotateCcw, Save, Copy, Users, ChevronDown, ChevronUp, Check, SlidersHorizontal, Tag } from 'lucide-react';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
@@ -16,6 +16,7 @@ import { PLUGIN_SURFACES } from '../pluginHost/constants';
 
 const emptyApp = { name: '', slug: '', description: '', long_description: '', icon: '📦', target_url: '', sort_order: 0, mode: 'redirect-plain', sso_endpoint: '', sso_method: 'GET', tags: [] };
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
+const UNLABELED_TAG_FILTER = '__frontdoor_unlabeled__';
 
 export default function Admin() {
   const { user } = useAuthStore();
@@ -46,16 +47,21 @@ export default function Admin() {
   const [appSearch, setAppSearch] = useState('');
   const [appModeFilter, setAppModeFilter] = useState('all');
   const [showOnlyOrphanApps, setShowOnlyOrphanApps] = useState(false);
-  const [showOnlyUnlabeledApps, setShowOnlyUnlabeledApps] = useState(false);
   const [modeFilterOpen, setModeFilterOpen] = useState(false);
+  const [tagFilterOpen, setTagFilterOpen] = useState(false);
+  const [selectedTagFilters, setSelectedTagFilters] = useState([]);
+  const [tagFilterSearch, setTagFilterSearch] = useState('');
   const [appSort, setAppSort] = useState({ key: 'sort_order', direction: 'asc' });
   const [pageNotice, setPageNotice] = useState(null);
+  const [appSaveNotice, setAppSaveNotice] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [cloning, setCloning] = useState(false);
   const iconFileInputRef = useRef(null);
   const slugAutoFillRef = useRef(false);
+  const appSaveNoticeTimer = useRef(null);
   const modeFilterRef = useRef(null);
+  const tagFilterRef = useRef(null);
   const canEdit = user?.role !== 'admin_readonly';
   const [brandingLanguage, setBrandingLanguage] = useState('en');
 
@@ -64,6 +70,18 @@ export default function Admin() {
     const timer = setTimeout(() => setPageNotice(null), 5000);
     return () => clearTimeout(timer);
   }, [pageNotice]);
+
+  useEffect(() => {
+    if (!appSaveNotice) return undefined;
+    if (appSaveNoticeTimer.current) clearTimeout(appSaveNoticeTimer.current);
+    appSaveNoticeTimer.current = setTimeout(() => {
+      setAppSaveNotice(null);
+      appSaveNoticeTimer.current = null;
+    }, 5500);
+    return () => {
+      if (appSaveNoticeTimer.current) clearTimeout(appSaveNoticeTimer.current);
+    };
+  }, [appSaveNotice]);
 
   useEffect(() => {
     if (!modeFilterOpen) return undefined;
@@ -76,7 +94,26 @@ export default function Admin() {
     return () => document.removeEventListener('mousedown', onMouseDown);
   }, [modeFilterOpen]);
 
+  useEffect(() => {
+    if (!tagFilterOpen) return undefined;
+    const onMouseDown = (event) => {
+      if (tagFilterRef.current && !tagFilterRef.current.contains(event.target)) {
+        setTagFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [tagFilterOpen]);
+
+  useEffect(() => {
+    if (tagFilterOpen) return;
+    setTagFilterSearch('');
+  }, [tagFilterOpen]);
+
   const pushNotice = (type, message) => setPageNotice({ type, message });
+  const pushAppSaveNotice = (type, message) => {
+    setAppSaveNotice({ type, message });
+  };
   const openConfirm = (dialog) => setConfirmDialog(dialog);
   const closeConfirm = () => {
     if (confirmBusy) return;
@@ -139,6 +176,7 @@ export default function Admin() {
       pushNotice('error', t.readOnly);
       return;
     }
+    setAppSaveNotice(null);
     slugAutoFillRef.current = false;
     setForm(emptyApp);
     setIconMode('emoji');
@@ -156,6 +194,7 @@ export default function Admin() {
       pushNotice('error', t.readOnly);
       return;
     }
+    setAppSaveNotice(null);
     setForm({
       name: app.name,
       slug: app.slug,
@@ -179,7 +218,8 @@ export default function Admin() {
     setEditing(app);
   };
 
-  const populateClonedApp = (cloned) => {
+  const populateClonedApp = (cloned, { includeDefaultGroup: includeDefaultGroupDefault = false } = {}) => {
+    setAppSaveNotice(null);
     slugAutoFillRef.current = false;
     setEditing('new');
     setForm({
@@ -202,7 +242,7 @@ export default function Admin() {
     setIconAssetPreview(cloned.iconDataUrl || cloned.iconUrl || '');
     setIconSvgText(cloned.iconSvgText || '');
     setRemoveIconAsset(false);
-    setIncludeDefaultGroup(true);
+    setIncludeDefaultGroup(includeDefaultGroupDefault);
     setClonedGroupIds(Array.isArray(cloned.groupIds) ? cloned.groupIds : []);
   };
 
@@ -228,7 +268,7 @@ export default function Admin() {
       const cloned = res.data?.app;
       if (!cloned) throw new Error(t.cloneDataMissing);
 
-      populateClonedApp(cloned);
+      populateClonedApp(cloned, { includeDefaultGroup: false });
       pushNotice('success', a.duplicateNotice);
     } catch (err) {
       pushNotice('error', err.response?.data?.error || err.message || t.cloneFailed);
@@ -245,7 +285,7 @@ export default function Admin() {
       const cloned = res.data?.app;
       if (!cloned) throw new Error(t.cloneDataMissing);
 
-      populateClonedApp(cloned);
+      populateClonedApp(cloned, { includeDefaultGroup: false });
       pushNotice('success', a.duplicateNotice);
     } catch (err) {
       pushNotice('error', err.response?.data?.error || err.message || t.cloneFailed);
@@ -254,6 +294,7 @@ export default function Admin() {
   };
 
   const close = () => {
+    setAppSaveNotice(null);
     slugAutoFillRef.current = false;
     setEditing(null);
     setForm(emptyApp);
@@ -414,6 +455,11 @@ export default function Admin() {
       pushNotice('error', t.readOnly);
       return;
     }
+    const normalizedSlug = normalizeAppSlug(form.slug);
+    if (normalizedSlug.length > 63) {
+      pushAppSaveNotice('error', a.slugTooLong);
+      return;
+    }
     setSaving(true);
     try {
       if (iconMode === 'asset' && !iconAssetDataUrl && !iconSvgText && !iconAssetPreview && editing === 'new') {
@@ -440,7 +486,7 @@ export default function Admin() {
       if (editing === 'new') {
         const res = await api.post('/apps', {
           ...form,
-          slug: normalizeAppSlug(form.slug),
+          slug: normalizedSlug,
           sso_endpoint: normalizedSsoEndpoint,
           ...iconPayload,
           icon: iconMode === 'emoji' ? form.icon : form.icon || '🖼️',
@@ -452,7 +498,7 @@ export default function Admin() {
         });
         loadApps();
         close();
-        pushNotice('success', a.appCreated);
+        pushAppSaveNotice('success', a.appCreated);
         if (!includeDefaultGroup) {
           openGroupAssignmentModal({
             ...res.data?.app,
@@ -462,7 +508,7 @@ export default function Admin() {
       } else {
         await api.put(`/apps/${editing.id}`, {
           ...form,
-          slug: normalizeAppSlug(form.slug),
+          slug: normalizedSlug,
           sso_endpoint: normalizedSsoEndpoint,
           ...iconPayload,
           icon: iconMode === 'emoji' ? form.icon : form.icon || '🖼️',
@@ -470,15 +516,15 @@ export default function Admin() {
         const savedApp = {
           ...editing,
           ...form,
-          slug: normalizeAppSlug(form.slug),
+          slug: normalizedSlug,
           sso_endpoint: normalizedSsoEndpoint,
           icon: iconMode === 'emoji' ? form.icon : form.icon || '🖼️',
           groupIds: Array.isArray(editing.groupIds) ? editing.groupIds : [],
         };
         loadApps();
-        pushNotice('success', a.appUpdated);
         if (openGroupAssignmentAfterSave) {
           close();
+          pushAppSaveNotice('success', a.appUpdated);
           openGroupAssignmentModal(
             savedApp,
             savedApp.groupIds,
@@ -487,10 +533,11 @@ export default function Admin() {
           );
         } else {
           close();
+          pushAppSaveNotice('success', a.appUpdated);
         }
       }
     } catch (err) {
-      pushNotice('error', err.response?.data?.error || err.message || t.errorSaving);
+      pushAppSaveNotice('error', err.response?.data?.error || err.message || t.errorSaving);
     }
     setSaving(false);
   };
@@ -586,6 +633,9 @@ export default function Admin() {
     });
     return [...tagSet].sort();
   }, [apps]);
+  useEffect(() => {
+    setSelectedTagFilters((prev) => prev.filter((tag) => tag === UNLABELED_TAG_FILTER || allTags.includes(tag)));
+  }, [allTags]);
   const toggleGroupAssignment = (groupId) => {
     setGroupAssignSelection((prev) => (
       prev.includes(groupId)
@@ -610,6 +660,7 @@ export default function Admin() {
     ...visibleModeOptions,
   ];
   const currentModeFilterOption = visibleModeFilterOptions.find((opt) => opt.value === appModeFilter) || visibleModeFilterOptions[0];
+  const hasTagFilters = selectedTagFilters.length > 0;
   const currentModeOption = modeOptions.find((opt) => opt.value === form.mode);
   const handleModeChange = (nextMode) => {
     if (nextMode === 'entra-app') {
@@ -626,24 +677,44 @@ export default function Admin() {
     }
     setForm((prev) => ({ ...prev, mode: nextMode }));
   };
-  function hasAppLabels(app) {
-    return Array.isArray(app.tags) && app.tags.some((tag) => String(tag || '').trim().length > 0);
-  }
+  const toggleTagFilter = (tag) => {
+    const normalizedTag = tag === UNLABELED_TAG_FILTER ? UNLABELED_TAG_FILTER : (tag ?? '').toString().trim().toLowerCase();
+    if (!normalizedTag) return;
+    setSelectedTagFilters((prev) => (
+      prev.includes(normalizedTag)
+        ? prev.filter((value) => value !== normalizedTag)
+        : [...prev, normalizedTag]
+    ));
+  };
+  const filteredTags = useMemo(() => {
+    const q = tagFilterSearch.trim().toLowerCase();
+    if (!q) return allTags;
+    return allTags.filter((tag) => tag.includes(q));
+  }, [allTags, tagFilterSearch]);
   const filteredApps = useMemo(() => {
     const q = appSearch.toLowerCase().trim();
     const filtered = apps.filter((app) => {
       if (showOnlyOrphanApps && Number(app.group_count || 0) !== 0) return false;
-      if (showOnlyUnlabeledApps && hasAppLabels(app)) return false;
       if (appModeFilter !== 'all' && app.mode !== appModeFilter) return false;
+      const tags = Array.isArray(app.tags)
+        ? app.tags.map((tag) => (tag ?? '').toString().trim().toLowerCase()).filter(Boolean)
+        : [];
+      if (selectedTagFilters.length > 0) {
+        const matchesTagFilter = selectedTagFilters.some((selectedTag) => (
+          selectedTag === UNLABELED_TAG_FILTER
+            ? tags.length === 0
+            : tags.includes(selectedTag)
+        ));
+        if (!matchesTagFilter) return false;
+      }
       if (!q) return true;
-      const tags = Array.isArray(app.tags) ? app.tags : [];
       return (
         app.name?.toLowerCase().includes(q) ||
         app.slug?.toLowerCase().includes(q) ||
         app.description?.toLowerCase().includes(q) ||
         app.target_url?.toLowerCase().includes(q) ||
         app.mode?.toLowerCase().includes(q) ||
-        tags.some((tag) => (tag || '').toString().toLowerCase().includes(q))
+        tags.some((tag) => tag.includes(q))
       );
     });
 
@@ -680,13 +751,9 @@ export default function Admin() {
       }
       return result * direction;
     });
-  }, [apps, appSearch, appModeFilter, appSort, showOnlyOrphanApps, showOnlyUnlabeledApps]);
+  }, [apps, appSearch, appModeFilter, appSort, showOnlyOrphanApps, selectedTagFilters]);
   const orphanApps = useMemo(
     () => apps.filter((app) => Number(app.group_count || 0) === 0),
-    [apps],
-  );
-  const unlabeledApps = useMemo(
-    () => apps.filter((app) => !hasAppLabels(app)),
     [apps],
   );
 
@@ -695,12 +762,6 @@ export default function Admin() {
       setShowOnlyOrphanApps(false);
     }
   }, [showOnlyOrphanApps, orphanApps.length]);
-
-  useEffect(() => {
-    if (showOnlyUnlabeledApps && unlabeledApps.length === 0) {
-      setShowOnlyUnlabeledApps(false);
-    }
-  }, [showOnlyUnlabeledApps, unlabeledApps.length]);
 
   const openGroupAssignmentModal = (app, selectedIds = [], defaultIncluded = false, allowNoChanges = false) => {
     const normalizedSelectedIds = [...new Set(selectedIds.filter(Boolean))];
@@ -811,6 +872,19 @@ export default function Admin() {
         </div>
       )}
 
+      {appSaveNotice && (
+        <div className="pointer-events-none fixed left-1/2 top-6 z-[70] w-[min(42rem,calc(100vw-2rem))] -translate-x-1/2">
+          <div className="pointer-events-auto">
+            <PageNotice
+              type={appSaveNotice.type}
+              message={appSaveNotice.message}
+              onClose={() => setAppSaveNotice(null)}
+              closeLabel={ui.common.closeNotice}
+            />
+          </div>
+        </div>
+      )}
+
       <PluginSurface surface={PLUGIN_SURFACES.ADMIN_PAGE_TOP} variant="stack" className="mb-6" />
 
       <div className="mb-6 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
@@ -829,18 +903,18 @@ export default function Admin() {
             <button
               type="button"
               onClick={() => setModeFilterOpen((prev) => !prev)}
-              className="relative inline-flex min-w-[220px] h-12 items-center w-full pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-left text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900"
+            className="relative inline-flex min-w-[220px] h-12 items-center w-full pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-left text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900"
             >
               <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-              <span className="truncate">{currentModeFilterOption.label}</span>
+              <span className="flex min-w-0 flex-1 items-center gap-1">
+                <span className="shrink-0 text-gray-400 dark:text-gray-500">{a.modeFilterShort}:</span>
+                <span className="truncate">{currentModeFilterOption.label}</span>
+              </span>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
             </button>
 
             {modeFilterOpen && (
-              <div className="absolute right-0 z-20 mt-2 min-w-[260px] overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
-                <div className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-800">
-                  {ui.admin.apps.modeFilter}
-                </div>
+              <div className="absolute right-0 z-20 mt-2 w-full overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
                 <div className="py-1">
                   {visibleModeFilterOptions.map((opt) => {
                     const selected = appModeFilter === opt.value;
@@ -856,6 +930,113 @@ export default function Admin() {
                           selected ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                         }`}
                       >
+                        <span className="flex-1">{opt.label}</span>
+                        {selected && <Check className="h-4 w-4 text-dark dark:text-gray-100" aria-hidden="true" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="relative" ref={tagFilterRef}>
+            <button
+              type="button"
+              onClick={() => setTagFilterOpen((prev) => !prev)}
+              className={`relative inline-flex min-w-[220px] h-12 items-center w-full pl-10 pr-10 border rounded-xl text-sm text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900 ${
+                hasTagFilters
+                  ? 'border-violet-300 bg-violet-50 text-violet-900 dark:border-violet-700 dark:bg-violet-950/45 dark:text-violet-100'
+                  : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300'
+              }`}
+              aria-haspopup="menu"
+              aria-expanded={tagFilterOpen}
+            >
+              <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <span className="flex min-w-0 flex-1 items-center gap-1">
+                <span className="shrink-0 text-gray-400 dark:text-gray-500">{a.tagFilterLabel}:</span>
+                <span className="truncate">
+                  {selectedTagFilters.length === 0
+                    ? a.tagFilterAll
+                    : a.tagFilterSelected.replace('{count}', String(selectedTagFilters.length))}
+                </span>
+              </span>
+              <span className="absolute right-10 top-1/2 -translate-y-1/2 inline-flex min-w-6 items-center justify-center rounded-full bg-white/80 dark:bg-gray-900/80 px-2 py-0.5 text-[11px] font-semibold text-gray-500 dark:text-gray-300">
+                {selectedTagFilters.length}
+              </span>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+            </button>
+
+            {tagFilterOpen && (
+              <div className="absolute right-0 z-20 mt-2 w-full overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
+                <div className="border-b border-gray-100 dark:border-gray-800 px-3 py-3">
+                  <ClearableSearchField
+                    value={tagFilterSearch}
+                    onChange={setTagFilterSearch}
+                    placeholder={a.tagFilterSearchPlaceholder}
+                    clearLabel={ui.common.clearSearch}
+                    inputClassName="text-sm"
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-72 overflow-auto py-1">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTagFilters([])}
+                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                      selectedTagFilters.length === 0
+                        ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <span
+                      className={`flex h-4 w-4 items-center justify-center rounded border ${
+                        selectedTagFilters.length === 0 ? 'border-dark bg-dark text-white' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-transparent'
+                      }`}
+                      aria-hidden="true"
+                    >
+                      <Check className="h-3 w-3" />
+                    </span>
+                    <span className="flex-1">{a.tagFilterAll}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleTagFilter(UNLABELED_TAG_FILTER)}
+                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                      selectedTagFilters.includes(UNLABELED_TAG_FILTER)
+                        ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <span
+                      className={`flex h-4 w-4 items-center justify-center rounded border ${
+                        selectedTagFilters.includes(UNLABELED_TAG_FILTER)
+                          ? 'border-dark bg-dark text-white'
+                          : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-transparent'
+                      }`}
+                      aria-hidden="true"
+                    >
+                      <Check className="h-3 w-3" />
+                    </span>
+                    <span className="flex-1">{a.appsWithoutTags}</span>
+                  </button>
+                  <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+                  {filteredTags.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-gray-400 dark:text-gray-500">
+                      {a.noTagFilterMatches}
+                    </div>
+                  ) : filteredTags.map((tag) => {
+                    const selected = selectedTagFilters.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTagFilter(tag)}
+                        className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                          selected
+                            ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100'
+                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}
+                      >
                         <span
                           className={`flex h-4 w-4 items-center justify-center rounded border ${
                             selected ? 'border-dark bg-dark text-white' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-transparent'
@@ -864,7 +1045,7 @@ export default function Admin() {
                         >
                           <Check className="h-3 w-3" />
                         </span>
-                        <span className="flex-1">{opt.label}</span>
+                        <span className="flex-1 truncate">{tag}</span>
                       </button>
                     );
                   })}
@@ -872,24 +1053,6 @@ export default function Admin() {
               </div>
             )}
           </div>
-          {unlabeledApps.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowOnlyUnlabeledApps((prev) => !prev)}
-              className={`inline-flex h-12 min-w-[220px] items-center justify-center rounded-xl border px-4 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-amber-700 dark:focus-visible:ring-offset-gray-900 ${
-                showOnlyUnlabeledApps
-                  ? 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-600 dark:bg-amber-950/55 dark:text-amber-200'
-                  : 'border-amber-200 bg-white dark:border-amber-800/70 dark:bg-gray-900 text-amber-900 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/35'
-              }`}
-            >
-              <span className="inline-flex items-center gap-2">
-                <span>{showOnlyUnlabeledApps ? a.showAllApps : a.showOnlyUnlabeled}</span>
-                <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-semibold text-amber-900 dark:bg-amber-800/85 dark:text-amber-100">
-                  {unlabeledApps.length}
-                </span>
-              </span>
-            </button>
-          )}
           <div className="text-xs text-gray-400 dark:text-gray-500">
             {filteredApps.length} {ui.nav.apps.toLowerCase()} {t.of} {apps.length}
           </div>
@@ -1224,6 +1387,7 @@ export default function Admin() {
                 <input
                   type="text"
                   value={form.slug}
+                  maxLength={63}
                   onChange={(e) => {
                     slugAutoFillRef.current = true;
                     setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') });
@@ -1231,8 +1395,14 @@ export default function Admin() {
                   placeholder={a.slugExample}
                   className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                 />
+                <p className="mt-1 flex items-center justify-between gap-3 text-xs text-gray-400 dark:text-gray-500">
+                  <span>{a.slugHelp}</span>
+                  <span className="shrink-0 font-mono">
+                    {form.slug.length}/63
+                  </span>
+                </p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  {a.slugHelp}
+                  {a.slugLimitHelp}
                 </p>
               </div>
 

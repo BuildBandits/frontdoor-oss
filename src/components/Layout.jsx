@@ -6,6 +6,7 @@ import { DEFAULT_COLOR_SCHEME, normalizeColorScheme, resolveAppColorScheme } fro
 import BrandMark from './BrandMark';
 import AppFooter from './AppFooter';
 import UserAvatar from './UserAvatar';
+import Tooltip from './Tooltip';
 import api from '../services/api';
 import { getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import PluginSurface from '../pluginHost/PluginSurface';
@@ -651,57 +652,71 @@ export default function Layout({ children }) {
             <div className="max-w-7xl mx-auto px-4 py-4 max-h-[calc(100vh-4.5rem)] overflow-y-auto overscroll-contain space-y-3">
               <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 -mx-1 px-1">
                 {showHomeNav && (
-                  <Link to="/" className={mobileNavIconClass('/')} aria-label={ui.nav.home} title={ui.nav.home}>
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
-                      <Home className="w-4 h-4" />
-                    </div>
-                    <span className="sr-only">{ui.nav.home}</span>
-                  </Link>
+                  <Tooltip content={ui.nav.home}>
+                    <Link to="/" className={mobileNavIconClass('/')} aria-label={ui.nav.home}>
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
+                        <Home className="w-4 h-4" />
+                      </div>
+                      <span className="sr-only">{ui.nav.home}</span>
+                    </Link>
+                  </Tooltip>
                 )}
 
                 {canUseAdminPages && (
                   <>
-                    <Link to="/admin" className={mobileNavIconClass('/admin')} aria-label={ui.nav.apps} title={ui.nav.apps}>
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
-                        <Settings className="w-4 h-4" />
-                      </div>
-                      <span className="sr-only">{ui.nav.apps}</span>
-                    </Link>
-                    <Link to="/admin/users" className={mobileNavIconClass('/admin/users')} aria-label={ui.nav.users} title={ui.nav.users}>
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
-                        <UserCog className="w-4 h-4" />
-                      </div>
-                      <span className="sr-only">{ui.nav.users}</span>
-                    </Link>
-                    <Link to="/admin/groups" className={mobileNavIconClass('/admin/groups')} aria-label={ui.nav.groups} title={ui.nav.groups}>
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
-                        <Users className="w-4 h-4" />
-                      </div>
-                      <span className="sr-only">{ui.nav.groups}</span>
-                    </Link>
-                    {isOwner && (
-                      <Link to="/admin/logs" className={mobileNavIconClass('/admin/logs')} aria-label={ui.nav.logs} title={ui.nav.logs}>
+                    <Tooltip content={ui.nav.apps}>
+                      <Link to="/admin" className={mobileNavIconClass('/admin')} aria-label={ui.nav.apps}>
                         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
-                          <Activity className="w-4 h-4" />
+                          <Settings className="w-4 h-4" />
                         </div>
-                        <span className="sr-only">{ui.nav.logs}</span>
+                        <span className="sr-only">{ui.nav.apps}</span>
                       </Link>
+                    </Tooltip>
+                    <Tooltip content={ui.nav.users}>
+                      <Link to="/admin/users" className={mobileNavIconClass('/admin/users')} aria-label={ui.nav.users}>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
+                          <UserCog className="w-4 h-4" />
+                        </div>
+                        <span className="sr-only">{ui.nav.users}</span>
+                      </Link>
+                    </Tooltip>
+                    <Tooltip content={ui.nav.groups}>
+                      <Link to="/admin/groups" className={mobileNavIconClass('/admin/groups')} aria-label={ui.nav.groups}>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
+                          <Users className="w-4 h-4" />
+                        </div>
+                        <span className="sr-only">{ui.nav.groups}</span>
+                      </Link>
+                    </Tooltip>
+                    {isOwner && (
+                      <Tooltip content={ui.nav.logs}>
+                        <Link to="/admin/logs" className={mobileNavIconClass('/admin/logs')} aria-label={ui.nav.logs}>
+                          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
+                            <Activity className="w-4 h-4" />
+                          </div>
+                          <span className="sr-only">{ui.nav.logs}</span>
+                        </Link>
+                      </Tooltip>
                     )}
                     {isOwner && (
-                      <Link to="/admin/audit" className={mobileNavIconClass('/admin/audit')} aria-label={ui.nav.audit} title={ui.nav.audit}>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
-                          <ShieldCheck className="w-4 h-4" />
-                        </div>
-                        <span className="sr-only">{ui.nav.audit}</span>
-                      </Link>
+                      <Tooltip content={ui.nav.audit}>
+                        <Link to="/admin/audit" className={mobileNavIconClass('/admin/audit')} aria-label={ui.nav.audit}>
+                          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
+                            <ShieldCheck className="w-4 h-4" />
+                          </div>
+                          <span className="sr-only">{ui.nav.audit}</span>
+                        </Link>
+                      </Tooltip>
                     )}
                     {isOwner && (
-                      <Link to="/admin/customization" className={mobileNavIconClass('/admin/customization')} aria-label={ui.nav.customize} title={ui.nav.customize}>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
-                          <Palette className="w-4 h-4" />
-                        </div>
-                        <span className="sr-only">{ui.nav.customize}</span>
-                      </Link>
+                      <Tooltip content={ui.nav.customize}>
+                        <Link to="/admin/customization" className={mobileNavIconClass('/admin/customization')} aria-label={ui.nav.customize}>
+                          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white dark:bg-gray-900">
+                            <Palette className="w-4 h-4" />
+                          </div>
+                          <span className="sr-only">{ui.nav.customize}</span>
+                        </Link>
+                      </Tooltip>
                     )}
                   </>
                 )}

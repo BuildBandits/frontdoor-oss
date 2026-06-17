@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { X, Star, LayoutGrid, List, Rows3, AppWindow } from 'lucide-react';
+import { X, Star, LayoutGrid, List, Rows3, AppWindow, RefreshCw } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -20,6 +20,7 @@ import AppCard from '../components/AppCard';
 import SortableAppCard from '../components/SortableAppCard';
 import TagGroupCard from '../components/TagGroupCard';
 import ClearableSearchField from '../components/ClearableSearchField';
+import Tooltip from '../components/Tooltip';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, resolveAppLanguage } from '../i18n';
 import PluginSurface from '../pluginHost/PluginSurface';
@@ -61,6 +62,7 @@ export default function Home() {
   const [search, setSearch] = useState('');
   const [selectedTags, setSelectedTags] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshingApps, setRefreshingApps] = useState(false);
   const [brandingLoading, setBrandingLoading] = useState(true);
 
   // Persisted preferences
@@ -160,12 +162,30 @@ export default function Home() {
     .replace('{current}', String(tourStep + 1))
     .replace('{total}', String(totalTourSteps));
 
-  useEffect(() => {
-    api.get('/apps').then((res) => {
+  const loadApps = useCallback(async ({ silent = false } = {}) => {
+    if (silent) {
+      setRefreshingApps(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const res = await api.get('/apps');
       setApps(res.data.apps);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    } catch {
+      // Keep the current list if a manual refresh fails.
+    } finally {
+      if (silent) {
+        setRefreshingApps(false);
+      } else {
+        setLoading(false);
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    void loadApps();
+  }, [loadApps]);
 
   useEffect(() => {
     api.get('/branding')
@@ -504,6 +524,9 @@ export default function Home() {
   const isLastTourStep = tourStepIndex === totalTourSteps - 1;
   const isCenteredTourStep = currentTourStep?.placement === 'center';
   const tourBrowserDocs = currentTourStep?.browserDocs ?? [];
+  const handleRefreshApps = useCallback(() => {
+    void loadApps({ silent: true });
+  }, [loadApps]);
 
   const handleTourPrevious = () => {
     setTourStep((value) => Math.max(0, value - 1));
@@ -760,46 +783,66 @@ export default function Home() {
             <div className="flex h-12 shrink-0 items-center rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
               {appCountLabel}
             </div>
-            <button
-              onClick={() => setShowFavorites((v) => !v)}
-              className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
-                showFavorites
-                  ? 'bg-yellow-50 border-yellow-300 text-yellow-700 dark:bg-yellow-950/50 dark:border-yellow-600 dark:text-yellow-300'
-                  : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
-              }`}
-              title={showFavorites ? ui.home.showAll : ui.home.favoritesTitle}
-            >
-              <Star className="w-4 h-4" fill={showFavorites ? 'currentColor' : 'none'} />
-              <span className="hidden sm:inline">{ui.home.favorites}</span>
-            </button>
+            <Tooltip content={ui.home.refreshAppsTitle}>
+              <button
+                type="button"
+                onClick={handleRefreshApps}
+                disabled={refreshingApps}
+                className="flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-medium text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none disabled:cursor-wait disabled:opacity-70"
+                aria-label={ui.home.refreshAppsTitle}
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshingApps ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">
+                  {refreshingApps ? ui.home.refreshAppsBusy : ui.home.refreshApps}
+                </span>
+              </button>
+            </Tooltip>
+            <Tooltip content={showFavorites ? ui.home.showAll : ui.home.favoritesTitle}>
+              <button
+                onClick={() => setShowFavorites((v) => !v)}
+                className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
+                  showFavorites
+                    ? 'bg-yellow-50 border-yellow-300 text-yellow-700 dark:bg-yellow-950/50 dark:border-yellow-600 dark:text-yellow-300'
+                    : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
+                }`}
+                aria-label={showFavorites ? ui.home.showAll : ui.home.favoritesTitle}
+              >
+                <Star className="w-4 h-4" fill={showFavorites ? 'currentColor' : 'none'} />
+                <span className="hidden sm:inline">{ui.home.favorites}</span>
+              </button>
+            </Tooltip>
 
-            <button
-              onClick={handleToggleGroupByTag}
-              disabled={mobileCompactViewForced}
-              className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
-                groupByTag
-                  ? 'bg-purple-50 border-purple-300 text-purple-700 dark:bg-purple-950/50 dark:border-purple-600 dark:text-purple-300'
-                  : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
-              } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
-              title={groupByTag ? ui.home.gridViewTitle : ui.home.groupByTitle}
-            >
-              {groupByTag ? <AppWindow className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
-              <span className="hidden sm:inline">{ui.home.groupBy}</span>
-            </button>
+            <Tooltip content={groupByTag ? ui.home.gridViewTitle : ui.home.groupByTitle}>
+              <button
+                onClick={handleToggleGroupByTag}
+                disabled={mobileCompactViewForced}
+                className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
+                  groupByTag
+                    ? 'bg-purple-50 border-purple-300 text-purple-700 dark:bg-purple-950/50 dark:border-purple-600 dark:text-purple-300'
+                    : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
+                } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
+                aria-label={groupByTag ? ui.home.gridViewTitle : ui.home.groupByTitle}
+              >
+                {groupByTag ? <AppWindow className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
+                <span className="hidden sm:inline">{ui.home.groupBy}</span>
+              </button>
+            </Tooltip>
 
-            <button
-              onClick={handleToggleCompactView}
-              disabled={mobileCompactViewForced}
-              className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
-                compactView
-                  ? 'bg-gradient-to-br from-sky-50 via-cyan-50 to-indigo-50 dark:from-sky-900/40 dark:via-cyan-900/30 dark:to-indigo-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 shadow-sm shadow-sky-200/50'
-                  : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
-              } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
-              title={mobileCompactViewForced ? ui.home.compactViewForcedTitle : (compactView ? ui.home.cardsLabel : ui.home.compactViewTitle)}
-            >
-              {compactView ? <Rows3 className="w-4 h-4" /> : <List className="w-4 h-4" />}
-              <span className="hidden sm:inline">{mobileCompactViewForced ? ui.home.compactMobileLabel : ui.home.compactLabel}</span>
-            </button>
+            <Tooltip content={mobileCompactViewForced ? ui.home.compactViewForcedTitle : (compactView ? ui.home.cardsLabel : ui.home.compactViewTitle)}>
+              <button
+                onClick={handleToggleCompactView}
+                disabled={mobileCompactViewForced}
+                className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
+                  compactView
+                    ? 'bg-gradient-to-br from-sky-50 via-cyan-50 to-indigo-50 dark:from-sky-900/40 dark:via-cyan-900/30 dark:to-indigo-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 shadow-sm shadow-sky-200/50'
+                    : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
+                } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
+                aria-label={mobileCompactViewForced ? ui.home.compactViewForcedTitle : (compactView ? ui.home.cardsLabel : ui.home.compactViewTitle)}
+              >
+                {compactView ? <Rows3 className="w-4 h-4" /> : <List className="w-4 h-4" />}
+                <span className="hidden sm:inline">{mobileCompactViewForced ? ui.home.compactMobileLabel : ui.home.compactLabel}</span>
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -955,15 +998,16 @@ export default function Home() {
                     {currentTourStep.title}
                   </h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={closeTour}
-                  className="rounded-full border border-gray-200 dark:border-gray-700 p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white"
-                  aria-label={ui.home.tour.skip}
-                  title={ui.home.tour.skip}
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <Tooltip content={ui.home.tour.skip}>
+                  <button
+                    type="button"
+                    onClick={closeTour}
+                    className="rounded-full border border-gray-200 dark:border-gray-700 p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white"
+                    aria-label={ui.home.tour.skip}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </Tooltip>
               </div>
 
               <p className="text-sm sm:text-base leading-relaxed text-gray-600 dark:text-gray-300">

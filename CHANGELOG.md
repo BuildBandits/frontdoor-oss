@@ -7,7 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- **Docker image optimization branch**: the production image now uses a cleaner multi-stage build on `node:22-bookworm-slim`, copies only the build artifacts and runtime dependencies into the final stage, and keeps the Docker build context small with a tighter `.dockerignore`.
+- **Runtime dependency cleanup**: the production dependency tree has been refreshed so the runtime audit now passes cleanly with `npm audit --omit=dev`, while the remaining builder-only findings stay confined to the build stage.
 - **Experimental plugin platform**: Frontdoor now has a real plugin host with runtime registration, shared APIs, extension surfaces, plugin routes, action injection, and a sample third-party-style plugin package. The host keeps the core app minimal while letting plugins extend navigation, account actions, admin surfaces and dedicated pages without touching core UI code.
+- **Home refresh control**: the Home toolbar now has an in-page refresh button, so users can reload the app catalog without hitting `F5` and without losing their current filters.
+- **App tag filter dropdown**: the Apps management page now uses a multi-select tag dropdown in place of the old unlabeled toggle. It supports picking multiple tags at once and also includes a `Without tags` option for unlabeled apps.
+- **Tag filter ordering polish**: the `Without tags` option now sits at the top of the Apps tag dropdown, next to `All tags`, so it is quicker to reach when you are narrowing down the catalog.
+- **Tag filter search**: the Apps tag dropdown now includes an inline tag search field, so admins can find the right label without scrolling through long tag lists.
 - **User detail group shortcuts**: the groups already managed in Frontdoor from the user detail panel are now clickable and jump straight to the matching group detail view, so you can inspect the linked apps without leaving the user card flow.
 - **Admin app quick duplicate action**: the Apps table now includes a one-click duplicate icon in the Actions column, reusing the existing clone flow from the app editor so admins can jump straight into editing the copied app.
 - **Home page guide shortcut**: the personal menu now includes a direct shortcut to the last Home tour popup, so users can jump straight to the homepage setup documentation without replaying the full tour.
@@ -18,6 +24,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Search shortcut hint**: the shared search field now exposes a visible `CTRL+K / ⌘K` hint and supports a global `Ctrl/Cmd+K` shortcut that focuses the primary search input on pages that have one.
 
 ### Changed
+- **Version bump**: Frontdoor is now on `1.2.7a` for the current branch, reflecting the small-fix release cadence while this work lands.
+- **Docker runtime hardening**: the container entrypoint now only repairs writable runtime paths before dropping privileges, instead of recursively chowning the whole app tree on every start.
+- **Security dependency refresh**: `@azure/msal-node`, `dompurify`, `express`, `react-router-dom`, and `uuid` were bumped, with transitive overrides for the vulnerable runtime chain where needed, and the lockfile was regenerated to match the new manifest.
+- **Tooltip behavior**: icon hints and card descriptions now use the in-app tooltip flow instead of the browser `title` bubble, so hover help appears immediately and stays visually consistent across the UI.
+- **Maintenance snapshot**: the Personalizza > Manutenzione box now starts with a compact storage overview that shows the database footprint plus the avatar and app icon cache sizes before the backup and restore row.
+- **Maintenance snapshot polish**: the storage overview cards now use soft background watermark icons, while the main summary pill keeps only the compact total badge for a cleaner look.
+- **Maintenance total badge polish**: the top-right total pill in the storage overview now keeps the small inline icon again, making the quick total read a little clearer.
+- **Maintenance block polish**: the `Conservazione log` and `Pulizia log accessi` controls now live in a single neutral card, leaving the storage snapshot as the only highlighted block.
+- **App slug validation**: slug length is now capped in the app editor input and the shared slug validation helper is reused on the server, so overlong slugs fail earlier and consistently.
+- **Admin dropdown consistency**: the role, status and audit/log filter selects now use the same custom dropdown style as the App page filters, so the admin areas feel more visually aligned.
+- **Admin filter behavior**: the Users role and status filters, plus the Log period and row selectors, now use single-choice option menus without checkboxes. The Audit page keeps single-choice menus for period and rows, while the admin filter can now select multiple owners/admins with checkboxes.
+- **Dropdown selection marker**: the shared admin dropdowns now show the App-style selected checkmark in single-select menus, while multi-select menus keep checkbox markers, matching the App page dropdown feel more closely.
+- **Dropdown width alignment**: the shared dropdown menu now expands to the same width as its trigger, so the open panel lines up cleanly with the button across admin pages.
+- **Dropdown sizing polish**: single-select rows now use the same compact App-style spacing, so the menus look and feel closer to the connections filter in the App page.
+- **Dropdown height polish**: the shared dropdown menu now caps its height and scrolls internally, so long option lists stay compact instead of turning into tall panels.
+- **App menu cleanup**: the App page connection-type and tag menus no longer show the internal section headers, so they now visually match the other admin dropdowns more closely.
+- **Audit admin default**: the Audit page admin filter now includes a top `All admins` option that clears the selection, matching the default-all behavior used by the App page filters.
+- **Audit admin UX**: selecting `All admins` now closes the menu immediately after clearing the filter, keeping the multi-select flow snappy and predictable.
+- **App filter prefixes**: the App page connection and tag menus now show a small prefix label before the selected value, matching the other admin screens' `Label: choice` style.
+- **App filter wording**: the App page connection prefix now uses the shorter `Connections` / `Collegamenti` wording instead of the longer connection-type label.
+
 - **Plugin kill switch**: the plugin system now has a tenant-level checkbox in Personalizza. In 1.2.5 it is visible but locked off, so plugin runtime loading, plugin routes, plugin surfaces and plugin admin pages all stay unavailable until the future 1.3.0 work lands.
 - **Plugin administration flow**: the Plugins page now acts as an installation, review and approval console rather than a database-oriented maintenance screen. Owners can approve or revoke packages, export them again as JSON or ZIP, and jump straight to the plugin audit trail from the same view.
 - **Runtime filtering**: audit queries and plugin loading paths now distinguish plugin records explicitly, so operational logs, plugin approvals and runtime bundles stay separated from the rest of the admin audit history.
@@ -36,6 +63,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Plugin admin crash**: restored the missing `FileJson` import on the plugin admin page so `/admin/plugins` no longer crashes on load with `ReferenceError: FileJson is not defined`.
 
 ### Fixed
+- **App editor error banner**: validation and save errors from the app add/edit modal now appear in a floating notice above the modal with a close button and auto-dismiss, so they are no longer hidden behind the dialog layer.
+- **Login logging**: successful Microsoft and dev logins now write an explicit line with the user email in the container log, making auth activity visible without hunting through the Entra sync noise.
+- **Malformed path noise**: the server now catches malformed request paths that trigger Express `URIError` decode failures, returning a plain `400` instead of spamming stack traces for suspicious traversal probes or broken encoded paths.
+- **Users refresh**: the Utenti page now includes an in-page refresh button, so the list can be reloaded without a full browser refresh.
 - **Admin app group modal search**: the "Manage groups" dialog now opens with focus already in the search field and accepts `Ctrl/Cmd+K` while the modal is open, so you can jump back to filtering without leaving the assignment flow.
 - **Group row expand state**: expanding a group in Gestione Gruppi no longer tints the title bar light gray in the light theme; the row now keeps the same neutral chrome and only the detail section changes.
 - **Admin app group modal**: the "Manage groups" dialog now synchronizes the full selected set, so deselecting an already-assigned group removes the app from that group instead of only adding new memberships. The title, helper text and action copy were updated to reflect the toggle-style workflow.

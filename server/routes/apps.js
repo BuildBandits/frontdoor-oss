@@ -12,7 +12,7 @@ import { iconUrlForApp, parseAppIconPayload, readAppIconAssetDataUrl, removeAppI
 import { getBrandingSettings } from '../services/branding.js';
 import { dispatchPluginEvent } from '../services/plugins.js';
 import { isValidEntraApplicationId, normalizeEntraApplicationId } from '../../shared/entra.js';
-import { normalizeAppSlug } from '../../shared/appSlug.js';
+import { normalizeAppSlug, validateAppSlug } from '../../shared/appSlug.js';
 
 const router = express.Router();
 
@@ -466,9 +466,8 @@ router.post('/', authenticate, isAdminEditor, async (req, res) => {
       return res.status(400).json({ error: 'name, slug, and target_url are required' });
     }
 
-    if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(slug)) {
-      return res.status(400).json({ error: 'slug must be lowercase alphanumeric with hyphens, 1-63 chars' });
-    }
+    const slugError = validateAppSlug(slug);
+    if (slugError) return res.status(400).json({ error: slugError });
 
     const urlError = validateTargetUrl(target_url);
     if (urlError) return res.status(400).json({ error: urlError });
@@ -555,6 +554,11 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
     const existing = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
     if (!existing) {
       return res.status(404).json({ error: 'App not found' });
+    }
+
+    if (slug !== undefined) {
+      const slugError = validateAppSlug(slug);
+      if (slugError) return res.status(400).json({ error: slugError });
     }
 
     if (slug && slug !== existing.slug) {

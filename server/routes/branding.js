@@ -1,12 +1,38 @@
 import express from 'express';
+import fsp from 'fs/promises';
 import { authenticate, isOwner } from '../middleware/auth.js';
-import { logRbacAudit } from '../db.js';
+import { dbPath, logRbacAudit } from '../db.js';
 import { clearAvatarCache, getAvatarCacheStats } from '../services/avatars.js';
 import { cleanupAppIconCache, getAppIconCacheStats } from '../services/appIcons.js';
 import { getBrandingSettings, serveBrandingLogo, updateBrandingSettings } from '../services/branding.js';
 import { respondWithError } from '../services/errors.js';
 
 const router = express.Router();
+
+async function getDatabaseFootprint() {
+  const files = [
+    { kind: 'database', path: dbPath },
+    { kind: 'wal', path: `${dbPath}-wal` },
+    { kind: 'shm', path: `${dbPath}-shm` },
+  ];
+
+  const parts = await Promise.all(files.map(async (file) => {
+    try {
+      const stats = await fsp.stat(file.path);
+      return { kind: file.kind, bytes: stats.size };
+    } catch {
+      return { kind: file.kind, bytes: 0 };
+    }
+  }));
+
+  const totalBytes = parts.reduce((total, part) => total + part.bytes, 0);
+  return {
+    bytes: totalBytes,
+    dbBytes: parts.find((part) => part.kind === 'database')?.bytes || 0,
+    walBytes: parts.find((part) => part.kind === 'wal')?.bytes || 0,
+    shmBytes: parts.find((part) => part.kind === 'shm')?.bytes || 0,
+  };
+}
 
 router.get('/', (req, res) => {
   res.json({ branding: getBrandingSettings() });
@@ -39,11 +65,17 @@ router.post('/avatars/refresh', authenticate, isOwner, async (req, res) => {
 
 router.get('/cache', authenticate, isOwner, async (req, res) => {
   try {
-    const [avatarCache, appIconCache] = await Promise.all([
+    const [database, avatarCache, appIconCache] = await Promise.all([
+      getDatabaseFootprint(),
       getAvatarCacheStats(),
       getAppIconCacheStats(),
     ]);
-    res.json({ avatarCache, appIconCache });
+    res.json({
+      database,
+      avatarCache,
+      appIconCache,
+      totalBytes: database.bytes + avatarCache.bytes + appIconCache.totalBytes,
+    });
   } catch (error) {
     console.error('Cache stats load failed:', error.message);
     res.status(500).json({ error: 'Failed to load cache stats' });

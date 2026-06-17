@@ -4,6 +4,7 @@ import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
 import AppIcon from '../components/AppIcon';
 import ClearableSearchField from '../components/ClearableSearchField';
+import DropdownSelect from '../components/DropdownSelect';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 
@@ -102,35 +103,31 @@ export default function AdminLogs() {
               searchShortcutLabel={ui.common.searchShortcut}
             />
           </div>
-          <div className="inline-flex h-12 items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 text-sm text-gray-600 dark:text-gray-300">
-            <Filter className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-            <span>{ui.admin.logs.period}</span>
-            <select
-              value={retentionDays}
-              onChange={(e) => setRetentionDays(parseInt(e.target.value, 10))}
-              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none"
-            >
-              {periodOptions.map((days) => (
-                <option key={days} value={days}>
-                  {days === 1 ? `1 ${ui.common.day}` : `${days} ${ui.common.days}`}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="inline-flex h-12 items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 text-sm text-gray-600 dark:text-gray-300">
-            <span className="text-gray-400 dark:text-gray-500">{ui.admin.logs.rows}</span>
-            <select
-              value={pageSize}
-              onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
-              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none"
-            >
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-              <option value={150}>150</option>
-              <option value={200}>200</option>
-              <option value={250}>250</option>
-            </select>
-          </div>
+          <DropdownSelect
+            value={retentionDays}
+            onChange={(next) => setRetentionDays(parseInt(next, 10))}
+            label={ui.admin.logs.period}
+            icon={Filter}
+            options={periodOptions.map((days) => ({
+              value: days,
+              label: days === 1 ? `1 ${ui.common.day}` : `${days} ${ui.common.days}`,
+            }))}
+            className="min-w-[220px]"
+          />
+          <DropdownSelect
+            value={pageSize}
+            onChange={(next) => setPageSize(parseInt(next, 10))}
+            label={ui.admin.logs.rows}
+            icon={Filter}
+            options={[
+              { value: 50, label: '50' },
+              { value: 100, label: '100' },
+              { value: 150, label: '150' },
+              { value: 200, label: '200' },
+              { value: 250, label: '250' },
+            ]}
+            className="min-w-[140px]"
+          />
         </div>
       </div>
 

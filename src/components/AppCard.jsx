@@ -2,6 +2,7 @@ import { forwardRef, useState } from 'react';
 import { Info, X, Lock, Star, GripVertical } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import AppIcon from './AppIcon';
+import Tooltip from './Tooltip';
 import api from '../services/api';
 
 const AppCard = forwardRef(function AppCard(
@@ -14,6 +15,8 @@ const AppCard = forwardRef(function AppCard(
   const isEntraApp = app.mode === 'entra-app';
   const hasLongDesc = app.long_description?.trim();
   const tags = Array.isArray(app.tags) ? app.tags : [];
+  const description = app.description || '';
+  const shouldShowDescriptionTooltip = !compact && description.trim().length > 69;
 
   const handleClick = () => {
     // Fire-and-forget access tracking. For mode='redirect' and
@@ -53,18 +56,19 @@ const AppCard = forwardRef(function AppCard(
             tourHighlight ? 'relative z-20 scale-[1.01]' : ''
           }`}
         >
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleClick();
-            }}
-            className="shrink-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40"
-            title={getLabel('openAppNamed', app.name)}
-            aria-label={getLabel('openAppNamed', app.name)}
-          >
-            <AppIcon app={app} className="w-8 h-8" textClassName="text-xl" alt={app.name} />
-          </button>
+          <Tooltip content={getLabel('openAppNamed', app.name)}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClick();
+              }}
+              className="shrink-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40"
+              aria-label={getLabel('openAppNamed', app.name)}
+            >
+              <AppIcon app={app} className="w-8 h-8" textClassName="text-xl" alt={app.name} />
+            </button>
+          </Tooltip>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
@@ -72,8 +76,10 @@ const AppCard = forwardRef(function AppCard(
                 {app.name}
               </span>
             </div>
-            {app.description && (
-              <p className="text-xs text-gray-400 dark:text-gray-500 truncate" title={app.description}>{app.description}</p>
+            {description && (
+              <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                {description}
+              </p>
             )}
           </div>
 
@@ -103,27 +109,31 @@ const AppCard = forwardRef(function AppCard(
               <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{getLabel('externalBadgeShort')}</span>
             )}
             {hasLongDesc && (
-              <button
-                ref={tourInfoRef}
-                onClick={handleInfo}
-                className="p-1 text-gray-300 dark:text-gray-600 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                title={getLabel('appInfo')}
-              >
-                <Info className="w-3.5 h-3.5" />
-              </button>
+              <Tooltip content={getLabel('appInfo')}>
+                <button
+                  ref={tourInfoRef}
+                  onClick={handleInfo}
+                  className="p-1 text-gray-300 dark:text-gray-600 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  aria-label={getLabel('appInfo')}
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+              </Tooltip>
             )}
-            <button
-              ref={tourFavoriteRef}
-              onClick={handleFavorite}
-              className={`p-1 rounded-lg transition-colors ${
-                isFavorite
-                  ? 'text-yellow-400 hover:text-yellow-500'
-                  : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-              title={isFavorite ? getLabel('removeFavorite') : getLabel('addFavorite')}
-            >
-              <Star className="w-3.5 h-3.5" fill={isFavorite ? 'currentColor' : 'none'} />
-            </button>
+            <Tooltip content={isFavorite ? getLabel('removeFavorite') : getLabel('addFavorite')}>
+              <button
+                ref={tourFavoriteRef}
+                onClick={handleFavorite}
+                className={`p-1 rounded-lg transition-colors ${
+                  isFavorite
+                    ? 'text-yellow-400 hover:text-yellow-500'
+                    : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+                aria-label={isFavorite ? getLabel('removeFavorite') : getLabel('addFavorite')}
+              >
+                <Star className="w-3.5 h-3.5" fill={isFavorite ? 'currentColor' : 'none'} />
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -144,54 +154,60 @@ const AppCard = forwardRef(function AppCard(
         }`}
       >
         {dragHandleProps && (
-          <button
-            type="button"
-            ref={tourDragHandleRef}
-            {...dragHandleProps}
-            className={`absolute top-2 left-2 p-1 text-gray-300 dark:text-gray-600 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-opacity cursor-grab active:cursor-grabbing touch-none ${
-              tourShowDragHandle ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-            }`}
-            title={getLabel('dragToReorder')}
-            aria-label={getLabel('dragToReorder')}
-          >
-            <GripVertical className="w-4 h-4" />
-          </button>
+          <Tooltip content={getLabel('dragToReorder')}>
+            <button
+              type="button"
+              ref={tourDragHandleRef}
+              {...dragHandleProps}
+              className={`absolute top-2 left-2 z-30 p-1 text-gray-300 dark:text-gray-600 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-opacity cursor-grab active:cursor-grabbing touch-none ${
+                tourShowDragHandle ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+              }`}
+              aria-label={getLabel('dragToReorder')}
+            >
+              <GripVertical className="w-4 h-4" />
+            </button>
+          </Tooltip>
         )}
         <div className="flex items-start justify-between mb-4">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleClick();
-            }}
-            className="shrink-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/40"
-            title={getLabel('openAppNamed', app.name)}
-            aria-label={getLabel('openAppNamed', app.name)}
-          >
-            <AppIcon app={app} className="w-12 h-12" textClassName="text-4xl" alt={app.name} />
-          </button>
-          <div className="flex items-center gap-1">
+          <Tooltip content={getLabel('openAppNamed', app.name)}>
             <button
-              ref={tourFavoriteRef}
-              onClick={handleFavorite}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isFavorite
-                  ? 'text-yellow-400 hover:text-yellow-500'
-                  : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-              title={isFavorite ? getLabel('removeFavorite') : getLabel('addFavorite')}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClick();
+              }}
+              className="shrink-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/40"
+              aria-label={getLabel('openAppNamed', app.name)}
             >
-              <Star className="w-4 h-4" fill={isFavorite ? 'currentColor' : 'none'} />
+              <AppIcon app={app} className="w-12 h-12" textClassName="text-4xl" alt={app.name} />
             </button>
-            {hasLongDesc && (
+          </Tooltip>
+          <div className="flex items-center gap-1">
+            <Tooltip content={isFavorite ? getLabel('removeFavorite') : getLabel('addFavorite')}>
               <button
-                ref={tourInfoRef}
-                onClick={handleInfo}
-                className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                title={getLabel('appInfo')}
+                ref={tourFavoriteRef}
+                onClick={handleFavorite}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  isFavorite
+                    ? 'text-yellow-400 hover:text-yellow-500'
+                    : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+                aria-label={isFavorite ? getLabel('removeFavorite') : getLabel('addFavorite')}
               >
-                <Info className="w-4 h-4" />
+                <Star className="w-4 h-4" fill={isFavorite ? 'currentColor' : 'none'} />
               </button>
+            </Tooltip>
+            {hasLongDesc && (
+              <Tooltip content={getLabel('appInfo')}>
+                <button
+                  ref={tourInfoRef}
+                  onClick={handleInfo}
+                  className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  aria-label={getLabel('appInfo')}
+                >
+                  <Info className="w-4 h-4" />
+                </button>
+              </Tooltip>
             )}
             {showModeBadges && isSharedCookie && (
               <span className="text-[10px] font-medium text-accent-dark bg-accent/10 px-1.5 py-0.5 rounded flex items-center gap-0.5">
@@ -210,9 +226,22 @@ const AppCard = forwardRef(function AppCard(
           <h3 className="text-lg font-bold text-dark dark:text-gray-100 mb-1.5 group-hover:text-dark/80 dark:group-hover:text-gray-200 transition-colors">
             {app.name}
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2" title={app.description}>
-            {app.description}
-          </p>
+          {description && shouldShowDescriptionTooltip ? (
+            <Tooltip
+              content={description}
+              tooltipClassName="text-left max-w-[min(36rem,calc(100vw-2rem))]"
+            >
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
+                {description}
+              </p>
+            </Tooltip>
+          ) : (
+            description && (
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
+                {description}
+              </p>
+            )
+          )}
         </button>
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-3">

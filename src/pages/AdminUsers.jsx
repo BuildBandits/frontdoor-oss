@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info } from 'lucide-react';
+import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import UserAvatar from '../components/UserAvatar';
@@ -8,6 +8,7 @@ import AppIcon from '../components/AppIcon';
 import PageNotice from '../components/PageNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
+import DropdownSelect from '../components/DropdownSelect';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 
 export default function AdminUsers() {
@@ -25,6 +26,7 @@ export default function AdminUsers() {
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [showVisibleApps, setShowVisibleApps] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [brandingLanguage, setBrandingLanguage] = useState('en');
 
   useEffect(() => {
@@ -45,7 +47,7 @@ export default function AdminUsers() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [showVisibleApps]);
 
-  const showToast = (message, type = 'success') => setPageNotice({ message, type });
+  const showToast = useCallback((message, type = 'success') => setPageNotice({ message, type }), []);
   const openConfirm = (dialog) => setConfirmDialog(dialog);
   const closeConfirm = () => {
     if (confirmBusy) return;
@@ -62,17 +64,30 @@ export default function AdminUsers() {
     }
   };
 
-  const loadUsers = useCallback(async () => {
+  const ui = getUiStrings(resolveAppLanguage(currentUser?.preferredLanguage, brandingLanguage));
+  const t = ui.admin.common;
+  const u = ui.admin.users;
+
+  const loadUsers = useCallback(async ({ showLoading = false } = {}) => {
+    if (showLoading) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     try {
       const res = await api.get('/users');
       setUsers(Array.isArray(res.data.users) ? res.data.users : []);
     } catch {
       showToast(t.errorLoadingUsers, 'error');
     }
-    setLoading(false);
-  }, []);
+    if (showLoading) {
+      setLoading(false);
+    } else {
+      setRefreshing(false);
+    }
+  }, [showToast, t.errorLoadingUsers]);
 
-  useEffect(() => { loadUsers(); }, [loadUsers]);
+  useEffect(() => { void loadUsers({ showLoading: true }); }, [loadUsers]);
   useEffect(() => {
     let cancelled = false;
     api.get('/branding')
@@ -86,9 +101,6 @@ export default function AdminUsers() {
       cancelled = true;
     };
   }, []);
-  const ui = getUiStrings(resolveAppLanguage(currentUser?.preferredLanguage, brandingLanguage));
-  const t = ui.admin.common;
-  const u = ui.admin.users;
 
   const loadUserDetail = async (userId) => {
     setDetailLoading(true);
@@ -341,13 +353,22 @@ export default function AdminUsers() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{ui.admin.users.pageTitle}</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-          {users.length} {ui.nav.users.toLowerCase()} {t.total} &middot; {activeCount} {t.active} &middot; {adminCount} {t.privileged}
-        </p>
-      </div>
+          <p className="mt-1 text-gray-500 dark:text-gray-400">
+            {users.length} {ui.nav.users.toLowerCase()} {t.total} &middot; {activeCount} {t.active} &middot; {adminCount} {t.privileged}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void loadUsers()}
+          disabled={refreshing || loading}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5 text-sm font-semibold text-dark dark:text-gray-100 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 max-sm:w-full"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {ui.admin.users.refresh}
+        </button>
       </div>
 
       {!canEditUsers && (
@@ -380,26 +401,32 @@ export default function AdminUsers() {
               searchShortcutLabel={ui.common.searchShortcut}
             />
           </div>
-          <select
+          <DropdownSelect
             value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value)}
-            className="h-12 px-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            <option value="all">{t.allRoles}</option>
-            <option value="owner">{u.ownerBadge}</option>
-            <option value="admin">{u.adminBadge}</option>
-            <option value="admin_readonly">{t.readOnlyRole}</option>
-            <option value="user">{t.usersOnly}</option>
-          </select>
-          <select
+            onChange={setFilterRole}
+            label={t.role}
+            icon={Shield}
+            options={[
+              { value: 'all', label: t.allRoles },
+              { value: 'owner', label: u.ownerBadge },
+              { value: 'admin', label: u.adminBadge },
+              { value: 'admin_readonly', label: t.readOnlyRole },
+              { value: 'user', label: t.usersOnly },
+            ]}
+            className="min-w-[220px]"
+          />
+          <DropdownSelect
             value={filterActive}
-            onChange={(e) => setFilterActive(e.target.value)}
-            className="h-12 px-3 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            <option value="all">{t.allStatuses}</option>
-            <option value="active">{t.activeOnly}</option>
-            <option value="inactive">{t.inactiveOnly}</option>
-          </select>
+            onChange={setFilterActive}
+            label={t.status}
+            icon={Clock}
+            options={[
+              { value: 'all', label: t.allStatuses },
+              { value: 'active', label: t.activeOnly },
+              { value: 'inactive', label: t.inactiveOnly },
+            ]}
+            className="min-w-[220px]"
+          />
         </div>
       </div>
 

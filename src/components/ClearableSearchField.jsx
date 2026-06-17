@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { Search, X } from 'lucide-react';
+import Tooltip from './Tooltip';
 
 export default function ClearableSearchField({
   value,
@@ -70,16 +71,17 @@ export default function ClearableSearchField({
             </span>
           )}
           {value && (
-            <button
-              type="button"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => onChange('')}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 dark:text-gray-500 transition-colors hover:bg-gray-100 hover:text-dark dark:hover:bg-gray-800 dark:hover:text-white"
-              aria-label={clearLabel}
-              title={clearLabel}
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <Tooltip content={clearLabel}>
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => onChange('')}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 dark:text-gray-500 transition-colors hover:bg-gray-100 hover:text-dark dark:hover:bg-gray-800 dark:hover:text-white"
+                aria-label={clearLabel}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </Tooltip>
           )}
         </div>
       </div>
