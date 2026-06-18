@@ -27,6 +27,8 @@ db.exec(`
     preferred_language TEXT,
     app_order TEXT,
     app_order_updated_at TEXT,
+    favorite_apps TEXT,
+    favorite_apps_updated_at TEXT,
     home_tour_seen_at TEXT,
     is_active INTEGER DEFAULT 1,
     last_login TEXT,
@@ -228,6 +230,8 @@ ensureColumn('users', 'preferred_language', 'preferred_language TEXT');
 ensureColumn('users', 'preferred_color_scheme', "preferred_color_scheme TEXT CHECK(preferred_color_scheme IN ('light', 'dark', 'auto'))");
 ensureColumn('users', 'app_order', 'app_order TEXT');
 ensureColumn('users', 'app_order_updated_at', 'app_order_updated_at TEXT');
+ensureColumn('users', 'favorite_apps', 'favorite_apps TEXT');
+ensureColumn('users', 'favorite_apps_updated_at', 'favorite_apps_updated_at TEXT');
 ensureColumn('users', 'home_tour_seen_at', 'home_tour_seen_at TEXT');
 ensureColumn('branding_settings', 'show_app_mode_badges', 'show_app_mode_badges INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'default_home_desktop_view', "default_home_desktop_view TEXT DEFAULT 'cards' CHECK(default_home_desktop_view IN ('cards', 'compact'))");
@@ -297,6 +301,8 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         preferred_color_scheme TEXT CHECK(preferred_color_scheme IN ('light', 'dark', 'auto')),
         app_order TEXT,
         app_order_updated_at TEXT,
+        favorite_apps TEXT,
+        favorite_apps_updated_at TEXT,
         home_tour_seen_at TEXT,
         is_active INTEGER DEFAULT 1,
         last_login TEXT,
@@ -346,14 +352,16 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         preferred_color_scheme TEXT CHECK(preferred_color_scheme IN ('light', 'dark', 'auto')),
         app_order TEXT,
         app_order_updated_at TEXT,
+        favorite_apps TEXT,
+        favorite_apps_updated_at TEXT,
         home_tour_seen_at TEXT,
         is_active INTEGER DEFAULT 1,
         last_login TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       );
-      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at, is_active, last_login, created_at, updated_at)
-      SELECT id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at, is_active, last_login, created_at, updated_at
+      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, last_login, created_at, updated_at)
+      SELECT id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, last_login, created_at, updated_at
       FROM users;
       DROP TABLE users;
       ALTER TABLE users_new RENAME TO users;

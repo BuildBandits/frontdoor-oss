@@ -22,6 +22,12 @@ export default function Login() {
   const validRedirect = redirect && /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(redirect)
     ? redirect
     : null;
+  const devRoleLabels = {
+    owner: ui.admin.users.ownerBadge,
+    admin: ui.admin.users.adminBadge,
+    admin_readonly: ui.admin.users.readOnlyRole,
+    user: ui.admin.users.userBadge,
+  };
 
   useEffect(() => {
     api.get('/branding')
@@ -137,7 +143,7 @@ export default function Login() {
 
           {devLogin && (
             <div className="mt-6 p-4 bg-amber-50 border border-amber-300 rounded-xl">
-              <p className="text-amber-800 text-xs font-semibold uppercase tracking-wide mb-3">Dev Login</p>
+              <p className="text-amber-800 text-xs font-semibold uppercase tracking-wide mb-3">{ui.login.devLoginTitle}</p>
               <div className="flex gap-2 mb-3">
                 {['owner', 'admin', 'admin_readonly', 'user'].map((r) => (
                   <button
@@ -149,7 +155,7 @@ export default function Login() {
                         : 'bg-white dark:bg-gray-900 text-amber-800 border-amber-300 hover:bg-amber-100'
                     }`}
                   >
-                    {r}
+                    {devRoleLabels[r]}
                   </button>
                 ))}
               </div>
@@ -158,7 +164,7 @@ export default function Login() {
                 disabled={devLoading}
                 className="w-full px-4 py-2.5 bg-amber-600 text-white rounded-lg font-semibold text-sm hover:bg-amber-700 transition-colors cursor-pointer disabled:opacity-50"
               >
-                {devLoading ? 'Logging in...' : `Enter as ${devRole}`}
+                {devLoading ? ui.login.devLoginLoading : ui.login.devLoginEnterAs.replace('{role}', devRoleLabels[devRole] || devRole)}
               </button>
             </div>
           )}

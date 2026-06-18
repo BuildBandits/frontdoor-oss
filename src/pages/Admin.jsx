@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/authStore';
 import TagInput from '../components/TagInput';
 import AppIcon from '../components/AppIcon';
 import PageNotice from '../components/PageNotice';
+import TopToastNotice from '../components/TopToastNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
@@ -59,29 +60,11 @@ export default function Admin() {
   const [cloning, setCloning] = useState(false);
   const iconFileInputRef = useRef(null);
   const slugAutoFillRef = useRef(false);
-  const appSaveNoticeTimer = useRef(null);
   const modeFilterRef = useRef(null);
   const tagFilterRef = useRef(null);
   const canEdit = user?.role !== 'admin_readonly';
   const [brandingLanguage, setBrandingLanguage] = useState('en');
-
-  useEffect(() => {
-    if (!pageNotice) return undefined;
-    const timer = setTimeout(() => setPageNotice(null), 5000);
-    return () => clearTimeout(timer);
-  }, [pageNotice]);
-
-  useEffect(() => {
-    if (!appSaveNotice) return undefined;
-    if (appSaveNoticeTimer.current) clearTimeout(appSaveNoticeTimer.current);
-    appSaveNoticeTimer.current = setTimeout(() => {
-      setAppSaveNotice(null);
-      appSaveNoticeTimer.current = null;
-    }, 5500);
-    return () => {
-      if (appSaveNoticeTimer.current) clearTimeout(appSaveNoticeTimer.current);
-    };
-  }, [appSaveNotice]);
+  const filterButtonMinWidth = 'min-w-[260px]';
 
   useEffect(() => {
     if (!modeFilterOpen) return undefined;
@@ -112,7 +95,10 @@ export default function Admin() {
 
   const pushNotice = (type, message) => setPageNotice({ type, message });
   const pushAppSaveNotice = (type, message) => {
-    setAppSaveNotice({ type, message });
+    const noticeId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : String(Date.now());
+    setAppSaveNotice({ id: noticeId, type, message });
   };
   const openConfirm = (dialog) => setConfirmDialog(dialog);
   const closeConfirm = () => {
@@ -861,35 +847,53 @@ export default function Admin() {
         </div>
       )}
 
-      {pageNotice && (
-        <div className="mb-6">
-          <PageNotice
-            type={pageNotice.type}
-            message={pageNotice.message}
-            onClose={() => setPageNotice(null)}
-            closeLabel={ui.common.closeNotice}
-          />
-        </div>
-      )}
+      <TopToastNotice
+        notice={pageNotice}
+        onClose={() => setPageNotice(null)}
+        closeLabel={ui.common.closeNotice}
+        positionClassName="top-4 sm:top-6"
+      />
 
-      {appSaveNotice && (
-        <div className="pointer-events-none fixed left-1/2 top-6 z-[70] w-[min(42rem,calc(100vw-2rem))] -translate-x-1/2">
-          <div className="pointer-events-auto">
-            <PageNotice
-              type={appSaveNotice.type}
-              message={appSaveNotice.message}
-              onClose={() => setAppSaveNotice(null)}
-              closeLabel={ui.common.closeNotice}
-            />
-          </div>
-        </div>
-      )}
+      <TopToastNotice
+        key={appSaveNotice?.id ?? 'app-save-notice'}
+        notice={appSaveNotice}
+        onClose={() => setAppSaveNotice(null)}
+        closeLabel={ui.common.closeNotice}
+        positionClassName="top-4 sm:top-6"
+      />
 
       <PluginSurface surface={PLUGIN_SURFACES.ADMIN_PAGE_TOP} variant="stack" className="mb-6" />
 
+      {orphanApps.length > 0 && (
+        <div className="mb-6">
+          <PageNotice
+            type="warning"
+            title={a.unassignedAppsTitle}
+            message={a.unassignedAppsHelp}
+            actionLabel={showOnlyOrphanApps ? a.showAllApps : a.showOnlyUnassigned}
+            onAction={() => setShowOnlyOrphanApps((prev) => !prev)}
+          >
+            <div className="flex flex-wrap gap-2">
+              {orphanApps.map((app) => (
+                <button
+                  key={app.id}
+                  type="button"
+                  onClick={() => openEdit(app)}
+                  className="inline-flex items-center gap-2 rounded-full border border-amber-200 dark:border-amber-800/70 bg-white dark:bg-gray-900 px-2.5 py-1 text-xs font-medium text-amber-900 dark:text-amber-200 transition-colors hover:bg-amber-100 dark:hover:bg-amber-950/45"
+                  title={a.unassignedAppOpen}
+                >
+                  <AppIcon app={app} className="h-4 w-4" textClassName="text-[10px]" />
+                  <span className="max-w-[220px] truncate">{app.name}</span>
+                </button>
+              ))}
+            </div>
+          </PageNotice>
+        </div>
+      )}
+
       <div className="mb-6 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex-1 min-w-[220px]">
+          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-[1.1] min-w-[180px]">
             <ClearableSearchField
               value={appSearch}
               onChange={setAppSearch}
@@ -903,7 +907,7 @@ export default function Admin() {
             <button
               type="button"
               onClick={() => setModeFilterOpen((prev) => !prev)}
-            className="relative inline-flex min-w-[220px] h-12 items-center w-full pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-left text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900"
+            className={`relative inline-flex h-12 items-center w-full ${filterButtonMinWidth} pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-left text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900`}
             >
               <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
               <span className="flex min-w-0 flex-1 items-center gap-1">
@@ -943,7 +947,7 @@ export default function Admin() {
             <button
               type="button"
               onClick={() => setTagFilterOpen((prev) => !prev)}
-              className={`relative inline-flex min-w-[220px] h-12 items-center w-full pl-10 pr-10 border rounded-xl text-sm text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900 ${
+              className={`relative inline-flex h-12 items-center w-full ${filterButtonMinWidth} pl-10 pr-10 border rounded-xl text-sm text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900 ${
                 hasTagFilters
                   ? 'border-violet-300 bg-violet-50 text-violet-900 dark:border-violet-700 dark:bg-violet-950/45 dark:text-violet-100'
                   : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300'
@@ -952,9 +956,15 @@ export default function Admin() {
               aria-expanded={tagFilterOpen}
             >
               <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-              <span className="flex min-w-0 flex-1 items-center gap-1">
+              <span
+                className="relative flex min-w-0 flex-1 items-center gap-1 overflow-hidden pr-12 whitespace-nowrap"
+                style={{
+                  WebkitMaskImage: 'linear-gradient(to right, #000 0, #000 calc(100% - 3rem), transparent 100%)',
+                  maskImage: 'linear-gradient(to right, #000 0, #000 calc(100% - 3rem), transparent 100%)',
+                }}
+              >
                 <span className="shrink-0 text-gray-400 dark:text-gray-500">{a.tagFilterLabel}:</span>
-                <span className="truncate">
+                <span className="min-w-0">
                   {selectedTagFilters.length === 0
                     ? a.tagFilterAll
                     : a.tagFilterSelected.replace('{count}', String(selectedTagFilters.length))}
@@ -979,18 +989,30 @@ export default function Admin() {
                   />
                 </div>
                 <div className="max-h-72 overflow-auto py-1">
+                  {hasTagFilters && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTagFilters([])}
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors text-violet-700 dark:text-violet-200 hover:bg-violet-50 dark:hover:bg-violet-950/30"
+                    >
+                      <span className="flex h-4 w-4 items-center justify-center rounded border border-violet-300 bg-violet-100 text-violet-700 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-100" aria-hidden="true">
+                        <Check className="h-3 w-3" />
+                      </span>
+                      <span className="flex-1 font-semibold">{a.clearTagFilters}</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setSelectedTagFilters([])}
                     className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                      selectedTagFilters.length === 0
+                      !hasTagFilters
                         ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                     }`}
                   >
                     <span
                       className={`flex h-4 w-4 items-center justify-center rounded border ${
-                        selectedTagFilters.length === 0 ? 'border-dark bg-dark text-white' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-transparent'
+                        !hasTagFilters ? 'border-dark bg-dark text-white' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-transparent'
                       }`}
                       aria-hidden="true"
                     >
@@ -1058,33 +1080,6 @@ export default function Admin() {
           </div>
         </div>
       </div>
-
-      {orphanApps.length > 0 && (
-        <div className="mb-8">
-          <PageNotice
-            type="warning"
-            title={a.unassignedAppsTitle}
-            message={a.unassignedAppsHelp}
-            actionLabel={showOnlyOrphanApps ? a.showAllApps : a.showOnlyUnassigned}
-            onAction={() => setShowOnlyOrphanApps((prev) => !prev)}
-          >
-            <div className="flex flex-wrap gap-2">
-              {orphanApps.map((app) => (
-                <button
-                  key={app.id}
-                  type="button"
-                  onClick={() => openEdit(app)}
-                  className="inline-flex items-center gap-2 rounded-full border border-amber-200 dark:border-amber-800/70 bg-white dark:bg-gray-900 px-2.5 py-1 text-xs font-medium text-amber-900 dark:text-amber-200 transition-colors hover:bg-amber-100 dark:hover:bg-amber-950/45"
-                  title={a.unassignedAppOpen}
-                >
-                  <AppIcon app={app} className="h-4 w-4" textClassName="text-[10px]" />
-                  <span className="max-w-[220px] truncate">{app.name}</span>
-                </button>
-              ))}
-            </div>
-          </PageNotice>
-        </div>
-      )}
 
       {/* App table */}
       {loading ? (

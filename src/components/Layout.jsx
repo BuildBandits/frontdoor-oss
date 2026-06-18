@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowUp, Activity, BookOpen, ChevronDown, Home, LogOut, Menu, Monitor, Moon, Palette, RotateCcw, Settings, Sparkles, Sun, Users, UserCog, X, ShieldCheck } from 'lucide-react';
+import { ArrowUp, Activity, BookOpen, ChevronDown, Home, LogOut, Menu, Monitor, Moon, Palette, RotateCcw, Settings, Sparkles, Star, Sun, Users, UserCog, X, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { DEFAULT_COLOR_SCHEME, normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
 import BrandMark from './BrandMark';
@@ -367,6 +367,10 @@ export default function Layout({ children }) {
   const appOrderSavedLabel = hasAppOrderOverride
     ? formatOrderTimestamp(user.appOrderUpdatedAt)
     : null;
+  const favoriteAppsCount = Array.isArray(user?.favoriteApps) ? user.favoriteApps.length : null;
+  const favoriteAppsSavedLabel = favoriteAppsCount != null
+    ? formatOrderTimestamp(user.favoriteAppsUpdatedAt)
+    : null;
   const ui = getUiStrings(effectiveLanguage);
   const languageOptions = getSupportedLanguageOptions(ui);
 
@@ -466,8 +470,29 @@ export default function Layout({ children }) {
                     className="absolute right-0 top-full mt-2 w-72 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-2 shadow-xl shadow-black/10"
                   >
                     <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800">
-                      <p className="text-sm font-semibold text-dark dark:text-gray-100">{user?.displayName}</p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user?.email}</p>
+                      <div className="flex items-center justify-between gap-3 min-w-0">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-dark dark:text-gray-100">
+                            {user?.displayName}
+                          </p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user?.email}</p>
+                        </div>
+                        {favoriteAppsCount != null && (
+                          favoriteAppsSavedLabel ? (
+                            <Tooltip content={ui.layout.savedFavoritesOn.replace('{date}', favoriteAppsSavedLabel)}>
+                              <div className="inline-flex shrink-0 self-center items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+                                <Star className="h-3.5 w-3.5 text-amber-500 fill-current" />
+                                <span>{favoriteAppsCount}</span>
+                              </div>
+                            </Tooltip>
+                          ) : (
+                            <div className="inline-flex shrink-0 self-center items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+                              <Star className="h-3.5 w-3.5 text-amber-500 fill-current" />
+                              <span>{favoriteAppsCount}</span>
+                            </div>
+                          )
+                        )}
+                      </div>
                     </div>
                     <div className="px-1 py-2">
                       <div className="flex items-center justify-between gap-2 px-3 pb-2">

@@ -1,6 +1,6 @@
 {
   "name": "oss-frontdoor",
-  "version": "1.2.7a",
+  "version": "1.2.8",
   "description": "Authentication gateway and app catalog for self-hosted projects",
   "type": "module",
   "scripts": {

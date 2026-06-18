@@ -5,6 +5,8 @@ import { authenticate, isAdminViewer, isAdminEditor, ROLE_OWNER } from '../middl
 import { ensureAvatarCached, serveAvatarForUser } from '../services/avatars.js';
 import { iconUrlForApp } from '../services/appIcons.js';
 import { getAccessibleGroupIdsForUser } from '../services/groupHierarchy.js';
+import { isSupportedLanguage } from '../../shared/languages.js';
+import { isSupportedColorScheme, normalizeOptionalColorScheme } from '../../shared/colorSchemes.js';
 
 const router = express.Router();
 const composeAdminEmails = new Set(
@@ -31,6 +33,7 @@ router.get('/', authenticate, isAdminViewer, (req, res) => {
   const users = db
     .prepare(`
       SELECT u.id, u.email, u.display_name, u.role, u.avatar_color, u.is_active, u.last_login, u.created_at,
+        u.home_desktop_view, u.preferred_language, u.preferred_color_scheme, u.app_order, u.app_order_updated_at,
         (SELECT COUNT(*) FROM user_group_members WHERE user_id = u.id) AS group_count
       FROM users u ORDER BY u.display_name
     `)
@@ -59,10 +62,83 @@ router.get('/:id/avatar', authenticate, async (req, res) => {
   }
 });
 
+// Reset one or more personal preferences for a specific user (editor roles only).
+router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
+  const { id } = req.params;
+  const updates = [];
+  const values = [];
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, 'homeDesktopView')) {
+    const { homeDesktopView } = req.body;
+    if (homeDesktopView !== null && !['cards', 'compact'].includes(homeDesktopView)) {
+      return res.status(400).json({ error: 'homeDesktopView must be cards, compact, or null' });
+    }
+    updates.push('home_desktop_view = ?');
+    values.push(homeDesktopView);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, 'preferredLanguage')) {
+    const { preferredLanguage } = req.body;
+    if (preferredLanguage !== null && !isSupportedLanguage(preferredLanguage)) {
+      return res.status(400).json({ error: 'preferredLanguage must be a supported language or null' });
+    }
+    updates.push('preferred_language = ?');
+    values.push(preferredLanguage);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, 'preferredColorScheme')) {
+    const { preferredColorScheme } = req.body;
+    if (preferredColorScheme !== null && !isSupportedColorScheme(preferredColorScheme)) {
+      return res.status(400).json({ error: 'preferredColorScheme must be light, dark, auto, or null' });
+    }
+    updates.push('preferred_color_scheme = ?');
+    values.push(normalizeOptionalColorScheme(preferredColorScheme));
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, 'appOrder')) {
+    const { appOrder } = req.body;
+    if (appOrder !== null && !Array.isArray(appOrder)) {
+      return res.status(400).json({ error: 'appOrder must be an array or null' });
+    }
+    if (Array.isArray(appOrder)) {
+      const normalized = [...new Set(appOrder.filter((item) => typeof item === 'string' && item.trim()))];
+      if (normalized.length > 0) {
+        updates.push('app_order = ?');
+        values.push(JSON.stringify(normalized));
+        updates.push('app_order_updated_at = datetime(\'now\')');
+      } else {
+        updates.push('app_order = NULL');
+        updates.push('app_order_updated_at = NULL');
+      }
+    } else {
+      updates.push('app_order = NULL');
+      updates.push('app_order_updated_at = NULL');
+    }
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No preference updates provided' });
+  }
+
+  db.prepare(
+    `UPDATE users
+     SET ${updates.join(', ')},
+         updated_at = datetime('now')
+     WHERE id = ?`
+  ).run(...values, id);
+
+  res.json({ ok: true });
+});
+
 // Get single user with group memberships (viewer roles only)
 router.get('/:id', authenticate, isAdminViewer, (req, res) => {
   const user = db
-    .prepare('SELECT id, email, display_name, role, avatar_color, is_active, last_login, created_at FROM users WHERE id = ?')
+    .prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, last_login, created_at FROM users WHERE id = ?')
     .get(req.params.id);
 
   if (!user) return res.status(404).json({ error: 'User not found' });

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Database, Download, Upload } from 'lucide-react';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
-import PageNotice from '../components/PageNotice';
+import TopToastNotice from '../components/TopToastNotice';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 
@@ -54,12 +54,6 @@ export default function AdminBackup() {
     { stage: 'branding', label: copy.includesBranding },
     { stage: 'avatars', label: copy.includesAvatars },
   ]), [copy]);
-
-  useEffect(() => {
-    if (!notice) return undefined;
-    const timer = setTimeout(() => setNotice(null), 5000);
-    return () => clearTimeout(timer);
-  }, [notice]);
 
   useEffect(() => () => {
     if (downloadProgressResetTimer.current) {
@@ -261,16 +255,12 @@ export default function AdminBackup() {
         </div>
       </div>
 
-      {notice && (
-        <div className="mb-6">
-          <PageNotice
-            type={notice.type}
-            message={notice.message}
-            onClose={() => setNotice(null)}
-            closeLabel={ui.common.closeNotice}
-          />
-        </div>
-      )}
+      <TopToastNotice
+        notice={notice}
+        onClose={() => setNotice(null)}
+        closeLabel={ui.common.closeNotice}
+        positionClassName="top-4 sm:top-6"
+      />
 
       {confirmDialog && (
         <ConfirmDialog

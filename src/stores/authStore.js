@@ -37,17 +37,21 @@ export const useAuthStore = create((set, get) => ({
     set({ user });
   },
 
-  savePreferences: async (preferences) => {
+  savePreferences: async (preferences, options = {}) => {
     const previousUser = get().user;
     const optimisticUser = previousUser ? { ...previousUser, ...preferences } : { ...preferences };
     if (Object.prototype.hasOwnProperty.call(preferences, 'appOrder')) {
       optimisticUser.appOrderUpdatedAt = Array.isArray(preferences.appOrder) ? new Date().toISOString() : null;
     }
+    if (Object.prototype.hasOwnProperty.call(preferences, 'favoriteApps')) {
+      optimisticUser.favoriteAppsUpdatedAt = Array.isArray(preferences.favoriteApps) ? new Date().toISOString() : null;
+    }
     set({ user: optimisticUser, isAuthenticated: true });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeUser(optimisticUser)));
 
     try {
-      const res = await api.put('/auth/me/preferences', preferences);
+      const requestBody = { ...preferences, ...options.requestBodyExtras };
+      const res = await api.put('/auth/me/preferences', requestBody);
       const nextUser = res.data.user;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeUser(nextUser)));
       set({ user: nextUser, isAuthenticated: true });
@@ -76,6 +80,13 @@ export const useAuthStore = create((set, get) => ({
   updateAppOrder: async (appOrder) => get().savePreferences({ appOrder }),
 
   resetAppOrder: async () => get().savePreferences({ appOrder: null }),
+
+  updateFavoriteApps: async (favoriteApps, options = {}) => get().savePreferences(
+    { favoriteApps },
+    options.migration ? { requestBodyExtras: { favoriteAppsMigrationFromLocalStorage: true } } : {}
+  ),
+
+  resetFavoriteApps: async () => get().savePreferences({ favoriteApps: null }),
 
   markHomeTourSeen: async () => get().savePreferences({ homeTourSeenAt: new Date().toISOString() }),
 

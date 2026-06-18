@@ -34,6 +34,7 @@ import {
 import { getBrowserHomepageDocs } from '../utils/browserHomeDocs';
 
 const LS_FAVORITES = 'frontdoor_favorites';
+const LS_FAVORITES_OWNER = 'frontdoor_favorites_owner';
 const LS_SHOW_FAVORITES = 'frontdoor_show_favorites';
 const LS_GROUP_BY_TAG = 'frontdoor_group_by_tag';
 
@@ -50,11 +51,17 @@ function normalizeTag(tag) {
   return (tag ?? '').toString().trim().toLowerCase();
 }
 
+function sameStringArray(left = [], right = []) {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
 export default function Home() {
   const {
     user,
     updateHomeDesktopView,
     updateAppOrder,
+    updateFavoriteApps,
     markHomeTourSeen,
   } = useAuthStore();
   const [apps, setApps] = useState([]);
@@ -80,6 +87,7 @@ export default function Home() {
   const [tourStep, setTourStep] = useState(0);
   const [tourDocsOnly, setTourDocsOnly] = useState(false);
   const [spotlightRects, setSpotlightRects] = useState([]);
+  const favoriteAppsBootstrapAttemptedRef = useRef(false);
   const spotlightMaskId = 'home-tour-spotlight-mask';
   const heroRef = useRef(null);
   const controlsRef = useRef(null);
@@ -222,6 +230,48 @@ export default function Home() {
   useEffect(() => { localStorage.setItem(LS_FAVORITES, JSON.stringify(favorites)); }, [favorites]);
   useEffect(() => { localStorage.setItem(LS_SHOW_FAVORITES, JSON.stringify(showFavorites)); }, [showFavorites]);
   useEffect(() => { localStorage.setItem(LS_GROUP_BY_TAG, JSON.stringify(groupByTag)); }, [groupByTag]);
+
+  useEffect(() => {
+    favoriteAppsBootstrapAttemptedRef.current = false;
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const storedFavorites = readJson(LS_FAVORITES, []);
+    const storedOwner = localStorage.getItem(LS_FAVORITES_OWNER);
+    const remoteFavorites = Array.isArray(user.favoriteApps) ? user.favoriteApps : null;
+
+    if (remoteFavorites) {
+      favoriteAppsBootstrapAttemptedRef.current = true;
+      if (!sameStringArray(favorites, remoteFavorites)) {
+        setFavorites(remoteFavorites);
+      }
+      if (!sameStringArray(storedFavorites, remoteFavorites) || storedOwner !== user.id) {
+        localStorage.setItem(LS_FAVORITES, JSON.stringify(remoteFavorites));
+        localStorage.setItem(LS_FAVORITES_OWNER, user.id);
+      }
+      return;
+    }
+
+    if (storedOwner && storedOwner !== user.id) {
+      favoriteAppsBootstrapAttemptedRef.current = true;
+      if (favorites.length !== 0) {
+        setFavorites([]);
+      }
+      if (storedFavorites.length !== 0) {
+        localStorage.setItem(LS_FAVORITES, JSON.stringify([]));
+      }
+      return;
+    }
+
+    if (favoriteAppsBootstrapAttemptedRef.current || storedFavorites.length === 0) return;
+
+    favoriteAppsBootstrapAttemptedRef.current = true;
+    void updateFavoriteApps(storedFavorites, { migration: true }).catch(() => {
+      favoriteAppsBootstrapAttemptedRef.current = false;
+    });
+  }, [favorites, updateFavoriteApps, user]);
 
   const closeTour = useCallback(() => {
     setTourDismissed(true);
@@ -386,10 +436,26 @@ export default function Home() {
   }, [currentTourStep, tourOpen]);
 
   const toggleFavorite = useCallback((appId) => {
-    setFavorites((prev) =>
-      prev.includes(appId) ? prev.filter((id) => id !== appId) : [...prev, appId]
-    );
-  }, []);
+    setFavorites((prev) => {
+      const next = prev.includes(appId) ? prev.filter((id) => id !== appId) : [...prev, appId];
+      localStorage.setItem(LS_FAVORITES, JSON.stringify(next));
+      if (user?.id) {
+        localStorage.setItem(LS_FAVORITES_OWNER, user.id);
+      } else {
+        localStorage.removeItem(LS_FAVORITES_OWNER);
+      }
+      void updateFavoriteApps(next).catch(() => {
+        setFavorites(prev);
+        localStorage.setItem(LS_FAVORITES, JSON.stringify(prev));
+        if (user?.id) {
+          localStorage.setItem(LS_FAVORITES_OWNER, user.id);
+        } else {
+          localStorage.removeItem(LS_FAVORITES_OWNER);
+        }
+      });
+      return next;
+    });
+  }, [updateFavoriteApps, user?.id]);
 
   const favoritesSet = useMemo(() => new Set(favorites), [favorites]);
   const appOrder = Array.isArray(user?.appOrder) && user.appOrder.length > 0 ? user.appOrder : null;

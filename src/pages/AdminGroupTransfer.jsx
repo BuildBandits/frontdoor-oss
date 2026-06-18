@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRightLeft, Copy, MoveRight, RefreshCw, ShieldAlert } from 'lucide-react';
+import { ArrowRightLeft, Copy, MoveRight, RefreshCw } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import PageNotice from '../components/PageNotice';
@@ -124,12 +124,6 @@ export default function AdminGroupTransfer() {
     };
   }, [sourceGroupId, g.transferSourceLoadFailed]);
 
-  useEffect(() => {
-    if (!pageNotice) return undefined;
-    const timer = setTimeout(() => setPageNotice(null), 5000);
-    return () => clearTimeout(timer);
-  }, [pageNotice]);
-
   const sourceApps = Array.isArray(sourceDetail?.apps) ? sourceDetail.apps : [];
   const transferCount = sourceApps.length;
   const hasValidSelection = Boolean(sourceGroupId && targetGroupId && sourceGroupId !== targetGroupId && transferCount > 0);
@@ -198,25 +192,23 @@ export default function AdminGroupTransfer() {
 
   return (
     <div>
-      <div className="mb-6 flex items-start justify-between gap-4 max-sm:flex-col max-sm:items-stretch">
+      <div className="mb-6">
         <div>
           <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{g.transferAppsPageTitle}</h1>
           <p className="mt-1 text-gray-500 dark:text-gray-400">{g.transferAppsPageSubtitle}</p>
         </div>
-        <div className="inline-flex items-center gap-2 self-start rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 max-sm:self-stretch max-sm:justify-center">
-          <ShieldAlert className="h-4 w-4" />
-          {g.transferAppsHiddenBadge}
-        </div>
       </div>
 
-      <PageNotice
-        type="warning"
-        title={g.transferAppsNoticeTitle}
-        message={g.transferAppsNoticeHelp}
-      />
+      <div className="mb-6">
+        <PageNotice
+          type="warning"
+          title={g.transferAppsNoticeTitle}
+          message={g.transferAppsNoticeHelp}
+        />
+      </div>
 
       {pageNotice && (
-        <div className="mt-6">
+        <div className="mb-6">
           <PageNotice
             type={pageNotice.type}
             message={pageNotice.message}
@@ -226,15 +218,14 @@ export default function AdminGroupTransfer() {
         </div>
       )}
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="space-y-6">
-          <div className="rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
-            <div className="mb-4">
-              <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.transferAppsSelectionTitle}</h2>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{g.transferAppsSelectionHelp}</p>
-            </div>
+      <div className="mt-6 grid gap-6 xl:grid-cols-2 xl:items-stretch">
+        <div className="h-full rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+          <div className="mb-6">
+            <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.transferAppsSelectionTitle}</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{g.transferAppsSelectionHelp}</p>
+          </div>
 
-            <div className="space-y-4">
+          <div className="space-y-4">
             <ClearableSearchField
               value={groupSearch}
               onChange={setGroupSearch}
@@ -244,169 +235,174 @@ export default function AdminGroupTransfer() {
               searchShortcutLabel={ui.common.searchShortcut}
             />
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{g.sourceGroupLabel}</span>
-                  <select
-                    value={sourceGroupId}
-                    onChange={(e) => setSourceGroupId(e.target.value)}
-                    className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-dark dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
-                    disabled={loadingGroups}
-                  >
-                    <option value="">{g.selectGroupPlaceholder}</option>
-                    {selectableGroups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {groupLabel(group)} ({group.app_count || 0} {g.appsCountSuffix})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{g.targetGroupLabel}</span>
-                  <select
-                    value={targetGroupId}
-                    onChange={(e) => setTargetGroupId(e.target.value)}
-                    className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-dark dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
-                    disabled={loadingGroups}
-                  >
-                    <option value="">{g.selectGroupPlaceholder}</option>
-                    {selectableGroups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {groupLabel(group)} ({group.app_count || 0} {g.appsCountSuffix})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-2">
-                <button
-                  type="button"
-                  onClick={() => setMode('copy')}
-                  className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
-                    mode === 'copy' ? 'bg-dark text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-900 hover:text-dark dark:hover:text-white'
-                  }`}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{g.sourceGroupLabel}</span>
+                <select
+                  value={sourceGroupId}
+                  onChange={(e) => setSourceGroupId(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-dark dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
+                  disabled={loadingGroups}
                 >
-                  <Copy className="h-4 w-4" />
-                  {g.copyModeLabel}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('move')}
-                  className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
-                    mode === 'move' ? 'bg-dark text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-900 hover:text-dark dark:hover:text-white'
-                  }`}
+                  <option value="">{g.selectGroupPlaceholder}</option>
+                  {selectableGroups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {groupLabel(group)} ({group.app_count || 0} {g.appsCountSuffix})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{g.targetGroupLabel}</span>
+                <select
+                  value={targetGroupId}
+                  onChange={(e) => setTargetGroupId(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-dark dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
+                  disabled={loadingGroups}
                 >
-                  <MoveRight className="h-4 w-4" />
-                  {g.moveModeLabel}
-                </button>
-              </div>
+                  <option value="">{g.selectGroupPlaceholder}</option>
+                  {selectableGroups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {groupLabel(group)} ({group.app_count || 0} {g.appsCountSuffix})
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
-          </div>
 
-          <div className="rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.transferAppsSummaryTitle}</h2>
-            {sourceGroup ? (
-              <div className="mt-3 space-y-3">
-                <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{g.sourceGroupLabel}</p>
-                      <p className="mt-1 text-sm font-semibold text-dark dark:text-gray-100">{groupLabel(sourceGroup)}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{sourceGroup.description || g.noDescription}</p>
-                    </div>
-                    <div className="text-right text-xs text-gray-500 dark:text-gray-400">
-                      <div>{sourceGroup.app_count || 0} {g.appsCountSuffix}</div>
-                      <div>{sourceGroup.member_count || 0} {g.membersCountSuffix}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {loadingSourceDetail ? (
-                  <div className="flex items-center gap-2 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    {ui.common.loading}
-                  </div>
-                ) : transferCount === 0 ? (
-                  <PageNotice type="info" message={g.noAppsToTransfer} />
-                ) : (
-                  <div className="rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                        {g.transferAppsPreviewTitle} ({transferCount})
-                      </h3>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">{mode === 'move' ? g.moveModeLabel : g.copyModeLabel}</span>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {previewApps.map((app) => (
-                        <span
-                          key={app.id}
-                          className="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200"
-                        >
-                          {app.name}
-                        </span>
-                      ))}
-                      {transferCount > previewApps.length && (
-                        <span className="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                          +{transferCount - previewApps.length}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <PageNotice type="info" message={g.selectSourceGroupHelp} />
-            )}
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-2">
+              <button
+                type="button"
+                onClick={() => setMode('copy')}
+                className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
+                  mode === 'copy' ? 'bg-dark text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-900 hover:text-dark dark:hover:text-white'
+                }`}
+              >
+                <Copy className="h-4 w-4" />
+                {g.copyModeLabel}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('move')}
+                className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
+                  mode === 'move' ? 'bg-dark text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-900 hover:text-dark dark:hover:text-white'
+                }`}
+              >
+                <MoveRight className="h-4 w-4" />
+                {g.moveModeLabel}
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.transferAppsActionTitle}</h2>
-            <div className="mt-4 space-y-3 text-sm text-gray-600 dark:text-gray-300">
-              <div className="flex items-start gap-3">
-                <ArrowRightLeft className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-dark" />
-                <p>{g.transferAppsActionHelp}</p>
-              </div>
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
-                <p className="font-semibold">{g.transferAppsCautionTitle}</p>
-                <p className="mt-1 text-sm leading-6">{g.transferAppsCautionHelp}</p>
-              </div>
+        <div className="h-full rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+          <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.transferAppsActionTitle}</h2>
+          <div className="mt-6 space-y-4 text-sm text-gray-600 dark:text-gray-300">
+            <div className="flex items-start gap-3">
+              <ArrowRightLeft className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-dark" />
+              <p>{g.transferAppsActionHelp}</p>
             </div>
-
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={handleTransfer}
-                disabled={!hasValidSelection || saving || loadingSourceDetail}
-                className="inline-flex items-center gap-2 rounded-2xl bg-dark px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <ActionIcon className="h-4 w-4" />
-                {actionLabel}
-              </button>
-              <div className="text-xs text-gray-400 dark:text-gray-500">
-                {!sourceGroupId || !targetGroupId
-                  ? g.transferSelectionHelp
-                  : sourceGroupId === targetGroupId
-                    ? g.sameGroupError
-                    : transferCount === 0
-                      ? g.noAppsToTransfer
-                      : g.transferReadyHelp.replace('{count}', String(transferCount))}
-              </div>
+            <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+              <p className="font-semibold">{g.transferAppsCautionTitle}</p>
+              <p className="mt-1 text-sm leading-6">{g.transferAppsCautionHelp}</p>
             </div>
           </div>
 
-          {targetGroup ? (
-            <div className="rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
-              <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.targetGroupLabel}</h2>
-              <div className="mt-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4">
-                <p className="text-sm font-semibold text-dark dark:text-gray-100">{groupLabel(targetGroup)}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{targetGroup.description || g.noDescription}</p>
-                <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                  {targetGroup.app_count || 0} {g.appsCountSuffix}
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleTransfer}
+              disabled={!hasValidSelection || saving || loadingSourceDetail}
+              className="inline-flex items-center gap-2 rounded-2xl bg-dark px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ActionIcon className="h-4 w-4" />
+              {actionLabel}
+            </button>
+            <div className="text-xs text-gray-400 dark:text-gray-500">
+              {!sourceGroupId || !targetGroupId
+                ? g.transferSelectionHelp
+                : sourceGroupId === targetGroupId
+                  ? g.sameGroupError
+                  : transferCount === 0
+                    ? g.noAppsToTransfer
+                    : g.transferReadyHelp.replace('{count}', String(transferCount))}
+            </div>
+          </div>
+        </div>
+
+        <div className="h-full rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+          <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.transferAppsSummaryTitle}</h2>
+          {sourceGroup ? (
+            <div className="mt-3 space-y-3">
+              <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{g.sourceGroupLabel}</p>
+                    <p className="mt-1 text-sm font-semibold text-dark dark:text-gray-100">{groupLabel(sourceGroup)}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{sourceGroup.description || g.noDescription}</p>
+                  </div>
+                  <div className="text-right text-xs text-gray-500 dark:text-gray-400">
+                    <div>{sourceGroup.app_count || 0} {g.appsCountSuffix}</div>
+                    <div>{sourceGroup.member_count || 0} {g.membersCountSuffix}</div>
+                  </div>
                 </div>
+              </div>
+
+              {loadingSourceDetail ? (
+                <div className="flex items-center gap-2 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  {ui.common.loading}
+                </div>
+              ) : transferCount === 0 ? (
+                <div className="rounded-2xl border border-sky-200 dark:border-sky-900/60 bg-sky-50 dark:bg-sky-950/40 p-4">
+                  <p className="text-sm font-medium text-sky-800 dark:text-sky-200 whitespace-pre-line">
+                    {g.noAppsToTransfer}
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      {g.transferAppsPreviewTitle} ({transferCount})
+                    </h3>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">{mode === 'move' ? g.moveModeLabel : g.copyModeLabel}</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {previewApps.map((app) => (
+                      <span
+                        key={app.id}
+                        className="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200"
+                      >
+                        {app.name}
+                      </span>
+                    ))}
+                    {transferCount > previewApps.length && (
+                      <span className="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                        +{transferCount - previewApps.length}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-sky-200 dark:border-sky-900/60 bg-sky-50 dark:bg-sky-950/40 p-4">
+              <p className="text-sm font-medium text-sky-800 dark:text-sky-200 whitespace-pre-line">
+                {g.selectSourceGroupHelp}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="h-full rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+          <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.targetGroupLabel}</h2>
+          {targetGroup ? (
+            <div className="mt-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4">
+              <p className="text-sm font-semibold text-dark dark:text-gray-100">{groupLabel(targetGroup)}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{targetGroup.description || g.noDescription}</p>
+              <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                {targetGroup.app_count || 0} {g.appsCountSuffix}
               </div>
             </div>
           ) : null}

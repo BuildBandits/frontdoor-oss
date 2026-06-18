@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Eye, Plus, Shield, Trash2, X, Save, Users, ChevronDown, ChevronRight, AppWindow, Pencil, Clock, RefreshCw, Layers3 } from 'lucide-react';
+import { Eye, Plus, Shield, Trash2, X, Save, Users, ChevronDown, ChevronRight, AppWindow, Pencil, Clock, RefreshCw, Layers3, ArrowRightLeft } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import UserAvatar from '../components/UserAvatar';
 import AppIcon from '../components/AppIcon';
 import PageNotice from '../components/PageNotice';
+import TopToastNotice from '../components/TopToastNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
@@ -30,12 +31,6 @@ export default function AdminGroups() {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [groupSearch, setGroupSearch] = useState('');
   const [activeGroupPanel, setActiveGroupPanel] = useState('members');
-
-  useEffect(() => {
-    if (!pageNotice) return undefined;
-    const timer = setTimeout(() => setPageNotice(null), 6000);
-    return () => clearTimeout(timer);
-  }, [pageNotice]);
 
   const showToast = (message, type = 'success') => setPageNotice({ message, type });
   const openConfirm = (dialog) => setConfirmDialog(dialog);
@@ -889,6 +884,15 @@ export default function AdminGroups() {
             <RefreshCw className={`w-4 h-4 ${forceSyncing ? 'animate-spin' : ''}`} />
             {g.syncGroups}
           </button>
+          {canEdit && (
+            <button
+              onClick={() => navigate('/admin/group-transfer')}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-200 dark:border-gray-700 text-dark dark:text-gray-100 rounded-xl font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors max-sm:w-full"
+            >
+              <ArrowRightLeft className="w-4 h-4" />
+              {g.transferGroups}
+            </button>
+          )}
         </div>
       </div>
       {!canEdit && (
@@ -897,44 +901,21 @@ export default function AdminGroups() {
         </div>
       )}
 
-      {pageNotice && (
-        <div className="mb-6">
-          <PageNotice
-            type={pageNotice.type}
-            message={pageNotice.message}
-            onClose={() => setPageNotice(null)}
-            closeLabel={ui.common.closeNotice}
-          />
-        </div>
-      )}
-
-      <div className="mb-6 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex-1 min-w-[240px]">
-            <ClearableSearchField
-              value={groupSearch}
-              onChange={setGroupSearch}
-              placeholder={ui.admin.groups.searchPlaceholder}
-              clearLabel={ui.common.clearSearch}
-              searchShortcutTarget="primary"
-              searchShortcutLabel={ui.common.searchShortcut}
-            />
-          </div>
-          <div className="text-xs text-gray-400 dark:text-gray-500">
-            {visibleGroups.length} {ui.nav.groups.toLowerCase()} {t.of} {groups.length}
-          </div>
-        </div>
-      </div>
+      <TopToastNotice
+        notice={pageNotice}
+        onClose={() => setPageNotice(null)}
+        closeLabel={ui.common.closeNotice}
+        positionClassName="top-4 sm:top-6"
+      />
 
       {hasIncompleteGroupsNotice && (
-        <div className="mb-8">
+        <div className="mb-6">
           <PageNotice
             type="warning"
             title={g.problemGroupsNoticeTitle}
             message={g.problemGroupsNoticeHelp}
             actionLabel={showOnlyProblemGroups ? g.showAllGroups : g.showOnlyProblemGroups}
             onAction={() => setShowOnlyProblemGroups((prev) => !prev)}
-            closeLabel={ui.common.closeNotice}
           >
             <div className="space-y-4">
               {groupsWithoutApps.length > 0 && (
@@ -980,6 +961,24 @@ export default function AdminGroups() {
           </PageNotice>
         </div>
       )}
+
+      <div className="mb-6 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[240px]">
+            <ClearableSearchField
+              value={groupSearch}
+              onChange={setGroupSearch}
+              placeholder={ui.admin.groups.searchPlaceholder}
+              clearLabel={ui.common.clearSearch}
+              searchShortcutTarget="primary"
+              searchShortcutLabel={ui.common.searchShortcut}
+            />
+          </div>
+          <div className="text-xs text-gray-400 dark:text-gray-500">
+            {visibleGroups.length} {ui.nav.groups.toLowerCase()} {t.of} {groups.length}
+          </div>
+        </div>
+      </div>
 
       {loading ? (
         <div className="animate-pulse space-y-3">

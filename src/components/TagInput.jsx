@@ -1,19 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
+import { useAuthStore } from '../stores/authStore';
+import { getUiStrings, resolveAppLanguage } from '../i18n';
 
 export default function TagInput({
   value = [],
   onChange,
-  placeholder = 'Add tag...',
+  placeholder,
   suggestions = [],
-  suggestionsLabel = 'Suggestions',
-  availableTagsLabel = 'Available tags',
-  useSuggestionLabel = 'Use existing tag',
+  suggestionsLabel,
+  availableTagsLabel,
+  useSuggestionLabel,
 }) {
+  const { user } = useAuthStore();
   const [input, setInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightedSuggestionIndex, setHighlightedSuggestionIndex] = useState(-1);
   const inputRef = useRef(null);
+  const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, 'en'));
+  const resolvedPlaceholder = placeholder || ui.admin.apps.tagsPlaceholder;
+  const resolvedSuggestionsLabel = suggestionsLabel || ui.admin.apps.tagSuggestionsTitle;
+  const resolvedAvailableTagsLabel = availableTagsLabel || ui.admin.apps.availableTagsTitle;
+  const resolvedUseSuggestionLabel = useSuggestionLabel || ui.admin.apps.useExistingTag;
 
   const normalizeTag = (tag) => tag.trim().toLowerCase();
 
@@ -166,7 +174,7 @@ export default function TagInput({
           }}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          placeholder={value.length === 0 ? placeholder : ''}
+          placeholder={value.length === 0 ? resolvedPlaceholder : ''}
           className="flex-1 min-w-[100px] text-sm outline-none bg-transparent py-0.5 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
         />
       </div>
@@ -174,7 +182,7 @@ export default function TagInput({
       {showSuggestions && normalizedSuggestions.length > 0 && (
         <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden">
           <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-800">
-            {input.trim() ? suggestionsLabel : availableTagsLabel}
+            {input.trim() ? resolvedSuggestionsLabel : resolvedAvailableTagsLabel}
           </div>
           <div className="max-h-48 overflow-y-auto py-1">
             {normalizedSuggestions.map((tag) => (
@@ -198,7 +206,7 @@ export default function TagInput({
                 }`}
               >
                 <span className="font-medium">{tag}</span>
-                <span className="text-[11px] text-gray-400 dark:text-gray-500">{useSuggestionLabel}</span>
+                <span className="text-[11px] text-gray-400 dark:text-gray-500">{resolvedUseSuggestionLabel}</span>
               </button>
             ))}
           </div>

@@ -1,15 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw } from 'lucide-react';
+import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, SlidersHorizontal } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import UserAvatar from '../components/UserAvatar';
 import AppIcon from '../components/AppIcon';
-import PageNotice from '../components/PageNotice';
+import TopToastNotice from '../components/TopToastNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
+import Tooltip from '../components/Tooltip';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { DEFAULT_COLOR_SCHEME, normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
 
 export default function AdminUsers() {
   const { user: currentUser } = useAuthStore();
@@ -19,6 +21,7 @@ export default function AdminUsers() {
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState('all'); // all | owner | admin | admin_readonly | user
   const [filterActive, setFilterActive] = useState('all'); // all | active | inactive
+  const [filterPersonalization, setFilterPersonalization] = useState('all'); // all | customized | none
   const [expandedUser, setExpandedUser] = useState(null);
   const [userDetail, setUserDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -28,12 +31,10 @@ export default function AdminUsers() {
   const [showVisibleApps, setShowVisibleApps] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [brandingLanguage, setBrandingLanguage] = useState('en');
-
-  useEffect(() => {
-    if (!pageNotice) return undefined;
-    const timer = setTimeout(() => setPageNotice(null), 5000);
-    return () => clearTimeout(timer);
-  }, [pageNotice]);
+  const [defaultHomeDesktopView, setDefaultHomeDesktopView] = useState('cards');
+  const [defaultColorScheme, setDefaultColorScheme] = useState(DEFAULT_COLOR_SCHEME);
+  const detailInfoRef = useRef(null);
+  const [detailInfoHeight, setDetailInfoHeight] = useState(null);
 
   useEffect(() => {
     if (!showVisibleApps) return undefined;
@@ -46,6 +47,28 @@ export default function AdminUsers() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [showVisibleApps]);
+
+  useLayoutEffect(() => {
+    const element = detailInfoRef.current;
+    if (!element) {
+      setDetailInfoHeight(null);
+      return undefined;
+    }
+
+    const updateHeight = () => {
+      setDetailInfoHeight(element.getBoundingClientRect().height);
+    };
+
+    updateHeight();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [expandedUser, detailLoading, userDetail]);
 
   const showToast = useCallback((message, type = 'success') => setPageNotice({ message, type }), []);
   const openConfirm = (dialog) => setConfirmDialog(dialog);
@@ -92,10 +115,18 @@ export default function AdminUsers() {
     let cancelled = false;
     api.get('/branding')
       .then((res) => {
-        if (!cancelled) setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+        if (!cancelled) {
+          setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+          setDefaultHomeDesktopView(res.data?.branding?.defaultHomeDesktopView === 'compact' ? 'compact' : 'cards');
+          setDefaultColorScheme(normalizeColorScheme(res.data?.branding?.defaultColorScheme));
+        }
       })
       .catch(() => {
-        if (!cancelled) setBrandingLanguage('en');
+        if (!cancelled) {
+          setBrandingLanguage('en');
+          setDefaultHomeDesktopView('cards');
+          setDefaultColorScheme(DEFAULT_COLOR_SCHEME);
+        }
       });
     return () => {
       cancelled = true;
@@ -223,6 +254,8 @@ export default function AdminUsers() {
     if (filterRole !== 'all' && u.role !== filterRole) return false;
     if (filterActive === 'active' && !u.is_active) return false;
     if (filterActive === 'inactive' && u.is_active) return false;
+    if (filterPersonalization === 'customized' && !hasAtLeastOnePersonalization(u)) return false;
+    if (filterPersonalization === 'none' && hasAtLeastOnePersonalization(u)) return false;
     if (search.trim()) {
       const q = search.toLowerCase();
       return (u.display_name || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
@@ -263,6 +296,128 @@ export default function AdminUsers() {
       return iso;
     }
   };
+
+  const formatDateTimeCompact = (iso) => {
+    if (!iso) return ui.common.default;
+    try {
+      const parsed = new Date(iso);
+      if (Number.isNaN(parsed.getTime())) return iso;
+      const date = new Intl.DateTimeFormat(ui.common.dateLocale, {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }).format(parsed);
+      const time = new Intl.DateTimeFormat(ui.common.dateLocale, {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(parsed);
+      return `${date} ${time}`;
+    } catch {
+      return iso;
+    }
+  };
+
+  function parseStoredJsonArray(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) {
+      return value.filter((item) => typeof item === 'string' && item.trim());
+    }
+    if (typeof value !== 'string') return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string' && item.trim()) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  const formatStoredPreference = (value, mapping) => {
+    if (!value) return ui.common.default;
+    return mapping[value] || value;
+  };
+
+  function hasAtLeastOnePersonalization(user) {
+    return Boolean(
+      (user?.home_desktop_view != null && normalizeHomeView(user.home_desktop_view) !== defaultHomeDesktopView)
+      || (user?.preferred_language != null && normalizeLanguage(user.preferred_language) !== normalizeLanguage(brandingLanguage))
+      || (user?.preferred_color_scheme != null && normalizeColorScheme(user.preferred_color_scheme) !== defaultColorScheme)
+      || parseStoredJsonArray(user?.app_order).length > 0
+    );
+  }
+
+  function normalizeHomeView(value) {
+    return value === 'compact' ? 'compact' : 'cards';
+  }
+  const renderPreferenceStatus = (value, { isDefault = false, resetLabel = null, onReset = null } = {}) => (
+    <div className="inline-flex max-w-full items-center justify-end gap-1.5">
+      <span className="min-w-0 truncate">{value}</span>
+      {isDefault ? (
+        <span className="text-gray-400 dark:text-gray-500 font-normal">
+          ({ui.common.default.toLowerCase()})
+        </span>
+      ) : null}
+      {!isDefault && canEditUsers && onReset && resetLabel && (
+        <Tooltip content={resetLabel}>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onReset();
+            }}
+            className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 transition-colors hover:bg-amber-100"
+            aria-label={resetLabel}
+          >
+            <AlertTriangle className="h-3 w-3" />
+          </button>
+        </Tooltip>
+      )}
+    </div>
+  );
+
+  const openPreferenceResetConfirm = (label, payload) => {
+    if (!userDetail?.user?.id) return;
+    openConfirm({
+      title: u.resetPreferenceTitle.replace('{label}', label),
+      message: u.resetPreferenceMessage.replace('{label}', label),
+      confirmLabel: ui.common.reset,
+      onConfirm: async () => {
+        try {
+          await api.put(`/users/${userDetail.user.id}/preferences`, payload);
+          showToast(ui.common.changesSaved);
+          await loadUserDetail(userDetail.user.id);
+        } catch (err) {
+          showToast(err.response?.data?.error || t.errorSaving, 'error');
+        }
+      },
+    });
+  };
+
+  const effectiveHomeView = normalizeHomeView(userDetail?.user?.home_desktop_view ?? defaultHomeDesktopView);
+  const effectiveLanguage = resolveAppLanguage(userDetail?.user?.preferred_language, brandingLanguage);
+  const effectiveColorScheme = resolveAppColorScheme(userDetail?.user?.preferred_color_scheme, defaultColorScheme);
+  const customOrderItems = parseStoredJsonArray(userDetail?.user?.app_order);
+  const hasCustomOrder = customOrderItems.length > 0;
+  const homeViewIsDefault = effectiveHomeView === defaultHomeDesktopView;
+  const languageIsDefault = !userDetail?.user?.preferred_language || effectiveLanguage === brandingLanguage;
+  const colorSchemeIsDefault = !userDetail?.user?.preferred_color_scheme || effectiveColorScheme === defaultColorScheme;
+
+  const renderInfoRow = (label, value, {
+    valueClassName = 'text-dark dark:text-gray-100 font-medium',
+    extra = null,
+    noBorder = false,
+  } = {}) => (
+    <div className={`flex items-start justify-between gap-4 py-2 ${noBorder ? 'last:pb-0' : 'border-b border-gray-100 dark:border-gray-800 last:border-b-0 last:pb-0'}`}>
+      <dt className="min-w-0 text-gray-400 dark:text-gray-500">
+        {label}
+      </dt>
+      <dd className={`shrink-0 text-right ${valueClassName}`}>
+        <span>{value}</span>
+        {extra}
+      </dd>
+    </div>
+  );
 
   const getRoleActions = (targetUser) => {
     if (!canEditUsers || isComposeLockedAdmin(targetUser)) return [];
@@ -348,6 +503,13 @@ export default function AdminUsers() {
     return actions;
   };
 
+  const getCompactActionLabel = (action) => {
+    if (action.role === 'admin') return u.roleAdminCompact;
+    if (action.role === 'admin_readonly') return u.roleReadonlyCompact;
+    if (action.role === 'user') return u.roleRemoveCompact;
+    return action.label;
+  };
+
   const adminCount = users.filter((u) => ['owner', 'admin'].includes(u.role) && u.is_active).length;
   const activeCount = users.filter((u) => u.is_active).length;
 
@@ -377,16 +539,12 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {pageNotice && (
-        <div className="mb-6">
-          <PageNotice
-            type={pageNotice.type}
-            message={pageNotice.message}
-            onClose={() => setPageNotice(null)}
-            closeLabel={ui.common.closeNotice}
-          />
-        </div>
-      )}
+      <TopToastNotice
+        notice={pageNotice}
+        onClose={() => setPageNotice(null)}
+        closeLabel={ui.common.closeNotice}
+        positionClassName="top-4 sm:top-6"
+      />
 
       {/* Filters */}
       <div className="mb-8 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
@@ -413,7 +571,7 @@ export default function AdminUsers() {
               { value: 'admin_readonly', label: t.readOnlyRole },
               { value: 'user', label: t.usersOnly },
             ]}
-            className="min-w-[220px]"
+            className="min-w-[190px]"
           />
           <DropdownSelect
             value={filterActive}
@@ -425,7 +583,19 @@ export default function AdminUsers() {
               { value: 'active', label: t.activeOnly },
               { value: 'inactive', label: t.inactiveOnly },
             ]}
-            className="min-w-[220px]"
+            className="min-w-[190px]"
+          />
+          <DropdownSelect
+            value={filterPersonalization}
+            onChange={setFilterPersonalization}
+            label={u.personalizationFilterLabel}
+            icon={SlidersHorizontal}
+            options={[
+              { value: 'all', label: u.allPersonalizationStates },
+              { value: 'customized', label: u.personalizedOnly },
+              { value: 'none', label: u.noPersonalizations },
+            ]}
+            className="min-w-[260px]"
           />
         </div>
       </div>
@@ -465,27 +635,29 @@ export default function AdminUsers() {
                     className={`w-9 h-9 ${!user.is_active ? 'opacity-40' : ''}`}
                     initialsClassName="text-xs"
                   />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`font-semibold text-sm ${user.is_active ? 'text-dark dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 line-through'}`}>
-                        {user.display_name || user.email}
-                      </span>
-                      <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium ${roleBadgeClass(user.role)}`}>
-                        {roleBadgeContent(user.role)}
-                      </span>
-                      {isComposeLockedAdmin(user) && (
-                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded font-medium">{u.composeBadge}</span>
-                      )}
-                      {!user.last_login && (
-                        <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5">
-                          <Clock className="w-3 h-3" />{t.noLogin}
+                  <div className="min-w-0 flex-1 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`font-semibold text-sm ${user.is_active ? 'text-dark dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 line-through'}`}>
+                          {user.display_name || user.email}
                         </span>
-                      )}
-                      {!user.is_active && (
-                        <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">{t.inactive}</span>
-                      )}
+                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium ${roleBadgeClass(user.role)}`}>
+                          {roleBadgeContent(user.role)}
+                        </span>
+                        {isComposeLockedAdmin(user) && (
+                          <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded font-medium">{u.composeBadge}</span>
+                        )}
+                        {!user.last_login && (
+                          <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5">
+                            <Clock className="w-3 h-3" />{t.noLogin}
+                          </span>
+                        )}
+                        {!user.is_active && (
+                          <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">{t.inactive}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user.email}</p>
                     </div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user.email}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -506,62 +678,125 @@ export default function AdminUsers() {
                       <div className="animate-spin w-6 h-6 border-2 border-gray-300 dark:border-gray-600 border-t-dark rounded-full" />
                     </div>
                   ) : userDetail ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.3fr)_minmax(0,0.88fr)] gap-6 lg:min-h-[460px]">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 xl:gap-10 lg:items-start">
                       {/* Info */}
-                      <div>
+                      <div ref={detailInfoRef} className="flex flex-col self-start">
                         <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">{t.info}</h3>
-                        <dl className="space-y-2 text-sm">
-                          <div>
-                            <dt className="text-gray-400 dark:text-gray-500">{u.emailLabel}</dt>
-                            <dd className="text-dark dark:text-gray-100 font-medium">{userDetail.user.email}</dd>
-                          </div>
-                          <div>
-                            <dt className="text-gray-400 dark:text-gray-500">{t.role}</dt>
-                            <dd className="inline-flex items-center gap-1 text-dark dark:text-gray-100 font-medium">
-                              {roleBadgeContent(userDetail.user.role)}
-                            </dd>
-                          </div>
-                          <div>
-                          <dt className="text-gray-400 dark:text-gray-500">{t.status}</dt>
-                          <dd className={userDetail.user.is_active ? 'text-accent-dark font-medium' : 'text-red-500 font-medium'}>
-                              {userDetail.user.is_active ? t.active : t.inactive}
-                          </dd>
-                        </div>
-                        <div>
-                            <dt className="text-gray-400 dark:text-gray-500">{t.registered}</dt>
-                            <dd className="text-dark dark:text-gray-100">{formatDate(userDetail.user.created_at)}</dd>
-                        </div>
-                        <div>
-                            <dt className="text-gray-400 dark:text-gray-500">{t.lastLogin}</dt>
-                            <dd className="text-dark dark:text-gray-100">{formatDate(userDetail.user.last_login)}</dd>
-                        </div>
-                          <div>
-                            <dt className="text-gray-400 dark:text-gray-500">{t.visibleApps}</dt>
-                            <dd>
-                              {userDetail.visibleAppCount > 0 ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setShowVisibleApps(true)}
-                                  className="inline-flex items-center gap-1 text-dark dark:text-gray-100 font-medium hover:text-accent-dark hover:underline"
-                                >
-                                  {userDetail.visibleAppCount}
-                                  <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
-                                </button>
-                              ) : (
-                                <span className="text-dark dark:text-gray-100 font-medium">0</span>
+                        <dl className="flex flex-col space-y-0 text-sm">
+                          {renderInfoRow(u.emailLabel, userDetail.user.email)}
+                          {renderInfoRow(
+                            t.role,
+                            <span className="inline-flex items-center gap-1">{roleBadgeContent(userDetail.user.role)}</span>
+                          )}
+                          {renderInfoRow(
+                            t.status,
+                            userDetail.user.is_active ? t.active : t.inactive,
+                            { valueClassName: userDetail.user.is_active ? 'text-accent-dark font-medium' : 'text-red-500 font-medium' }
+                          )}
+                          {renderInfoRow(t.registered, formatDate(userDetail.user.created_at))}
+                          {renderInfoRow(t.lastLogin, formatDate(userDetail.user.last_login))}
+                          {renderInfoRow(
+                            t.visibleApps,
+                            userDetail.visibleAppCount > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => setShowVisibleApps(true)}
+                                className="inline-flex items-center gap-1 text-dark dark:text-gray-100 font-medium hover:text-accent-dark hover:underline"
+                              >
+                                {userDetail.visibleAppCount}
+                                <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                              </button>
+                            ) : '0',
+                            { noBorder: true }
+                          )}
+                          <div aria-hidden="true" className="block h-0 py-5" />
+                          <div className="mt-16 pt-2">
+                            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                              {u.personalSettings}
+                            </h3>
+                            <dl className="space-y-0 text-sm">
+                              {renderInfoRow(
+                                u.homeView,
+                                renderPreferenceStatus(
+                                  formatStoredPreference(effectiveHomeView, {
+                                  cards: ui.layout.homeViewCards,
+                                  compact: ui.layout.homeViewCompact,
+                                  }),
+                                  {
+                                    isDefault: homeViewIsDefault,
+                                    resetLabel: u.resetPreferenceTooltip.replace('{label}', u.homeView),
+                                    onReset: homeViewIsDefault ? null : () => openPreferenceResetConfirm(u.homeView, { homeDesktopView: null }),
+                                  }
+                                )
                               )}
-                            </dd>
+                              {renderInfoRow(
+                                u.languageSetting,
+                                renderPreferenceStatus(
+                                  formatStoredPreference(effectiveLanguage, {
+                                  en: ui.common.english,
+                                  it: ui.common.italian,
+                                  }),
+                                  {
+                                    isDefault: languageIsDefault,
+                                    resetLabel: u.resetPreferenceTooltip.replace('{label}', u.languageSetting),
+                                    onReset: languageIsDefault ? null : () => openPreferenceResetConfirm(u.languageSetting, { preferredLanguage: null }),
+                                  }
+                                )
+                              )}
+                              {renderInfoRow(
+                                u.themeSetting,
+                                renderPreferenceStatus(
+                                  formatStoredPreference(effectiveColorScheme, {
+                                  light: ui.layout.colorSchemeLight,
+                                  dark: ui.layout.colorSchemeDark,
+                                  auto: ui.layout.colorSchemeAuto,
+                                  }),
+                                  {
+                                    isDefault: colorSchemeIsDefault,
+                                    resetLabel: u.resetPreferenceTooltip.replace('{label}', u.themeSetting),
+                                    onReset: colorSchemeIsDefault ? null : () => openPreferenceResetConfirm(u.themeSetting, { preferredColorScheme: null }),
+                                  }
+                                )
+                              )}
+                              {renderInfoRow(
+                                u.customOrder,
+                                renderPreferenceStatus(
+                                  hasCustomOrder ? ui.common.yes : ui.common.no,
+                                  {
+                                    isDefault: !hasCustomOrder,
+                                    resetLabel: u.resetPreferenceTooltip.replace('{label}', u.customOrder),
+                                    onReset: !hasCustomOrder ? null : () => openPreferenceResetConfirm(u.customOrder, { appOrder: null }),
+                                  }
+                                ),
+                                {
+                                  extra: userDetail.user.app_order_updated_at
+                                    ? (
+                                      <span className="text-gray-400 dark:text-gray-500 font-normal">
+                                        {` (${formatDateTimeCompact(userDetail.user.app_order_updated_at)})`}
+                                      </span>
+                                    )
+                                    : null,
+                                }
+                              )}
+                              {renderInfoRow(
+                                ui.home.favorites,
+                                `${parseStoredJsonArray(userDetail.user.favorite_apps).length}${userDetail.user.favorite_apps_updated_at ? ` (${formatDateTimeCompact(userDetail.user.favorite_apps_updated_at)})` : ''}`
+                              )}
+                            </dl>
                           </div>
                         </dl>
                       </div>
 
                       {/* Groups */}
-                      <div>
+                      <div
+                        className="flex h-full min-h-0 flex-col overflow-hidden self-start"
+                        style={detailInfoHeight ? { height: `${detailInfoHeight}px`, maxHeight: `${detailInfoHeight}px` } : undefined}
+                      >
                         <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
                           {t.frontdoorGroups} ({userDetail.groups.length})
                         </h3>
 
-                        <div className="space-y-5 h-full overflow-y-auto pr-1 lg:max-h-[390px]">
+                        <div className="flex min-h-0 flex-1 flex-col space-y-5 overflow-y-auto pr-1">
                           <div>
                             <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
                               {t.localGroups} ({localGroups.length})
@@ -623,7 +858,10 @@ export default function AdminUsers() {
                         </div>
                       </div>
 
-                      <div>
+                      <div
+                        className="flex h-full min-h-0 flex-col overflow-hidden self-start"
+                        style={detailInfoHeight ? { height: `${detailInfoHeight}px`, maxHeight: `${detailInfoHeight}px` } : undefined}
+                      >
                         <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
                           {t.detectedEntraGroups} ({detectedEntraGroups.length})
                         </h3>
@@ -633,7 +871,7 @@ export default function AdminUsers() {
                         {detectedEntraGroups.length === 0 ? (
                           <p className="text-sm text-gray-300 dark:text-gray-600 italic">{t.noDetectedEntraGroups}</p>
                         ) : (
-                          <div className="space-y-1.5 h-full overflow-y-auto pr-1 lg:max-h-[390px]">
+                          <div className="flex min-h-0 flex-1 flex-col space-y-1.5 overflow-y-auto pr-1">
                             {detectedEntraGroups.map((group) => (
                               <button
                                 key={group.entra_group_id}
@@ -669,66 +907,75 @@ export default function AdminUsers() {
                         )}
                       </div>
 
-                      {/* Actions */}
-                      <div>
+                      <div className="col-span-full border-t border-gray-100 dark:border-gray-800 pt-5 mt-1">
                         <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">{t.actions}</h3>
-                        <div className="space-y-2 lg:sticky lg:top-4">
-                          {!canEditUsers && (
-                            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
-                              {u.readOnlyUsersMessage}
-                            </div>
-                          )}
-
+                        {!canEditUsers && (
+                          <div className="mb-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+                            {u.readOnlyUsersMessage}
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-2">
                           {getRoleActions(user).map((action) => {
                             const Icon = action.icon;
                             return (
-                              <button
-                                key={action.role}
-                                onClick={() => updateRole(user, action.role)}
-                                className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${action.className}`}
-                              >
-                                <Icon className="w-4 h-4" />
-                                {action.label}
-                              </button>
+                              <Tooltip key={action.role} content={action.label}>
+                                <button
+                                  type="button"
+                                  onClick={() => updateRole(user, action.role)}
+                                  aria-label={action.label}
+                                  className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${action.className}`}
+                                >
+                                  <Icon className="h-4 w-4 shrink-0" />
+                                  <span className="min-w-0 truncate">{getCompactActionLabel(action)}</span>
+                                </button>
+                              </Tooltip>
                             );
                           })}
 
-                          <button
-                            onClick={!canEditUsers || isComposeLockedAdmin(user) ? undefined : () => toggleActive(user)}
-                            disabled={!canEditUsers || isComposeLockedAdmin(user)}
-                            className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                              !canEditUsers || isComposeLockedAdmin(user)
-                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                                : user.is_active
-                                  ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/45'
-                                  : 'bg-accent/10 text-accent-dark hover:bg-accent/20 dark:bg-accent-dark/25 dark:text-gray-100 dark:hover:bg-accent-dark/35'
-                            }`}
-                          >
-                            {!canEditUsers || isComposeLockedAdmin(user) ? (
-                              <><UserX className="w-4 h-4" /> {u.deactivateBlocked}</>
-                            ) : user.is_active ? (
-                              <><UserX className="w-4 h-4" /> {u.deactivateUser}</>
-                            ) : (
-                              <><UserCheck className="w-4 h-4" /> {u.reactivateUser}</>
-                            )}
-                          </button>
-                          <div className="border-t border-gray-100 dark:border-gray-800 pt-2 mt-1">
+                          <Tooltip content={!canEditUsers || isComposeLockedAdmin(user) ? u.deactivateBlocked : (user.is_active ? u.deactivateUser : u.reactivateUser)}>
                             <button
+                              type="button"
+                              onClick={!canEditUsers || isComposeLockedAdmin(user) ? undefined : () => toggleActive(user)}
+                              disabled={!canEditUsers || isComposeLockedAdmin(user)}
+                              aria-label={!canEditUsers || isComposeLockedAdmin(user) ? u.deactivateBlocked : (user.is_active ? u.deactivateUser : u.reactivateUser)}
+                              className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+                                !canEditUsers || isComposeLockedAdmin(user)
+                                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                                  : user.is_active
+                                    ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/45'
+                                    : 'bg-accent/10 text-accent-dark hover:bg-accent/20 dark:bg-accent-dark/25 dark:text-gray-100 dark:hover:bg-accent-dark/35'
+                              }`}
+                            >
+                              {!canEditUsers || isComposeLockedAdmin(user) ? (
+                                <><UserX className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deactivateBlocked}</span></>
+                              ) : user.is_active ? (
+                                <><UserX className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deactivateUser}</span></>
+                              ) : (
+                                <><UserCheck className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.reactivateUser}</span></>
+                              )}
+                            </button>
+                          </Tooltip>
+                          <Tooltip content={!canEditUsers || isComposeLockedAdmin(user) ? u.deleteBlocked : u.deleteUser}>
+                            <button
+                              type="button"
                               onClick={!canEditUsers || isComposeLockedAdmin(user) ? undefined : () => deleteUser(user)}
                               disabled={!canEditUsers || isComposeLockedAdmin(user)}
-                              className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                              aria-label={!canEditUsers || isComposeLockedAdmin(user) ? u.deleteBlocked : u.deleteUser}
+                              className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                                 !canEditUsers || isComposeLockedAdmin(user)
                                   ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                                   : 'bg-red-50 text-red-700 hover:bg-red-200 dark:bg-red-950/45 dark:text-red-300 dark:hover:bg-red-900/55'
                               }`}
                             >
-                              <Trash2 className="w-4 h-4" /> {!canEditUsers || isComposeLockedAdmin(user) ? u.deleteBlocked : u.deleteUser}
+                              <Trash2 className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deleteUser}</span>
                             </button>
-                            <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 px-1">{u.removeUserSummary}</p>
-                            {isComposeLockedAdmin(user) && (
-                              <p className="text-[11px] text-slate-400 mt-2 px-1">{u.composeWarning}</p>
-                            )}
-                          </div>
+                          </Tooltip>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-3 px-1 text-[11px] text-gray-400 dark:text-gray-500">
+                          <span>{u.removeUserSummary}</span>
+                          {isComposeLockedAdmin(user) && (
+                            <span>{u.composeWarning}</span>
+                          )}
                         </div>
                       </div>
                     </div>

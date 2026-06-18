@@ -7,6 +7,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- **User summary layout polish**: the Users detail card now keeps the favorites badge inline with the name and renders the personal settings as a compact label/value table, including the new parenthesized date format for saved favorites.
+- **Admin users preference summary**: the Users detail card now shows database-backed personalization data for each user, including home view, language, theme, custom app order status and the saved favorites count.
+- **Favorites persistence sync**: user favorites now live in the database alongside the other personal settings, existing browser bookmarks are migrated on the next Home load, and the account menu now shows a saved favorites badge with the persisted count and last save time.
 - **Docker image optimization branch**: the production image now uses a cleaner multi-stage build on `node:22-bookworm-slim`, copies only the build artifacts and runtime dependencies into the final stage, and keeps the Docker build context small with a tighter `.dockerignore`.
 - **Runtime dependency cleanup**: the production dependency tree has been refreshed so the runtime audit now passes cleanly with `npm audit --omit=dev`, while the remaining builder-only findings stay confined to the build stage.
 - **Experimental plugin platform**: Frontdoor now has a real plugin host with runtime registration, shared APIs, extension surfaces, plugin routes, action injection, and a sample third-party-style plugin package. The host keeps the core app minimal while letting plugins extend navigation, account actions, admin surfaces and dedicated pages without touching core UI code.
@@ -24,7 +27,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Search shortcut hint**: the shared search field now exposes a visible `CTRL+K / ⌘K` hint and supports a global `Ctrl/Cmd+K` shortcut that focuses the primary search input on pages that have one.
 
 ### Changed
-- **Version bump**: Frontdoor is now on `1.2.7a` for the current branch, reflecting the small-fix release cadence while this work lands.
+- **Version bump**: Frontdoor is now on `1.2.8` for the current branch, reflecting the small-fix release cadence while this work lands.
 - **Docker runtime hardening**: the container entrypoint now only repairs writable runtime paths before dropping privileges, instead of recursively chowning the whole app tree on every start.
 - **Security dependency refresh**: `@azure/msal-node`, `dompurify`, `express`, `react-router-dom`, and `uuid` were bumped, with transitive overrides for the vulnerable runtime chain where needed, and the lockfile was regenerated to match the new manifest.
 - **Tooltip behavior**: icon hints and card descriptions now use the in-app tooltip flow instead of the browser `title` bubble, so hover help appears immediately and stays visually consistent across the UI.
@@ -63,7 +66,45 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Plugin admin crash**: restored the missing `FileJson` import on the plugin admin page so `/admin/plugins` no longer crashes on load with `ReferenceError: FileJson is not defined`.
 
 ### Fixed
-- **App editor error banner**: validation and save errors from the app add/edit modal now appear in a floating notice above the modal with a close button and auto-dismiss, so they are no longer hidden behind the dialog layer.
+- **Users personalization filter**: hoisted the home view normalization helper so the new personalization filter no longer trips a render-time reference error when the filter branch is evaluated.
+- **Users filter spacing**: the Role and Status dropdowns on the Users page are now slightly narrower, leaving a bit more room for the search field.
+- **Users personalization filter**: the customization filter now compares each setting against the system default instead of counting any stored value, so accounts with default-equivalent settings are no longer misclassified.
+- **Users personalization filter**: fixed a render crash in the new personalization menu by hoisting its helper logic, so selecting the filter no longer turns the page white.
+- **Users personalization filter**: the new personalization menu now uses a dedicated default label and safely handles unexpected stored values, avoiding the blank-page crash when filtering.
+- **Users personalization filter**: the Users page now has a third admin filter for accounts with at least one saved customization, so controls and audits are faster to triage.
+- **Personal settings spacing**: an invisible spacer now creates a fixed gap between `App visibili` and `Impostazioni personali`, so the two groups stay clearly separated without adding visible chrome.
+- **Personal settings spacing**: the `Impostazioni personali` block now starts even lower, with a larger gap above it so it reads as a clearly separated second paragraph.
+- **Translation cleanup**: the login dev panel and the reusable tag input no longer rely on hardcoded English fallbacks for their visible labels, and the user-facing dead locale keys were removed from `en` and `it`.
+- **Users translation cleanup**: removed dead admin-users locale keys and moved the compact action labels in the Users detail card into the language files so the visible UI copy is no longer hardcoded there.
+- **Personal settings spacing**: the `Impostazioni personali` section now starts a little lower, with more top margin before the second block begins.
+- **Personal settings spacing**: the `App visibili` row no longer draws a divider under the personal settings section, and the `Impostazioni personali` block now has extra breathing room above it.
+- **User preference recovery**: the Users detail card now highlights personalization values that differ from the Frontdoor default and lets editors reset Home view, language, theme and custom order back to the system value with a confirmation popup, while favorites stay untouched.
+- **Personal settings spacing**: the `Impostazioni personali` block now sits a little lower, with more breathing room above it.
+- **Personal settings heading**: the `Impostazioni personali` block now uses the same heading treatment as `Informazioni`, with a clearer gap above it and no internal divider under `App visibili`.
+- **Users detail height anchor**: the Information column no longer stretches with the grid, so the Frontdoor and Entra groups panels can reliably lock to its natural height and scroll internally.
+- **Users tooltip polish**: the Users detail action buttons now use the shared in-app tooltip style instead of the native browser `title` bubble.
+- **Detected Entra groups scroll**: the detected Entra groups column now stays clipped to the Information column height with internal scrolling on the full panel.
+- **Detected Entra groups scroll**: the detected Entra groups column now scrolls as a single fixed-height panel instead of stretching the detail card vertically.
+- **User actions compactness**: the Users detail action buttons now render as compact chips with short labels and tooltipped full text, so they no longer waste horizontal space.
+- **User actions layout**: the Users detail actions now use a tighter two-column grid with compact labels and full-text tooltips, so the buttons stay elegant without wrapping.
+- **User groups column height**: the Frontdoor and detected Entra groups columns now take the Information column height as their limit and scroll internally instead of stretching the page.
+- **Favorites badge and user detail height**: the account menu favorites star now uses the bookmark yellow, and the Groups columns in the Users detail panel now cap to the height of the Information column with internal scroll.
+- **User detail layout**: the three main user detail columns now stretch to the same height and the actions moved into a compact horizontal band with a separator, while the favorites badge in the account menu stays right-aligned beside the user block.
+- **User detail spacing**: the account menu favorites badge now stays inline beside the display name, the accidental badge was removed from the Users row, and the Users detail columns now split into three even blocks with more breathing room.
+- **Top toast stack spacing**: stacked notices now sit closer together, so multiple messages stay readable without leaving a huge vertical gap.
+- **Top toast stacking**: when two top notices are visible at the same time, the newer one now appears above the older one and pushes it down instead of overlapping it.
+- **Top toast alignment**: every page that uses `TopToastNotice` now mounts it at the exact same top offset, so the transient notices land in a consistent place across the UI.
+- **Admin notice migration**: the main admin tabs now use the shared top toast for transient single-line notices, while the richer page warnings stay embedded in the page body, so message placement and behavior are consistent across App, Users, Groups, Backup, Group Transfer and Customization.
+- **Admin groups notice placement**: the `Gruppi problematici rilevati` banner now sits above the search/filter box again, matching the Apps page layout and keeping the warning visually ahead of the list controls.
+- **Group transfer notices**: the Group Transfer page now keeps its warning and helper notices inside the page body again instead of rendering them as top toasts.
+- **Group transfer layout**: the Group Transfer page now gives the left and right panels equal width, adds more breathing room to the section notes, and removes the leftover hidden-admin badge from the header.
+- **Group transfer card heights**: the Group Transfer page now uses a 2x2 grid so each right-side card matches the height of its left-side counterpart, keeping the summary and destination panels aligned with the selection and action panels.
+- **Group transfer entry point**: the group transfer shortcut now lives in the Groups toolbar next to the creation and sync actions, and the duplicate maintenance shortcut was removed from Personalizza.
+- **Maintenance buttons**: the maintenance action buttons now share the same fixed width treatment, and the cache/log actions are visually separated from the transfer shortcut with a dashed divider.
+- **App save notice timing**: the top app save toast now stays on screen a little less before auto-closing, while keeping the same countdown bar and close button.
+- **App save notice border**: the top app save toast now uses a stronger border and subtle outer ring, so it stays visually separated from overlapping modals like group assignment.
+- **App tag filter spacing**: the App page tag menu now matches the connection filter width, keeps the label text from colliding with the selected-count badge, and shows a conditional `Clear` action above `All tags` whenever filters are active.
+- **App save notice placement**: the app add/edit duplicate error and success notice now drops in from the top of the screen instead of sitting under the modal header, and it includes a closing `X` plus a countdown bar so the auto-dismiss timing is obvious.
 - **Login logging**: successful Microsoft and dev logins now write an explicit line with the user email in the container log, making auth activity visible without hunting through the Entra sync noise.
 - **Malformed path noise**: the server now catches malformed request paths that trigger Express `URIError` decode failures, returning a plain `400` instead of spamming stack traces for suspicious traversal probes or broken encoded paths.
 - **Users refresh**: the Utenti page now includes an in-page refresh button, so the list can be reloaded without a full browser refresh.

@@ -56,6 +56,18 @@ const parseStoredAppOrder = (value) => {
   }
 };
 
+const parseStoredStringArray = (value) => {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? [...new Set(parsed.filter((item) => typeof item === 'string' && item.trim()))]
+      : null;
+  } catch {
+    return null;
+  }
+};
+
 const normalizePreferredLanguage = (value) => (
   isSupportedLanguage(value) ? value : null
 );
@@ -73,6 +85,8 @@ const serializeCurrentUser = (user) => ({
   preferredColorScheme: normalizeOptionalColorScheme(user.preferred_color_scheme),
   appOrder: parseStoredAppOrder(user.app_order),
   appOrderUpdatedAt: user.app_order_updated_at || null,
+  favoriteApps: parseStoredStringArray(user.favorite_apps),
+  favoriteAppsUpdatedAt: user.favorite_apps_updated_at || null,
   homeTourSeenAt: user.home_tour_seen_at || null,
 });
 
@@ -388,6 +402,26 @@ router.put('/me/preferences', authenticate, (req, res) => {
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(req.body, 'favoriteApps')) {
+    const { favoriteApps } = req.body;
+    const isLocalStorageMigration = req.body.favoriteAppsMigrationFromLocalStorage === true;
+    if (favoriteApps !== null && !Array.isArray(favoriteApps)) {
+      return res.status(400).json({ error: 'favoriteApps must be an array or null' });
+    }
+    if (Array.isArray(favoriteApps)) {
+      const normalized = [...new Set(favoriteApps.filter((id) => typeof id === 'string' && id.trim()))];
+      if (isLocalStorageMigration && normalized.length > 0) {
+        console.info(`[favorites-migration] user=${req.user.id} email=${req.user.email} count=${normalized.length}`);
+      }
+      updates.push('favorite_apps = ?');
+      values.push(JSON.stringify(normalized));
+      updates.push('favorite_apps_updated_at = datetime(\'now\')');
+    } else {
+      updates.push('favorite_apps = NULL');
+      updates.push('favorite_apps_updated_at = NULL');
+    }
+  }
+
   if (Object.prototype.hasOwnProperty.call(req.body, 'homeTourSeenAt')) {
     const { homeTourSeenAt } = req.body;
     if (homeTourSeenAt !== null && typeof homeTourSeenAt !== 'string') {
@@ -408,7 +442,7 @@ router.put('/me/preferences', authenticate, (req, res) => {
      WHERE id = ?`
   ).run(...values, req.user.id);
 
-  const user = db.prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at FROM users WHERE id = ?').get(req.user.id);
 
   res.json({
     user: serializeCurrentUser(user),

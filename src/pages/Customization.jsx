@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, BookOpen, CheckCircle2, ChevronRight, Database, Eye, HardDrive, Home, Image, LogIn, PlugZap, Save, Settings, ShieldCheck, Smartphone, SlidersHorizontal, Trash2, Type, Users, Wrench } from 'lucide-react';
+import { BookOpen, ChevronRight, Database, Eye, HardDrive, Home, Image, LogIn, PlugZap, Save, Settings, ShieldCheck, Smartphone, SlidersHorizontal, Trash2, Type, Users, Wrench } from 'lucide-react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
+import TopToastNotice from '../components/TopToastNotice';
 import { useAuthStore } from '../stores/authStore';
 import { getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import PluginSurface from '../pluginHost/PluginSurface';
@@ -74,8 +75,6 @@ export default function Customization() {
   const [accessLogPurging, setAccessLogPurging] = useState(false);
   const [cacheStats, setCacheStats] = useState(null);
   const [cacheStatsLoading, setCacheStatsLoading] = useState(true);
-  const noticeTimer = useRef(null);
-  const saveNoticeTimer = useRef(null);
   const brandingSectionRef = useRef(null);
   const appOptionsSectionRef = useRef(null);
   const homeOptionsSectionRef = useRef(null);
@@ -97,21 +96,11 @@ export default function Customization() {
   }), []);
 
   const pushNotice = (type, message) => {
-    if (noticeTimer.current) clearTimeout(noticeTimer.current);
     setPageNotice({ type, message });
-    noticeTimer.current = setTimeout(() => {
-      setPageNotice(null);
-      noticeTimer.current = null;
-    }, 4500);
   };
 
   const pushSaveNotice = (type, message) => {
-    if (saveNoticeTimer.current) clearTimeout(saveNoticeTimer.current);
     setSaveNotice({ type, message });
-    saveNoticeTimer.current = setTimeout(() => {
-      setSaveNotice(null);
-      saveNoticeTimer.current = null;
-    }, 4500);
   };
 
   const openConfirm = (dialog) => setConfirmDialog(dialog);
@@ -243,10 +232,6 @@ export default function Customization() {
   useEffect(() => {
     loadBranding();
     loadCacheStats();
-    return () => {
-      if (noticeTimer.current) clearTimeout(noticeTimer.current);
-      if (saveNoticeTimer.current) clearTimeout(saveNoticeTimer.current);
-    };
   }, []);
 
   useEffect(() => {
@@ -369,15 +354,9 @@ export default function Customization() {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.common.changeStatus}</p>
-          {saveNotice ? (
-            <p className={`text-xs font-medium ${saveNotice.type === 'error' ? 'text-red-600' : 'text-accent-dark'}`}>
-              {saveNotice.message}
-            </p>
-          ) : (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {isDirty ? ui.common.unsavedChanges : ui.common.noPendingChanges}
-            </p>
-          )}
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {isDirty ? ui.common.unsavedChanges : ui.common.noPendingChanges}
+          </p>
         </div>
         <button
           type="button"
@@ -401,22 +380,19 @@ export default function Customization() {
         </div>
       </div>
 
-      {pageNotice && (
-        <div
-          className={`mb-8 flex items-start gap-3 rounded-2xl border px-4 py-3 ${
-            pageNotice.type === 'error'
-              ? 'border-red-200 bg-red-50 text-red-700'
-              : 'border-accent/30 bg-accent/10 text-dark dark:text-gray-100'
-          }`}
-        >
-          {pageNotice.type === 'error' ? (
-            <AlertCircle className="mt-0.5 w-5 h-5 shrink-0" />
-          ) : (
-            <CheckCircle2 className="mt-0.5 w-5 h-5 shrink-0" />
-          )}
-          <div className="text-sm font-medium">{pageNotice.message}</div>
-        </div>
-      )}
+      <TopToastNotice
+        notice={pageNotice}
+        onClose={() => setPageNotice(null)}
+        closeLabel={ui.common.closeNotice}
+        positionClassName="top-4 sm:top-6"
+      />
+
+      <TopToastNotice
+        notice={saveNotice}
+        onClose={() => setSaveNotice(null)}
+        closeLabel={ui.common.closeNotice}
+        positionClassName="top-4 sm:top-6"
+      />
 
       <PluginSurface surface={PLUGIN_SURFACES.CUSTOMIZATION_PAGE_TOP} variant="stack" className="mb-8" />
 
@@ -1163,7 +1139,7 @@ export default function Customization() {
                   </div>
                   <RouterLink
                     to="/admin/backup"
-                    className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
+                    className="inline-flex w-full lg:w-[240px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
                   >
                     <Database className="h-4 w-4" />
                     {ui.customization.maintenance.openBackupRestore}
@@ -1171,30 +1147,32 @@ export default function Customization() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.maintenance.avatarCacheTitle}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.maintenance.avatarCacheHelp}</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                      {cacheStatsLoading ? ui.common.loading : `${cacheStats?.avatarCache?.files || 0} ${ui.customization.maintenance.cacheFiles} · ${formatBytes(cacheStats?.avatarCache?.bytes || 0)}`}
-                    </p>
-                  </div>
-                  <div className="flex items-start lg:shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => openConfirm({
-                        title: ui.customization.maintenance.refreshAvatarCacheConfirmTitle,
-                        message: ui.customization.maintenance.refreshAvatarCacheConfirmMessage,
-                        confirmLabel: ui.customization.maintenance.refreshAvatarCacheConfirmLabel,
-                        onConfirm: refreshAvatarCache,
-                      })}
-                      disabled={avatarRefreshing}
-                      className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      {avatarRefreshing ? ui.customization.maintenance.refreshAvatarCacheBusy : ui.customization.maintenance.refreshAvatarCache}
-                    </button>
+              <div className="pt-4 border-t border-dashed border-slate-200 dark:border-slate-700">
+                <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.maintenance.avatarCacheTitle}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.maintenance.avatarCacheHelp}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        {cacheStatsLoading ? ui.common.loading : `${cacheStats?.avatarCache?.files || 0} ${ui.customization.maintenance.cacheFiles} · ${formatBytes(cacheStats?.avatarCache?.bytes || 0)}`}
+                      </p>
+                    </div>
+                    <div className="flex items-start lg:shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => openConfirm({
+                          title: ui.customization.maintenance.refreshAvatarCacheConfirmTitle,
+                          message: ui.customization.maintenance.refreshAvatarCacheConfirmMessage,
+                          confirmLabel: ui.customization.maintenance.refreshAvatarCacheConfirmLabel,
+                          onConfirm: refreshAvatarCache,
+                        })}
+                        disabled={avatarRefreshing}
+                        className="inline-flex w-full lg:w-[240px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        {avatarRefreshing ? ui.customization.maintenance.refreshAvatarCacheBusy : ui.customization.maintenance.refreshAvatarCache}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1228,7 +1206,7 @@ export default function Customization() {
                         onConfirm: cleanupAppIconCache,
                       })}
                       disabled={iconCacheCleaning}
-                      className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                      className="inline-flex w-full lg:w-[240px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
                     >
                       <Trash2 className="w-4 h-4" />
                       {iconCacheCleaning ? ui.customization.maintenance.refreshAppIconCacheBusy : ui.customization.maintenance.refreshAppIconCache}
@@ -1287,7 +1265,7 @@ export default function Customization() {
                               onConfirm: clearAccessLog,
                             })}
                             disabled={!isOwner || accessLogPurging}
-                            className="inline-flex min-w-[212px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                            className="inline-flex w-full lg:w-[240px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
                           >
                             <Trash2 className="w-4 h-4" />
                             {accessLogPurging ? ui.customization.maintenance.clearAccessLogBusy : ui.customization.maintenance.clearAccessLog}
