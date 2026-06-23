@@ -25,6 +25,7 @@ db.exec(`
     avatar_color TEXT,
     home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact')),
     preferred_language TEXT,
+    preferred_timezone TEXT,
     app_order TEXT,
     app_order_updated_at TEXT,
     favorite_apps TEXT,
@@ -32,6 +33,7 @@ db.exec(`
     home_tour_seen_at TEXT,
     is_active INTEGER DEFAULT 1,
     last_login TEXT,
+    last_activity_at TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );
@@ -65,6 +67,9 @@ db.exec(`
     default_home_desktop_view TEXT DEFAULT 'cards' CHECK(default_home_desktop_view IN ('cards', 'compact')),
     default_compact_view INTEGER DEFAULT 0,
     default_language TEXT DEFAULT 'en',
+    default_timezone TEXT DEFAULT 'UTC',
+    default_color_scheme TEXT DEFAULT 'light' CHECK(default_color_scheme IN ('light', 'dark', 'auto')),
+    enable_dark_mode_beta INTEGER DEFAULT 0,
     use_european_date_format INTEGER DEFAULT 0,
     log_retention_days INTEGER DEFAULT 90,
     hide_login_page INTEGER DEFAULT 0,
@@ -227,16 +232,19 @@ ensureColumn('user_groups', 'entra_synced_at', 'entra_synced_at TEXT');
 ensureColumn('apps', 'icon_file_name', 'icon_file_name TEXT');
 ensureColumn('users', 'home_desktop_view', "home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact'))");
 ensureColumn('users', 'preferred_language', 'preferred_language TEXT');
+ensureColumn('users', 'preferred_timezone', 'preferred_timezone TEXT');
 ensureColumn('users', 'preferred_color_scheme', "preferred_color_scheme TEXT CHECK(preferred_color_scheme IN ('light', 'dark', 'auto'))");
 ensureColumn('users', 'app_order', 'app_order TEXT');
 ensureColumn('users', 'app_order_updated_at', 'app_order_updated_at TEXT');
 ensureColumn('users', 'favorite_apps', 'favorite_apps TEXT');
 ensureColumn('users', 'favorite_apps_updated_at', 'favorite_apps_updated_at TEXT');
 ensureColumn('users', 'home_tour_seen_at', 'home_tour_seen_at TEXT');
+ensureColumn('users', 'last_activity_at', 'last_activity_at TEXT');
 ensureColumn('branding_settings', 'show_app_mode_badges', 'show_app_mode_badges INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'default_home_desktop_view', "default_home_desktop_view TEXT DEFAULT 'cards' CHECK(default_home_desktop_view IN ('cards', 'compact'))");
 ensureColumn('branding_settings', 'default_compact_view', 'default_compact_view INTEGER DEFAULT 0');
 ensureColumn('branding_settings', 'default_language', `default_language TEXT DEFAULT '${DEFAULT_LANGUAGE}'`);
+ensureColumn('branding_settings', 'default_timezone', "default_timezone TEXT DEFAULT 'UTC'");
 ensureColumn('branding_settings', 'use_european_date_format', 'use_european_date_format INTEGER DEFAULT 0');
 ensureColumn('branding_settings', 'use_24h_time_format', 'use_24h_time_format INTEGER DEFAULT 0');
 ensureColumn('branding_settings', 'log_retention_days', 'log_retention_days INTEGER DEFAULT 90');
@@ -298,6 +306,7 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         avatar_color TEXT,
         home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact')),
         preferred_language TEXT,
+        preferred_timezone TEXT,
         preferred_color_scheme TEXT CHECK(preferred_color_scheme IN ('light', 'dark', 'auto')),
         app_order TEXT,
         app_order_updated_at TEXT,
@@ -306,12 +315,13 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         home_tour_seen_at TEXT,
         is_active INTEGER DEFAULT 1,
         last_login TEXT,
+        last_activity_at TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       );
-      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at, is_active, last_login, created_at, updated_at)
+      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at, is_active, last_login, last_activity_at, created_at, updated_at)
       SELECT id, email, display_name, microsoft_id, ${normalizeRoleSql},
-        avatar_color, COALESCE(home_desktop_view, 'cards'), preferred_language, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at, is_active, last_login, created_at, updated_at
+        avatar_color, COALESCE(home_desktop_view, 'cards'), preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at, is_active, last_login, last_login, created_at, updated_at
       FROM users;
       DROP TABLE users;
       ALTER TABLE users_new RENAME TO users;
@@ -349,6 +359,7 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         avatar_color TEXT,
         home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact')),
         preferred_language TEXT,
+        preferred_timezone TEXT,
         preferred_color_scheme TEXT CHECK(preferred_color_scheme IN ('light', 'dark', 'auto')),
         app_order TEXT,
         app_order_updated_at TEXT,
@@ -357,11 +368,12 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         home_tour_seen_at TEXT,
         is_active INTEGER DEFAULT 1,
         last_login TEXT,
+        last_activity_at TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       );
-      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, last_login, created_at, updated_at)
-      SELECT id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, last_login, created_at, updated_at
+      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, last_login, last_activity_at, created_at, updated_at)
+      SELECT id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, last_login, last_login, created_at, updated_at
       FROM users;
       DROP TABLE users;
       ALTER TABLE users_new RENAME TO users;
@@ -383,6 +395,9 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         default_home_desktop_view TEXT DEFAULT 'cards' CHECK(default_home_desktop_view IN ('cards', 'compact')),
         default_compact_view INTEGER DEFAULT 0,
         default_language TEXT DEFAULT '${DEFAULT_LANGUAGE}',
+        default_timezone TEXT DEFAULT 'UTC',
+        default_color_scheme TEXT DEFAULT 'light' CHECK(default_color_scheme IN ('light', 'dark', 'auto')),
+        enable_dark_mode_beta INTEGER DEFAULT 0,
         use_european_date_format INTEGER DEFAULT 0,
         use_24h_time_format INTEGER DEFAULT 0,
         log_retention_days INTEGER DEFAULT 90,
@@ -396,8 +411,8 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       );
-      INSERT INTO branding_settings_new (id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, plugins_enabled, logo_file_name, logo_content_type, created_at, updated_at)
-      SELECT id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, COALESCE(plugins_enabled, 0), logo_file_name, logo_content_type, created_at, updated_at
+      INSERT INTO branding_settings_new (id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, default_timezone, default_color_scheme, enable_dark_mode_beta, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, plugins_enabled, logo_file_name, logo_content_type, created_at, updated_at)
+      SELECT id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, default_timezone, default_color_scheme, COALESCE(enable_dark_mode_beta, 0), use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, COALESCE(plugins_enabled, 0), logo_file_name, logo_content_type, created_at, updated_at
       FROM branding_settings;
       DROP TABLE branding_settings;
       ALTER TABLE branding_settings_new RENAME TO branding_settings;
@@ -468,6 +483,7 @@ db.exec('UPDATE branding_settings SET show_app_mode_badges = COALESCE(show_app_m
 db.exec("UPDATE branding_settings SET default_home_desktop_view = COALESCE(default_home_desktop_view, 'cards')");
 db.exec('UPDATE branding_settings SET default_compact_view = COALESCE(default_compact_view, 0)');
 db.exec(`UPDATE branding_settings SET default_language = COALESCE(default_language, '${DEFAULT_LANGUAGE}')`);
+db.exec("UPDATE branding_settings SET default_timezone = COALESCE(default_timezone, 'UTC')");
 db.exec('UPDATE branding_settings SET use_european_date_format = COALESCE(use_european_date_format, 0)');
 db.exec('UPDATE branding_settings SET use_24h_time_format = COALESCE(use_24h_time_format, 0)');
 db.exec('UPDATE branding_settings SET log_retention_days = COALESCE(log_retention_days, 90)');
@@ -478,6 +494,7 @@ db.exec('UPDATE branding_settings SET show_shared_cookie_mode = COALESCE(show_sh
 db.exec('UPDATE branding_settings SET show_redirect_sso_mode = COALESCE(show_redirect_sso_mode, 1)');
 db.exec('UPDATE branding_settings SET show_entra_app_mode = COALESCE(show_entra_app_mode, 1)');
 db.exec('UPDATE branding_settings SET plugins_enabled = COALESCE(plugins_enabled, 0)');
+db.exec("UPDATE users SET last_activity_at = COALESCE(last_activity_at, last_login, updated_at)");
 
 db.exec("UPDATE user_groups SET source = 'local' WHERE source IS NULL OR source NOT IN ('local', 'entra');");
 db.exec("CREATE INDEX IF NOT EXISTS idx_user_groups_source ON user_groups(source);");
@@ -498,9 +515,9 @@ db.exec(`
 
 db.prepare(`
   INSERT OR IGNORE INTO branding_settings (
-    id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, plugins_enabled, logo_file_name, logo_content_type
+    id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, default_timezone, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, plugins_enabled, logo_file_name, logo_content_type
   )
-  VALUES (?, ?, ?, ?, 1, 0, 1, 'cards', 0, 'en', 0, 0, 90, 0, 1, 1, 1, 0, NULL, NULL)
+  VALUES (?, ?, ?, ?, 1, 0, 1, 'cards', 0, 'en', 'UTC', 0, 0, 90, 0, 1, 1, 1, 0, NULL, NULL)
 `).run(
   'default',
   'Your apps,',

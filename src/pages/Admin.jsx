@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Pencil, Trash2, X, RotateCcw, Save, Copy, Users, ChevronDown, ChevronUp, Check, SlidersHorizontal, Tag } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Save, Copy, Users, ChevronDown, ChevronUp, Check, Filter, Settings, Tag } from 'lucide-react';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
@@ -9,6 +9,8 @@ import PageNotice from '../components/PageNotice';
 import TopToastNotice from '../components/TopToastNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
+import DropdownSelect from '../components/DropdownSelect';
+import PaginationControls from '../components/PaginationControls';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { normalizeEntraApplicationId } from '../../shared/entra.js';
 import { normalizeAppSlug, suggestAppSlug } from '../../shared/appSlug.js';
@@ -31,7 +33,6 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [restoringDefaults, setRestoringDefaults] = useState(false);
   const [iconMode, setIconMode] = useState('emoji');
   const [iconAssetDataUrl, setIconAssetDataUrl] = useState('');
   const [iconAssetPreview, setIconAssetPreview] = useState('');
@@ -53,6 +54,8 @@ export default function Admin() {
   const [selectedTagFilters, setSelectedTagFilters] = useState([]);
   const [tagFilterSearch, setTagFilterSearch] = useState('');
   const [appSort, setAppSort] = useState({ key: 'sort_order', direction: 'asc' });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [pageNotice, setPageNotice] = useState(null);
   const [appSaveNotice, setAppSaveNotice] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
@@ -62,6 +65,8 @@ export default function Admin() {
   const slugAutoFillRef = useRef(false);
   const modeFilterRef = useRef(null);
   const tagFilterRef = useRef(null);
+  const tagFilterSearchRef = useRef(null);
+  const tagFilterItemRefs = useRef([]);
   const canEdit = user?.role !== 'admin_readonly';
   const [brandingLanguage, setBrandingLanguage] = useState('en');
   const filterButtonMinWidth = 'min-w-[260px]';
@@ -570,33 +575,6 @@ export default function Admin() {
     }
   };
 
-  const handleRestoreDefaults = async () => {
-    if (!canEdit) {
-      pushNotice('error', t.readOnly);
-      return;
-    }
-    openConfirm({
-      title: a.restoreDemoTitle,
-      message: a.restoreDemoMessage,
-      confirmLabel: a.restoreDemoConfirm,
-      onConfirm: async () => {
-        setRestoringDefaults(true);
-        try {
-          const res = await api.post('/apps/restore-defaults');
-          loadApps();
-          pushNotice(
-            'success',
-            `${a.restoreDemoSuccess}. ${a.restoreDemoSummary.replace('{created}', res.data.created).replace('{updated}', res.data.updated)}`
-          );
-        } catch (err) {
-          pushNotice('error', err.response?.data?.error || t.errorSaving);
-        } finally {
-          setRestoringDefaults(false);
-        }
-      },
-    });
-  };
-
   const groupLabel = (group) => group.entra_display_name || group.name;
   const groupMatchesSearch = (group) => {
     if (!groupAssignSearch.trim()) return true;
@@ -648,6 +626,9 @@ export default function Admin() {
   const currentModeFilterOption = visibleModeFilterOptions.find((opt) => opt.value === appModeFilter) || visibleModeFilterOptions[0];
   const hasTagFilters = selectedTagFilters.length > 0;
   const currentModeOption = modeOptions.find((opt) => opt.value === form.mode);
+  useEffect(() => {
+    setPage(1);
+  }, [appSearch, appModeFilter, showOnlyOrphanApps, selectedTagFilters, appSort, pageSize]);
   const handleModeChange = (nextMode) => {
     if (nextMode === 'entra-app') {
       setForm((prev) => ({
@@ -677,6 +658,54 @@ export default function Admin() {
     if (!q) return allTags;
     return allTags.filter((tag) => tag.includes(q));
   }, [allTags, tagFilterSearch]);
+  const tagFilterOptionCount = (hasTagFilters ? 1 : 0) + 2 + filteredTags.length;
+  const focusTagFilterItem = (index) => {
+    tagFilterItemRefs.current[index]?.focus?.();
+  };
+  const handleTagFilterSearchKeyDown = (event) => {
+    if (tagFilterOptionCount === 0) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      focusTagFilterItem(0);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      focusTagFilterItem(Math.max(0, tagFilterOptionCount - 1));
+      return;
+    }
+    if (event.key === 'Home') {
+      event.preventDefault();
+      focusTagFilterItem(0);
+      return;
+    }
+    if (event.key === 'End') {
+      event.preventDefault();
+      focusTagFilterItem(Math.max(0, tagFilterOptionCount - 1));
+    }
+  };
+  const handleTagFilterItemKeyDown = (event, index) => {
+    if (tagFilterOptionCount === 0) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      focusTagFilterItem((index + 1) % tagFilterOptionCount);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      focusTagFilterItem((index - 1 + tagFilterOptionCount) % tagFilterOptionCount);
+      return;
+    }
+    if (event.key === 'Home') {
+      event.preventDefault();
+      focusTagFilterItem(0);
+      return;
+    }
+    if (event.key === 'End') {
+      event.preventDefault();
+      focusTagFilterItem(Math.max(0, tagFilterOptionCount - 1));
+    }
+  };
   const filteredApps = useMemo(() => {
     const q = appSearch.toLowerCase().trim();
     const filtered = apps.filter((app) => {
@@ -738,6 +767,15 @@ export default function Admin() {
       return result * direction;
     });
   }, [apps, appSearch, appModeFilter, appSort, showOnlyOrphanApps, selectedTagFilters]);
+  const pagination = useMemo(() => ({
+    page,
+    pages: Math.max(1, Math.ceil(filteredApps.length / pageSize)),
+    total: filteredApps.length,
+  }), [filteredApps.length, page, pageSize]);
+  const paginatedApps = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredApps.slice(start, start + pageSize);
+  }, [filteredApps, page, pageSize]);
   const orphanApps = useMemo(
     () => apps.filter((app) => Number(app.group_count || 0) === 0),
     [apps],
@@ -748,6 +786,12 @@ export default function Admin() {
       setShowOnlyOrphanApps(false);
     }
   }, [showOnlyOrphanApps, orphanApps.length]);
+
+  useEffect(() => {
+    if (page > pagination.pages) {
+      setPage(pagination.pages);
+    }
+  }, [page, pagination.pages]);
 
   const openGroupAssignmentModal = (app, selectedIds = [], defaultIncluded = false, allowNoChanges = false) => {
     const normalizedSelectedIds = [...new Set(selectedIds.filter(Boolean))];
@@ -909,7 +953,7 @@ export default function Admin() {
               onClick={() => setModeFilterOpen((prev) => !prev)}
             className={`relative inline-flex h-12 items-center w-full ${filterButtonMinWidth} pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-left text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900`}
             >
-              <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <Settings className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
               <span className="flex min-w-0 flex-1 items-center gap-1">
                 <span className="shrink-0 text-gray-400 dark:text-gray-500">{a.modeFilterShort}:</span>
                 <span className="truncate">{currentModeFilterOption.label}</span>
@@ -986,6 +1030,8 @@ export default function Admin() {
                     clearLabel={ui.common.clearSearch}
                     inputClassName="text-sm"
                     autoFocus
+                    inputRef={tagFilterSearchRef}
+                    onKeyDown={handleTagFilterSearchKeyDown}
                   />
                 </div>
                 <div className="max-h-72 overflow-auto py-1">
@@ -993,6 +1039,8 @@ export default function Admin() {
                     <button
                       type="button"
                       onClick={() => setSelectedTagFilters([])}
+                      ref={(node) => { tagFilterItemRefs.current[0] = node; }}
+                      onKeyDown={(event) => handleTagFilterItemKeyDown(event, 0)}
                       className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors text-violet-700 dark:text-violet-200 hover:bg-violet-50 dark:hover:bg-violet-950/30"
                     >
                       <span className="flex h-4 w-4 items-center justify-center rounded border border-violet-300 bg-violet-100 text-violet-700 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-100" aria-hidden="true">
@@ -1004,6 +1052,8 @@ export default function Admin() {
                   <button
                     type="button"
                     onClick={() => setSelectedTagFilters([])}
+                    ref={(node) => { tagFilterItemRefs.current[hasTagFilters ? 1 : 0] = node; }}
+                    onKeyDown={(event) => handleTagFilterItemKeyDown(event, hasTagFilters ? 1 : 0)}
                     className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
                       !hasTagFilters
                         ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100'
@@ -1023,6 +1073,8 @@ export default function Admin() {
                   <button
                     type="button"
                     onClick={() => toggleTagFilter(UNLABELED_TAG_FILTER)}
+                    ref={(node) => { tagFilterItemRefs.current[hasTagFilters ? 2 : 1] = node; }}
+                    onKeyDown={(event) => handleTagFilterItemKeyDown(event, hasTagFilters ? 2 : 1)}
                     className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
                       selectedTagFilters.includes(UNLABELED_TAG_FILTER)
                         ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100'
@@ -1046,13 +1098,16 @@ export default function Admin() {
                     <div className="px-4 py-3 text-sm text-gray-400 dark:text-gray-500">
                       {a.noTagFilterMatches}
                     </div>
-                  ) : filteredTags.map((tag) => {
+                  ) : filteredTags.map((tag, tagIndex) => {
                     const selected = selectedTagFilters.includes(tag);
+                    const index = (hasTagFilters ? 3 : 2) + tagIndex;
                     return (
                       <button
                         key={tag}
                         type="button"
                         onClick={() => toggleTagFilter(tag)}
+                        ref={(node) => { tagFilterItemRefs.current[index] = node; }}
+                        onKeyDown={(event) => handleTagFilterItemKeyDown(event, index)}
                         className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
                           selected
                             ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100'
@@ -1075,6 +1130,19 @@ export default function Admin() {
               </div>
             )}
           </div>
+          <DropdownSelect
+            value={pageSize}
+            onChange={(next) => setPageSize(parseInt(next, 10))}
+            label={ui.admin.logs.rows}
+            icon={Filter}
+            options={[
+              { value: 25, label: '25' },
+              { value: 50, label: '50' },
+              { value: 100, label: '100' },
+              { value: 150, label: '150' },
+            ]}
+            className="min-w-[150px]"
+          />
           <div className="text-xs text-gray-400 dark:text-gray-500">
             {filteredApps.length} {ui.nav.apps.toLowerCase()} {t.of} {apps.length}
           </div>
@@ -1090,6 +1158,18 @@ export default function Admin() {
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+          <PaginationControls
+            page={pagination.page}
+            pages={pagination.pages}
+            total={pagination.total}
+            summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} ${ui.nav.apps.toLowerCase()}`}
+            previousLabel={ui.common.previous}
+            nextLabel={ui.common.next}
+            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+            onNext={() => setPage((current) => Math.min(pagination.pages, current + 1))}
+            variant="attached-top"
+            className="mt-0 bg-white dark:bg-gray-900"
+          />
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100 dark:border-gray-800">
@@ -1122,7 +1202,7 @@ export default function Admin() {
               </tr>
             </thead>
             <tbody>
-              {filteredApps.map((app) => (
+              {paginatedApps.map((app) => (
                 <tr key={app.id} className="border-b border-gray-100 dark:border-gray-800 transition-colors hover:bg-gray-50/90 dark:hover:bg-gray-800/55">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -1198,16 +1278,18 @@ export default function Admin() {
               ))}
             </tbody>
           </table>
-          <div className="flex justify-end px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-950/50">
-            <button
-              onClick={handleRestoreDefaults}
-              disabled={restoringDefaults || !canEdit}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 text-xs font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <RotateCcw className={`w-3.5 h-3.5 ${restoringDefaults ? 'animate-spin' : ''}`} />
-              {ui.admin.apps.restoreDemoApps}
-            </button>
-          </div>
+          <PaginationControls
+            page={pagination.page}
+            pages={pagination.pages}
+            total={pagination.total}
+            summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} ${ui.nav.apps.toLowerCase()}`}
+            previousLabel={ui.common.previous}
+            nextLabel={ui.common.next}
+            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+            onNext={() => setPage((current) => Math.min(pagination.pages, current + 1))}
+            variant="attached-bottom"
+            className="mt-0 bg-white dark:bg-gray-900"
+          />
         </div>
       )}
 

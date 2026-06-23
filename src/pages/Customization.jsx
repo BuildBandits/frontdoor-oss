@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, ChevronRight, Database, Eye, HardDrive, Home, Image, LogIn, PlugZap, Save, Settings, ShieldCheck, Smartphone, SlidersHorizontal, Trash2, Type, Users, Wrench } from 'lucide-react';
+import { BookOpen, ChevronRight, Database, Eye, HardDrive, Home, Image, LogIn, PlugZap, RotateCcw, Save, Settings, ShieldCheck, Smartphone, SlidersHorizontal, Trash2, Type, Users, Wrench } from 'lucide-react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import TopToastNotice from '../components/TopToastNotice';
 import { useAuthStore } from '../stores/authStore';
 import { getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { getSupportedTimeZoneOptions, normalizeTimeZone } from '../../shared/timeZones.js';
 import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
 
@@ -19,8 +20,8 @@ const emptyBranding = {
   defaultHomeDesktopView: 'cards',
   defaultCompactView: false,
   defaultLanguage: 'en',
+  defaultTimeZone: 'UTC',
   defaultColorScheme: 'light',
-  enableDarkModeBeta: false,
   useEuropeanDateFormat: false,
   use24hTimeFormat: false,
   logRetentionDays: 90,
@@ -41,8 +42,8 @@ const brandingKeys = [
   'defaultHomeDesktopView',
   'defaultCompactView',
   'defaultLanguage',
+  'defaultTimeZone',
   'defaultColorScheme',
-  'enableDarkModeBeta',
   'useEuropeanDateFormat',
   'use24hTimeFormat',
   'logRetentionDays',
@@ -73,8 +74,10 @@ export default function Customization() {
   const [avatarRefreshing, setAvatarRefreshing] = useState(false);
   const [iconCacheCleaning, setIconCacheCleaning] = useState(false);
   const [accessLogPurging, setAccessLogPurging] = useState(false);
+  const [databaseCompacting, setDatabaseCompacting] = useState(false);
   const [cacheStats, setCacheStats] = useState(null);
   const [cacheStatsLoading, setCacheStatsLoading] = useState(true);
+  const [restoringDemoApps, setRestoringDemoApps] = useState(false);
   const brandingSectionRef = useRef(null);
   const appOptionsSectionRef = useRef(null);
   const homeOptionsSectionRef = useRef(null);
@@ -85,6 +88,8 @@ export default function Customization() {
   const brandingLogoInputRef = useRef(null);
   const ui = useMemo(() => getUiStrings(uiLanguage), [uiLanguage]);
   const languageOptions = useMemo(() => getSupportedLanguageOptions(ui), [ui]);
+  const timeZoneOptions = useMemo(() => getSupportedTimeZoneOptions(), []);
+  const selectClassName = 'flex-none w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent lg:w-[288px] shrink-0';
   const sectionRefs = useMemo(() => ({
     login: homeOptionsSectionRef,
     home: brandingSectionRef,
@@ -166,6 +171,7 @@ export default function Customization() {
       databaseDbBytes: cacheStats?.database?.dbBytes || 0,
       databaseWalBytes: cacheStats?.database?.walBytes || 0,
       databaseShmBytes: cacheStats?.database?.shmBytes || 0,
+      databaseReclaimableBytes: cacheStats?.database?.reclaimableBytes || 0,
       avatarCacheBytes,
       appIconCacheBytes,
       totalBytes,
@@ -229,6 +235,50 @@ export default function Customization() {
     setAccessLogPurging(false);
   };
 
+  const compactDatabaseStorage = async () => {
+    setDatabaseCompacting(true);
+    try {
+      const res = await api.post('/branding/database/compact');
+      loadCacheStats();
+      const reclaimedBytes = res.data?.reclaimedBytes || 0;
+      const reclaimedMessage = reclaimedBytes
+        ? ui.customization.maintenance.databaseCompactedWithCount
+            .replace('{bytes}', formatBytes(reclaimedBytes))
+            .replace('{pages}', String(res.data?.reclaimedPages || 0))
+        : ui.customization.maintenance.databaseCompacted;
+      pushSaveNotice('success', `${reclaimedMessage}. ${ui.customization.maintenance.databaseCompactionReloadNotice}`);
+    } catch (err) {
+      pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorSaving);
+    }
+    setDatabaseCompacting(false);
+  };
+
+  const restoreDemoApps = () => {
+    if (user?.role === 'admin_readonly') {
+      pushNotice('error', ui.admin.apps.readOnly);
+      return;
+    }
+    openConfirm({
+      title: ui.admin.apps.restoreDemoTitle,
+      message: ui.admin.apps.restoreDemoMessage,
+      confirmLabel: ui.admin.apps.restoreDemoConfirm,
+      onConfirm: async () => {
+        setRestoringDemoApps(true);
+        try {
+          const res = await api.post('/apps/restore-defaults');
+          pushSaveNotice(
+            'success',
+            `${ui.admin.apps.restoreDemoSuccess}. ${ui.admin.apps.restoreDemoSummary.replace('{created}', res.data.created).replace('{updated}', res.data.updated)}`
+          );
+        } catch (err) {
+          pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorSaving);
+        } finally {
+          setRestoringDemoApps(false);
+        }
+      },
+    });
+  };
+
   useEffect(() => {
     loadBranding();
     loadCacheStats();
@@ -274,8 +324,8 @@ export default function Customization() {
         defaultHomeDesktopView: branding.defaultHomeDesktopView,
         defaultCompactView: branding.defaultCompactView,
         defaultLanguage: branding.defaultLanguage,
+        defaultTimeZone: branding.defaultTimeZone,
         defaultColorScheme: branding.defaultColorScheme,
-        enableDarkModeBeta: branding.enableDarkModeBeta,
         useEuropeanDateFormat: branding.useEuropeanDateFormat,
         use24hTimeFormat: branding.use24hTimeFormat,
         logRetentionDays: branding.logRetentionDays,
@@ -689,7 +739,7 @@ export default function Customization() {
                       id="home-desktop-view"
                       value={branding.defaultHomeDesktopView}
                       onChange={(e) => setBranding({ ...branding, defaultHomeDesktopView: e.target.value })}
-                      className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent lg:w-72 disabled:opacity-60"
+                      className={selectClassName}
                     >
                       <option value="cards">{ui.customization.home.cards}</option>
                       <option value="compact">{ui.customization.home.compact}</option>
@@ -767,6 +817,24 @@ export default function Customization() {
               </label>
             </div>
 
+            <div className="mt-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.admin.apps.restoreDemoApps}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.admin.apps.restoreDemoMessage}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={restoreDemoApps}
+                  disabled={restoringDemoApps || user?.role === 'admin_readonly'}
+                  className="inline-flex w-full lg:w-[240px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                >
+                  <RotateCcw className={`w-4 h-4 ${restoringDemoApps ? 'animate-spin' : ''}`} />
+                  {restoringDemoApps ? ui.common.saving : ui.admin.apps.restoreDemoApps}
+                </button>
+              </div>
+            </div>
+
             {renderSaveStatusBar('app')}
           </section>
 
@@ -791,7 +859,7 @@ export default function Customization() {
                   <select
                     value={branding.defaultLanguage || 'en'}
                     onChange={(e) => setBranding({ ...branding, defaultLanguage: normalizeLanguage(e.target.value) })}
-                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent lg:w-72"
+                    className={selectClassName}
                   >
                     {languageOptions.map((language) => (
                       <option key={language.code} value={language.code}>{language.label}</option>
@@ -800,26 +868,26 @@ export default function Customization() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-amber-200 dark:border-amber-800/55 bg-amber-50/70 dark:bg-amber-950/25 px-4 py-3 space-y-3">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={branding.enableDarkModeBeta === true}
-                    onChange={(e) => setBranding({ ...branding, enableDarkModeBeta: e.target.checked })}
-                    className="mt-1 rounded border-amber-300 dark:border-amber-700 text-amber-600 focus:ring-amber-400"
-                  />
-                  <span className="min-w-0">
-                    <span className="inline-flex items-center gap-2 text-sm font-semibold text-dark dark:text-gray-100">
-                      {ui.customization.preferences.darkModeBetaTitle}
-                      <span className="inline-flex items-center rounded-full bg-amber-200 dark:bg-amber-900/55 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-200">
-                        {ui.customization.preferences.betaBadge}
-                      </span>
-                    </span>
-                    <span className="block text-xs text-gray-600 dark:text-gray-400 mt-1">{ui.customization.preferences.darkModeBetaHelp}</span>
-                  </span>
-                </label>
+              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.preferences.timeZoneTitle}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.preferences.timeZoneHelp}</p>
+                  </div>
+                  <select
+                    value={normalizeTimeZone(branding.defaultTimeZone, 'UTC')}
+                    onChange={(e) => setBranding({ ...branding, defaultTimeZone: normalizeTimeZone(e.target.value, 'UTC') })}
+                    className={selectClassName}
+                  >
+                    {timeZoneOptions.map((timeZone) => (
+                      <option key={timeZone.code} value={timeZone.code}>{timeZone.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-                <div className={`flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between rounded-xl border border-amber-100 dark:border-amber-900/40 bg-white/70 dark:bg-gray-900/60 px-4 py-3 transition-opacity ${branding.enableDarkModeBeta ? '' : 'opacity-50 pointer-events-none'}`}>
+              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.preferences.colorSchemeTitle}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.preferences.colorSchemeHelp}</p>
@@ -827,8 +895,7 @@ export default function Customization() {
                   <select
                     value={branding.defaultColorScheme || 'light'}
                     onChange={(e) => setBranding({ ...branding, defaultColorScheme: e.target.value })}
-                    disabled={!branding.enableDarkModeBeta}
-                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent lg:w-72 disabled:cursor-not-allowed"
+                    className={selectClassName}
                   >
                     <option value="light">{ui.customization.preferences.colorSchemeLight}</option>
                     <option value="dark">{ui.customization.preferences.colorSchemeDark}</option>
@@ -932,7 +999,7 @@ export default function Customization() {
                     value={branding.pluginsEnabled === true ? 'on' : 'off'}
                     disabled
                     onChange={(e) => setBranding({ ...branding, pluginsEnabled: e.target.value === 'on' })}
-                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent lg:w-72 disabled:cursor-not-allowed"
+                    className={`${selectClassName} disabled:cursor-not-allowed`}
                   >
                     <option value="off">{ui.customization.plugins.killSwitchOff}</option>
                     <option value="on">{ui.customization.plugins.killSwitchOn}</option>
@@ -1097,6 +1164,11 @@ export default function Customization() {
                         ? ui.common.loading
                         : `DB ${formatBytes(storageSnapshot.databaseDbBytes)} · WAL ${formatBytes(storageSnapshot.databaseWalBytes)} · SHM ${formatBytes(storageSnapshot.databaseShmBytes)}`}
                     </p>
+                    <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                      {cacheStatsLoading
+                        ? ui.common.loading
+                        : `${formatBytes(storageSnapshot.databaseReclaimableBytes)} ${ui.customization.maintenance.storageReclaimableLabel}`}
+                    </p>
                   </div>
 
                   <div className="relative overflow-hidden rounded-xl border border-amber-100 dark:border-amber-900/40 bg-white/80 dark:bg-gray-900/80 px-3 py-3">
@@ -1141,9 +1213,39 @@ export default function Customization() {
                     to="/admin/backup"
                     className="inline-flex w-full lg:w-[240px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
                   >
-                    <Database className="h-4 w-4" />
+                    <Save className="h-4 w-4" />
                     {ui.customization.maintenance.openBackupRestore}
                   </RouterLink>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.maintenance.databaseCompactionTitle}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.maintenance.databaseCompactionHelp}</p>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                      {cacheStatsLoading
+                        ? ui.common.loading
+                        : `${formatBytes(storageSnapshot.databaseReclaimableBytes)} ${ui.customization.maintenance.storageReclaimableLabel}`}
+                    </p>
+                  </div>
+                  <div className="flex items-start lg:shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openConfirm({
+                        title: ui.customization.maintenance.databaseCompactionConfirmTitle,
+                        message: ui.customization.maintenance.databaseCompactionConfirmMessage,
+                        confirmLabel: ui.customization.maintenance.databaseCompactionConfirmLabel,
+                        onConfirm: compactDatabaseStorage,
+                      })}
+                      disabled={databaseCompacting}
+                      className="inline-flex w-full lg:w-[240px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      <Database className="w-4 h-4" />
+                      {databaseCompacting ? ui.customization.maintenance.databaseCompactionBusy : ui.customization.maintenance.databaseCompaction}
+                    </button>
+                  </div>
                 </div>
               </div>
 

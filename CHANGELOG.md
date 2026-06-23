@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- **CORS startup confirmation**: when `CORS_ALLOWED_ORIGINS` is set, the server now prints the allowlist in the startup config so container logs immediately show which origins were loaded.
+- **Pagination controls top and bottom**: the App, Users, Groups, Log and Audit lists now repeat the shared pager above the table or card list as well as below it, so moving between pages is quicker without scrolling all the way down.
+- **Cross-origin session checks**: Frontdoor can now expose credentialed CORS for an allowlist of origins via `CORS_ALLOWED_ORIGINS`, making it possible for satellite pages on sibling or external domains to call session endpoints like `GET /api/auth/me` with the `frontdoor_token` cookie.
+- **User last activity tracking**: the Users detail panel now separates `Last login` from `Last activity`, and the activity timestamp is refreshed only when the Home page is actually reached.
+- **Dropdown keyboard navigation**: the shared dropdowns and the App tag filter menu now accept arrow keys for moving between options, with the search field able to jump focus down into the checkbox list so you can toggle items without touching the mouse.
+- **Database space maintenance**: the Personalizza > Manutenzione panel now includes an owner-only SQLite compaction action that can reclaim free pages and truncate the WAL, with a live storage estimate and confirmation dialog.
+- **Admin list pagination**: the App, Users and Groups admin lists now page their visible rows with a shared control, so large production datasets no longer flood the screen all at once.
 - **User summary layout polish**: the Users detail card now keeps the favorites badge inline with the name and renders the personal settings as a compact label/value table, including the new parenthesized date format for saved favorites.
 - **Admin users preference summary**: the Users detail card now shows database-backed personalization data for each user, including home view, language, theme, custom app order status and the saved favorites count.
 - **Favorites persistence sync**: user favorites now live in the database alongside the other personal settings, existing browser bookmarks are migrated on the next Home load, and the account menu now shows a saved favorites badge with the persisted count and last save time.
@@ -27,7 +34,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Search shortcut hint**: the shared search field now exposes a visible `CTRL+K / ⌘K` hint and supports a global `Ctrl/Cmd+K` shortcut that focuses the primary search input on pages that have one.
 
 ### Changed
-- **Version bump**: Frontdoor is now on `1.2.8` for the current branch, reflecting the small-fix release cadence while this work lands.
+- **Demo apps restore placement**: the demo-app reimport action now lives in `Personalizza > App` instead of the App list footer, so the App pagination footer can stay visually identical to Audit and Log.
+- **Version bump**: Frontdoor is now on `1.2.8c` for the current branch, keeping the small-fix release cadence aligned with this work.
+- **Users personalization icon**: the Admin Users personalization filter now uses a wand-style icon, so the menu reads more like a customization control than a generic filter.
+- **Admin filter icons**: the new row filter selects on Admin Apps, Admin Users and Admin Groups now use the same funnel icon as Audit and Log, and the App page connections menu now uses the gear icon for a consistent admin chrome.
+- **Customization select alignment**: the preference dropdowns on Personalizza now share the same width, so language, time zone, home view, color scheme and plugin controls line up consistently across the page, and dark mode/theme is always available as a standard tenant row.
+- **Localization labels**: the language and time zone rows in Personalizza now use shorter labels, dropping the redundant product name from the title.
+- **Dropdown hotfix**: the keyboard navigation dropdown fix now keeps the render order safe, preventing the white-screen crash on pages that use the shared select component.
+- **Timestamp timezone alignment**: the remaining browser-rendered timestamps in Admin Users, Admin Apps, Admin Icons, Admin Plugin Audit, Admin Audit and Admin Logs now honor the container timezone too, and backup archive names are generated server-side with the same timezone.
+- **Favorites timezone fix**: saved favorites and custom-order timestamps now use the container timezone declared in `TZ`/`TIMEZONE`, so Europe/Rome is honored instead of the browser locale.
+- **Maintenance button polish**: the new database compaction action now aligns vertically with the other maintenance rows, and the backup shortcut uses a download icon to avoid repeating the database glyph.
+- **Maintenance icon polish**: the backup shortcut now uses a floppy-style save icon, which reads more naturally for backup/restore flows.
+- **Version bump**: Frontdoor is now on `1.2.8b` for the current branch, reflecting the small-fix release cadence while this work lands.
 - **Docker runtime hardening**: the container entrypoint now only repairs writable runtime paths before dropping privileges, instead of recursively chowning the whole app tree on every start.
 - **Security dependency refresh**: `@azure/msal-node`, `dompurify`, `express`, `react-router-dom`, and `uuid` were bumped, with transitive overrides for the vulnerable runtime chain where needed, and the lockfile was regenerated to match the new manifest.
 - **Tooltip behavior**: icon hints and card descriptions now use the in-app tooltip flow instead of the browser `title` bubble, so hover help appears immediately and stays visually consistent across the UI.
@@ -66,6 +84,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Plugin admin crash**: restored the missing `FileJson` import on the plugin admin page so `/admin/plugins` no longer crashes on load with `ReferenceError: FileJson is not defined`.
 
 ### Fixed
+- **Unused localization cleanup**: removed the dead `layout.beta` translation key now that the theme beta badge is no longer rendered anywhere in the UI.
 - **Users personalization filter**: hoisted the home view normalization helper so the new personalization filter no longer trips a render-time reference error when the filter branch is evaluated.
 - **Users filter spacing**: the Role and Status dropdowns on the Users page are now slightly narrower, leaving a bit more room for the search field.
 - **Users personalization filter**: the customization filter now compares each setting against the system default instead of counting any stored value, so accounts with default-equivalent settings are no longer misclassified.

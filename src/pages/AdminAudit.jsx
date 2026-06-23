@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, AlertCircle, Filter, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Filter, ShieldCheck } from 'lucide-react';
 import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
+import PaginationControls from '../components/PaginationControls';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatDateTimeWithTimeZone } from '../utils/dateTime';
+import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
 const PRIVILEGED_ROLES = new Set(['owner', 'admin', 'admin_readonly']);
 
@@ -22,15 +25,23 @@ export default function AdminAudit() {
   const [pageSize, setPageSize] = useState(50);
   const [selectedActorIds, setSelectedActorIds] = useState([]);
   const [brandingLanguage, setBrandingLanguage] = useState('en');
+  const [brandingTimeZone, setBrandingTimeZone] = useState('UTC');
+  const timeZone = resolveAppTimeZone(user?.preferredTimeZone, brandingTimeZone);
 
   useEffect(() => {
     let cancelled = false;
     api.get('/branding')
       .then((res) => {
-        if (!cancelled) setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+        if (!cancelled) {
+          setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+          setBrandingTimeZone(normalizeTimeZone(res.data?.branding?.defaultTimeZone, 'UTC'));
+        }
       })
       .catch(() => {
-        if (!cancelled) setBrandingLanguage('en');
+        if (!cancelled) {
+          setBrandingLanguage('en');
+          setBrandingTimeZone('UTC');
+        }
       });
     return () => {
       cancelled = true;
@@ -89,10 +100,22 @@ export default function AdminAudit() {
   const formatDate = (iso) => {
     if (!iso) return '-';
     try {
-      return new Date(iso).toLocaleDateString('it-IT', {
-        day: '2-digit', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
+      const formatted = formatDateTimeWithTimeZone(iso, {
+        locale: 'it-IT',
+        timeZone,
+        dateOptions: {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        },
+        timeOptions: {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        },
       });
+      if (!formatted) return iso;
+      return `${formatted.formattedDate} ${formatted.formattedTime}`;
     } catch {
       return iso;
     }
@@ -206,6 +229,17 @@ export default function AdminAudit() {
           </div>
         ) : (
           <>
+            <PaginationControls
+              page={pagination.page}
+              pages={pagination.pages}
+              total={pagination.total}
+              summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} eventi totali`}
+              previousLabel={ui.common.previous}
+              nextLabel={ui.common.next}
+              onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+              onNext={() => setPage((p) => Math.min(pagination.pages, p + 1))}
+              variant="attached-top"
+            />
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -259,29 +293,17 @@ export default function AdminAudit() {
               </table>
             </div>
 
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-gray-800">
-                <p className="text-xs text-gray-400 dark:text-gray-500">
-                  Pagina {pagination.page} di {pagination.pages} &middot; {pagination.total} eventi totali
-                </p>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={pagination.page <= 1}
-                    className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setPage((p) => Math.min(pagination.pages, p + 1))}
-                    disabled={pagination.page >= pagination.pages}
-                    className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
+            <PaginationControls
+              page={pagination.page}
+              pages={pagination.pages}
+              total={pagination.total}
+              summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} eventi totali`}
+              previousLabel={ui.common.previous}
+              nextLabel={ui.common.next}
+              onPrevious={() => setPage((p) => Math.max(1, p - 1))}
+              onNext={() => setPage((p) => Math.min(pagination.pages, p + 1))}
+              variant="attached-bottom"
+            />
           </>
         )}
       </div>

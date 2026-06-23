@@ -1,12 +1,12 @@
 import express from 'express';
 import db from '../db.js';
 import { authenticate, isOwner } from '../middleware/auth.js';
+import { getAppTimeZone } from '../config.js';
 import { iconUrlForApp } from '../services/appIcons.js';
 
 const router = express.Router();
 const PAGE_SIZES = [50, 100, 150, 200, 250];
 const RETENTION_DAYS = [1, 7, 14, 30, 60, 90];
-const APP_TIMEZONE = process.env.TIMEZONE || process.env.TZ || 'Europe/Rome';
 
 function normalizePage(value) {
   const page = parseInt(value, 10);
@@ -58,7 +58,7 @@ function formatTimestamp(value) {
   if (!parsed || Number.isNaN(parsed.getTime())) return value || null;
   try {
     return new Intl.DateTimeFormat('it-IT', {
-      timeZone: APP_TIMEZONE,
+      timeZone: getAppTimeZone(),
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -308,7 +308,7 @@ router.get('/top-apps', authenticate, isOwner, (req, res) => {
     iconUrl: iconUrlForApp(app),
   }));
 
-  res.json({ topApps, days, timeZone: APP_TIMEZONE });
+  res.json({ topApps, days, timeZone: getAppTimeZone() });
 });
 
 // List audit logs with pagination (owner only)

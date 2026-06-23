@@ -7,6 +7,8 @@ import ClearableSearchField from '../components/ClearableSearchField';
 import Tooltip from '../components/Tooltip';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatDateTimeWithTimeZone } from '../utils/dateTime';
+import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
 const KIND_ORDER = ['app-icon', 'branding-logo'];
 
@@ -40,6 +42,7 @@ export default function AdminIcons() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [brandingLanguage, setBrandingLanguage] = useState('en');
+  const [brandingTimeZone, setBrandingTimeZone] = useState('UTC');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [assets, setAssets] = useState([]);
@@ -58,10 +61,16 @@ export default function AdminIcons() {
     let cancelled = false;
     api.get('/branding')
       .then((res) => {
-        if (!cancelled) setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+        if (!cancelled) {
+          setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+          setBrandingTimeZone(normalizeTimeZone(res.data?.branding?.defaultTimeZone, 'UTC'));
+        }
       })
       .catch(() => {
-        if (!cancelled) setBrandingLanguage('en');
+        if (!cancelled) {
+          setBrandingLanguage('en');
+          setBrandingTimeZone('UTC');
+        }
       });
     return () => {
       cancelled = true;
@@ -69,6 +78,7 @@ export default function AdminIcons() {
   }, []);
 
   const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
+  const timeZone = resolveAppTimeZone(user?.preferredTimeZone, brandingTimeZone);
 
   const handleSearchChange = (value) => {
     setSearch(value);
@@ -235,13 +245,21 @@ export default function AdminIcons() {
   const formatDate = (iso) => {
     if (!iso) return '-';
     try {
-      return new Date(iso).toLocaleString(ui.common.dateLocale, {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
+      const formatted = formatDateTimeWithTimeZone(iso, {
+        locale: ui.common.dateLocale,
+        timeZone,
+        dateOptions: {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        },
+        timeOptions: {
+          hour: '2-digit',
+          minute: '2-digit',
+        },
       });
+      if (!formatted) return iso;
+      return `${formatted.formattedDate} ${formatted.formattedTime}`;
     } catch {
       return iso;
     }

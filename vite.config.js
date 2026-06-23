@@ -1,6 +1,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+
+function readPackageVersion() {
+  const packageJson = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'));
+  return `v${packageJson.version}`;
+}
 
 function buildTimestamp() {
   // Compact UTC timestamp like "20260415-1147" so it reads as a short version string.
@@ -28,6 +34,7 @@ export default defineConfig({
   plugins: [react()],
   root: '.',
   define: {
+    __APP_VERSION__: JSON.stringify(readPackageVersion()),
     __COMMIT_SHA__: JSON.stringify(resolveVersion()),
   },
   build: {

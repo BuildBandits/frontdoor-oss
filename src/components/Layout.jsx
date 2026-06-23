@@ -9,8 +9,10 @@ import UserAvatar from './UserAvatar';
 import Tooltip from './Tooltip';
 import api from '../services/api';
 import { getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { getSupportedTimeZoneOptions, normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
+import { formatDateTimeWithTimeZone } from '../utils/dateTime';
 import {
   HOME_TOUR_ACCOUNT_MENU_CLOSE_EVENT,
   HOME_TOUR_ACCOUNT_MENU_OPEN_EVENT,
@@ -36,12 +38,13 @@ export default function Layout({ children }) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [homeViewSaving, setHomeViewSaving] = useState(false);
   const [languageSaving, setLanguageSaving] = useState(false);
+  const [timeZoneSaving, setTimeZoneSaving] = useState(false);
   const [colorSchemeSaving, setColorSchemeSaving] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [defaultHomeDesktopView, setDefaultHomeDesktopView] = useState('cards');
   const [brandingLanguage, setBrandingLanguage] = useState('en');
+  const [brandingTimeZone, setBrandingTimeZone] = useState('UTC');
   const [brandingColorScheme, setBrandingColorScheme] = useState(DEFAULT_COLOR_SCHEME);
-  const [darkModeBetaEnabled, setDarkModeBetaEnabled] = useState(false);
   const [useEuropeanDateFormat, setUseEuropeanDateFormat] = useState(false);
   const [use24hTimeFormat, setUse24hTimeFormat] = useState(false);
   const [hideLoginPage, setHideLoginPage] = useState(false);
@@ -141,8 +144,8 @@ export default function Layout({ children }) {
         if (!cancelled) {
           setDefaultHomeDesktopView(res.data?.branding?.defaultHomeDesktopView === 'compact' ? 'compact' : 'cards');
           setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+          setBrandingTimeZone(normalizeTimeZone(res.data?.branding?.defaultTimeZone, 'UTC'));
           setBrandingColorScheme(normalizeColorScheme(res.data?.branding?.defaultColorScheme));
-          setDarkModeBetaEnabled(res.data?.branding?.enableDarkModeBeta === true);
           setUseEuropeanDateFormat(res.data?.branding?.useEuropeanDateFormat === true);
           setUse24hTimeFormat(res.data?.branding?.use24hTimeFormat === true);
           setHideLoginPage(res.data?.branding?.hideLoginPage === true);
@@ -152,8 +155,8 @@ export default function Layout({ children }) {
         if (!cancelled) {
           setDefaultHomeDesktopView('cards');
           setBrandingLanguage('en');
+          setBrandingTimeZone('UTC');
           setBrandingColorScheme(DEFAULT_COLOR_SCHEME);
-          setDarkModeBetaEnabled(false);
           setUseEuropeanDateFormat(false);
           setUse24hTimeFormat(false);
           setHideLoginPage(false);
@@ -168,8 +171,8 @@ export default function Layout({ children }) {
     const onBrandingUpdated = (event) => {
       setDefaultHomeDesktopView(event.detail?.defaultHomeDesktopView === 'compact' ? 'compact' : 'cards');
       setBrandingLanguage(normalizeLanguage(event.detail?.defaultLanguage));
+      setBrandingTimeZone(normalizeTimeZone(event.detail?.defaultTimeZone, 'UTC'));
       setBrandingColorScheme(normalizeColorScheme(event.detail?.defaultColorScheme));
-      setDarkModeBetaEnabled(event.detail?.enableDarkModeBeta === true);
       setUseEuropeanDateFormat(event.detail?.useEuropeanDateFormat === true);
       setUse24hTimeFormat(event.detail?.use24hTimeFormat === true);
       setHideLoginPage(event.detail?.hideLoginPage === true);
@@ -225,27 +228,30 @@ export default function Layout({ children }) {
       : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white'
   }`;
 
-  const parseTimestamp = (value) => {
-    if (!value) return null;
-    if (value instanceof Date) return value;
-    if (typeof value !== 'string') return new Date(value);
-    if (/[zZ]$/.test(value) || /[+-]\d\d:\d\d$/.test(value)) {
-      return new Date(value);
-    }
-    return new Date(`${value.replace(' ', 'T')}Z`);
-  };
-
   const formatOrderTimestamp = (value) => {
-    const parsed = parseTimestamp(value);
-    if (!parsed || Number.isNaN(parsed.getTime())) return null;
-    const date = useEuropeanDateFormat
-      ? `${String(parsed.getDate()).padStart(2, '0')}/${String(parsed.getMonth() + 1).padStart(2, '0')}/${String(parsed.getFullYear()).padStart(4, '0')}`
-      : `${String(parsed.getFullYear()).padStart(4, '0')}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
-    const time = new Intl.DateTimeFormat(use24hTimeFormat ? 'it-IT' : 'en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: !use24hTimeFormat,
-    }).format(parsed);
+    const formatted = formatDateTimeWithTimeZone(value, {
+      locale: useEuropeanDateFormat ? 'it-IT' : 'en-US',
+      timeZone: effectiveTimeZone,
+      dateOptions: useEuropeanDateFormat
+        ? {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+          }
+        : {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          },
+      timeOptions: {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: !use24hTimeFormat,
+      },
+    });
+    if (!formatted) return null;
+    const date = formatted.formattedDate;
+    const time = formatted.formattedTime;
     return `${date} ${effectiveLanguage === 'it' ? 'alle' : 'at'} ${time}`;
   };
 
@@ -311,6 +317,38 @@ export default function Layout({ children }) {
     }
   };
 
+  const handlePreferredTimeZoneChange = async (nextTimeZone) => {
+    if (timeZoneSaving) return;
+    const normalizedNext = normalizeTimeZone(nextTimeZone, brandingTimeZone);
+    if (normalizedNext === normalizeTimeZone(brandingTimeZone, brandingTimeZone)) {
+      if (user?.preferredTimeZone == null) return;
+      setTimeZoneSaving(true);
+      try {
+        await resetPreferredTimeZone();
+      } finally {
+        setTimeZoneSaving(false);
+      }
+      return;
+    }
+    if (user?.preferredTimeZone === normalizedNext) return;
+    setTimeZoneSaving(true);
+    try {
+      await updatePreferredTimeZone(normalizedNext);
+    } finally {
+      setTimeZoneSaving(false);
+    }
+  };
+
+  const handleResetPreferredTimeZone = async () => {
+    if (timeZoneSaving || user?.preferredTimeZone == null) return;
+    setTimeZoneSaving(true);
+    try {
+      await resetPreferredTimeZone();
+    } finally {
+      setTimeZoneSaving(false);
+    }
+  };
+
   const handlePreferredColorSchemeChange = async (nextScheme) => {
     if (colorSchemeSaving) return;
     if (nextScheme === brandingColorScheme) {
@@ -360,6 +398,9 @@ export default function Layout({ children }) {
   const effectiveLanguage = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
   const hasPreferredLanguageOverride = user?.preferredLanguage != null
     && normalizeLanguage(user.preferredLanguage) !== normalizeLanguage(brandingLanguage);
+  const effectiveTimeZone = resolveAppTimeZone(user?.preferredTimeZone, brandingTimeZone);
+  const hasPreferredTimeZoneOverride = user?.preferredTimeZone != null
+    && normalizeTimeZone(user.preferredTimeZone, brandingTimeZone) !== normalizeTimeZone(brandingTimeZone);
   const effectiveColorScheme = resolveAppColorScheme(user?.preferredColorScheme, brandingColorScheme);
   const hasColorSchemeOverride = user?.preferredColorScheme != null
     && normalizeColorScheme(user.preferredColorScheme) !== normalizeColorScheme(brandingColorScheme);
@@ -373,6 +414,7 @@ export default function Layout({ children }) {
     : null;
   const ui = getUiStrings(effectiveLanguage);
   const languageOptions = getSupportedLanguageOptions(ui);
+  const timeZoneOptions = getSupportedTimeZoneOptions();
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFAFA] dark:bg-gray-950">
@@ -388,6 +430,7 @@ export default function Layout({ children }) {
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen((value) => !value)}
+                id="frontdoor-mobile-menu-button"
                 className="inline-flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-2.5 text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white"
                 aria-label={ui.common.openMenu}
                 aria-expanded={mobileMenuOpen}
@@ -557,14 +600,42 @@ export default function Layout({ children }) {
                         </select>
                       </div>
                     </div>
-                    {darkModeBetaEnabled && (
+                    <div className="px-1 py-2">
+                      <div className="flex items-center justify-between gap-2 px-3 pb-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                          {ui.layout.timeZone}
+                        </p>
+                        {hasPreferredTimeZoneOverride && (
+                          <button
+                            type="button"
+                            onClick={handleResetPreferredTimeZone}
+                            disabled={timeZoneSaving}
+                            className="inline-flex items-center gap-1 rounded-full border border-gray-200 dark:border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white disabled:opacity-60"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                            {ui.layout.restoreTimeZone}
+                          </button>
+                        )}
+                      </div>
+                      <div>
+                        <label className="sr-only" htmlFor="personal-time-zone-select">{ui.layout.timeZone}</label>
+                        <select
+                          id="personal-time-zone-select"
+                          value={effectiveTimeZone}
+                          onChange={(event) => handlePreferredTimeZoneChange(event.target.value)}
+                          disabled={timeZoneSaving}
+                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                        >
+                          {timeZoneOptions.map((timeZone) => (
+                            <option key={timeZone.code} value={timeZone.code}>{timeZone.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                     <div className="px-1 py-2">
                       <div className="flex items-center justify-between gap-2 px-3 pb-2">
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                           {ui.layout.colorScheme}
-                          <span className="ml-1.5 inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-950/55 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                            {ui.layout.beta}
-                          </span>
                         </p>
                         {hasColorSchemeOverride && (
                           <button
@@ -605,7 +676,6 @@ export default function Layout({ children }) {
                         })}
                       </div>
                     </div>
-                    )}
                     {hasAppOrderOverride && (
                       <>
                         <div className="my-1 h-px bg-gray-100 dark:bg-gray-800" />
@@ -673,7 +743,7 @@ export default function Layout({ children }) {
         </div>
 
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <div id="frontdoor-mobile-menu-panel" className="md:hidden border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
             <div className="max-w-7xl mx-auto px-4 py-4 max-h-[calc(100vh-4.5rem)] overflow-y-auto overscroll-contain space-y-3">
               <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 -mx-1 px-1">
                 {showHomeNav && (
@@ -776,15 +846,6 @@ export default function Layout({ children }) {
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleTakeTour}
-                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-accent/10 hover:text-dark dark:hover:text-white"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  {ui.layout.takeTour}
-                </button>
-
                 <div className="space-y-2">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                     {ui.layout.personalHomeViewShort || ui.layout.personalHomeView}
@@ -842,53 +903,95 @@ export default function Layout({ children }) {
                   )}
                 </div>
 
-                {darkModeBetaEnabled && (
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                      {ui.layout.colorScheme}
-                      <span className="ml-1.5 inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-950/55 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                        {ui.layout.beta}
-                      </span>
-                    </p>
-                    <div className="grid grid-cols-3 gap-1">
-                      {[
-                        { code: 'light', Icon: Sun, label: ui.layout.colorSchemeLight },
-                        { code: 'dark', Icon: Moon, label: ui.layout.colorSchemeDark },
-                        { code: 'auto', Icon: Monitor, label: ui.layout.colorSchemeAuto },
-                      ].map(({ code, Icon, label }) => {
-                        const active = effectiveColorScheme === code;
-                        return (
-                          <button
-                            key={code}
-                            type="button"
-                            onClick={() => handlePreferredColorSchemeChange(code)}
-                            disabled={colorSchemeSaving}
-                            className={`flex flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2 text-[11px] font-medium transition-colors disabled:opacity-60 ${
-                              active
-                                ? 'border-accent bg-accent/20 text-dark dark:text-gray-100'
-                                : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 hover:text-dark dark:hover:text-white'
-                            }`}
-                            aria-pressed={active}
-                          >
-                            <Icon className="h-4 w-4" />
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {hasColorSchemeOverride && (
-                      <button
-                        type="button"
-                        onClick={handleResetPreferredColorScheme}
-                        disabled={colorSchemeSaving}
-                        className="inline-flex items-center gap-1 rounded-full border border-gray-200 dark:border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white disabled:opacity-60"
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                        {ui.layout.restoreColorScheme}
-                      </button>
-                    )}
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    {ui.layout.timeZone}
+                  </p>
+                  <label className="sr-only" htmlFor="mobile-personal-time-zone-select">{ui.layout.timeZone}</label>
+                  <select
+                    id="mobile-personal-time-zone-select"
+                    value={effectiveTimeZone}
+                    onChange={(event) => handlePreferredTimeZoneChange(event.target.value)}
+                    disabled={timeZoneSaving}
+                    className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                  >
+                    {timeZoneOptions.map((timeZone) => (
+                      <option key={timeZone.code} value={timeZone.code}>{timeZone.label}</option>
+                    ))}
+                  </select>
+                  {hasPreferredTimeZoneOverride && (
+                    <button
+                      type="button"
+                      onClick={handleResetPreferredTimeZone}
+                      disabled={timeZoneSaving}
+                      className="inline-flex items-center gap-1 rounded-full border border-gray-200 dark:border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white disabled:opacity-60"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      {ui.layout.restoreTimeZone}
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    {ui.layout.colorScheme}
+                  </p>
+                  <div className="grid grid-cols-3 gap-1">
+                    {[
+                      { code: 'light', Icon: Sun, label: ui.layout.colorSchemeLight },
+                      { code: 'dark', Icon: Moon, label: ui.layout.colorSchemeDark },
+                      { code: 'auto', Icon: Monitor, label: ui.layout.colorSchemeAuto },
+                    ].map(({ code, Icon, label }) => {
+                      const active = effectiveColorScheme === code;
+                      return (
+                        <button
+                          key={code}
+                          type="button"
+                          onClick={() => handlePreferredColorSchemeChange(code)}
+                          disabled={colorSchemeSaving}
+                          className={`flex flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2 text-[11px] font-medium transition-colors disabled:opacity-60 ${
+                            active
+                              ? 'border-accent bg-accent/20 text-dark dark:text-gray-100'
+                              : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 hover:text-dark dark:hover:text-white'
+                          }`}
+                          aria-pressed={active}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {label}
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
+                  {hasColorSchemeOverride && (
+                    <button
+                      type="button"
+                      onClick={handleResetPreferredColorScheme}
+                      disabled={colorSchemeSaving}
+                      className="inline-flex items-center gap-1 rounded-full border border-gray-200 dark:border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white disabled:opacity-60"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      {ui.layout.restoreColorScheme}
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleOpenHomepageGuide}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-accent/10 hover:text-dark dark:hover:text-white"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  {ui.layout.openHomepageGuide}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleTakeTour}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-accent/10 hover:text-dark dark:hover:text-white"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {ui.layout.takeTour}
+                </button>
               </div>
             </div>
           </div>

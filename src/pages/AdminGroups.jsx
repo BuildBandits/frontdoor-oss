@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Eye, Plus, Shield, Trash2, X, Save, Users, ChevronDown, ChevronRight, AppWindow, Pencil, Clock, RefreshCw, Layers3, ArrowRightLeft } from 'lucide-react';
+import { Eye, Plus, Shield, Trash2, X, Save, Users, ChevronDown, ChevronRight, AppWindow, Pencil, Clock, RefreshCw, Layers3, ArrowRightLeft, Filter } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import UserAvatar from '../components/UserAvatar';
@@ -9,6 +9,8 @@ import PageNotice from '../components/PageNotice';
 import TopToastNotice from '../components/TopToastNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
+import DropdownSelect from '../components/DropdownSelect';
+import PaginationControls from '../components/PaginationControls';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
@@ -77,6 +79,8 @@ export default function AdminGroups() {
   const [appSearch, setAppSearch] = useState('');
   const [selectedGroupIds, setSelectedGroupIds] = useState([]);
   const [showOnlyProblemGroups, setShowOnlyProblemGroups] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // Entra import modal
   const [showEntraImport, setShowEntraImport] = useState(false);
@@ -797,12 +801,30 @@ export default function AdminGroups() {
     ? filteredGroups.filter((group) => Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) === 0 && (Number(group.app_count || 0) === 0 || Number(group.member_count || 0) === 0))
     : filteredGroups;
   const hasGroupFilter = groupSearch.trim().length > 0 || showOnlyProblemGroups;
+  const pagination = useMemo(() => ({
+    page,
+    pages: Math.max(1, Math.ceil(visibleGroups.length / pageSize)),
+    total: visibleGroups.length,
+  }), [page, pageSize, visibleGroups.length]);
+  const paginatedGroups = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return visibleGroups.slice(start, start + pageSize);
+  }, [page, pageSize, visibleGroups]);
 
   useEffect(() => {
     if (showOnlyProblemGroups && problemGroups.length === 0) {
       setShowOnlyProblemGroups(false);
     }
   }, [showOnlyProblemGroups, problemGroups.length]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [groupSearch, showOnlyProblemGroups, pageSize]);
+  useEffect(() => {
+    if (page > pagination.pages) {
+      setPage(pagination.pages);
+    }
+  }, [page, pagination.pages]);
 
   return (
     <div>
@@ -974,6 +996,19 @@ export default function AdminGroups() {
               searchShortcutLabel={ui.common.searchShortcut}
             />
           </div>
+          <DropdownSelect
+            value={pageSize}
+            onChange={(next) => setPageSize(parseInt(next, 10))}
+            label={ui.admin.logs.rows}
+            icon={Filter}
+            options={[
+              { value: 25, label: '25' },
+              { value: 50, label: '50' },
+              { value: 100, label: '100' },
+              { value: 150, label: '150' },
+            ]}
+            className="min-w-[140px]"
+          />
           <div className="text-xs text-gray-400 dark:text-gray-500">
             {visibleGroups.length} {ui.nav.groups.toLowerCase()} {t.of} {groups.length}
           </div>
@@ -1050,7 +1085,19 @@ export default function AdminGroups() {
             </div>
           </div>
 
-          {visibleGroups.map((group) => (
+          <PaginationControls
+            page={pagination.page}
+            pages={pagination.pages}
+            total={pagination.total}
+            summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} ${ui.nav.groups.toLowerCase()}`}
+            previousLabel={ui.common.previous}
+            nextLabel={ui.common.next}
+            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+            onNext={() => setPage((current) => Math.min(pagination.pages, current + 1))}
+            className="mt-0"
+          />
+
+          {paginatedGroups.map((group) => (
             <div key={group.id} ref={setGroupRowRef(group.id)} className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden transition-colors">
               {/* Group row */}
               <div
@@ -1474,6 +1521,17 @@ export default function AdminGroups() {
           ))}
         </div>
       )}
+
+      <PaginationControls
+        page={pagination.page}
+        pages={pagination.pages}
+        total={pagination.total}
+        summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} ${ui.nav.groups.toLowerCase()}`}
+        previousLabel={ui.common.previous}
+        nextLabel={ui.common.next}
+        onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+        onNext={() => setPage((current) => Math.min(pagination.pages, current + 1))}
+      />
 
       {/* Create group modal */}
       {showCreate && (

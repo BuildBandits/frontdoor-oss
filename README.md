@@ -124,7 +124,7 @@ App: http://localhost:3001
 | `AVATAR_CACHE_MISS_TTL_DAYS` | Retry interval when no avatar was found | `30` |
 | `BASE_DOMAIN` | Base domain (no protocol) | `frontdoor.local` |
 | `FRONTEND_URL` | Frontend URL with protocol (see `.env.example.*`) | - |
-| `TZ` | Timezone used to render Log/Audit timestamps | `Europe/Rome` |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated allowlist of origins that can call Frontdoor with `credentials: 'include'` for shared-cookie or session-check pages | - |
 | `AZURE_CLIENT_ID` | Azure AD App Registration Client ID | - |
 | `AZURE_CLIENT_SECRET` | Azure AD Client Secret | - |
 | `AZURE_TENANT_ID` | Azure AD Tenant ID | - |
@@ -141,7 +141,7 @@ For a real deployment, set at least:
 
 - `BASE_DOMAIN`
 - `FRONTEND_URL`
-- `TZ`
+- `CORS_ALLOWED_ORIGINS` if you want a static page or satellite app on another origin to call Frontdoor with credentials
 - `AZURE_CLIENT_ID`
 - `AZURE_CLIENT_SECRET`
 - `AZURE_TENANT_ID`
@@ -153,9 +153,45 @@ Recommended but optional:
 - `ADMIN_EMAILS`
 - `ADMIN_API_KEY`
 - `JWT_EXPIRES_IN`
-- `TZ` to align server-rendered timestamps with your local tenant timezone
+- Tenant default time zone from `Personalizza` if you want something other than UTC
 
 If one of the required values is missing or malformed, the container now fails fast at startup with a clear log entry instead of surfacing a runtime auth error later.
+
+#### Cross-origin session checks
+
+`CORS_ALLOWED_ORIGINS` is meant for pages that only need to check whether a user already has an active Frontdoor session, for example a plain static HTML page or a lightweight download/launch page hosted on a sibling domain.
+
+If you host a page on `https://contoso.com`, set:
+
+```bash
+CORS_ALLOWED_ORIGINS=https://contoso.com
+```
+
+Then the page can ask Frontdoor whether the current browser session is already authenticated:
+
+```html
+<script>
+  async function checkSession() {
+    const response = await fetch('https://frontdoor.contoso.com/api/auth/me', {
+      credentials: 'include',
+    });
+
+    if (response.ok) {
+      const user = await response.json();
+      console.log('Signed in as:', user.email || user.display_name);
+      return;
+    }
+
+    window.location.href = 'https://frontdoor.contoso.com/login';
+  }
+
+  checkSession().catch(() => {
+    window.location.href = 'https://frontdoor.contoso.com/login';
+  });
+</script>
+```
+
+The important part is `credentials: 'include'`: it tells the browser to send the `frontdoor_token` cookie with the request. Frontdoor will only accept that cross-origin request if the page origin is listed in `CORS_ALLOWED_ORIGINS`.
 
 #### Roles and access tiers
 
@@ -207,7 +243,7 @@ The home hero text, optional company logo, homepage/login behavior, and app badg
 
 #### Audit and retention
 
-- Log and Audit timestamps are rendered with the container `TZ` setting, while the database continues to store UTC values.
+- Log and Audit timestamps are stored in UTC and rendered using the app/tenant/user time zone settings, while the database continues to store UTC values.
 - Audit includes an owner-only admin filter so you can narrow the view to a single privileged account.
 - Frontdoor automatically purges `access_logs` and `rbac_audit_logs` entries older than 90 days at startup and then once per day.
 
@@ -233,12 +269,12 @@ Frontdoor startup configuration:
   PORT=3001
   DATABASE_PATH=/data/frontdoor.db
   BRANDING_ASSET_DIR=/data/branding
-  BASE_DOMAIN=cerbero.cc
-  FRONTEND_URL=https://frontdoor.cerbero.cc
+  BASE_DOMAIN=contoso.com
+  FRONTEND_URL=https://frontdoor.contoso.com
   AZURE_CLIENT_ID=[set]
   AZURE_CLIENT_SECRET=[set]
   AZURE_TENANT_ID=[set]
-  AZURE_REDIRECT_URI=https://frontdoor.cerbero.cc/api/auth/microsoft/callback
+  AZURE_REDIRECT_URI=https://frontdoor.contoso.com/api/auth/microsoft/callback
   JWT_SECRET=[set]
   ADMIN_EMAILS=1 owner configured
   ENTRA_GROUP_SYNC=true

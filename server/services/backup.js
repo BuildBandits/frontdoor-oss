@@ -2,6 +2,7 @@ import fsp from 'fs/promises';
 import path from 'path';
 import zlib from 'zlib';
 import db from '../db.js';
+import { getAppTimeZone } from '../config.js';
 import { AVATAR_CACHE_DIR } from './avatars.js';
 import { BRANDING_ASSET_DIR } from './branding.js';
 import { APP_ICON_CACHE_DIR } from './appIcons.js';
@@ -24,6 +25,25 @@ function resolveBackupBuckets({
 
 function quoteIdentifier(identifier) {
   return `"${String(identifier).replace(/"/g, '""')}"`;
+}
+
+function formatBackupFileStamp(iso) {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: getAppTimeZone(),
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(parsed);
+
+  const pick = (type) => parts.find((part) => part.type === type)?.value || '';
+  return `${pick('year')}-${pick('month')}-${pick('day')}T${pick('hour')}-${pick('minute')}-${pick('second')}`;
 }
 
 function listTables(dbHandle) {
@@ -154,7 +174,7 @@ export async function createBackupArchive({
   return {
     archive,
     snapshot,
-    fileName: `frontdoor-backup-${snapshot.createdAt.replace(/[:.]/g, '-')}.json.gz`,
+    fileName: `frontdoor-backup-${formatBackupFileStamp(snapshot.createdAt) || snapshot.createdAt.replace(/[:.]/g, '-')}.json.gz`,
   };
 }
 

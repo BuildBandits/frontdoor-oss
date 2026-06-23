@@ -139,12 +139,22 @@ export default function Home() {
         body: ui.home.tour.steps.appCards.body,
         spotlightRefs: [featuredFavoriteRef, featuredInfoRef],
       },
-      {
+    ];
+    if (!isMobileViewport) {
+      steps.push({
         key: 'reorder',
         targetRef: featuredAppRef,
         title: ui.home.tour.steps.reorder.title,
         body: ui.home.tour.steps.reorder.body,
         spotlightRefs: [featuredDragHandleRef],
+      });
+    }
+    steps.push(
+      {
+        key: 'menuButton',
+        targetRef: { current: null },
+        title: ui.home.tour.steps.menuButton.title,
+        body: ui.home.tour.steps.menuButton.body,
       },
       {
         key: 'menu',
@@ -160,10 +170,10 @@ export default function Home() {
         title: ui.home.tour.steps.homepage.title,
         body: ui.home.tour.steps.homepage.body,
         browserDocs: browserHomepageDocs,
-      },
-    ];
+      }
+    );
     return steps;
-  }, [browserHomepageDocs, ui]);
+  }, [browserHomepageDocs, isMobileViewport, ui]);
   const currentTourStep = tourSteps[tourStep] || tourSteps[0];
   const totalTourSteps = tourSteps.length;
   const tourProgressLabel = ui.home.tour.progress
@@ -194,6 +204,13 @@ export default function Home() {
   useEffect(() => {
     void loadApps();
   }, [loadApps]);
+
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return undefined;
+    void api.post('/auth/home-activity').catch(() => {});
+    return undefined;
+  }, [userId]);
 
   useEffect(() => {
     api.get('/branding')
@@ -343,19 +360,34 @@ export default function Home() {
   }, [currentTourStep, tourOpen, loading, apps.length]);
 
   useEffect(() => {
+    const mobileMenuButton = document.getElementById('frontdoor-mobile-menu-button');
+
     if (!tourOpen) {
       requestHomeTourAccountMenuClose();
+      if (mobileMenuButton?.getAttribute('aria-expanded') === 'true') {
+        mobileMenuButton.click();
+      }
       return undefined;
     }
 
     if (currentTourStep?.key === 'menu') {
-      requestHomeTourAccountMenuOpen();
+      if (isMobileViewport) {
+        requestHomeTourAccountMenuClose();
+        if (mobileMenuButton?.getAttribute('aria-expanded') !== 'true') {
+          mobileMenuButton.click();
+        }
+      } else {
+        requestHomeTourAccountMenuOpen();
+      }
     } else {
       requestHomeTourAccountMenuClose();
+      if (isMobileViewport && mobileMenuButton?.getAttribute('aria-expanded') === 'true') {
+        mobileMenuButton.click();
+      }
     }
 
     return undefined;
-  }, [currentTourStep?.key, tourOpen]);
+  }, [currentTourStep?.key, isMobileViewport, tourOpen]);
 
   useEffect(() => {
     if (!tourOpen) {
@@ -364,8 +396,11 @@ export default function Home() {
     }
 
     const getTargetElements = () => {
+      if (currentTourStep?.key === 'menuButton') {
+        return [document.getElementById('frontdoor-mobile-menu-button')].filter(Boolean);
+      }
       if (currentTourStep?.key === 'menu') {
-        return [document.getElementById('frontdoor-account-menu-panel')].filter(Boolean);
+        return [document.getElementById(isMobileViewport ? 'frontdoor-mobile-menu-panel' : 'frontdoor-account-menu-panel')].filter(Boolean);
       }
       if (Array.isArray(currentTourStep?.spotlightRefs) && currentTourStep.spotlightRefs.length > 0) {
         return currentTourStep.spotlightRefs.map((ref) => ref?.current).filter(Boolean);
@@ -419,7 +454,7 @@ export default function Home() {
     };
 
     const raf = window.requestAnimationFrame(() => {
-      if (currentTourStep?.key === 'menu') {
+      if (currentTourStep?.key === 'menu' && !isMobileViewport) {
         window.requestAnimationFrame(updateSpotlight);
         return;
       }
@@ -586,6 +621,7 @@ export default function Home() {
   const filtersActive = search.trim().length > 0 || selectedTags.length > 0;
   const dragEnabled = !groupByTag && !filtersActive && !compactView;
   const appCountLabel = ui.home.appCount.replace('{count}', String(filtered.length));
+  const hideMobileCompactControls = mobileCompactViewForced;
   const tourStepIndex = tourStep;
   const isLastTourStep = tourStepIndex === totalTourSteps - 1;
   const isCenteredTourStep = currentTourStep?.placement === 'center';
@@ -701,9 +737,9 @@ export default function Home() {
   );
 
   const renderAppGrid = (appList, { canSpotlight = true } = {}) => {
-    const spotlightTargetApp = canSpotlight && tourOpen && (tourStepIndex === 3 || tourStepIndex === 4)
+    const spotlightTargetApp = canSpotlight && tourOpen && (currentTourStep?.key === 'appCards' || currentTourStep?.key === 'reorder')
       ? (
-        tourStepIndex === 3
+        currentTourStep?.key === 'appCards'
           ? (appList.find((app) => app.long_description?.trim()) || appList[0])
           : (appList[0] || null)
       )
@@ -722,7 +758,7 @@ export default function Home() {
               showModeBadges={showModeBadges}
               compact
               tourHighlight={app.id === spotlightTargetId}
-              tourShowDragHandle={tourOpen && tourStepIndex === 4 && app.id === spotlightTargetId}
+              tourShowDragHandle={tourOpen && currentTourStep?.key === 'reorder' && app.id === spotlightTargetId}
               tourFavoriteRef={app.id === spotlightTargetId ? featuredFavoriteRef : null}
               tourInfoRef={app.id === spotlightTargetId ? featuredInfoRef : null}
               tourDragHandleRef={app.id === spotlightTargetId ? featuredDragHandleRef : null}
@@ -745,7 +781,7 @@ export default function Home() {
               onToggleFavorite={toggleFavorite}
               showModeBadges={showModeBadges}
               tourHighlight={app.id === spotlightTargetId}
-              tourShowDragHandle={tourOpen && tourStepIndex === 4 && app.id === spotlightTargetId}
+              tourShowDragHandle={tourOpen && currentTourStep?.key === 'reorder' && app.id === spotlightTargetId}
               tourFavoriteRef={app.id === spotlightTargetId ? featuredFavoriteRef : null}
               tourInfoRef={app.id === spotlightTargetId ? featuredInfoRef : null}
               labels={appCardLabels}
@@ -767,7 +803,7 @@ export default function Home() {
                 onToggleFavorite={toggleFavorite}
                 showModeBadges={showModeBadges}
                 tourHighlight={app.id === spotlightTargetId}
-                tourShowDragHandle={tourOpen && tourStepIndex === 4 && app.id === spotlightTargetId}
+                tourShowDragHandle={tourOpen && currentTourStep?.key === 'reorder' && app.id === spotlightTargetId}
                 tourFavoriteRef={app.id === spotlightTargetId ? featuredFavoriteRef : null}
                 tourInfoRef={app.id === spotlightTargetId ? featuredInfoRef : null}
                 tourDragHandleRef={app.id === spotlightTargetId ? featuredDragHandleRef : null}
@@ -846,7 +882,7 @@ export default function Home() {
             className="flex-1 min-w-0"
           />
           <div className="flex shrink-0 items-stretch gap-2 sm:gap-3 overflow-x-auto">
-            <div className="flex h-12 shrink-0 items-center rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+            <div className={`${hideMobileCompactControls ? 'flex' : 'hidden sm:flex'} h-12 shrink-0 items-center rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap`}>
               {appCountLabel}
             </div>
             <Tooltip content={ui.home.refreshAppsTitle}>
@@ -878,37 +914,41 @@ export default function Home() {
               </button>
             </Tooltip>
 
-            <Tooltip content={groupByTag ? ui.home.gridViewTitle : ui.home.groupByTitle}>
-              <button
-                onClick={handleToggleGroupByTag}
-                disabled={mobileCompactViewForced}
-                className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
-                  groupByTag
-                    ? 'bg-purple-50 border-purple-300 text-purple-700 dark:bg-purple-950/50 dark:border-purple-600 dark:text-purple-300'
-                    : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
-                } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
-                aria-label={groupByTag ? ui.home.gridViewTitle : ui.home.groupByTitle}
-              >
-                {groupByTag ? <AppWindow className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
-                <span className="hidden sm:inline">{ui.home.groupBy}</span>
-              </button>
-            </Tooltip>
+            {!hideMobileCompactControls && (
+              <>
+                <Tooltip content={groupByTag ? ui.home.gridViewTitle : ui.home.groupByTitle}>
+                  <button
+                    onClick={handleToggleGroupByTag}
+                    disabled={mobileCompactViewForced}
+                    className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
+                      groupByTag
+                        ? 'bg-purple-50 border-purple-300 text-purple-700 dark:bg-purple-950/50 dark:border-purple-600 dark:text-purple-300'
+                        : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
+                    } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    aria-label={groupByTag ? ui.home.gridViewTitle : ui.home.groupByTitle}
+                  >
+                    {groupByTag ? <AppWindow className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
+                    <span className="hidden sm:inline">{ui.home.groupBy}</span>
+                  </button>
+                </Tooltip>
 
-            <Tooltip content={mobileCompactViewForced ? ui.home.compactViewForcedTitle : (compactView ? ui.home.cardsLabel : ui.home.compactViewTitle)}>
-              <button
-                onClick={handleToggleCompactView}
-                disabled={mobileCompactViewForced}
-                className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
-                  compactView
-                    ? 'bg-gradient-to-br from-sky-50 via-cyan-50 to-indigo-50 dark:from-sky-900/40 dark:via-cyan-900/30 dark:to-indigo-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 shadow-sm shadow-sky-200/50'
-                    : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
-                } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
-                aria-label={mobileCompactViewForced ? ui.home.compactViewForcedTitle : (compactView ? ui.home.cardsLabel : ui.home.compactViewTitle)}
-              >
-                {compactView ? <Rows3 className="w-4 h-4" /> : <List className="w-4 h-4" />}
-                <span className="hidden sm:inline">{mobileCompactViewForced ? ui.home.compactMobileLabel : ui.home.compactLabel}</span>
-              </button>
-            </Tooltip>
+                <Tooltip content={mobileCompactViewForced ? ui.home.compactViewForcedTitle : (compactView ? ui.home.cardsLabel : ui.home.compactViewTitle)}>
+                  <button
+                    onClick={handleToggleCompactView}
+                    disabled={mobileCompactViewForced}
+                    className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
+                      compactView
+                        ? 'bg-gradient-to-br from-sky-50 via-cyan-50 to-indigo-50 dark:from-sky-900/40 dark:via-cyan-900/30 dark:to-indigo-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 shadow-sm shadow-sky-200/50'
+                        : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
+                    } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    aria-label={mobileCompactViewForced ? ui.home.compactViewForcedTitle : (compactView ? ui.home.cardsLabel : ui.home.compactViewTitle)}
+                  >
+                    {compactView ? <Rows3 className="w-4 h-4" /> : <List className="w-4 h-4" />}
+                    <span className="hidden sm:inline">{mobileCompactViewForced ? ui.home.compactMobileLabel : ui.home.compactLabel}</span>
+                  </button>
+                </Tooltip>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { iconUrlForApp } from '../services/appIcons.js';
 import { getAccessibleGroupIdsForUser } from '../services/groupHierarchy.js';
 import { isSupportedLanguage } from '../../shared/languages.js';
 import { isSupportedColorScheme, normalizeOptionalColorScheme } from '../../shared/colorSchemes.js';
+import { isSupportedTimeZone, normalizeOptionalTimeZone } from '../../shared/timeZones.js';
 
 const router = express.Router();
 const composeAdminEmails = new Set(
@@ -32,8 +33,8 @@ const remainingEditorCountExcluding = (userId) => db
 router.get('/', authenticate, isAdminViewer, (req, res) => {
   const users = db
     .prepare(`
-      SELECT u.id, u.email, u.display_name, u.role, u.avatar_color, u.is_active, u.last_login, u.created_at,
-        u.home_desktop_view, u.preferred_language, u.preferred_color_scheme, u.app_order, u.app_order_updated_at,
+      SELECT u.id, u.email, u.display_name, u.role, u.avatar_color, u.is_active, u.last_login, u.last_activity_at, u.created_at,
+        u.home_desktop_view, u.preferred_language, u.preferred_timezone, u.preferred_color_scheme, u.app_order, u.app_order_updated_at,
         (SELECT COUNT(*) FROM user_group_members WHERE user_id = u.id) AS group_count
       FROM users u ORDER BY u.display_name
     `)
@@ -91,6 +92,15 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
     values.push(preferredLanguage);
   }
 
+  if (Object.prototype.hasOwnProperty.call(req.body, 'preferredTimeZone')) {
+    const { preferredTimeZone } = req.body;
+    if (preferredTimeZone !== null && !isSupportedTimeZone(preferredTimeZone)) {
+      return res.status(400).json({ error: 'preferredTimeZone must be a supported time zone or null' });
+    }
+    updates.push('preferred_timezone = ?');
+    values.push(normalizeOptionalTimeZone(preferredTimeZone));
+  }
+
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredColorScheme')) {
     const { preferredColorScheme } = req.body;
     if (preferredColorScheme !== null && !isSupportedColorScheme(preferredColorScheme)) {
@@ -138,7 +148,7 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
 // Get single user with group memberships (viewer roles only)
 router.get('/:id', authenticate, isAdminViewer, (req, res) => {
   const user = db
-    .prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, last_login, created_at FROM users WHERE id = ?')
+    .prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, last_login, last_activity_at, created_at FROM users WHERE id = ?')
     .get(req.params.id);
 
   if (!user) return res.status(404).json({ error: 'User not found' });

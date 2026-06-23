@@ -16,9 +16,24 @@ export default function DropdownSelect({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const itemRefs = useRef([]);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const selectedValues = useMemo(() => {
+    if (multi) return Array.isArray(value) ? value : [];
+    return [value];
+  }, [multi, value]);
 
   useEffect(() => {
     if (!open) return undefined;
+    setActiveIndex(() => {
+      const selectedIndex = options.findIndex((option) => (
+        multi
+          ? (option.clearSelection ? selectedValues.length === 0 : selectedValues.includes(option.value))
+          : option.value === value
+      ));
+      return Math.max(0, selectedIndex);
+    });
     const onMouseDown = (event) => {
       if (ref.current && !ref.current.contains(event.target)) {
         setOpen(false);
@@ -33,12 +48,12 @@ export default function DropdownSelect({
       document.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [open]);
+  }, [multi, open, options, selectedValues, value]);
 
-  const selectedValues = useMemo(() => {
-    if (multi) return Array.isArray(value) ? value : [];
-    return [value];
-  }, [multi, value]);
+  useEffect(() => {
+    if (!open) return;
+    itemRefs.current[activeIndex]?.focus?.();
+  }, [activeIndex, open]);
 
   const selectedOptions = useMemo(
     () => options.filter((option) => selectedValues.includes(option.value)),
@@ -78,11 +93,50 @@ export default function DropdownSelect({
     setOpen(false);
   };
 
+  const moveActive = (delta) => {
+    if (options.length === 0) return;
+    setActiveIndex((current) => {
+      const next = (current + delta + options.length) % options.length;
+      return next;
+    });
+  };
+
+  const handleKeyDown = (event) => {
+    if (!open) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        setOpen(true);
+      }
+      return;
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveActive(1);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveActive(-1);
+      return;
+    }
+    if (event.key === 'Home') {
+      event.preventDefault();
+      setActiveIndex(0);
+      return;
+    }
+    if (event.key === 'End') {
+      event.preventDefault();
+      setActiveIndex(Math.max(0, options.length - 1));
+    }
+  };
+
   return (
     <div ref={ref} className={`relative ${className}`}>
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
+        onKeyDown={handleKeyDown}
         className={`relative inline-flex h-12 w-full items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 text-sm text-left text-gray-600 dark:text-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900 ${buttonClassName}`}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -100,9 +154,10 @@ export default function DropdownSelect({
           className={`absolute top-full z-20 mt-2 w-full min-w-full max-w-full overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl ${
             align === 'right' ? 'right-0' : 'left-0'
           } ${menuClassName}`}
+          onKeyDown={handleKeyDown}
         >
           <div className="max-h-72 overflow-auto py-1">
-            {options.map((option) => {
+            {options.map((option, index) => {
               const selected = multi
                 ? (option.clearSelection ? selectedValues.length === 0 : selectedValues.includes(option.value))
                 : option.value === value;
@@ -110,9 +165,14 @@ export default function DropdownSelect({
                 <button
                   key={String(option.value)}
                   type="button"
+                  ref={(node) => {
+                    itemRefs.current[index] = node;
+                  }}
                   onClick={() => handleSelect(option.clearSelection ? '__clear__' : option.value)}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  tabIndex={open && index === activeIndex ? 0 : -1}
                   className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                    selected
+                    selected || index === activeIndex
                       ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                   }`}

@@ -73,6 +73,10 @@ export const useAuthStore = create((set, get) => ({
 
   resetPreferredLanguage: async () => get().savePreferences({ preferredLanguage: null }),
 
+  updatePreferredTimeZone: async (preferredTimeZone) => get().savePreferences({ preferredTimeZone }),
+
+  resetPreferredTimeZone: async () => get().savePreferences({ preferredTimeZone: null }),
+
   updatePreferredColorScheme: async (preferredColorScheme) => get().savePreferences({ preferredColorScheme }),
 
   resetPreferredColorScheme: async () => get().savePreferences({ preferredColorScheme: null }),

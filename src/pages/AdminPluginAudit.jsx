@@ -6,6 +6,8 @@ import UserAvatar from '../components/UserAvatar';
 import ClearableSearchField from '../components/ClearableSearchField';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatDateTimeWithTimeZone } from '../utils/dateTime';
+import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
 const PRIVILEGED_ROLES = new Set(['owner', 'admin', 'admin_readonly']);
 const ACTION_OPTIONS = ['approve', 'revoke'];
@@ -24,15 +26,23 @@ export default function AdminPluginAudit() {
   const [pageSize, setPageSize] = useState(50);
   const [selectedActorId, setSelectedActorId] = useState('');
   const [brandingLanguage, setBrandingLanguage] = useState('en');
+  const [brandingTimeZone, setBrandingTimeZone] = useState('UTC');
+  const timeZone = resolveAppTimeZone(user?.preferredTimeZone, brandingTimeZone);
 
   useEffect(() => {
     let cancelled = false;
     api.get('/branding')
       .then((res) => {
-        if (!cancelled) setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+        if (!cancelled) {
+          setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+          setBrandingTimeZone(normalizeTimeZone(res.data?.branding?.defaultTimeZone, 'UTC'));
+        }
       })
       .catch(() => {
-        if (!cancelled) setBrandingLanguage('en');
+        if (!cancelled) {
+          setBrandingLanguage('en');
+          setBrandingTimeZone('UTC');
+        }
       });
     return () => {
       cancelled = true;
@@ -93,10 +103,22 @@ export default function AdminPluginAudit() {
   const formatDate = (iso) => {
     if (!iso) return '-';
     try {
-      return new Date(iso).toLocaleDateString('it-IT', {
-        day: '2-digit', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
+      const formatted = formatDateTimeWithTimeZone(iso, {
+        locale: 'it-IT',
+        timeZone,
+        dateOptions: {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        },
+        timeOptions: {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        },
       });
+      if (!formatted) return iso;
+      return `${formatted.formattedDate} ${formatted.formattedTime}`;
     } catch {
       return iso;
     }

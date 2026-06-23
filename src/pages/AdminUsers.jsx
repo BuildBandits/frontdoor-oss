@@ -1,6 +1,6 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, SlidersHorizontal } from 'lucide-react';
+import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, Wand2, Filter } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import UserAvatar from '../components/UserAvatar';
@@ -10,8 +10,11 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import Tooltip from '../components/Tooltip';
+import PaginationControls from '../components/PaginationControls';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { DEFAULT_COLOR_SCHEME, normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
+import { formatDateTimeWithTimeZone } from '../utils/dateTime';
+import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
 export default function AdminUsers() {
   const { user: currentUser } = useAuthStore();
@@ -31,8 +34,11 @@ export default function AdminUsers() {
   const [showVisibleApps, setShowVisibleApps] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [brandingLanguage, setBrandingLanguage] = useState('en');
+  const [brandingTimeZone, setBrandingTimeZone] = useState('UTC');
   const [defaultHomeDesktopView, setDefaultHomeDesktopView] = useState('cards');
   const [defaultColorScheme, setDefaultColorScheme] = useState(DEFAULT_COLOR_SCHEME);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const detailInfoRef = useRef(null);
   const [detailInfoHeight, setDetailInfoHeight] = useState(null);
 
@@ -90,6 +96,7 @@ export default function AdminUsers() {
   const ui = getUiStrings(resolveAppLanguage(currentUser?.preferredLanguage, brandingLanguage));
   const t = ui.admin.common;
   const u = ui.admin.users;
+  const timeZone = resolveAppTimeZone(currentUser?.preferredTimeZone, brandingTimeZone);
 
   const loadUsers = useCallback(async ({ showLoading = false } = {}) => {
     if (showLoading) {
@@ -112,11 +119,15 @@ export default function AdminUsers() {
 
   useEffect(() => { void loadUsers({ showLoading: true }); }, [loadUsers]);
   useEffect(() => {
+    setPage(1);
+  }, [search, filterRole, filterActive, filterPersonalization, pageSize]);
+  useEffect(() => {
     let cancelled = false;
     api.get('/branding')
       .then((res) => {
         if (!cancelled) {
           setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
+          setBrandingTimeZone(normalizeTimeZone(res.data?.branding?.defaultTimeZone, 'UTC'));
           setDefaultHomeDesktopView(res.data?.branding?.defaultHomeDesktopView === 'compact' ? 'compact' : 'cards');
           setDefaultColorScheme(normalizeColorScheme(res.data?.branding?.defaultColorScheme));
         }
@@ -124,6 +135,7 @@ export default function AdminUsers() {
       .catch(() => {
         if (!cancelled) {
           setBrandingLanguage('en');
+          setBrandingTimeZone('UTC');
           setDefaultHomeDesktopView('cards');
           setDefaultColorScheme(DEFAULT_COLOR_SCHEME);
         }
@@ -262,6 +274,20 @@ export default function AdminUsers() {
     }
     return true;
   });
+  const pagination = useMemo(() => ({
+    page,
+    pages: Math.max(1, Math.ceil(filtered.length / pageSize)),
+    total: filtered.length,
+  }), [filtered.length, page, pageSize]);
+  const paginatedUsers = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
+  useEffect(() => {
+    if (page > pagination.pages) {
+      setPage(pagination.pages);
+    }
+  }, [page, pagination.pages]);
 
   const groupLabel = (group) => group.entra_display_name || group.name;
   const openManagedGroup = (group) => {
@@ -291,7 +317,21 @@ export default function AdminUsers() {
   const formatDate = (iso) => {
     if (!iso) return t.noLogin;
     try {
-      return new Date(iso).toLocaleDateString(ui.common.dateLocale, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const formatted = formatDateTimeWithTimeZone(iso, {
+        locale: ui.common.dateLocale,
+        timeZone,
+        dateOptions: {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        },
+        timeOptions: {
+          hour: '2-digit',
+          minute: '2-digit',
+        },
+      });
+      if (!formatted) return iso;
+      return `${formatted.formattedDate} ${formatted.formattedTime}`;
     } catch {
       return iso;
     }
@@ -299,23 +339,22 @@ export default function AdminUsers() {
 
   const formatDateTimeCompact = (iso) => {
     if (!iso) return ui.common.default;
-    try {
-      const parsed = new Date(iso);
-      if (Number.isNaN(parsed.getTime())) return iso;
-      const date = new Intl.DateTimeFormat(ui.common.dateLocale, {
+    const formatted = formatDateTimeWithTimeZone(iso, {
+      locale: ui.common.dateLocale,
+      timeZone,
+      dateOptions: {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
-      }).format(parsed);
-      const time = new Intl.DateTimeFormat(ui.common.dateLocale, {
+      },
+      timeOptions: {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
-      }).format(parsed);
-      return `${date} ${time}`;
-    } catch {
-      return iso;
-    }
+      },
+    });
+    if (!formatted) return iso;
+    return `${formatted.formattedDate} ${formatted.formattedTime}`;
   };
 
   function parseStoredJsonArray(value) {
@@ -341,6 +380,7 @@ export default function AdminUsers() {
     return Boolean(
       (user?.home_desktop_view != null && normalizeHomeView(user.home_desktop_view) !== defaultHomeDesktopView)
       || (user?.preferred_language != null && normalizeLanguage(user.preferred_language) !== normalizeLanguage(brandingLanguage))
+      || (user?.preferred_timezone != null && normalizeTimeZone(user.preferred_timezone, brandingTimeZone) !== normalizeTimeZone(brandingTimeZone, brandingTimeZone))
       || (user?.preferred_color_scheme != null && normalizeColorScheme(user.preferred_color_scheme) !== defaultColorScheme)
       || parseStoredJsonArray(user?.app_order).length > 0
     );
@@ -396,11 +436,13 @@ export default function AdminUsers() {
 
   const effectiveHomeView = normalizeHomeView(userDetail?.user?.home_desktop_view ?? defaultHomeDesktopView);
   const effectiveLanguage = resolveAppLanguage(userDetail?.user?.preferred_language, brandingLanguage);
+  const effectiveTimeZone = resolveAppTimeZone(userDetail?.user?.preferred_timezone, brandingTimeZone);
   const effectiveColorScheme = resolveAppColorScheme(userDetail?.user?.preferred_color_scheme, defaultColorScheme);
   const customOrderItems = parseStoredJsonArray(userDetail?.user?.app_order);
   const hasCustomOrder = customOrderItems.length > 0;
   const homeViewIsDefault = effectiveHomeView === defaultHomeDesktopView;
   const languageIsDefault = !userDetail?.user?.preferred_language || effectiveLanguage === brandingLanguage;
+  const timeZoneIsDefault = !userDetail?.user?.preferred_timezone || effectiveTimeZone === brandingTimeZone;
   const colorSchemeIsDefault = !userDetail?.user?.preferred_color_scheme || effectiveColorScheme === defaultColorScheme;
 
   const renderInfoRow = (label, value, {
@@ -589,13 +631,26 @@ export default function AdminUsers() {
             value={filterPersonalization}
             onChange={setFilterPersonalization}
             label={u.personalizationFilterLabel}
-            icon={SlidersHorizontal}
+            icon={Wand2}
             options={[
               { value: 'all', label: u.allPersonalizationStates },
               { value: 'customized', label: u.personalizedOnly },
               { value: 'none', label: u.noPersonalizations },
             ]}
             className="min-w-[260px]"
+          />
+          <DropdownSelect
+            value={pageSize}
+            onChange={(next) => setPageSize(parseInt(next, 10))}
+            label={ui.admin.logs.rows}
+            icon={Filter}
+            options={[
+              { value: 25, label: '25' },
+              { value: 50, label: '50' },
+              { value: 100, label: '100' },
+              { value: 150, label: '150' },
+            ]}
+            className="min-w-[140px]"
           />
         </div>
       </div>
@@ -614,7 +669,18 @@ export default function AdminUsers() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((user) => (
+          <PaginationControls
+            page={pagination.page}
+            pages={pagination.pages}
+            total={pagination.total}
+            summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} ${ui.nav.users.toLowerCase()}`}
+            previousLabel={ui.common.previous}
+            nextLabel={ui.common.next}
+            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+            onNext={() => setPage((current) => Math.min(pagination.pages, current + 1))}
+            className="mt-0"
+          />
+          {paginatedUsers.map((user) => (
             <div key={user.id} className={`bg-white dark:bg-gray-900 rounded-2xl border overflow-hidden transition-colors ${
               user.is_active ? 'border-gray-100 dark:border-gray-800' : 'border-red-100 dark:border-red-900/50 bg-red-50/30 dark:bg-red-950/25'
             }`}>
@@ -695,6 +761,7 @@ export default function AdminUsers() {
                           )}
                           {renderInfoRow(t.registered, formatDate(userDetail.user.created_at))}
                           {renderInfoRow(t.lastLogin, formatDate(userDetail.user.last_login))}
+                          {renderInfoRow(t.lastActivity, formatDate(userDetail.user.last_activity_at))}
                           {renderInfoRow(
                             t.visibleApps,
                             userDetail.visibleAppCount > 0 ? (
@@ -740,6 +807,17 @@ export default function AdminUsers() {
                                     isDefault: languageIsDefault,
                                     resetLabel: u.resetPreferenceTooltip.replace('{label}', u.languageSetting),
                                     onReset: languageIsDefault ? null : () => openPreferenceResetConfirm(u.languageSetting, { preferredLanguage: null }),
+                                  }
+                                )
+                              )}
+                              {renderInfoRow(
+                                u.timeZoneSetting,
+                                renderPreferenceStatus(
+                                  effectiveTimeZone,
+                                  {
+                                    isDefault: timeZoneIsDefault,
+                                    resetLabel: u.resetPreferenceTooltip.replace('{label}', u.timeZoneSetting),
+                                    onReset: timeZoneIsDefault ? null : () => openPreferenceResetConfirm(u.timeZoneSetting, { preferredTimeZone: null }),
                                   }
                                 )
                               )}
@@ -986,6 +1064,17 @@ export default function AdminUsers() {
           ))}
         </div>
       )}
+
+      <PaginationControls
+        page={pagination.page}
+        pages={pagination.pages}
+        total={pagination.total}
+        summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} ${ui.nav.users.toLowerCase()}`}
+        previousLabel={ui.common.previous}
+        nextLabel={ui.common.next}
+        onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+        onNext={() => setPage((current) => Math.min(pagination.pages, current + 1))}
+      />
 
       {showVisibleApps && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setShowVisibleApps(false)}>

@@ -6,7 +6,7 @@ import { ConfidentialClientApplication } from '@azure/msal-node';
 import db from '../db.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
-import { getRequiredEnv, isDevLoginEnabled } from '../config.js';
+import { getAppTimeZone, getRequiredEnv, isDevLoginEnabled } from '../config.js';
 import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, refreshGroupCacheFromTenant, syncUserEntraGroups } from '../services/entraGroups.js';
 import { ensureAvatarCached } from '../services/avatars.js';
 import { verifySsoTokenChain } from '../services/verifySsoToken.js';
@@ -14,6 +14,7 @@ import { dispatchPluginEvent } from '../services/plugins.js';
 import { logRbacAudit } from '../db.js';
 import { isSupportedLanguage } from '../../shared/languages.js';
 import { isSupportedColorScheme, normalizeOptionalColorScheme } from '../../shared/colorSchemes.js';
+import { isSupportedTimeZone, normalizeOptionalTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
 const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 const authScopes = getAuthScopes();
@@ -82,12 +83,15 @@ const serializeCurrentUser = (user) => ({
     ? (user.home_desktop_view === 'compact' ? 'compact' : 'cards')
     : null,
   preferredLanguage: normalizePreferredLanguage(user.preferred_language),
+  preferredTimeZone: normalizeOptionalTimeZone(user.preferred_timezone),
   preferredColorScheme: normalizeOptionalColorScheme(user.preferred_color_scheme),
   appOrder: parseStoredAppOrder(user.app_order),
   appOrderUpdatedAt: user.app_order_updated_at || null,
   favoriteApps: parseStoredStringArray(user.favorite_apps),
   favoriteAppsUpdatedAt: user.favorite_apps_updated_at || null,
   homeTourSeenAt: user.home_tour_seen_at || null,
+  lastActivityAt: user.last_activity_at || null,
+  timeZone: resolveAppTimeZone(user.preferred_timezone, getAppTimeZone()),
 });
 
 // Initiate SSO login.
@@ -227,7 +231,7 @@ router.get('/microsoft/callback', async (req, res) => {
       // Existing user (either pre-registered or returning) — update profile
       const shouldPromote = adminEmails.includes(email.toLowerCase()) && user.role !== 'owner';
       db.prepare(
-        `UPDATE users SET microsoft_id = ?, display_name = ?, last_login = datetime('now'), updated_at = datetime('now') WHERE id = ?`
+        `UPDATE users SET microsoft_id = ?, display_name = ?, last_login = datetime('now'), last_activity_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
       ).run(microsoftId, displayName, user.id);
       if (shouldPromote) {
         db.prepare(`UPDATE users SET role = 'owner', updated_at = datetime('now') WHERE id = ?`).run(user.id);
@@ -240,8 +244,8 @@ router.get('/microsoft/callback', async (req, res) => {
 
       const role = adminEmails.includes(email.toLowerCase()) ? 'owner' : 'user';
       db.prepare(`
-        INSERT INTO users (id, email, display_name, microsoft_id, role, avatar_color, last_login)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        INSERT INTO users (id, email, display_name, microsoft_id, role, avatar_color, last_login, last_activity_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
       `).run(userId, email, displayName, microsoftId, role, avatarColor);
 
       user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
@@ -350,6 +354,18 @@ router.get('/me', authenticate, (req, res) => {
   });
 });
 
+// Record a real Home visit separately from login time.
+router.post('/home-activity', authenticate, (req, res) => {
+  db.prepare(`
+    UPDATE users
+    SET last_activity_at = datetime('now')
+    WHERE id = ?
+      AND (last_activity_at IS NULL OR last_activity_at < datetime('now', '-30 minutes'))
+  `).run(req.user.id);
+
+  res.json({ ok: true });
+});
+
 router.put('/me/preferences', authenticate, (req, res) => {
   const updates = [];
   const values = [];
@@ -370,6 +386,15 @@ router.put('/me/preferences', authenticate, (req, res) => {
     }
     updates.push('preferred_language = ?');
     values.push(preferredLanguage);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, 'preferredTimeZone')) {
+    const { preferredTimeZone } = req.body;
+    if (preferredTimeZone !== null && !isSupportedTimeZone(preferredTimeZone)) {
+      return res.status(400).json({ error: 'preferredTimeZone must be a supported time zone or null' });
+    }
+    updates.push('preferred_timezone = ?');
+    values.push(normalizeOptionalTimeZone(preferredTimeZone));
   }
 
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredColorScheme')) {
@@ -442,7 +467,7 @@ router.put('/me/preferences', authenticate, (req, res) => {
      WHERE id = ?`
   ).run(...values, req.user.id);
 
-  const user = db.prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, last_activity_at FROM users WHERE id = ?').get(req.user.id);
 
   res.json({
     user: serializeCurrentUser(user),
@@ -501,8 +526,8 @@ router.post('/dev-login', (req, res) => {
     const userId = uuidv4();
     const avatarColor = '#6366f1';
     db.prepare(`
-      INSERT INTO users (id, email, display_name, role, avatar_color, is_active, last_login)
-      VALUES (?, ?, ?, ?, ?, 1, datetime('now'))
+      INSERT INTO users (id, email, display_name, role, avatar_color, is_active, last_login, last_activity_at)
+      VALUES (?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
     `).run(userId, devEmail, devDisplayName, role, avatarColor);
 
     // Add to default group
@@ -511,7 +536,7 @@ router.post('/dev-login', (req, res) => {
     user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
   } else {
     // Update role if it changed and refresh last_login
-    db.prepare(`UPDATE users SET role = ?, display_name = ?, last_login = datetime('now'), updated_at = datetime('now') WHERE id = ?`)
+    db.prepare(`UPDATE users SET role = ?, display_name = ?, last_login = datetime('now'), last_activity_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`)
       .run(role, devDisplayName, user.id);
     user = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
   }

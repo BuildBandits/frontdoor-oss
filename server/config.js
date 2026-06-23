@@ -1,3 +1,6 @@
+import { DEFAULT_TIME_ZONE, normalizeTimeZone } from '../shared/timeZones.js';
+import { getBrandingSettings } from './services/branding.js';
+
 const REDACTED = '[set]';
 
 // Secrets that ship as placeholders in .env.example files and MUST NOT be used
@@ -29,6 +32,11 @@ function isValidHttpUrl(value) {
   }
 }
 
+export function getAppTimeZone() {
+  const brandingTimeZone = getBrandingSettings()?.defaultTimeZone;
+  return normalizeTimeZone(brandingTimeZone || process.env.TIMEZONE || process.env.TZ, DEFAULT_TIME_ZONE);
+}
+
 export function getRequiredEnv(name, context = 'startup') {
   const value = process.env[name];
   if (!isSet(value)) {
@@ -40,7 +48,10 @@ export function getRequiredEnv(name, context = 'startup') {
 export function getStartupConfig() {
   const baseDomain = process.env.BASE_DOMAIN || 'frontdoor.local';
   const frontendUrl = process.env.FRONTEND_URL || 'https://frontdoor.local';
-  const timezone = process.env.TZ || 'Europe/Rome';
+  const timezone = getAppTimeZone();
+  const corsAllowedOrigins = process.env.CORS_ALLOWED_ORIGINS
+    ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
   const azureClientId = process.env.AZURE_CLIENT_ID || '';
   const azureClientSecret = process.env.AZURE_CLIENT_SECRET || '';
   const azureTenantId = process.env.AZURE_TENANT_ID || '';
@@ -56,6 +67,7 @@ export function getStartupConfig() {
     BRANDING_ASSET_DIR: brandingAssetDir,
     BASE_DOMAIN: baseDomain,
     FRONTEND_URL: frontendUrl,
+    CORS_ALLOWED_ORIGINS: corsAllowedOrigins.length > 0 ? corsAllowedOrigins.join(', ') : '[empty]',
     TIMEZONE: timezone,
     DEV_LOGIN: isDevLoginEnabled() ? 'enabled' : 'disabled',
     AZURE_CLIENT_ID: isSet(azureClientId) ? REDACTED : '[missing]',
@@ -98,9 +110,6 @@ export function validateStartupEnv() {
   }
   if (!isSet(process.env.FRONTEND_URL)) {
     warnings.push('FRONTEND_URL is not set, defaulting to https://frontdoor.local');
-  }
-  if (!isSet(process.env.TZ)) {
-    warnings.push('TZ is not set, defaulting to Europe/Rome');
   }
   if (!isSet(process.env.BRANDING_ASSET_DIR)) {
     warnings.push('BRANDING_ASSET_DIR is not set, defaulting to ./data/branding');

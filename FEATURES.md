@@ -169,7 +169,7 @@ SQLite (better-sqlite3) in WAL mode with foreign-key enforcement. Schema covers 
 - Configuration through `.env`:
   - Node-mode example: `.env.example.node`
   - Docker-mode example: `.env.example.docker`
-- Timezone configurable via `TZ` (default `Europe/Rome`).
+- Timezone configurable per tenant and per user in the app.
 - Static assets served from `dist/` with SPA fallback in production.
 
 ## Admin Page Map

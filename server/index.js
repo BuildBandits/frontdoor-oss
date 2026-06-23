@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
@@ -102,6 +103,18 @@ app.use(helmet({
   },
 }));
 app.use(cookieParser());
+
+const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
+  ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
+  : [];
+
+if (allowedOrigins.length > 0) {
+  app.use(cors({
+    origin: allowedOrigins,
+    credentials: true,
+  }));
+  console.log(`Frontdoor CORS allowlist loaded: ${allowedOrigins.join(', ')}`);
+}
 
 // Keep a slightly larger body limit because branding/image uploads are sent as data URLs.
 app.use(express.json({ limit: '5mb' }));
