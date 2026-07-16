@@ -13,6 +13,7 @@ import { getBrandingSettings } from '../services/branding.js';
 import { dispatchPluginEvent } from '../services/plugins.js';
 import { isValidEntraApplicationId, normalizeEntraApplicationId } from '../../shared/entra.js';
 import { normalizeAppSlug, validateAppSlug } from '../../shared/appSlug.js';
+import { validateTargetUrl } from '../../shared/targetUrl.js';
 
 const router = express.Router();
 
@@ -46,7 +47,7 @@ router.get('/', authenticate, (req, res) => {
       ? `/api/apps/${app.slug}/sso-redirect`
       : app.mode === 'entra-app'
       ? `/api/apps/${app.slug}/entra-redirect`
-      : app.target_url; // redirect-plain and shared-cookie both link directly
+      : app.target_url; // redirect-plain, internal-link, and shared-cookie link directly
     const tags = parseTags(app.tags);
     return { ...app, url, tags, iconUrl: iconUrlForApp(app) };
   });
@@ -219,7 +220,7 @@ router.get('/:slug/entra-redirect', authenticate, (req, res) => {
 // Track an access to an app. Frontend fires this fire-and-forget before opening
 // the target URL in a new tab, so we can record access events for apps that
 // don't go through the /sso-redirect (or /entra-redirect) server round-trip
-// (i.e. redirect-plain and shared-cookie modes, which link directly to
+// (i.e. redirect-plain, internal-link, and shared-cookie modes, which link directly to
 // target_url from the browser).
 router.post('/:slug/track-access', authenticate, (req, res) => {
   const app = db
@@ -345,22 +346,6 @@ router.post('/restore-defaults', authenticate, isAdminEditor, (req, res) => {
   }
 });
 
-// Validate target_url helper
-function validateTargetUrl(target_url) {
-  try {
-    const parsed = new URL(target_url);
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      return 'target_url must use http or https';
-    }
-    if (/^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|0\.0\.0\.0|localhost|169\.254\.)/.test(parsed.hostname)) {
-      return 'target_url cannot point to private networks';
-    }
-    return null;
-  } catch {
-    return 'target_url must be a valid URL';
-  }
-}
-
 function normalizeEntraEndpoint(value) {
   return normalizeEntraApplicationId(value);
 }
@@ -392,6 +377,7 @@ function parseTags(rawTags) {
 
 function isAppModeEnabled(mode, branding = getBrandingSettings()) {
   if (mode === 'redirect-plain') return true;
+  if (mode === 'internal-link') return true;
   if (mode === 'shared-cookie') return branding.showSharedCookieMode !== false;
   if (mode === 'redirect') return branding.showRedirectSsoMode !== false;
   if (mode === 'entra-app') return branding.showEntraAppMode !== false;
@@ -469,11 +455,8 @@ router.post('/', authenticate, isAdminEditor, async (req, res) => {
     const slugError = validateAppSlug(slug);
     if (slugError) return res.status(400).json({ error: slugError });
 
-    const urlError = validateTargetUrl(target_url);
-    if (urlError) return res.status(400).json({ error: urlError });
-
-    if (mode && !['redirect', 'redirect-plain', 'shared-cookie', 'entra-app'].includes(mode)) {
-      return res.status(400).json({ error: 'mode must be redirect, redirect-plain, shared-cookie, or entra-app' });
+    if (mode && !['redirect', 'redirect-plain', 'internal-link', 'shared-cookie', 'entra-app'].includes(mode)) {
+      return res.status(400).json({ error: 'mode must be redirect, redirect-plain, internal-link, shared-cookie, or entra-app' });
     }
     if (sso_method && !['GET', 'POST'].includes(sso_method)) {
       return res.status(400).json({ error: 'sso_method must be GET or POST' });
@@ -483,6 +466,9 @@ router.post('/', authenticate, isAdminEditor, async (req, res) => {
     if (!isAppModeEnabled(requestedMode)) {
       return res.status(400).json({ error: 'Selected app mode is disabled by personalization settings' });
     }
+
+    const urlError = validateTargetUrl(target_url, requestedMode);
+    if (urlError) return res.status(400).json({ error: urlError });
 
     const normalizedSsoEndpoint = requestedMode === 'entra-app'
       ? normalizeEntraEndpoint(sso_endpoint)
@@ -568,13 +554,15 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
       }
     }
 
-    if (target_url) {
-      const urlError = validateTargetUrl(target_url);
+    const nextMode = mode !== undefined ? mode : existing.mode;
+
+    if (target_url !== undefined) {
+      const urlError = validateTargetUrl(target_url, nextMode);
       if (urlError) return res.status(400).json({ error: urlError });
     }
 
-    if (mode !== undefined && !['redirect', 'redirect-plain', 'shared-cookie', 'entra-app'].includes(mode)) {
-      return res.status(400).json({ error: 'mode must be redirect, redirect-plain, shared-cookie, or entra-app' });
+    if (mode !== undefined && !['redirect', 'redirect-plain', 'internal-link', 'shared-cookie', 'entra-app'].includes(mode)) {
+      return res.status(400).json({ error: 'mode must be redirect, redirect-plain, internal-link, shared-cookie, or entra-app' });
     }
     if (sso_method !== undefined && !['GET', 'POST'].includes(sso_method)) {
       return res.status(400).json({ error: 'sso_method must be GET or POST' });
@@ -584,7 +572,6 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
       return res.status(400).json({ error: 'Selected app mode is disabled by personalization settings' });
     }
 
-    const nextMode = mode !== undefined ? mode : existing.mode;
     const normalizedSsoEndpoint = nextMode === 'entra-app'
       ? normalizeEntraEndpoint(sso_endpoint !== undefined ? sso_endpoint : existing.sso_endpoint)
       : (sso_endpoint !== undefined ? sso_endpoint : existing.sso_endpoint);
@@ -780,12 +767,7 @@ router.post('/bulk', (req, res) => {
         continue;
       }
 
-      const urlError = validateTargetUrl(app.target_url);
-      if (urlError) {
-        results.push({ slug: app.slug, status: 'skipped', reason: urlError });
-        continue;
-      }
-      if (app.mode && !['redirect', 'redirect-plain', 'shared-cookie', 'entra-app'].includes(app.mode)) {
+      if (app.mode && !['redirect', 'redirect-plain', 'internal-link', 'shared-cookie', 'entra-app'].includes(app.mode)) {
         results.push({ slug: app.slug, status: 'skipped', reason: 'invalid mode' });
         continue;
       }
@@ -798,6 +780,12 @@ router.post('/bulk', (req, res) => {
       const requestedMode = app.mode || existing?.mode || 'redirect-plain';
       if (!isAppModeEnabled(requestedMode)) {
         results.push({ slug: app.slug, status: 'skipped', reason: 'selected mode is disabled by personalization settings' });
+        continue;
+      }
+
+      const urlError = validateTargetUrl(app.target_url, requestedMode);
+      if (urlError) {
+        results.push({ slug: app.slug, status: 'skipped', reason: urlError });
         continue;
       }
 

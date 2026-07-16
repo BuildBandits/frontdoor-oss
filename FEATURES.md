@@ -44,6 +44,7 @@ Four role tiers with distinct scopes:
 How Frontdoor hands the user off to a target application:
 
 - **`redirect-plain`** — plain external link, no auth forwarding.
+- **`internal-link`** — plain link to a private IP literal, for rare on-prem/internal targets.
 - **`redirect`** — JWT forwarded via GET query or POST form to the app's SSO endpoint. Verified either locally (shared `JWT_SECRET`) or via Frontdoor's introspection endpoint (no secret sharing).
 - **`shared-cookie`** — `httpOnly` JWT cookie scoped to a wildcard domain, ideal for `*.example.com` subdomains.
 - **`entra-app`** — Microsoft MyApps launcher redirect for native Entra-enrolled apps. Accepts either a UUID or a full `launcher.myapps.microsoft.com/...` URL.
@@ -53,6 +54,7 @@ How Frontdoor hands the user off to a target application:
 - Create / edit / duplicate / delete apps from `/admin`.
 - Auto-suggested slug from name (until manually edited).
 - Per-app: name, slug, description, long description, target URL, icon, tags, mode, SSO endpoint & method, sort order, group assignments, active flag.
+- `internal-link` mode for rare private-IP targets that must stay reachable through Frontdoor.
 - Unlabeled-apps quick filter with live count, surfaced as a discreet badge.
 - Orphan-app warning with direct edit links for apps without group assignments.
 - Soft-delete via `is_active` (hidden from catalog without losing history).

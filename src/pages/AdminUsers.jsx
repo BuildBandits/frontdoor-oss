@@ -304,12 +304,14 @@ export default function AdminUsers() {
   const visibleApps = userDetail?.visibleApps || [];
   const appModeLabel = (mode) => {
     if (mode === 'redirect') return t.redirectSso;
+    if (mode === 'internal-link') return t.internalLink;
     if (mode === 'shared-cookie') return t.sharedCookie;
     if (mode === 'entra-app') return t.entraApp;
     return t.link;
   };
   const appModeBadgeClass = (mode) => {
     if (mode === 'redirect') return 'bg-blue-100 text-blue-700';
+    if (mode === 'internal-link') return 'bg-emerald-100 text-emerald-700';
     if (mode === 'shared-cookie') return 'bg-accent/10 text-accent-dark';
     if (mode === 'entra-app') return 'bg-violet-100 text-violet-700';
     return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300';
@@ -985,77 +987,74 @@ export default function AdminUsers() {
                         )}
                       </div>
 
-                      <div className="col-span-full border-t border-gray-100 dark:border-gray-800 pt-5 mt-1">
-                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">{t.actions}</h3>
-                        {!canEditUsers && (
-                          <div className="mb-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
-                            {u.readOnlyUsersMessage}
-                          </div>
-                        )}
-                        <div className="flex flex-wrap gap-2">
-                          {getRoleActions(user).map((action) => {
-                            const Icon = action.icon;
-                            return (
-                              <Tooltip key={action.role} content={action.label}>
-                                <button
-                                  type="button"
-                                  onClick={() => updateRole(user, action.role)}
-                                  aria-label={action.label}
-                                  className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${action.className}`}
-                                >
-                                  <Icon className="h-4 w-4 shrink-0" />
-                                  <span className="min-w-0 truncate">{getCompactActionLabel(action)}</span>
-                                </button>
-                              </Tooltip>
-                            );
-                          })}
+                      {canEditUsers && (
+                        <div className="col-span-full border-t border-gray-100 dark:border-gray-800 pt-5 mt-1">
+                          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">{t.actions}</h3>
+                          <div className="flex flex-wrap gap-2">
+                            {getRoleActions(user).map((action) => {
+                              const Icon = action.icon;
+                              return (
+                                <Tooltip key={action.role} content={action.label}>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateRole(user, action.role)}
+                                    aria-label={action.label}
+                                    className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${action.className}`}
+                                  >
+                                    <Icon className="h-4 w-4 shrink-0" />
+                                    <span className="min-w-0 truncate">{getCompactActionLabel(action)}</span>
+                                  </button>
+                                </Tooltip>
+                              );
+                            })}
 
-                          <Tooltip content={!canEditUsers || isComposeLockedAdmin(user) ? u.deactivateBlocked : (user.is_active ? u.deactivateUser : u.reactivateUser)}>
-                            <button
-                              type="button"
-                              onClick={!canEditUsers || isComposeLockedAdmin(user) ? undefined : () => toggleActive(user)}
-                              disabled={!canEditUsers || isComposeLockedAdmin(user)}
-                              aria-label={!canEditUsers || isComposeLockedAdmin(user) ? u.deactivateBlocked : (user.is_active ? u.deactivateUser : u.reactivateUser)}
-                              className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
-                                !canEditUsers || isComposeLockedAdmin(user)
-                                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                                  : user.is_active
-                                    ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/45'
-                                    : 'bg-accent/10 text-accent-dark hover:bg-accent/20 dark:bg-accent-dark/25 dark:text-gray-100 dark:hover:bg-accent-dark/35'
-                              }`}
-                            >
-                              {!canEditUsers || isComposeLockedAdmin(user) ? (
-                                <><UserX className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deactivateBlocked}</span></>
-                              ) : user.is_active ? (
-                                <><UserX className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deactivateUser}</span></>
-                              ) : (
-                                <><UserCheck className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.reactivateUser}</span></>
-                              )}
-                            </button>
-                          </Tooltip>
-                          <Tooltip content={!canEditUsers || isComposeLockedAdmin(user) ? u.deleteBlocked : u.deleteUser}>
-                            <button
-                              type="button"
-                              onClick={!canEditUsers || isComposeLockedAdmin(user) ? undefined : () => deleteUser(user)}
-                              disabled={!canEditUsers || isComposeLockedAdmin(user)}
-                              aria-label={!canEditUsers || isComposeLockedAdmin(user) ? u.deleteBlocked : u.deleteUser}
-                              className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
-                                !canEditUsers || isComposeLockedAdmin(user)
-                                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                                  : 'bg-red-50 text-red-700 hover:bg-red-200 dark:bg-red-950/45 dark:text-red-300 dark:hover:bg-red-900/55'
-                              }`}
-                            >
-                              <Trash2 className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deleteUser}</span>
-                            </button>
-                          </Tooltip>
+                            <Tooltip content={isComposeLockedAdmin(user) ? u.deactivateBlocked : (user.is_active ? u.deactivateUser : u.reactivateUser)}>
+                              <button
+                                type="button"
+                                onClick={isComposeLockedAdmin(user) ? undefined : () => toggleActive(user)}
+                                disabled={isComposeLockedAdmin(user)}
+                                aria-label={isComposeLockedAdmin(user) ? u.deactivateBlocked : (user.is_active ? u.deactivateUser : u.reactivateUser)}
+                                className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+                                  isComposeLockedAdmin(user)
+                                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                                    : user.is_active
+                                      ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/45'
+                                      : 'bg-accent/10 text-accent-dark hover:bg-accent/20 dark:bg-accent-dark/25 dark:text-gray-100 dark:hover:bg-accent-dark/35'
+                                }`}
+                              >
+                                {isComposeLockedAdmin(user) ? (
+                                  <><UserX className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deactivateBlocked}</span></>
+                                ) : user.is_active ? (
+                                  <><UserX className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deactivateUser}</span></>
+                                ) : (
+                                  <><UserCheck className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.reactivateUser}</span></>
+                                )}
+                              </button>
+                            </Tooltip>
+                            <Tooltip content={isComposeLockedAdmin(user) ? u.deleteBlocked : u.deleteUser}>
+                              <button
+                                type="button"
+                                onClick={isComposeLockedAdmin(user) ? undefined : () => deleteUser(user)}
+                                disabled={isComposeLockedAdmin(user)}
+                                aria-label={isComposeLockedAdmin(user) ? u.deleteBlocked : u.deleteUser}
+                                className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+                                  isComposeLockedAdmin(user)
+                                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                                    : 'bg-red-50 text-red-700 hover:bg-red-200 dark:bg-red-950/45 dark:text-red-300 dark:hover:bg-red-900/55'
+                                }`}
+                              >
+                                <Trash2 className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deleteUser}</span>
+                              </button>
+                            </Tooltip>
+                          </div>
+                          <div className="mt-3 flex flex-wrap items-center gap-3 px-1 text-[11px] text-gray-400 dark:text-gray-500">
+                            <span>{u.removeUserSummary}</span>
+                            {isComposeLockedAdmin(user) && (
+                              <span>{u.composeWarning}</span>
+                            )}
+                          </div>
                         </div>
-                        <div className="mt-3 flex flex-wrap items-center gap-3 px-1 text-[11px] text-gray-400 dark:text-gray-500">
-                          <span>{u.removeUserSummary}</span>
-                          {isComposeLockedAdmin(user) && (
-                            <span>{u.composeWarning}</span>
-                          )}
-                        </div>
-                      </div>
+                      )}
                     </div>
                   ) : null}
                 </div>

@@ -3,7 +3,7 @@ import fsp from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
-import { DEFAULT_LANGUAGE, isSupportedLanguage } from '../../shared/languages.js';
+import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGE_CODES, isSupportedLanguage } from '../../shared/languages.js';
 import { DEFAULT_COLOR_SCHEME, normalizeColorScheme } from '../../shared/colorSchemes.js';
 import { DEFAULT_TIME_ZONE, normalizeTimeZone } from '../../shared/timeZones.js';
 import { archiveMediaAsset } from './mediaAssets.js';
@@ -18,6 +18,9 @@ const DEFAULT_BRANDING = {
   heroTitleLine1: 'Your apps,',
   heroTitleLine2: 'all in one place.',
   heroSubtitle: 'Quickly access all the tools and platforms in your workspace.',
+  heroTitleLine1I18n: {},
+  heroTitleLine2I18n: {},
+  heroSubtitleI18n: {},
   showHomeHero: true,
   hideHomeHeroOnMobile: false,
   showAppModeBadges: true,
@@ -62,6 +65,31 @@ function normalizeLanguage(value, fallback = DEFAULT_LANGUAGE) {
   return isSupportedLanguage(value) ? value : fallback;
 }
 
+// Sanitize an arbitrary object into a { [supportedLangCode]: trimmedNonEmptyString } map.
+// Unsupported languages and empty strings are dropped.
+function sanitizeI18nMap(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const out = {};
+  for (const code of SUPPORTED_LANGUAGE_CODES) {
+    const text = (value[code] ?? '').toString().trim();
+    if (text) out[code] = text;
+  }
+  return out;
+}
+
+function parseI18nMap(jsonText) {
+  if (!jsonText) return {};
+  try {
+    return sanitizeI18nMap(JSON.parse(jsonText));
+  } catch {
+    return {};
+  }
+}
+
+function serializeI18nMap(map) {
+  return Object.keys(map).length ? JSON.stringify(map) : null;
+}
+
 function getStoredBrandingRow() {
   return db.prepare('SELECT * FROM branding_settings WHERE id = ?').get(BRANDING_ID);
 }
@@ -72,6 +100,9 @@ function toPublicBranding(row) {
     heroTitleLine1: normalizeText(row?.hero_title_line1, DEFAULT_BRANDING.heroTitleLine1),
     heroTitleLine2: normalizeText(row?.hero_title_line2, DEFAULT_BRANDING.heroTitleLine2),
     heroSubtitle: normalizeText(row?.hero_subtitle, DEFAULT_BRANDING.heroSubtitle),
+    heroTitleLine1I18n: parseI18nMap(row?.hero_title_line1_i18n),
+    heroTitleLine2I18n: parseI18nMap(row?.hero_title_line2_i18n),
+    heroSubtitleI18n: parseI18nMap(row?.hero_subtitle_i18n),
     showHomeHero: row?.show_home_hero !== 0,
     hideHomeHeroOnMobile: row?.hide_home_hero_on_mobile === 1,
     showAppModeBadges: row?.show_app_mode_badges !== 0,
@@ -100,6 +131,9 @@ function buildBrandingAuditDetails(currentRow, nextBranding, input = {}) {
     'heroTitleLine1',
     'heroTitleLine2',
     'heroSubtitle',
+    'heroTitleLine1I18n',
+    'heroTitleLine2I18n',
+    'heroSubtitleI18n',
     'showHomeHero',
     'hideHomeHeroOnMobile',
     'showAppModeBadges',
@@ -120,7 +154,7 @@ function buildBrandingAuditDetails(currentRow, nextBranding, input = {}) {
   ];
 
   const changes = changedKeys
-    .filter((key) => currentBranding[key] !== nextBranding[key])
+    .filter((key) => JSON.stringify(currentBranding[key]) !== JSON.stringify(nextBranding[key]))
     .map((key) => ({
       field: key,
       from: currentBranding[key],
@@ -203,9 +237,33 @@ export function getBrandingSettings() {
 
 export async function updateBrandingSettings(input = {}) {
   const current = getStoredBrandingRow();
-  const heroTitleLine1 = normalizeText(input.heroTitleLine1, current?.hero_title_line1 || DEFAULT_BRANDING.heroTitleLine1);
-  const heroTitleLine2 = normalizeText(input.heroTitleLine2, current?.hero_title_line2 || DEFAULT_BRANDING.heroTitleLine2);
-  const heroSubtitle = normalizeText(input.heroSubtitle, current?.hero_subtitle || DEFAULT_BRANDING.heroSubtitle);
+  // Language whose hero variant seeds the scalar (backward-compatible) columns.
+  const heroDefaultLanguage = input.defaultLanguage === undefined
+    ? normalizeLanguage(current?.default_language || DEFAULT_BRANDING.defaultLanguage)
+    : normalizeLanguage(input.defaultLanguage);
+
+  const heroTitleLine1I18n = input.heroTitleLine1I18n === undefined
+    ? parseI18nMap(current?.hero_title_line1_i18n)
+    : sanitizeI18nMap(input.heroTitleLine1I18n);
+  const heroTitleLine2I18n = input.heroTitleLine2I18n === undefined
+    ? parseI18nMap(current?.hero_title_line2_i18n)
+    : sanitizeI18nMap(input.heroTitleLine2I18n);
+  const heroSubtitleI18n = input.heroSubtitleI18n === undefined
+    ? parseI18nMap(current?.hero_subtitle_i18n)
+    : sanitizeI18nMap(input.heroSubtitleI18n);
+
+  // Keep the scalar columns as a sensible representative value (default language, else
+  // any provided variant, else the previous/default text) so legacy consumers keep working.
+  const firstValue = (map) => map[heroDefaultLanguage] || Object.values(map)[0] || '';
+  const heroTitleLine1 = firstValue(heroTitleLine1I18n)
+    || normalizeText(input.heroTitleLine1, current?.hero_title_line1 || DEFAULT_BRANDING.heroTitleLine1);
+  const heroTitleLine2 = firstValue(heroTitleLine2I18n)
+    || normalizeText(input.heroTitleLine2, current?.hero_title_line2 || DEFAULT_BRANDING.heroTitleLine2);
+  const heroSubtitle = firstValue(heroSubtitleI18n)
+    || normalizeText(input.heroSubtitle, current?.hero_subtitle || DEFAULT_BRANDING.heroSubtitle);
+  const heroTitleLine1I18nJson = serializeI18nMap(heroTitleLine1I18n);
+  const heroTitleLine2I18nJson = serializeI18nMap(heroTitleLine2I18n);
+  const heroSubtitleI18nJson = serializeI18nMap(heroSubtitleI18n);
   const showHomeHero = input.showHomeHero === undefined
     ? (current?.show_home_hero ?? 1)
     : (input.showHomeHero ? 1 : 0);
@@ -270,13 +328,16 @@ export async function updateBrandingSettings(input = {}) {
 
   db.prepare(`
     INSERT INTO branding_settings (
-      id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, default_timezone, default_color_scheme, enable_dark_mode_beta, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, plugins_enabled, logo_file_name, logo_content_type, updated_at
+      id, hero_title_line1, hero_title_line2, hero_subtitle, hero_title_line1_i18n, hero_title_line2_i18n, hero_subtitle_i18n, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, default_timezone, default_color_scheme, enable_dark_mode_beta, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, plugins_enabled, logo_file_name, logo_content_type, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       hero_title_line1 = excluded.hero_title_line1,
       hero_title_line2 = excluded.hero_title_line2,
       hero_subtitle = excluded.hero_subtitle,
+      hero_title_line1_i18n = excluded.hero_title_line1_i18n,
+      hero_title_line2_i18n = excluded.hero_title_line2_i18n,
+      hero_subtitle_i18n = excluded.hero_subtitle_i18n,
       show_home_hero = excluded.show_home_hero,
       hide_home_hero_on_mobile = excluded.hide_home_hero_on_mobile,
       show_app_mode_badges = excluded.show_app_mode_badges,
@@ -302,6 +363,9 @@ export async function updateBrandingSettings(input = {}) {
     heroTitleLine1,
     heroTitleLine2,
     heroSubtitle,
+    heroTitleLine1I18nJson,
+    heroTitleLine2I18nJson,
+    heroSubtitleI18nJson,
     showHomeHero,
     hideHomeHeroOnMobile,
     showAppModeBadges,

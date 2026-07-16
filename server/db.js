@@ -47,7 +47,7 @@ db.exec(`
     target_url TEXT NOT NULL,
     is_active INTEGER DEFAULT 1,
     sort_order INTEGER DEFAULT 0,
-    mode TEXT DEFAULT 'redirect-plain' CHECK(mode IN ('redirect', 'redirect-plain', 'shared-cookie', 'entra-app')),
+    mode TEXT DEFAULT 'redirect-plain' CHECK(mode IN ('redirect', 'redirect-plain', 'internal-link', 'shared-cookie', 'entra-app')),
     sso_endpoint TEXT DEFAULT '/sso',
     sso_method TEXT DEFAULT 'GET' CHECK(sso_method IN ('GET', 'POST')),
     long_description TEXT DEFAULT '',
@@ -257,6 +257,11 @@ ensureColumn('branding_settings', 'show_entra_app_mode', 'show_entra_app_mode IN
 ensureColumn('branding_settings', 'plugins_enabled', 'plugins_enabled INTEGER DEFAULT 0');
 ensureColumn('branding_settings', 'default_color_scheme', "default_color_scheme TEXT DEFAULT 'light' CHECK(default_color_scheme IN ('light', 'dark', 'auto'))");
 ensureColumn('branding_settings', 'enable_dark_mode_beta', 'enable_dark_mode_beta INTEGER DEFAULT 0');
+// Per-language overrides for the Home hero, stored as JSON maps keyed by language code
+// (e.g. {"en":"...","it":"..."}). Empty/absent falls back to the scalar hero_* columns.
+ensureColumn('branding_settings', 'hero_title_line1_i18n', 'hero_title_line1_i18n TEXT');
+ensureColumn('branding_settings', 'hero_title_line2_i18n', 'hero_title_line2_i18n TEXT');
+ensureColumn('branding_settings', 'hero_subtitle_i18n', 'hero_subtitle_i18n TEXT');
 ensureColumn('entra_group_cache', 'description', 'description TEXT');
 ensureColumn('media_assets', 'app_name', 'app_name TEXT');
 ensureColumn('media_assets', 'app_slug', 'app_slug TEXT');
@@ -448,10 +453,10 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
   }
 }
 
-// Migration: add 'entra-app' to apps.mode CHECK constraint (existing databases only)
+// Migration: add 'entra-app' and 'internal-link' to apps.mode CHECK constraint (existing databases only)
 {
   const appsSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='apps'").get();
-  if (appsSchema && !appsSchema.sql.includes('entra-app')) {
+  if (appsSchema && (!appsSchema.sql.includes('entra-app') || !appsSchema.sql.includes('internal-link'))) {
     db.pragma('foreign_keys = OFF');
     db.exec(`
       CREATE TABLE apps_new (
@@ -464,7 +469,7 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         target_url TEXT NOT NULL,
         is_active INTEGER DEFAULT 1,
         sort_order INTEGER DEFAULT 0,
-        mode TEXT DEFAULT 'redirect-plain' CHECK(mode IN ('redirect', 'redirect-plain', 'shared-cookie', 'entra-app')),
+        mode TEXT DEFAULT 'redirect-plain' CHECK(mode IN ('redirect', 'redirect-plain', 'internal-link', 'shared-cookie', 'entra-app')),
         sso_endpoint TEXT DEFAULT '/sso',
         sso_method TEXT DEFAULT 'GET' CHECK(sso_method IN ('GET', 'POST')),
         long_description TEXT DEFAULT '',

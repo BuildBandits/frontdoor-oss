@@ -7,6 +7,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- **Internal link mode**: admins can now create an `internal-link` app connection that accepts only private IP literals over `http` or `https`, so rare on-prem targets can still be exposed through Frontdoor without reopening hostname-based SSRF paths. `redirect-plain` keeps its private-network block.
+- **Per-language Home hero text**: the Home hero title (both lines) and subtitle can now hold a distinct value per supported language. The Customization page shows a language selector above the hero fields so an admin can enter, for example, an English and an Italian version; the Home renders the variant matching the viewer's effective language and falls back to the default text when a language is left empty. Stored as JSON maps in new `hero_*_i18n` branding columns (additive, backward-compatible migration); the legacy scalar `hero_*` columns are kept in sync with the default-language value so existing API consumers keep working. Previously the hero was a single string shown to everyone regardless of language.
 - **CORS startup confirmation**: when `CORS_ALLOWED_ORIGINS` is set, the server now prints the allowlist in the startup config so container logs immediately show which origins were loaded.
 - **Pagination controls top and bottom**: the App, Users, Groups, Log and Audit lists now repeat the shared pager above the table or card list as well as below it, so moving between pages is quicker without scrolling all the way down.
 - **Cross-origin session checks**: Frontdoor can now expose credentialed CORS for an allowlist of origins via `CORS_ALLOWED_ORIGINS`, making it possible for satellite pages on sibling or external domains to call session endpoints like `GET /api/auth/me` with the `frontdoor_token` cookie.
@@ -33,7 +35,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Plugin bundle persistence**: when a plugin is imported with module source, Frontdoor stores a local bundle and serves it back through the runtime loader instead of requiring a manual database edit.
 - **Search shortcut hint**: the shared search field now exposes a visible `CTRL+K / ⌘K` hint and supports a global `Ctrl/Cmd+K` shortcut that focuses the primary search input on pages that have one.
 
+### Fixed
+- **App update on internal-link**: editing an `internal-link` app no longer throws `Cannot access 'nextMode' before initialization` when the target URL is revalidated during save.
+- **Read-only admin user details**: the user detail card now hides the entire actions section for `admin_readonly` users instead of rendering blocked buttons and helper text.
+- **Read-only admin group shortcut**: the Apps table "Groups" action is now available to `admin_readonly` users again, since it only opens the group search view and does not perform any mutation.
+- **Internal link app creation**: the `apps.mode` SQLite constraint now includes `internal-link` on both fresh installs and existing databases, so saving a new internal-link app no longer fails with `CHECK constraint failed`.
+- **Search shortcut hint**: the shared search field badge now adapts to the current platform, showing only `CTRL+K` on Windows and other non-macOS systems and only `⌘K` on macOS so the hint uses less space.
+
 ### Changed
+- **Version bump**: Frontdoor is now on `1.2.8d` for the current branch, keeping the small-fix release cadence aligned with this work.
 - **Demo apps restore placement**: the demo-app reimport action now lives in `Personalizza > App` instead of the App list footer, so the App pagination footer can stay visually identical to Audit and Log.
 - **Version bump**: Frontdoor is now on `1.2.8c` for the current branch, keeping the small-fix release cadence aligned with this work.
 - **Users personalization icon**: the Admin Users personalization filter now uses a wand-style icon, so the menu reads more like a customization control than a generic filter.
@@ -84,6 +94,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Plugin admin crash**: restored the missing `FileJson` import on the plugin admin page so `/admin/plugins` no longer crashes on load with `ReferenceError: FileJson is not defined`.
 
 ### Fixed
+- **Accessibility — `<html lang>` now follows the active language**: the document language attribute was hardcoded to `en` in `index.html` and never updated when the user switched language or when the tenant default differed, so screen readers (JAWS, NVDA, VoiceOver) read localized content with the wrong speech-synthesis voice (WCAG 3.1.1 violation). A new `useDocumentLanguage` hook — mirroring `useColorScheme` — resolves the effective language from the user preference and branding default and keeps `document.documentElement.lang` in sync, including on the pre-auth login page and on live language/branding changes.
 - **Unused localization cleanup**: removed the dead `layout.beta` translation key now that the theme beta badge is no longer rendered anywhere in the UI.
 - **Users personalization filter**: hoisted the home view normalization helper so the new personalization filter no longer trips a render-time reference error when the filter branch is evaluated.
 - **Users filter spacing**: the Role and Status dropdowns on the Users page are now slightly narrower, leaving a bit more room for the search field.
@@ -141,6 +152,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Plugin page crash**: restored the missing `Sparkles` icon import on the admin Plugins page so the dashboard no longer boots to a white screen with `ReferenceError: Sparkles is not defined`.
 
 ### Security
+- **No user email in favorites-migration log**: the one-off `favoriteAppsMigrationFromLocalStorage` path no longer prints the user's email to the application log; it now logs only the user id and the migrated count, keeping PII out of stdout/infrastructure logs.
 - **Plugin capability boundary**: plugin packages now move through a constrained manifest/module contract and an owner approval step before they are mounted, reducing the chance of accidentally treating a third-party integration like a core feature.
 
 ## [1.2.1] — 2026-05-21

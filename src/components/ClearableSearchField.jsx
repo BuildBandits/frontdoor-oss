@@ -2,6 +2,28 @@ import { useRef } from 'react';
 import { Search, X } from 'lucide-react';
 import Tooltip from './Tooltip';
 
+function isMacLikePlatform() {
+  if (typeof navigator === 'undefined') {
+    return false;
+  }
+
+  const platform = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || '';
+  return /mac|iphone|ipad|ipod/i.test(platform);
+}
+
+function resolveSearchShortcutLabel(label) {
+  if (typeof label !== 'string') {
+    return label;
+  }
+
+  const parts = label.split('/').map((part) => part.trim()).filter(Boolean);
+  if (parts.length !== 2) {
+    return label;
+  }
+
+  return isMacLikePlatform() ? parts[1] : parts[0];
+}
+
 export default function ClearableSearchField({
   value,
   onChange,
@@ -16,6 +38,7 @@ export default function ClearableSearchField({
   clearLabel = 'Clear search',
 }) {
   const lastClearedValueRef = useRef('');
+  const visibleSearchShortcutLabel = resolveSearchShortcutLabel(searchShortcutLabel);
 
   const handleKeyDown = (event) => {
     if (event.key === 'Escape') {
@@ -62,12 +85,12 @@ export default function ClearableSearchField({
           className={`min-w-0 flex-1 h-full border-0 bg-transparent p-0 text-sm leading-none text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 dark:text-gray-100 dark:placeholder:text-gray-500 ${inputClassName}`}
         />
         <div className="flex items-center gap-2 shrink-0">
-          {searchShortcutTarget && searchShortcutLabel && (
+          {searchShortcutTarget && visibleSearchShortcutLabel && (
             <span
               className="hidden md:inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500"
               aria-hidden="true"
             >
-              {searchShortcutLabel}
+              {visibleSearchShortcutLabel}
             </span>
           )}
           {value && (

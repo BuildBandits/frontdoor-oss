@@ -615,6 +615,7 @@ export default function Home() {
     closeDialog: ui.common.closeDialog,
     entraBadgeShort: ui.home.entraBadgeShort,
     externalBadgeShort: ui.home.externalBadgeShort,
+    internalLinkBadgeShort: ui.home.internalLinkBadgeShort,
     ssoBadgeShort: ui.home.ssoBadgeShort,
   }), [ui]);
 
@@ -835,17 +836,16 @@ export default function Home() {
                   </>
                 ) : (
                   <>
-                    {branding.heroTitleLine1}<br />
-                    <span className="text-dark/70 dark:text-gray-300">{branding.heroTitleLine2}</span>
+                    {branding.heroTitleLine1I18n?.[language] || branding.heroTitleLine1}<br />
+                    <span className="text-dark/70 dark:text-gray-300">{branding.heroTitleLine2I18n?.[language] || branding.heroTitleLine2}</span>
                   </>
                 )}
               </h1>
-              {/* Sottotitolo temporaneamente lasciato come branding amministrabile. */}
               <p className="text-gray-600 dark:text-gray-300 text-base md:text-lg max-w-xl">
                 {brandingLoading || !branding ? (
                   ui.home.heroSubtitle
                 ) : (
-                  branding.heroSubtitle
+                  branding.heroSubtitleI18n?.[language] || branding.heroSubtitle
                 )}
               </p>
             </div>

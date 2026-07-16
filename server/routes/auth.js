@@ -436,7 +436,7 @@ router.put('/me/preferences', authenticate, (req, res) => {
     if (Array.isArray(favoriteApps)) {
       const normalized = [...new Set(favoriteApps.filter((id) => typeof id === 'string' && id.trim()))];
       if (isLocalStorageMigration && normalized.length > 0) {
-        console.info(`[favorites-migration] user=${req.user.id} email=${req.user.email} count=${normalized.length}`);
+        console.info(`[favorites-migration] user=${req.user.id} count=${normalized.length}`);
       }
       updates.push('favorite_apps = ?');
       values.push(JSON.stringify(normalized));

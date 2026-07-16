@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import api from './services/api';
 import { getUiStrings, normalizeLanguage } from './i18n';
 import { useColorScheme } from './hooks/useColorScheme';
+import { useDocumentLanguage } from './hooks/useDocumentLanguage';
 import PluginHostProvider, { usePluginRuntimeApi } from './pluginHost/PluginHostProvider';
 import { usePluginRegistry } from './pluginHost/registry';
 import { PLUGIN_ACCESS } from './pluginHost/constants';
@@ -85,6 +86,7 @@ function AppRoutes() {
   const { isAuthenticated, user, updateUser } = useAuthStore();
   const ui = getUiStrings(normalizeLanguage('en'));
   useColorScheme(user?.preferredColorScheme);
+  useDocumentLanguage(user?.preferredLanguage);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return undefined;

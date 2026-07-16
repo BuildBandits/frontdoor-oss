@@ -54,6 +54,25 @@ const brandingKeys = [
   'pluginsEnabled',
 ];
 
+const heroI18nKeys = ['heroTitleLine1I18n', 'heroTitleLine2I18n', 'heroSubtitleI18n'];
+
+// Ensure each per-language hero map has the default-language slot populated from the
+// scalar value, so the editor starts from the current text and existing behavior is preserved.
+function seedHeroMaps(branding) {
+  const lang = branding?.defaultLanguage || 'en';
+  const seed = (map, scalar) => {
+    const next = { ...(map || {}) };
+    if (!next[lang] && scalar) next[lang] = scalar;
+    return next;
+  };
+  return {
+    ...branding,
+    heroTitleLine1I18n: seed(branding?.heroTitleLine1I18n, branding?.heroTitleLine1),
+    heroTitleLine2I18n: seed(branding?.heroTitleLine2I18n, branding?.heroTitleLine2),
+    heroSubtitleI18n: seed(branding?.heroSubtitleI18n, branding?.heroSubtitle),
+  };
+}
+
 export default function Customization() {
   const { user } = useAuthStore();
   const location = useLocation();
@@ -61,6 +80,7 @@ export default function Customization() {
   const [branding, setBranding] = useState(emptyBranding);
   const [initialBranding, setInitialBranding] = useState(emptyBranding);
   const [uiLanguage, setUiLanguage] = useState('en');
+  const [heroLang, setHeroLang] = useState('en');
   const [brandingLoading, setBrandingLoading] = useState(true);
   const [brandingSaving, setBrandingSaving] = useState(false);
   const [brandingLogoDataUrl, setBrandingLogoDataUrl] = useState('');
@@ -135,9 +155,10 @@ export default function Customization() {
     setBrandingLoading(true);
     api.get('/branding')
       .then((res) => {
-        const next = res.data.branding || emptyBranding;
+        const next = seedHeroMaps(res.data.branding || emptyBranding);
         setBranding(next);
         setInitialBranding(next);
+        setHeroLang(next.defaultLanguage || 'en');
         setUiLanguage(resolveAppLanguage(user?.preferredLanguage, next.defaultLanguage));
         setBrandingLogoPreview(next.logoUrl || null);
         setBrandingLogoDataUrl('');
@@ -318,6 +339,9 @@ export default function Customization() {
         heroTitleLine1: branding.heroTitleLine1,
         heroTitleLine2: branding.heroTitleLine2,
         heroSubtitle: branding.heroSubtitle,
+        heroTitleLine1I18n: branding.heroTitleLine1I18n,
+        heroTitleLine2I18n: branding.heroTitleLine2I18n,
+        heroSubtitleI18n: branding.heroSubtitleI18n,
         showHomeHero: branding.showHomeHero,
         hideHomeHeroOnMobile: branding.hideHomeHeroOnMobile,
         showAppModeBadges: branding.showAppModeBadges,
@@ -339,7 +363,7 @@ export default function Customization() {
       };
 
       const res = await api.put('/branding', payload);
-      const next = res.data.branding || emptyBranding;
+      const next = seedHeroMaps(res.data.branding || emptyBranding);
       setBranding(next);
       setInitialBranding(next);
       setUiLanguage(resolveAppLanguage(user?.preferredLanguage, next.defaultLanguage));
@@ -362,8 +386,11 @@ export default function Customization() {
 
   const isDirty = useMemo(() => {
     const brandingDirty = brandingKeys.some((key) => branding?.[key] !== initialBranding?.[key]);
+    const heroI18nDirty = heroI18nKeys.some(
+      (key) => JSON.stringify(branding?.[key] || {}) !== JSON.stringify(initialBranding?.[key] || {})
+    );
     const logoDirty = Boolean(brandingLogoDataUrl || removeBrandingLogo);
-    return brandingDirty || logoDirty;
+    return brandingDirty || heroI18nDirty || logoDirty;
   }, [branding, initialBranding, brandingLogoDataUrl, removeBrandingLogo]);
 
   const scrollToSection = useCallback((ref) => {
@@ -558,12 +585,34 @@ export default function Customization() {
                     </div>
                   ) : (
                     <div className="space-y-4">
+                      {/* Per-language variant selector: each language keeps its own hero text. */}
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="inline-flex rounded-xl border border-gray-200 dark:border-gray-700 p-0.5 bg-gray-50 dark:bg-gray-900">
+                          {languageOptions.map((option) => (
+                            <button
+                              key={option.code}
+                              type="button"
+                              onClick={() => setHeroLang(option.code)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                heroLang === option.code
+                                  ? 'bg-white dark:bg-gray-800 text-dark dark:text-gray-100 shadow-sm'
+                                  : 'text-gray-500 dark:text-gray-400 hover:text-dark dark:hover:text-gray-200'
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">{ui.customization.hero.variantHint}</span>
+                      </div>
+
                       <div>
                         <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{ui.customization.hero.line1}</label>
                         <input
                           type="text"
-                          value={branding.heroTitleLine1}
-                          onChange={(e) => setBranding({ ...branding, heroTitleLine1: e.target.value })}
+                          value={branding.heroTitleLine1I18n?.[heroLang] || ''}
+                          placeholder={branding.heroTitleLine1}
+                          onChange={(e) => setBranding({ ...branding, heroTitleLine1I18n: { ...branding.heroTitleLine1I18n, [heroLang]: e.target.value } })}
                           className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                         />
                       </div>
@@ -572,8 +621,9 @@ export default function Customization() {
                         <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{ui.customization.hero.line2}</label>
                         <input
                           type="text"
-                          value={branding.heroTitleLine2}
-                          onChange={(e) => setBranding({ ...branding, heroTitleLine2: e.target.value })}
+                          value={branding.heroTitleLine2I18n?.[heroLang] || ''}
+                          placeholder={branding.heroTitleLine2}
+                          onChange={(e) => setBranding({ ...branding, heroTitleLine2I18n: { ...branding.heroTitleLine2I18n, [heroLang]: e.target.value } })}
                           className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                         />
                       </div>
@@ -582,8 +632,9 @@ export default function Customization() {
                         <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{ui.customization.hero.subtitle}</label>
                         <textarea
                           rows="3"
-                          value={branding.heroSubtitle}
-                          onChange={(e) => setBranding({ ...branding, heroSubtitle: e.target.value })}
+                          value={branding.heroSubtitleI18n?.[heroLang] || ''}
+                          placeholder={branding.heroSubtitle}
+                          onChange={(e) => setBranding({ ...branding, heroSubtitleI18n: { ...branding.heroSubtitleI18n, [heroLang]: e.target.value } })}
                           className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500 resize-none"
                         />
                       </div>
@@ -688,10 +739,10 @@ export default function Customization() {
                     <div className="rounded-2xl bg-white/90 border border-white/80 dark:bg-gray-900/95 dark:border-gray-700 p-4 md:p-5 min-h-[220px] flex flex-col md:flex-row md:items-center md:justify-between gap-5">
                       <div className="min-w-0">
                         <div className="text-2xl md:text-3xl font-extrabold text-dark dark:text-gray-100 leading-tight">
-                          {branding.heroTitleLine1}<br />
-                          <span className="text-dark/70 dark:text-gray-400">{branding.heroTitleLine2}</span>
+                          {branding.heroTitleLine1I18n?.[heroLang] || branding.heroTitleLine1}<br />
+                          <span className="text-dark/70 dark:text-gray-400">{branding.heroTitleLine2I18n?.[heroLang] || branding.heroTitleLine2}</span>
                         </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-3 max-w-lg">{branding.heroSubtitle}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-3 max-w-lg">{branding.heroSubtitleI18n?.[heroLang] || branding.heroSubtitle}</p>
                       </div>
                       <div className="flex items-center justify-center md:justify-end min-w-[160px]">
                         {brandingLogoPreview ? (

@@ -11,6 +11,7 @@ const AppCard = forwardRef(function AppCard(
 ) {
   const [showInfo, setShowInfo] = useState(false);
   const isExternal = app.mode === 'redirect' || app.mode === 'redirect-plain';
+  const isInternalLink = app.mode === 'internal-link';
   const isSharedCookie = app.mode === 'shared-cookie';
   const isEntraApp = app.mode === 'entra-app';
   const hasLongDesc = app.long_description?.trim();
@@ -22,7 +23,7 @@ const AppCard = forwardRef(function AppCard(
     // Fire-and-forget access tracking. For mode='redirect' and
     // mode='entra-app' the server already logs via the dedicated redirect
     // endpoint, so we skip the explicit track call to avoid duplicate rows.
-    // For redirect-plain / shared-cookie modes the browser goes directly to
+    // For redirect-plain / internal-link / shared-cookie modes the browser goes directly to
     // target_url with no server round-trip, so this is the only signal the
     // server gets. Errors are swallowed — tracking must not block navigation.
     if (app.mode !== 'redirect' && app.mode !== 'entra-app') {
@@ -107,6 +108,9 @@ const AppCard = forwardRef(function AppCard(
             )}
             {showModeBadges && isExternal && (
               <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{getLabel('externalBadgeShort')}</span>
+            )}
+            {showModeBadges && isInternalLink && (
+              <span className="text-[10px] font-medium text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 px-1.5 py-0.5 rounded">{getLabel('internalLinkBadgeShort')}</span>
             )}
             {hasLongDesc && (
               <Tooltip content={getLabel('appInfo')}>
@@ -219,6 +223,9 @@ const AppCard = forwardRef(function AppCard(
             )}
             {showModeBadges && isExternal && (
               <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{getLabel('externalBadgeShort')}</span>
+            )}
+            {showModeBadges && isInternalLink && (
+              <span className="text-[10px] font-medium text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 px-1.5 py-0.5 rounded">{getLabel('internalLinkBadgeShort')}</span>
             )}
           </div>
         </div>

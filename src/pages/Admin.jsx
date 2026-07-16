@@ -614,6 +614,7 @@ export default function Admin() {
   };
   const modeOptions = [
     { value: 'redirect-plain', label: a.externalLink, active: 'bg-dark text-white border-dark', alwaysVisible: true },
+    { value: 'internal-link', label: a.internalLink, active: 'bg-emerald-600 text-white border-emerald-600', alwaysVisible: true },
     { value: 'shared-cookie', label: a.sharedCookie, active: 'bg-accent text-dark dark:text-gray-100 border-accent', visible: modeVisibility.showSharedCookieMode !== false },
     { value: 'redirect', label: a.redirectSso, active: 'bg-blue-600 text-white border-blue-600', visible: modeVisibility.showRedirectSsoMode !== false },
     { value: 'entra-app', label: a.entraApp, active: 'bg-violet-600 text-white border-violet-600', visible: modeVisibility.showEntraAppMode !== false },
@@ -1215,11 +1216,12 @@ export default function Admin() {
                   <td className="px-6 py-4 text-center whitespace-nowrap">
                     <span className={`inline-flex items-center text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ${
                       app.mode === 'redirect' ? 'bg-blue-100 text-blue-700'
+                        : app.mode === 'internal-link' ? 'bg-emerald-100 text-emerald-700'
                         : app.mode === 'shared-cookie' ? 'bg-accent/10 text-accent-dark'
                         : app.mode === 'entra-app' ? 'bg-violet-100 text-violet-700'
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
                     }`}>
-                      {app.mode === 'redirect' ? t.redirectSso : app.mode === 'shared-cookie' ? t.sharedCookie : app.mode === 'entra-app' ? t.entraApp : t.link}
+                      {app.mode === 'redirect' ? t.redirectSso : app.mode === 'internal-link' ? t.internalLink : app.mode === 'shared-cookie' ? t.sharedCookie : app.mode === 'entra-app' ? t.entraApp : t.link}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center">
@@ -1243,7 +1245,6 @@ export default function Admin() {
                     <div className="flex items-center justify-center gap-1">
                       <button
                         onClick={() => jumpToGroupsForApp(app)}
-                        disabled={!canEdit}
                         className="p-2 text-gray-400 dark:text-gray-500 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         title={a.goToGroupsSearch}
                       >
@@ -1503,6 +1504,11 @@ export default function Admin() {
                   placeholder={a.targetUrlExample}
                   className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                 />
+                {form.mode === 'internal-link' && (
+                  <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
+                    {a.internalLinkHelp}
+                  </p>
+                )}
               </div>
 
                 {editing === 'new' && (
@@ -1531,7 +1537,7 @@ export default function Admin() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.connection}</label>
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
                   {visibleModeOptions.map((opt) => (
                     <button
                       key={opt.value}
