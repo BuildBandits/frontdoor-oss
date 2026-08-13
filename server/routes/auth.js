@@ -477,7 +477,13 @@ router.put('/me/preferences', authenticate, (req, res) => {
 // Logout — clear cookie
 router.post('/logout', (req, res) => {
   const baseDomain = process.env.BASE_DOMAIN || 'frontdoor.local';
-  res.clearCookie('frontdoor_token', { domain: `.${baseDomain}` });
+  res.clearCookie('frontdoor_token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    ...(baseDomain === 'localhost' ? {} : { domain: `.${baseDomain}` }),
+  });
   res.json({ ok: true });
 });
 

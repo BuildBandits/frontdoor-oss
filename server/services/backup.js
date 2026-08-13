@@ -6,20 +6,23 @@ import { getAppTimeZone } from '../config.js';
 import { AVATAR_CACHE_DIR } from './avatars.js';
 import { BRANDING_ASSET_DIR } from './branding.js';
 import { APP_ICON_CACHE_DIR } from './appIcons.js';
+import { PLUGIN_ASSET_DIR } from './plugins.js';
 import { UserFacingError } from './errors.js';
 
 const BACKUP_VERSION = 1;
-const BACKUP_PROGRESS_STAGES = ['database', 'app-icons', 'branding', 'avatars'];
+const BACKUP_PROGRESS_STAGES = ['database', 'app-icons', 'branding', 'avatars', 'plugins'];
 
 function resolveBackupBuckets({
   appIconDir = APP_ICON_CACHE_DIR,
   brandingDir = BRANDING_ASSET_DIR,
   avatarCacheDir = AVATAR_CACHE_DIR,
+  pluginAssetDir = PLUGIN_ASSET_DIR,
 } = {}) {
   return [
     { key: 'app-icons', dir: appIconDir },
     { key: 'branding', dir: brandingDir },
     { key: 'avatars', dir: avatarCacheDir },
+    { key: 'plugins', dir: pluginAssetDir },
   ];
 }
 
@@ -126,11 +129,12 @@ export async function buildBackupSnapshot({
   appIconDir = APP_ICON_CACHE_DIR,
   brandingDir = BRANDING_ASSET_DIR,
   avatarCacheDir = AVATAR_CACHE_DIR,
+  pluginAssetDir = PLUGIN_ASSET_DIR,
   onProgress,
 } = {}) {
   const database = collectDatabaseSnapshot(dbHandle);
   const buckets = [];
-  const bucketDefinitions = resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir });
+  const bucketDefinitions = resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir, pluginAssetDir });
   emitBackupProgress(onProgress, 'database', 25, ['database']);
 
   for (let index = 0; index < bucketDefinitions.length; index += 1) {
@@ -165,9 +169,10 @@ export async function createBackupArchive({
   appIconDir = APP_ICON_CACHE_DIR,
   brandingDir = BRANDING_ASSET_DIR,
   avatarCacheDir = AVATAR_CACHE_DIR,
+  pluginAssetDir = PLUGIN_ASSET_DIR,
   onProgress,
 } = {}) {
-  const snapshot = await buildBackupSnapshot({ dbHandle, appIconDir, brandingDir, avatarCacheDir, onProgress });
+  const snapshot = await buildBackupSnapshot({ dbHandle, appIconDir, brandingDir, avatarCacheDir, pluginAssetDir, onProgress });
   const json = `${JSON.stringify(snapshot)}\n`;
   const archive = zlib.gzipSync(Buffer.from(json, 'utf8'), { level: 9 });
 
@@ -260,8 +265,15 @@ async function restoreBucketFiles(bucket, files) {
   let restored = 0;
   for (const file of files || []) {
     const absolutePath = path.join(bucket.dir, file.path.replaceAll('/', path.sep));
-    await fsp.mkdir(path.dirname(absolutePath), { recursive: true });
-    await fsp.writeFile(absolutePath, Buffer.from(file.data || '', 'base64'));
+    await fsp.mkdir(path.dirname(absolutePath), { recursive: true, mode: 0o750 });
+    await fsp.writeFile(
+      absolutePath,
+      Buffer.from(file.data || '', 'base64'),
+      bucket.key === 'plugins' ? { mode: 0o440 } : undefined
+    );
+    if (bucket.key === 'plugins') {
+      await fsp.chmod(absolutePath, 0o440);
+    }
     restored += 1;
   }
 
@@ -273,6 +285,7 @@ export async function restoreBackupArchive(buffer, {
   appIconDir = APP_ICON_CACHE_DIR,
   brandingDir = BRANDING_ASSET_DIR,
   avatarCacheDir = AVATAR_CACHE_DIR,
+  pluginAssetDir = PLUGIN_ASSET_DIR,
 } = {}) {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
     throw new UserFacingError('Backup file is empty');
@@ -298,7 +311,7 @@ export async function restoreBackupArchive(buffer, {
 
   const restoreOrder = listTables(dbHandle).filter((tableName) => dbTables.has(tableName));
   const restoreCounts = { tables: 0, rows: 0, files: 0 };
-  const restoreBuckets = resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir });
+  const restoreBuckets = resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir, pluginAssetDir });
 
   dbHandle.exec('PRAGMA foreign_keys = OFF');
   try {

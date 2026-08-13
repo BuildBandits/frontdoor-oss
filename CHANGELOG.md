@@ -7,6 +7,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- **Plugin ship gate**: added serial unit/integration coverage plus Playwright Chromium E2E scenarios for core-off behavior, owner/read-only/user RBAC, login/logout, immutable plugin loading, live revocation/reapproval and the global kill switch. CI now runs dependency audit, production build and browser tests on Node 22.
+- **Plugin artifact backup**: portable backups now include content-addressed plugin modules together with the SQLite registry and restore executable files with read-only permissions.
 - **Internal link mode**: admins can now create an `internal-link` app connection that accepts only private IP literals over `http` or `https`, so rare on-prem targets can still be exposed through Frontdoor without reopening hostname-based SSRF paths. `redirect-plain` keeps its private-network block.
 - **Per-language Home hero text**: the Home hero title (both lines) and subtitle can now hold a distinct value per supported language. The Customization page shows a language selector above the hero fields so an admin can enter, for example, an English and an Italian version; the Home renders the variant matching the viewer's effective language and falls back to the default text when a language is left empty. Stored as JSON maps in new `hero_*_i18n` branding columns (additive, backward-compatible migration); the legacy scalar `hero_*` columns are kept in sync with the default-language value so existing API consumers keep working. Previously the hero was a single string shown to everyone regardless of language.
 - **CORS startup confirmation**: when `CORS_ALLOWED_ORIGINS` is set, the server now prints the allowlist in the startup config so container logs immediately show which origins were loaded.
@@ -152,6 +154,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Plugin page crash**: restored the missing `Sparkles` icon import on the admin Plugins page so the dashboard no longer boots to a white screen with `ReferenceError: Sparkles is not defined`.
 
 ### Security
+- **Plugin trust-boundary hardening**: production plugins now require bounded local JSON/ZIP packages, immutable SHA-256-addressed artifacts and owner approval bound to the exact code and security metadata. Runtime metadata and bytes require authenticated role authorization and are re-verified before serving; mutable remote entries are rejected.
+- **Plugin least privilege and lifecycle**: manifest permissions now gate each host API, roles/events/access levels fail closed, routes cannot shadow core paths, external links require HTTPS, host snapshots are detached and frozen, and revoke/delete/switch-off cleanup propagates across tabs with a bounded asynchronous unload window.
+- **Plugin webhook and secret safety**: backend events use allowlisted minimal schemas, encrypted secrets, HTTPS-only connect-time DNS validation with private/metadata/IPv4/IPv6 rebinding protection, pinned connections, no redirect following, bounded bodies and timeouts, generic delivery errors and expanded audit events.
+- **Dependency audit remediation**: refreshed Axios, DOMPurify, React Router, Vite and affected transitive builder packages. Both full `npm audit` and production-only audit now report zero vulnerabilities.
 - **No user email in favorites-migration log**: the one-off `favoriteAppsMigrationFromLocalStorage` path no longer prints the user's email to the application log; it now logs only the user id and the migrated count, keeping PII out of stdout/infrastructure logs.
 - **Plugin capability boundary**: plugin packages now move through a constrained manifest/module contract and an owner approval step before they are mounted, reducing the chance of accidentally treating a third-party integration like a core feature.
 

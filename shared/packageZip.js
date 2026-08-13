@@ -1,5 +1,10 @@
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder('utf-8');
+const MAX_ARCHIVE_BYTES = 2 * 1024 * 1024;
+const MAX_ARCHIVE_ENTRIES = 16;
+const MAX_ARCHIVE_ENTRY_BYTES = 1024 * 1024;
+const MAX_MANIFEST_BYTES = 64 * 1024;
+const MAX_MODULE_BYTES = 1024 * 1024;
 
 const CRC32_TABLE = new Uint32Array(256);
 for (let i = 0; i < 256; i += 1) {
@@ -160,25 +165,52 @@ function findEndOfCentralDirectory(data) {
 
 export function parseZipArchive(input) {
   const data = toBytes(input);
+  if (data.length > MAX_ARCHIVE_BYTES) {
+    throw new Error('Plugin archive exceeds the 2 MiB size limit');
+  }
   const endOffset = findEndOfCentralDirectory(data);
   if (endOffset < 0) {
     throw new Error('Plugin archive is not a valid ZIP file');
   }
 
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const commentLength = view.getUint16(endOffset + 20, true);
+  if (endOffset + 22 + commentLength !== data.length) {
+    throw new Error('Plugin archive end record is invalid');
+  }
+  const diskNumber = view.getUint16(endOffset + 4, true);
+  const centralDirectoryDisk = view.getUint16(endOffset + 6, true);
+  const entriesOnDisk = view.getUint16(endOffset + 8, true);
   const totalEntries = view.getUint16(endOffset + 10, true);
   const centralDirectorySize = view.getUint32(endOffset + 12, true);
   const centralDirectoryOffset = view.getUint32(endOffset + 16, true);
+  if (diskNumber !== 0 || centralDirectoryDisk !== 0 || entriesOnDisk !== totalEntries) {
+    throw new Error('Multi-disk plugin archives are not supported');
+  }
+  if (totalEntries === 0 || totalEntries > MAX_ARCHIVE_ENTRIES) {
+    throw new Error(`Plugin archive must contain between 1 and ${MAX_ARCHIVE_ENTRIES} entries`);
+  }
+  if (centralDirectoryOffset + centralDirectorySize !== endOffset) {
+    throw new Error('Plugin archive central directory bounds are invalid');
+  }
   const entries = [];
+  const seenNames = new Set();
   let cursor = centralDirectoryOffset;
 
   for (let index = 0; index < totalEntries; index += 1) {
+    if (cursor + 46 > endOffset) {
+      throw new Error('Plugin archive central directory is truncated');
+    }
     const signature = view.getUint32(cursor, true);
     if (signature !== 0x02014b50) {
       throw new Error('Plugin archive central directory is invalid');
     }
 
+    const flags = view.getUint16(cursor + 8, true);
     const compression = view.getUint16(cursor + 10, true);
+    if ((flags & ~0x0800) !== 0) {
+      throw new Error('Plugin archive uses unsupported ZIP flags');
+    }
     if (compression !== 0) {
       throw new Error('Plugin archive uses unsupported compression');
     }
@@ -187,9 +219,34 @@ export function parseZipArchive(input) {
     const extraFieldLength = view.getUint16(cursor + 30, true);
     const fileCommentLength = view.getUint16(cursor + 32, true);
     const localHeaderOffset = view.getUint32(cursor + 42, true);
+    const compressedSize = view.getUint32(cursor + 20, true);
+    const uncompressedSize = view.getUint32(cursor + 24, true);
+    const expectedCrc = view.getUint32(cursor + 16, true);
+    const centralEntryEnd = cursor + 46 + fileNameLength + extraFieldLength + fileCommentLength;
+    if (centralEntryEnd > endOffset) {
+      throw new Error('Plugin archive central directory entry is truncated');
+    }
+    if (compressedSize !== uncompressedSize || uncompressedSize > MAX_ARCHIVE_ENTRY_BYTES) {
+      throw new Error('Plugin archive entry exceeds limits or uses inconsistent sizes');
+    }
     const fileNameBytes = data.slice(cursor + 46, cursor + 46 + fileNameLength);
-    const fileName = fromBytes(fileNameBytes);
+    const rawFileName = fromBytes(fileNameBytes);
+    const fileName = normalizeArchiveName(rawFileName);
+    const pathSegments = rawFileName.replace(/\\/g, '/').split('/');
+    if (
+      !rawFileName
+      || rawFileName.startsWith('/')
+      || rawFileName.includes('\0')
+      || pathSegments.some((segment) => segment === '..' || segment === '.')
+      || seenNames.has(fileName)
+    ) {
+      throw new Error('Plugin archive contains an unsafe or duplicate path');
+    }
+    seenNames.add(fileName);
 
+    if (localHeaderOffset + 30 > centralDirectoryOffset) {
+      throw new Error('Plugin archive local header is out of bounds');
+    }
     const localSignature = view.getUint32(localHeaderOffset, true);
     if (localSignature !== 0x04034b50) {
       throw new Error('Plugin archive local header is invalid');
@@ -201,21 +258,43 @@ export function parseZipArchive(input) {
     }
 
     const localFileNameLength = view.getUint16(localHeaderOffset + 26, true);
+    const localFlags = view.getUint16(localHeaderOffset + 6, true);
     const localExtraLength = view.getUint16(localHeaderOffset + 28, true);
-    const compressedSize = view.getUint32(localHeaderOffset + 18, true);
+    const localCrc = view.getUint32(localHeaderOffset + 14, true);
+    const localCompressedSize = view.getUint32(localHeaderOffset + 18, true);
+    const localUncompressedSize = view.getUint32(localHeaderOffset + 22, true);
+    const localFileNameStart = localHeaderOffset + 30;
+    const localFileNameEnd = localFileNameStart + localFileNameLength;
     const dataOffset = localHeaderOffset + 30 + localFileNameLength + localExtraLength;
+    const dataEnd = dataOffset + compressedSize;
+    if (dataEnd > centralDirectoryOffset || localFileNameEnd > centralDirectoryOffset) {
+      throw new Error('Plugin archive file data is out of bounds');
+    }
+    const localFileName = fromBytes(data.slice(localFileNameStart, localFileNameEnd));
+    if (
+      localFileName !== rawFileName
+      || localFlags !== flags
+      || localCrc !== expectedCrc
+      || localCompressedSize !== compressedSize
+      || localUncompressedSize !== uncompressedSize
+    ) {
+      throw new Error('Plugin archive headers are inconsistent');
+    }
     const fileData = data.slice(dataOffset, dataOffset + compressedSize);
+    if (crc32(fileData) !== expectedCrc) {
+      throw new Error('Plugin archive entry checksum is invalid');
+    }
 
     entries.push({
-      name: normalizeArchiveName(fileName),
+      name: fileName,
       data: fileData,
     });
 
-    cursor += 46 + fileNameLength + extraFieldLength + fileCommentLength;
+    cursor = centralEntryEnd;
   }
 
-  if (entries.length === 0 || centralDirectorySize < 0) {
-    throw new Error('Plugin archive is empty');
+  if (cursor !== endOffset) {
+    throw new Error('Plugin archive central directory size is inconsistent');
   }
 
   return entries;
@@ -246,14 +325,25 @@ export function buildPluginPackageZip(packageData = {}, options = {}) {
 
 export function extractPluginPackageZip(input) {
   const entries = parseZipArchive(input);
-  const manifestEntry = entries.find((entry) => entry.name.endsWith('/manifest.json') || entry.name === 'manifest.json');
-  const moduleEntry = entries.find((entry) => entry.name.endsWith('/module.mjs') || entry.name === 'module.mjs');
+  const manifestEntries = entries.filter((entry) => entry.name.endsWith('/manifest.json') || entry.name === 'manifest.json');
+  const moduleEntries = entries.filter((entry) => entry.name.endsWith('/module.mjs') || entry.name === 'module.mjs');
+  if (manifestEntries.length > 1 || moduleEntries.length > 1) {
+    throw new Error('Plugin archive contains ambiguous package files');
+  }
+  const manifestEntry = manifestEntries[0];
+  const moduleEntry = moduleEntries[0];
 
   if (!manifestEntry) {
     throw new Error('Plugin archive is missing manifest.json');
   }
   if (!moduleEntry) {
     throw new Error('Plugin archive is missing module.mjs');
+  }
+  if (manifestEntry.data.length > MAX_MANIFEST_BYTES) {
+    throw new Error('Plugin archive manifest exceeds the 64 KiB size limit');
+  }
+  if (moduleEntry.data.length > MAX_MODULE_BYTES) {
+    throw new Error('Plugin archive module exceeds the 1 MiB size limit');
   }
 
   let manifest;

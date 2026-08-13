@@ -9,6 +9,7 @@ import { getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAp
 import { getSupportedTimeZoneOptions, normalizeTimeZone } from '../../shared/timeZones.js';
 import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
+import { notifyPluginLifecycle } from '../pluginHost/lifecycle';
 
 const emptyBranding = {
   heroTitleLine1: 'Your apps,',
@@ -372,6 +373,9 @@ export default function Customization() {
       setBrandingLogoFileName('');
       setRemoveBrandingLogo(false);
       window.dispatchEvent(new CustomEvent('frontdoor:branding-updated', { detail: next }));
+      if (next.pluginsEnabled !== initialBranding.pluginsEnabled) {
+        notifyPluginLifecycle({ kind: 'branding', reason: next.pluginsEnabled ? 'enabled' : 'disabled' });
+      }
       pushSaveNotice(
         'success',
         retentionChanged
@@ -1047,10 +1051,10 @@ export default function Customization() {
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.plugins.killSwitchHelp}</p>
                   </div>
                   <select
+                    aria-label={ui.customization.plugins.killSwitchTitle}
                     value={branding.pluginsEnabled === true ? 'on' : 'off'}
-                    disabled
                     onChange={(e) => setBranding({ ...branding, pluginsEnabled: e.target.value === 'on' })}
-                    className={`${selectClassName} disabled:cursor-not-allowed`}
+                    className={selectClassName}
                   >
                     <option value="off">{ui.customization.plugins.killSwitchOff}</option>
                     <option value="on">{ui.customization.plugins.killSwitchOn}</option>
@@ -1161,6 +1165,7 @@ export default function Customization() {
               )}
 
             </div>
+            {renderSaveStatusBar('plugins')}
           </section>
 
           <section id="maintenance" ref={maintenanceSectionRef} className="scroll-mt-32 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6">

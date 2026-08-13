@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import db from '../server/db.js';
 import { getBrandingSettings } from '../server/services/branding.js';
-import { approvePluginRegistry, dispatchPluginEvent, getRuntimePlugins, upsertPluginRegistry } from '../server/services/plugins.js';
+import { approvePluginRegistry, dispatchPluginEvent, getRuntimePlugins, importPluginBundle } from '../server/services/plugins.js';
 
 beforeEach(() => {
   db.prepare('DELETE FROM plugin_registry').run();
@@ -13,15 +13,16 @@ beforeEach(() => {
 test('plugin system stays off by default and blocks runtime delivery', async () => {
   assert.equal(getBrandingSettings().pluginsEnabled, false);
 
-  upsertPluginRegistry({
-    id: 'switch-plugin',
-    name: 'Switch Plugin',
-    version: '1.0.0',
-    entry: 'https://plugins.example.com/plugin.mjs',
+  await importPluginBundle({
+    manifest: {
+      id: 'switch-plugin',
+      name: 'Switch Plugin',
+      version: '1.0.0',
+    },
+    moduleSource: 'export function register() {}',
     backendEnabled: true,
     backendUrl: 'https://plugins.example.com/webhook',
     eventSubscriptions: ['auth.login'],
-    approved: false,
   });
 
   approvePluginRegistry('switch-plugin', 'owner-1');
@@ -34,7 +35,7 @@ test('plugin system stays off by default and blocks runtime delivery', async () 
   };
 
   try {
-    assert.equal(getRuntimePlugins().length, 0);
+    assert.equal(getRuntimePlugins({ role: 'owner' }).length, 0);
     const summary = await dispatchPluginEvent('auth.login', { userId: 'u-1' });
     assert.equal(fetchCalls, 0);
     assert.equal(summary.attempted, 0);

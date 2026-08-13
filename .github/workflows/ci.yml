@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
@@ -28,3 +28,15 @@ jobs:
 
       - name: Check i18n dictionaries
         run: npm run check:i18n
+
+      - name: Audit dependencies
+        run: npm audit
+
+      - name: Build production frontend
+        run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser E2E tests
+        run: npx playwright test

@@ -1,4 +1,9 @@
-import { PLUGIN_ACCESS, PLUGIN_API_VERSION } from './constants.js';
+import {
+  PLUGIN_ACCESS,
+  PLUGIN_API_VERSION,
+  validatePluginPermissions,
+  validatePluginRoles,
+} from './constants.js';
 
 export function definePlugin(plugin) {
   return {
@@ -63,8 +68,8 @@ export function normalizePluginManifest(manifest, fallback = {}) {
     author: source.author || fallback.author || '',
     homepage: source.homepage || fallback.homepage || '',
     entry: source.entry || fallback.entry || '',
-    permissions: Array.isArray(source.permissions) ? source.permissions : [],
-    roles: Array.isArray(source.roles) ? source.roles : null,
+    permissions: validatePluginPermissions(Array.isArray(source.permissions) ? source.permissions : []),
+    roles: Array.isArray(source.roles) ? validatePluginRoles(source.roles) : null,
     url: source.url || fallback.url || '',
     source: source.source || fallback.source || 'local',
   };

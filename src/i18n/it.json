@@ -351,7 +351,7 @@
       "openPluginDocs": "Documentazione plugin",
       "openPluginDocsHelp": "Consulta il contratto del manifest, gli esempi di modulo e gli hint del loader senza toccare il flusso di installazione.",
       "killSwitchTitle": "Abilita i plugin per Frontdoor",
-      "killSwitchHelp": "Questa checkbox è visibile per lavori futuri, ma in 1.2.8b resta bloccata su OFF. Frontdoor core resta disponibile e non carica pagine, surface o hook dei plugin.",
+      "killSwitchHelp": "Kill switch globale. Se disabilitato, Frontdoor mantiene disponibile il core e ferma pagine, surface, hook runtime e consegne backend dei plugin.",
       "killSwitchOn": "Abilitati",
       "killSwitchOff": "Disabilitati"
     },
@@ -495,7 +495,7 @@
     "plugins": {
       "badge": "Host plugin",
       "title": "Plugin",
-      "subtitle": "Ispeziona il registro runtime, i bundle caricati, le route registrate e le surface esposte. I plugin di terze parti possono estendere Frontdoor senza toccare la UI core.",
+      "subtitle": "Ispeziona i pacchetti revisionati, il registro runtime, le route registrate e le surface esposte. Questa release supporta codice plugin first-party fidato.",
       "loadedLabel": "Caricati",
       "readyLabel": "Pronti",
       "errorLabel": "Errori",
@@ -543,7 +543,7 @@
       "backendUrlLabel": "URL backend",
       "eventSubscriptionsLabel": "Sottoscrizioni eventi",
       "packageLabel": "Pacchetto plugin",
-      "packageHelp": "Pacchetto JSON singolo con i campi del manifest e l'eventuale sorgente del modulo.",
+      "packageHelp": "Un pacchetto JSON contiene i campi del manifest e il sorgente autonomo del modulo. Le nuove installazioni richiedono il sorgente.",
       "archiveLabel": "Archivio plugin",
       "archiveHelp": "Archivio ZIP con `manifest.json` e `module.mjs`.",
       "manifestFileLabel": "File manifest",
@@ -625,16 +625,16 @@
       "pluginApprovedAndActivated": "approvato e attivato",
       "pluginApprovalRevoked": "approvazione revocata",
       "manifestTitle": "Contratto del manifest",
-      "manifestHelp": "I plugin remoti possono essere descritti da un manifest che punta al modulo JavaScript di ingresso.",
+      "manifestHelp": "Il manifest dichiara i metadati di sicurezza associati al digest del modulo durante l'approvazione del proprietario.",
       "moduleTitle": "Contratto del modulo",
-      "moduleHelp": "Un modulo plugin dovrebbe esportare una funzione register(api). Al suo interno puoi registrare azioni, route o surface personalizzate.",
-      "loaderTitle": "Configurazione loader",
-      "loaderHelp": "Imposta uno o più URL nelle variabili d'ambiente prima di buildare o distribuire Frontdoor."
+      "moduleHelp": "Un modulo plugin autonomo esporta register(api) e può esportare onUnload(). I metodi host sono esposti solo per le capability approvate.",
+      "loaderTitle": "Configurazione runtime",
+      "loaderHelp": "Usa uno storage locale persistente per gli artefatti e una chiave di cifratura stabile. Il flag del plugin di esempio è solo per sviluppo."
     },
     "pluginDocs": {
       "badge": "Documentazione plugin",
       "pageTitle": "Documentazione plugin",
-      "subtitle": "Un riferimento separato per manifest, moduli, configurazione del loader ed esempi di validazione.",
+      "subtitle": "Un riferimento separato per manifest pacchettizzati, moduli autonomi, configurazione runtime ed esempi di validazione.",
       "backToPlugins": "Torna ai plugin",
       "manifestPreviewHelp": "Usa l'esempio del manifest qui sotto come contratto che punta al punto di ingresso del modulo.",
       "validationStepOne": "Controlla il manifest",
@@ -647,7 +647,7 @@
     "pluginAudit": {
       "badge": "Audit plugin",
       "title": "Registro audit dei plugin",
-      "subtitle": "Controlla approvazioni, revoche e altre azioni privilegiate legate ai plugin. Il target è fissato su plugin, così puoi concentrarti sulle integrazioni di terze parti.",
+      "subtitle": "Controlla approvazioni, revoche e altre azioni privilegiate legate ai plugin. Il target è fissato su plugin, così puoi concentrarti sulle integrazioni revisionate.",
       "pageTitle": "Registro audit dei plugin",
       "searchPlaceholder": "Cerca admin, ID plugin o dettagli...",
       "allActions": "Tutte le azioni",

@@ -1,4 +1,11 @@
-export const PLUGIN_API_VERSION = 1;
+export {
+  PLUGIN_API_VERSION,
+  PLUGIN_PERMISSIONS,
+  SUPPORTED_PLUGIN_PERMISSIONS,
+  SUPPORTED_PLUGIN_ROLES,
+  validatePluginPermissions,
+  validatePluginRoles,
+} from '../../shared/pluginPolicy.js';
 
 export const PLUGIN_ACCESS = {
   PUBLIC: 'public',
@@ -30,4 +37,3 @@ export const ADMIN_ROLE_SETS = {
   viewer: ['owner', 'admin', 'admin_readonly'],
   editor: ['owner', 'admin'],
 };
-

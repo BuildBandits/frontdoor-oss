@@ -188,7 +188,10 @@ db.exec(`
     backend_url TEXT,
     backend_secret TEXT,
     event_subscriptions_json TEXT DEFAULT '[]',
+    artifact_sha256 TEXT,
+    content_digest TEXT,
     approved INTEGER DEFAULT 0,
+    approved_digest TEXT,
     approved_by TEXT,
     approved_at TEXT,
     enabled INTEGER DEFAULT 1,
@@ -268,6 +271,9 @@ ensureColumn('media_assets', 'app_slug', 'app_slug TEXT');
 ensureColumn('media_assets', 'app_target_url', 'app_target_url TEXT');
 ensureColumn('media_assets', 'app_mode', 'app_mode TEXT');
 ensureColumn('plugin_registry', 'approved', 'approved INTEGER DEFAULT 0');
+ensureColumn('plugin_registry', 'artifact_sha256', 'artifact_sha256 TEXT');
+ensureColumn('plugin_registry', 'content_digest', 'content_digest TEXT');
+ensureColumn('plugin_registry', 'approved_digest', 'approved_digest TEXT');
 ensureColumn('plugin_registry', 'approved_by', 'approved_by TEXT');
 ensureColumn('plugin_registry', 'approved_at', 'approved_at TEXT');
 db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(app_slug);');

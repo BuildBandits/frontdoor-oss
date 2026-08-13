@@ -351,7 +351,7 @@
       "openPluginDocs": "Plugin docs",
       "openPluginDocsHelp": "Check the manifest contract, module examples and loader hints without touching the install flow.",
       "killSwitchTitle": "Enable plugins for Frontdoor",
-      "killSwitchHelp": "This checkbox is visible for future work, but in 1.2.8b it is locked off. Frontdoor core stays available and no plugin page, surface or runtime hook loads.",
+      "killSwitchHelp": "Global kill switch. When disabled, Frontdoor keeps the core available and stops plugin pages, surfaces, runtime hooks and backend delivery.",
       "killSwitchOn": "Enabled",
       "killSwitchOff": "Disabled"
     },
@@ -495,7 +495,7 @@
     "plugins": {
       "badge": "Plugin host",
       "title": "Plugins",
-      "subtitle": "Inspect the runtime registry, loaded bundles, registered routes and exposed surfaces. Third-party plugins can extend Frontdoor without touching the core UI.",
+      "subtitle": "Inspect reviewed packages, the runtime registry, registered routes and exposed surfaces. This release supports trusted first-party plugin code.",
       "loadedLabel": "Loaded",
       "readyLabel": "Ready",
       "errorLabel": "Errors",
@@ -543,7 +543,7 @@
       "backendUrlLabel": "Backend URL",
       "eventSubscriptionsLabel": "Event subscriptions",
       "packageLabel": "Plugin package",
-      "packageHelp": "Single JSON package with manifest fields and optional module source.",
+      "packageHelp": "A JSON package contains manifest fields and a self-contained module source. New installations require the module source.",
       "archiveLabel": "Plugin archive",
       "archiveHelp": "ZIP archive with `manifest.json` and `module.mjs`.",
       "manifestFileLabel": "Manifest file",
@@ -625,16 +625,16 @@
       "pluginApprovedAndActivated": "approved and activated",
       "pluginApprovalRevoked": "approval revoked",
       "manifestTitle": "Manifest contract",
-      "manifestHelp": "Remote plugins can be described by a manifest that points to the JavaScript module entry point.",
+      "manifestHelp": "The manifest declares security metadata that is bound to the packaged module digest during owner approval.",
       "moduleTitle": "Module contract",
-      "moduleHelp": "A plugin module should export a register(api) function. Inside it, register actions, routes or custom surfaces.",
-      "loaderTitle": "Loader configuration",
-      "loaderHelp": "Set one or more URLs in the environment before building or deploying Frontdoor."
+      "moduleHelp": "A self-contained plugin module exports register(api) and may export onUnload(). Host methods are exposed only for approved capabilities.",
+      "loaderTitle": "Runtime configuration",
+      "loaderHelp": "Use persistent local artifact storage and a stable encryption key. The built-in sample flag is development-only."
     },
     "pluginDocs": {
       "badge": "Plugin docs",
       "pageTitle": "Plugin documentation",
-      "subtitle": "A standalone reference for manifests, modules, loader settings and validation examples.",
+      "subtitle": "A standalone reference for packaged manifests, self-contained modules, runtime settings and validation examples.",
       "backToPlugins": "Back to plugins",
       "manifestPreviewHelp": "Use the manifest example below as the contract that points to the module entry point.",
       "validationStepOne": "Review the manifest",
@@ -647,7 +647,7 @@
     "pluginAudit": {
       "badge": "Plugin audit",
       "title": "Plugin audit trail",
-      "subtitle": "Review approvals, revocations and other plugin-related privileged actions. The target type is fixed to plugin so you can focus on third-party integrations.",
+      "subtitle": "Review approvals, revocations and other plugin-related privileged actions. The target type is fixed to plugin so you can focus on reviewed integrations.",
       "pageTitle": "Plugin audit trail",
       "searchPlaceholder": "Search actor, plugin ID or details...",
       "allActions": "All actions",

@@ -3,6 +3,9 @@
   "version": "1.2.8d",
   "description": "Authentication gateway and app catalog for self-hosted projects",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "concurrently \"vite\" \"nodemon server/index.js\"",
     "dev:server": "nodemon server/index.js",
@@ -10,7 +13,9 @@
     "build": "vite build",
     "start": "node server/index.js",
     "check:i18n": "node scripts/check-i18n.mjs",
-    "test": "node --test test/*.test.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:headed": "npm run build && playwright test --headed",
     "db:seed": "node server/seed.js",
     "avatars:prewarm": "node server/scripts/prewarmAvatars.js"
   },
@@ -19,12 +24,12 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "axios": "^1.16.0",
+    "axios": "^1.19.0",
     "better-sqlite3": "^9.4.3",
     "clsx": "^2.1.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
-    "dompurify": "^3.4.9",
+    "dompurify": "^3.4.13",
     "dotenv": "^16.4.1",
     "express": "^4.22.2",
     "express-rate-limit": "^7.1.5",
@@ -34,7 +39,7 @@
     "lucide-react": "^0.323.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.30.4",
+    "react-router-dom": "^7.18.2",
     "uuid": "^11.1.1",
     "zustand": "^4.5.0"
   },
@@ -42,11 +47,11 @@
     "@azure/msal-node": {
       "uuid": "^11.1.1"
     },
-    "body-parser": "^1.20.5",
-    "dompurify": "^3.4.9",
+    "body-parser": "^1.20.6",
+    "dompurify": "^3.4.13",
     "form-data": "^4.0.6",
     "qs": "^6.15.2",
-    "react-router-dom": "^6.30.4",
+    "react-router-dom": "^7.18.2",
     "uuid": "^11.1.1",
     "ws": "^8.21.0"
   },
@@ -65,6 +70,7 @@
     "rbac"
   ],
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react": "^5.2.0",

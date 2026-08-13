@@ -126,12 +126,9 @@ function AppRoutes() {
     <Suspense fallback={<div className="p-8 text-sm text-gray-500 dark:text-gray-400">{ui.common.loading}</div>}>
       <Routes>
         {coreRoutes.map((route) => {
-          const isPluginAdminRoute = route.path.startsWith('/admin/plugins');
-          const element = !pluginsEnabled && isPluginAdminRoute
-            ? <Navigate to="/" replace />
-            : route.layout === 'app'
-              ? <Layout>{resolveRouteElement(route, pluginRuntimeApi)}</Layout>
-              : resolveRouteElement(route, pluginRuntimeApi);
+          const element = route.layout === 'app'
+            ? <Layout>{resolveRouteElement(route, pluginRuntimeApi)}</Layout>
+            : resolveRouteElement(route, pluginRuntimeApi);
           return (
             <Route
               key={route.path}

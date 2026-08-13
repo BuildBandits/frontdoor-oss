@@ -16,10 +16,11 @@ import pluginsRoutes from './routes/plugins.js';
 import usersRoutes from './routes/users.js';
 import groupsRoutes from './routes/groups.js';
 import logsRoutes, { purgeLogsOlderThan } from './routes/logs.js';
+import { authenticate } from './middleware/auth.js';
 import { getStartupConfig, validateStartupEnv } from './config.js';
 import { getBrandingSettings, isPluginSystemEnabled } from './services/branding.js';
 import { backfillMediaLibrary } from './services/mediaAssets.js';
-import { PLUGIN_ASSET_DIR } from './services/plugins.js';
+import { readVerifiedPluginArtifact } from './services/plugins.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -166,11 +167,18 @@ app.get('/api/health', (req, res) => {
 });
 
 // API routes
-app.use('/api/plugins/files', (req, res, next) => {
+app.use('/api/plugins/files', authenticate, async (req, res) => {
   if (!isPluginSystemEnabled()) {
     return res.status(404).end();
   }
-  return express.static(PLUGIN_ASSET_DIR, { dotfiles: 'deny' })(req, res, next);
+  const artifact = await readVerifiedPluginArtifact(req.path, req.user);
+  if (!artifact) {
+    return res.status(403).json({ error: 'Plugin artifact is not available to this user' });
+  }
+  res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.type('text/javascript; charset=utf-8');
+  return res.send(artifact);
 });
 app.use('/api/auth', authRoutes);
 app.use('/api/branding', brandingRoutes);

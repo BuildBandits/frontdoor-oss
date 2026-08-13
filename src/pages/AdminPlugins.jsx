@@ -20,6 +20,7 @@ import Tooltip from '../components/Tooltip';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { usePluginRegistry } from '../pluginHost/registry';
+import { notifyPluginLifecycle } from '../pluginHost/lifecycle';
 import { moduleExample } from '../pluginHost/pluginDocsContent';
 import {
   analyzePluginPackage,
@@ -417,6 +418,7 @@ export default function AdminPlugins() {
         text: `${response.data?.plugin?.name || reviewState.pluginName} ${t.pluginApprovedAndActivated}`,
       });
       closeReviewWizard();
+      notifyPluginLifecycle({ reason: 'approval-granted' });
       await loadServerPlugins();
     } catch (error) {
       setServerMessage({
@@ -439,6 +441,7 @@ export default function AdminPlugins() {
           ? `${response.data?.plugin?.name || plugin.name} ${t.pluginApprovedAndActivated}`
           : `${response.data?.plugin?.name || plugin.name} ${t.pluginApprovalRevoked}`,
       });
+      notifyPluginLifecycle({ reason: approved ? 'approval-granted' : 'approval-revoked' });
       await loadServerPlugins();
     } catch (error) {
       setServerMessage({
@@ -483,6 +486,7 @@ export default function AdminPlugins() {
           : t.pluginInstalledPendingApproval,
       });
       resetForm();
+      notifyPluginLifecycle({ reason: editingId ? 'plugin-updated' : 'plugin-imported' });
       await loadServerPlugins();
     } catch (error) {
       setServerMessage({
@@ -502,6 +506,7 @@ export default function AdminPlugins() {
       await api.delete(`/plugins/${plugin.id}`);
       setServerMessage({ type: 'success', text: `${plugin.name} ${t.pluginDeleted}` });
       if (editingId === plugin.id) resetForm();
+      notifyPluginLifecycle({ reason: 'plugin-deleted' });
       await loadServerPlugins();
     } catch (error) {
       setServerMessage({
@@ -970,15 +975,15 @@ export default function AdminPlugins() {
                 <div className="grid grid-cols-3 gap-3 lg:min-w-[280px]">
                   <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-950/40 p-3">
                     <div className="text-[11px] uppercase tracking-wider text-gray-400 dark:text-gray-500">{ui.admin.plugins.actionsLabel}</div>
-                    <div className="mt-1 text-xl font-extrabold text-dark dark:text-gray-100">{plugin.actions.length}</div>
+                    <div className="mt-1 text-xl font-extrabold text-dark dark:text-gray-100">{plugin.actions?.length || 0}</div>
                   </div>
                   <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-950/40 p-3">
                     <div className="text-[11px] uppercase tracking-wider text-gray-400 dark:text-gray-500">{ui.admin.plugins.surfacesLabel}</div>
-                    <div className="mt-1 text-xl font-extrabold text-dark dark:text-gray-100">{plugin.surfaces.length}</div>
+                    <div className="mt-1 text-xl font-extrabold text-dark dark:text-gray-100">{plugin.surfaces?.length || 0}</div>
                   </div>
                   <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-950/40 p-3">
                     <div className="text-[11px] uppercase tracking-wider text-gray-400 dark:text-gray-500">{ui.admin.plugins.routesLabel}</div>
-                    <div className="mt-1 text-xl font-extrabold text-dark dark:text-gray-100">{plugin.routes.length}</div>
+                    <div className="mt-1 text-xl font-extrabold text-dark dark:text-gray-100">{plugin.routes?.length || 0}</div>
                   </div>
                 </div>
               </div>

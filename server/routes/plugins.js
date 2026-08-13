@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate, isAdminViewer, isAdminEditor, isOwner } from '../middleware/auth.js';
+import { logRbacAudit } from '../db.js';
 import { isPluginSystemEnabled } from '../services/branding.js';
 import {
   buildRuntimePluginPayload,
@@ -10,24 +11,21 @@ import {
   getPluginRegistry,
   getPluginRegistryById,
   revokePluginApproval,
-  upsertPluginRegistry,
 } from '../services/plugins.js';
 
 const router = express.Router();
 
-router.get('/runtime', (_req, res) => {
+router.get('/runtime', authenticate, (req, res) => {
   if (!isPluginSystemEnabled()) {
     return res.json({ plugins: [] });
   }
-  res.json({ plugins: buildRuntimePluginPayload() });
-});
-
-router.use((req, res, next) => {
-  if (isPluginSystemEnabled()) {
-    return next();
+  const plugins = buildRuntimePluginPayload(req.user);
+  for (const plugin of plugins) {
+    logRbacAudit(req.user.id, 'runtime_authorized', 'plugin', plugin.manifest?.id || null, {
+      contentDigest: plugin.contentDigest,
+    });
   }
-
-  return res.status(404).json({ error: 'Plugin system is disabled' });
+  res.json({ plugins });
 });
 
 router.get('/', authenticate, isAdminViewer, (_req, res) => {
@@ -42,9 +40,9 @@ router.get('/:id', authenticate, isAdminViewer, (req, res) => {
   return res.json({ plugin });
 });
 
-router.post('/', authenticate, isAdminEditor, (req, res) => {
+router.post('/', authenticate, isAdminEditor, async (req, res) => {
   try {
-    const plugin = upsertPluginRegistry(req.body || {});
+    const plugin = await importPluginBundle({ ...(req.body || {}), actorId: req.user.id });
     return res.status(201).json({ plugin });
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to create plugin' });
@@ -53,7 +51,7 @@ router.post('/', authenticate, isAdminEditor, (req, res) => {
 
 router.post('/import', authenticate, isAdminEditor, async (req, res) => {
   try {
-    const plugin = await importPluginBundle(req.body || {});
+    const plugin = await importPluginBundle({ ...(req.body || {}), actorId: req.user.id });
     return res.status(201).json({ plugin });
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to import plugin' });
@@ -65,6 +63,7 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
     const plugin = await importPluginBundle({
       ...req.body,
       id: req.params.id,
+      actorId: req.user.id,
     });
     return res.json({ plugin });
   } catch (error) {
@@ -73,7 +72,7 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
 });
 
 router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
-  const removed = deletePluginRegistry(req.params.id);
+  const removed = deletePluginRegistry(req.params.id, req.user.id);
   if (!removed) {
     return res.status(404).json({ error: 'Plugin not found' });
   }
@@ -86,21 +85,30 @@ router.post('/:id/test-event/:eventName', authenticate, isAdminEditor, async (re
     return res.status(404).json({ error: 'Plugin not found' });
   }
 
-  const summary = await dispatchPluginEvent(req.params.eventName, req.body?.payload || {}, {
-    actorId: req.user.id,
-    targetPluginId: plugin.id,
-    testMode: true,
-  });
-
-  return res.json({ pluginId: plugin.id, summary });
+  try {
+    const summary = await dispatchPluginEvent(req.params.eventName, req.body?.payload || {}, {
+      actorId: req.user.id,
+      targetPluginId: plugin.id,
+      testMode: true,
+    });
+    return res.json({ pluginId: plugin.id, summary });
+  } catch (error) {
+    return res.status(400).json({
+      error: error instanceof Error ? error.message : 'Failed to dispatch plugin event',
+    });
+  }
 });
 
 router.post('/:id/approve', authenticate, isOwner, (req, res) => {
-  const plugin = approvePluginRegistry(req.params.id, req.user.id);
-  if (!plugin) {
-    return res.status(404).json({ error: 'Plugin not found' });
+  try {
+    const plugin = approvePluginRegistry(req.params.id, req.user.id);
+    if (!plugin) {
+      return res.status(404).json({ error: 'Plugin not found' });
+    }
+    return res.json({ plugin });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to approve plugin' });
   }
-  return res.json({ plugin });
 });
 
 router.post('/:id/revoke', authenticate, isOwner, (req, res) => {

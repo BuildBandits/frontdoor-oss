@@ -1,5 +1,11 @@
 import { createElement, isValidElement, useSyncExternalStore } from 'react';
-import { ADMIN_ROLE_SETS, PLUGIN_ACCESS, PLUGIN_SURFACES } from './constants.js';
+import {
+  ADMIN_ROLE_SETS,
+  PLUGIN_ACCESS,
+  PLUGIN_PERMISSIONS,
+  PLUGIN_SURFACES,
+  validatePluginRoles,
+} from './constants.js';
 import {
   createPluginAction,
   createPluginRoute,
@@ -8,6 +14,7 @@ import {
 } from './sdk.js';
 
 const subscribers = new Set();
+const PLUGIN_UNLOAD_TIMEOUT_MS = 500;
 
 const state = {
   plugins: new Map(),
@@ -15,6 +22,7 @@ const state = {
   routes: new Map(),
   loadErrors: [],
   loadedSources: new Set(),
+  unloadHooks: new Map(),
   bootstrapped: false,
   bootstrapping: false,
 };
@@ -77,7 +85,57 @@ function emitChange() {
   subscribers.forEach((listener) => listener());
 }
 
+const supportedAccessLevels = new Set(Object.values(PLUGIN_ACCESS));
+const supportedSurfaces = new Set(Object.values(PLUGIN_SURFACES));
+
+function normalizeEntryRoles(roles) {
+  return Array.isArray(roles) && roles.length > 0 ? validatePluginRoles(roles) : null;
+}
+
+function validateEntryPolicy(access, roles) {
+  if (!supportedAccessLevels.has(access)) {
+    throw new Error(`Unsupported plugin access level: ${access}`);
+  }
+  return normalizeEntryRoles(roles);
+}
+
+function validatePluginHref(pluginId, href) {
+  const value = String(href || '').trim();
+  if (!value) return '';
+  const permissions = new Set(state.plugins.get(pluginId)?.permissions || []);
+
+  if (value.startsWith('/') && !value.startsWith('//') && !value.includes('\\')) {
+    if (!permissions.has(PLUGIN_PERMISSIONS.NAVIGATION_USE)) {
+      throw new Error('Internal plugin links require navigation.use');
+    }
+    return value;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('Plugin links must use an absolute internal path or HTTPS URL');
+  }
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+    throw new Error('External plugin links must use HTTPS without embedded credentials');
+  }
+  if (!permissions.has(PLUGIN_PERMISSIONS.EXTERNAL_LINKS_OPEN)) {
+    throw new Error('External plugin links require external-links.open');
+  }
+  return parsed.href;
+}
+
 function upsertSurfaceEntry(pluginId, entry) {
+  const access = entry.access || PLUGIN_ACCESS.AUTHENTICATED;
+  const roles = validateEntryPolicy(access, entry.roles);
+  if (!supportedSurfaces.has(entry.surface)) {
+    throw new Error(`Unsupported plugin surface: ${entry.surface}`);
+  }
+  const target = entry.target || '_self';
+  if (!['_self', '_blank'].includes(target)) {
+    throw new Error(`Unsupported plugin link target: ${target}`);
+  }
   const normalized = {
     id: String(entry.id || `${pluginId}:${entry.surface}:${entry.label || 'entry'}`),
     pluginId,
@@ -86,11 +144,11 @@ function upsertSurfaceEntry(pluginId, entry) {
     label: entry.label || '',
     description: entry.description || '',
     order: Number.isFinite(entry.order) ? entry.order : 100,
-    access: entry.access || PLUGIN_ACCESS.AUTHENTICATED,
-    roles: Array.isArray(entry.roles) ? [...entry.roles] : entry.roles || null,
+    access,
+    roles,
     icon: entry.icon || null,
-    href: entry.href || '',
-    target: entry.target || '_self',
+    href: validatePluginHref(pluginId, entry.href),
+    target,
     title: entry.title || '',
     variant: entry.variant || 'default',
     onClick: typeof entry.onClick === 'function' ? entry.onClick : null,
@@ -116,16 +174,19 @@ function upsertSurfaceEntry(pluginId, entry) {
 }
 
 function upsertRouteEntry(pluginId, entry) {
+  const access = entry.access || PLUGIN_ACCESS.AUTHENTICATED;
+  const roles = validateEntryPolicy(access, entry.roles);
+  const routePath = String(entry.path || '').trim();
   const normalized = {
-    id: String(entry.id || `${pluginId}:${entry.path}`),
+    id: `${pluginId}:${String(entry.id || routePath)}`,
     pluginId,
-    path: String(entry.path || '').trim(),
+    path: routePath,
     label: entry.label || '',
     description: entry.description || '',
     order: Number.isFinite(entry.order) ? entry.order : 100,
-    access: entry.access || PLUGIN_ACCESS.AUTHENTICATED,
-    roles: Array.isArray(entry.roles) ? [...entry.roles] : entry.roles || null,
-    layout: entry.layout || 'app',
+    access,
+    roles,
+    layout: 'app',
     nav: entry.nav || null,
     element: entry.element || null,
     render: typeof entry.render === 'function' ? entry.render : null,
@@ -133,6 +194,18 @@ function upsertRouteEntry(pluginId, entry) {
 
   if (!normalized.path) {
     throw new Error(`Plugin route "${normalized.id}" is missing a path`);
+  }
+  if (
+    !/^\/plugins\/[a-z0-9][a-z0-9/_-]*$/.test(normalized.path)
+    || normalized.path.split('/').some((segment) => segment === '.' || segment === '..')
+  ) {
+    throw new Error('Plugin routes must use a static path below /plugins/');
+  }
+  const conflictingRoute = Array.from(state.routes.values()).find(
+    (route) => route.path === normalized.path && route.pluginId !== pluginId
+  );
+  if (conflictingRoute) {
+    throw new Error(`Plugin route path is already registered: ${normalized.path}`);
   }
 
   state.routes.set(normalized.id, normalized);
@@ -159,9 +232,49 @@ function removePluginEntries(pluginId) {
   }
 }
 
-function canUseAccess(access, roles) {
-  if (Array.isArray(roles) && roles.length > 0) return true;
-  return access === PLUGIN_ACCESS.AUTHENTICATED;
+function takePluginUnloadHook(pluginId) {
+  const onUnload = state.unloadHooks.get(pluginId);
+  state.unloadHooks.delete(pluginId);
+  return onUnload;
+}
+
+async function runPluginUnload(pluginId, reason, onUnload = takePluginUnloadHook(pluginId)) {
+  if (typeof onUnload !== 'function') return;
+  let timeout;
+  try {
+    await Promise.race([
+      Promise.resolve().then(() => onUnload({ pluginId, reason })),
+      new Promise((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error(`Plugin cleanup exceeded ${PLUGIN_UNLOAD_TIMEOUT_MS} ms`)),
+          PLUGIN_UNLOAD_TIMEOUT_MS
+        );
+      }),
+    ]);
+  } catch (error) {
+    state.loadErrors = [
+      ...state.loadErrors,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        pluginId,
+        source: 'onUnload',
+        message: error instanceof Error ? error.message : String(error),
+      },
+    ];
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function unloadPlugin(pluginId, reason = 'unload') {
+  const plugin = state.plugins.get(pluginId);
+  const onUnload = takePluginUnloadHook(pluginId);
+  removePluginEntries(pluginId);
+  state.plugins.delete(pluginId);
+  if (plugin?.source) state.loadedSources.delete(plugin.source);
+  emitChange();
+  await runPluginUnload(pluginId, reason, onUnload);
+  emitChange();
 }
 
 function renderIcon(icon) {
@@ -184,6 +297,7 @@ function getUserRole(user) {
 
 function isEntryVisible(entry, user) {
   if (!entry) return false;
+  if (!user && Array.isArray(entry.roles) && entry.roles.length > 0) return false;
   const role = getUserRole(user);
 
   if (Array.isArray(entry.roles) && entry.roles.length > 0) {
@@ -207,22 +321,50 @@ function isEntryVisible(entry, user) {
 }
 
 function buildPluginApi(pluginId, runtimeApi = {}) {
-  return {
+  const plugin = state.plugins.get(pluginId);
+  const permissions = new Set(plugin?.permissions || []);
+  const api = {
     apiVersion: runtimeApi.apiVersion || 1,
     pluginId,
     surfaceVariant: runtimeApi.surfaceVariant || null,
-    getCurrentUser: () => runtimeApi.getCurrentUser?.() || null,
-    getBranding: () => runtimeApi.getBranding?.() || null,
-    getLanguage: () => runtimeApi.getLanguage?.() || 'en',
-    getUiStrings: () => runtimeApi.getUiStrings?.() || null,
-    navigate: (...args) => runtimeApi.navigate?.(...args),
-    notify: (payload) => runtimeApi.notify?.(payload),
-    openExternalUrl: (url, target = '_blank') => runtimeApi.openExternalUrl?.(url, target),
-    registerAction: (action) => registerAction(pluginId, action),
-    registerSurface: (surface) => registerSurface(pluginId, surface),
-    registerRoute: (route) => registerRoute(pluginId, route),
-    registerNavigationItem: (item) => registerNavigationItem(pluginId, item),
   };
+
+  const grant = (permission, name, implementation) => {
+    if (permissions.has(permission)) api[name] = implementation;
+  };
+  const cloneHostValue = (value) => {
+    if (value === undefined || value === null) return value ?? null;
+    const clone = typeof structuredClone === 'function'
+      ? structuredClone(value)
+      : JSON.parse(JSON.stringify(value));
+    const freeze = (item) => {
+      if (!item || typeof item !== 'object' || Object.isFrozen(item)) return item;
+      Object.values(item).forEach(freeze);
+      return Object.freeze(item);
+    };
+    return freeze(clone);
+  };
+  grant(PLUGIN_PERMISSIONS.USER_READ, 'getCurrentUser', () => cloneHostValue(runtimeApi.getCurrentUser?.() || null));
+  grant(PLUGIN_PERMISSIONS.BRANDING_READ, 'getBranding', () => cloneHostValue(runtimeApi.getBranding?.() || null));
+  grant(PLUGIN_PERMISSIONS.LANGUAGE_READ, 'getLanguage', () => runtimeApi.getLanguage?.() || 'en');
+  grant(PLUGIN_PERMISSIONS.LANGUAGE_READ, 'getUiStrings', () => cloneHostValue(runtimeApi.getUiStrings?.() || null));
+  grant(PLUGIN_PERMISSIONS.NAVIGATION_USE, 'navigate', (...args) => runtimeApi.navigate?.(...args));
+  grant(PLUGIN_PERMISSIONS.NOTIFICATIONS_WRITE, 'notify', (payload) => runtimeApi.notify?.(payload));
+  grant(
+    PLUGIN_PERMISSIONS.EXTERNAL_LINKS_OPEN,
+    'openExternalUrl',
+    (url, target = '_blank') => runtimeApi.openExternalUrl?.(url, target)
+  );
+  grant(PLUGIN_PERMISSIONS.ACTIONS_WRITE, 'registerAction', (action) => registerAction(pluginId, action));
+  grant(PLUGIN_PERMISSIONS.SURFACES_WRITE, 'registerSurface', (surface) => registerSurface(pluginId, surface));
+  grant(PLUGIN_PERMISSIONS.ROUTES_WRITE, 'registerRoute', (route) => registerRoute(pluginId, route));
+  grant(
+    PLUGIN_PERMISSIONS.NAVIGATION_WRITE,
+    'registerNavigationItem',
+    (item) => registerNavigationItem(pluginId, item)
+  );
+
+  return Object.freeze(api);
 }
 
 function registerAction(pluginId, action) {
@@ -317,14 +459,21 @@ export function addPluginLoadError(error) {
   emitChange();
 }
 
-export function clearPluginRegistry() {
+export async function clearPluginRegistry(reason = 'clear') {
+  const pluginIds = Array.from(state.plugins.keys());
+  const unloadHooks = pluginIds.map((pluginId) => [pluginId, takePluginUnloadHook(pluginId)]);
   state.plugins.clear();
   state.surfaces.clear();
   state.routes.clear();
   state.loadErrors = [];
   state.loadedSources.clear();
+  state.unloadHooks.clear();
   state.bootstrapped = false;
   state.bootstrapping = false;
+  emitChange();
+  await Promise.all(unloadHooks.map(([pluginId, onUnload]) => (
+    runPluginUnload(pluginId, reason, onUnload)
+  )));
   emitChange();
 }
 
@@ -333,7 +482,7 @@ export async function registerPlugin(pluginDefinition, runtimeApi = {}, fallback
   const { manifest } = plugin;
 
   if (state.plugins.has(manifest.id)) {
-    removePluginEntries(manifest.id);
+    await unloadPlugin(manifest.id, 'replace');
   }
 
   const pluginRecord = {
@@ -356,6 +505,9 @@ export async function registerPlugin(pluginDefinition, runtimeApi = {}, fallback
   };
 
   state.plugins.set(manifest.id, pluginRecord);
+  if (typeof plugin.onUnload === 'function') {
+    state.unloadHooks.set(manifest.id, plugin.onUnload);
+  }
   emitChange();
 
   const api = buildPluginApi(manifest.id, runtimeApi);
@@ -367,6 +519,8 @@ export async function registerPlugin(pluginDefinition, runtimeApi = {}, fallback
     pluginRecord.status = 'ready';
     state.loadedSources.add(manifest.source || manifest.entry || manifest.id);
   } catch (error) {
+    const onUnload = takePluginUnloadHook(manifest.id);
+    removePluginEntries(manifest.id);
     pluginRecord.status = 'error';
     pluginRecord.error = error instanceof Error ? error.message : String(error);
     addPluginLoadError({
@@ -374,6 +528,7 @@ export async function registerPlugin(pluginDefinition, runtimeApi = {}, fallback
       source: manifest.source,
       message: pluginRecord.error,
     });
+    await runPluginUnload(manifest.id, 'registration-error', onUnload);
   }
 
   emitChange();
@@ -403,7 +558,7 @@ export function resolveRenderableEntry(entry, runtimeApi = {}) {
       {
         href: entry.href,
         target: entry.target || '_self',
-        rel: entry.target === '_blank' ? 'noreferrer' : undefined,
+        rel: entry.target === '_blank' ? 'noopener noreferrer' : undefined,
         title: entry.title || entry.description || entry.label,
         className: surfaceVariant === 'menu'
           ? 'flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-accent/10 hover:text-dark dark:hover:text-white'

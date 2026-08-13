@@ -1,28 +1,70 @@
-# Frontdoor Plugin Host
+# FrontDoor Plugin Host
 
-Frontdoor can load plugins at runtime through a lightweight host.
+FrontDoor loads reviewed, packaged plugins through an authenticated runtime host. The
+global switch is off by default. The plugin manager remains available while the
+switch is off so owners can inspect, approve, revoke, or remove packages without
+executing them.
 
-## Loader inputs
+## Trust model
 
-Set one or more URLs before building or deploying:
+The current host runs plugin JavaScript in FrontDoor's browser realm. Capabilities
+limit the host API, but they are not a JavaScript sandbox: plugin code can still use
+ambient browser APIs. Only reviewed first-party code is supported for this release.
+Untrusted third-party plugins require a future iframe or worker isolation protocol.
 
-- `VITE_FRONTDOOR_PLUGIN_MANIFESTS`
-- `VITE_FRONTDOOR_PLUGIN_MODULES`
-- `VITE_FRONTDOOR_ENABLE_SAMPLE_PLUGIN`
+Production plugins must be installed as a JSON or ZIP package. Remote module URLs
+and build-time manifest/module lists are rejected. The built-in ticket plugin can be
+enabled only during development with `VITE_FRONTDOOR_ENABLE_SAMPLE_PLUGIN=true`.
 
-`VITE_FRONTDOOR_PLUGIN_MANIFESTS` and `VITE_FRONTDOOR_PLUGIN_MODULES` accept a comma-separated or newline-separated list.
-`VITE_FRONTDOOR_ENABLE_SAMPLE_PLUGIN` is a boolean flag that loads the built-in ticket example.
+## Package and approval
+
+A JSON package contains a manifest and a self-contained ES module:
+
+```json
+{
+  "manifest": {
+    "apiVersion": 1,
+    "id": "ticket-plugin",
+    "name": "Ticket Plugin",
+    "version": "1.0.0",
+    "permissions": ["actions.write", "routes.write", "notifications.write"],
+    "roles": ["owner", "admin"]
+  },
+  "moduleSource": "export function register(api) { api.registerRoute({ id: 'ticket-plugin.route', path: '/plugins/ticket-center', label: 'Ticket Center' }); }"
+}
+```
+
+A ZIP package contains exactly one unambiguous `manifest.json` and `module.mjs`,
+normally below a single package directory:
+
+```text
+ticket-plugin-1.0.0/
+  manifest.json
+  module.mjs
+```
+
+ZIP input is bounded and validated for paths, entry count, sizes, header
+consistency, supported flags, and CRC-32. FrontDoor writes the module to an
+immutable content-addressed local path and calculates SHA-256 over both the
+artifact and canonical security metadata. New and updated plugins remain pending
+until an owner approves that exact digest. Any change to code, permissions, roles,
+backend configuration, events, or version invalidates approval.
 
 ## Manifest contract
 
 ```json
 {
+  "apiVersion": 1,
   "id": "ticket-plugin",
   "name": "Ticket Plugin",
   "version": "1.0.0",
-  "description": "Adds a ticket creation action, route and surface",
-  "entry": "https://cdn.example.com/ticket-plugin/index.js",
-  "permissions": ["actions", "routes"],
+  "description": "Adds a ticket action and route",
+  "permissions": [
+    "actions.write",
+    "routes.write",
+    "navigation.use",
+    "notifications.write"
+  ],
   "roles": ["owner", "admin"],
   "backend": {
     "enabled": true,
@@ -32,113 +74,90 @@ Set one or more URLs before building or deploying:
 }
 ```
 
-## Module contract
+Supported roles are `owner`, `admin`, `admin_readonly`, and `user`. Plugin routes
+must be static paths below `/plugins/`; they cannot shadow core routes. Unknown
+permissions, roles, events, surfaces, access levels, or API versions fail closed.
 
-The module should export a `register(api)` function. For convenience, the SDK also exposes `definePlugin()` and `definePluginManifest()` helpers for canonical metadata and plugin definitions.
+## Module contract and capabilities
+
+The module exports `register(api)` and may export `onUnload({ pluginId, reason })`.
+It must be self-contained; relative imports from the FrontDoor source tree are not
+available to uploaded packages.
 
 ```js
-import { definePlugin, definePluginManifest } from '../pluginHost/sdk';
-
-export const manifest = definePluginManifest({
-  id: 'ticket-plugin',
-  name: 'Ticket Plugin',
-  version: '1.0.0',
-});
-
 export function register(api) {
   api.registerAction({
     id: 'create-ticket',
     label: 'Create Ticket',
     surface: 'layout.accountMenu',
-    onClick: async () => {
-      api.notify({ type: 'success', message: 'Ticket flow opened' });
-    },
+    onClick: () => api.notify({ type: 'success', message: 'Ticket flow opened' }),
   });
 }
 
-export default definePlugin({
-  manifest,
-  register,
-});
-```
-
-## Runtime API
-
-The plugin host currently exposes:
-
-- `getCurrentUser()`
-- `getBranding()`
-- `getLanguage()`
-- `getUiStrings()`
-- `navigate()`
-- `notify()`
-- `openExternalUrl()`
-- `registerAction()`
-- `registerSurface()`
-- `registerRoute()`
-- `registerNavigationItem()`
-
-## Server registry
-
-Frontdoor can also persist plugin metadata in SQLite and expose it through `/api/plugins`.
-The runtime loader will read `/api/plugins/runtime` and load any enabled plugin that has a frontend `entry`.
-The admin screen also shows the server registry separately from the in-memory runtime snapshot.
-Plugins can also opt into backend event dispatch by declaring a `backend.url` and `backend.eventSubscriptions`.
-Backend dispatch only targets plugins that are both enabled and approved.
-From the admin page you can install a plugin by filling in the manifest fields, pasting a module source, uploading a single JSON package, or pointing to an external `entry` URL.
-New installs are created as pending until an owner approves them from the same admin screen.
-The same page can export the current draft as a JSON package and open a validation wizard before installation or approval.
-It can also import or export a ZIP archive containing `manifest.json` and `module.mjs`.
-
-### Package format
-
-For one-file installs, Frontdoor accepts a JSON package with a `manifest` object and optional `moduleSource` string.
-The module source should be self-contained and export `register(api)` directly.
-
-```json
-{
-  "manifest": {
-    "id": "ticket-plugin",
-    "name": "Ticket Plugin",
-    "version": "1.0.0",
-    "permissions": ["actions.write", "routes.write", "surfaces.write"],
-    "roles": ["owner", "admin"]
-  },
-  "moduleSource": "export function register(api) { api.registerRoute({ id: 'ticket-plugin.route', path: '/plugins/ticket-center', label: 'Ticket Center' }); } export default { register };"
+export function onUnload({ reason }) {
+  // Remove timers, listeners, and other resources created by the plugin.
+  console.info(`Ticket plugin unloaded: ${reason}`);
 }
 ```
 
-The validation wizard highlights the package risk level, required permissions, backend webhook exposure, and the raw package payload before approval.
+The host exposes a method only when its matching permission was approved:
 
-### ZIP package
+- `actions.write` -> `registerAction()`
+- `surfaces.write` -> `registerSurface()`
+- `routes.write` -> `registerRoute()`
+- `navigation.write` -> `registerNavigationItem()`
+- `user.read` -> `getCurrentUser()`
+- `branding.read` -> `getBranding()`
+- `language.read` -> `getLanguage()` and `getUiStrings()`
+- `navigation.use` -> `navigate()` and internal link targets
+- `notifications.write` -> `notify()`
+- `external-links.open` -> `openExternalUrl()` and HTTPS link targets
 
-Frontdoor also accepts a ZIP archive with the following structure:
+Host data is returned as a detached, frozen snapshot. External links must use
+HTTPS without embedded credentials. Lifecycle cleanup runs on replacement,
+revocation, deletion, switch-off, and provider unmount; local and cross-tab
+registry changes trigger reload or cleanup.
 
-```text
-my-plugin-1.0.0/
-  manifest.json
-  module.mjs
-```
+## Runtime and authorisation
 
-The ZIP file is ideal for third-party plugins that want a single distributable bundle.
+`/api/plugins/runtime` and `/api/plugins/files/...` require an authenticated
+session. Runtime results and artifact downloads are filtered by plugin roles.
+Artifacts use digest-based URLs, are re-hashed before serving, and are returned
+with private immutable caching and `nosniff`. Anonymous users, disallowed roles,
+pending plugins, revoked plugins, disabled plugins, and digest mismatches cannot
+retrieve executable bytes.
 
-### Audit trail
+## Backend events
 
-Plugin approvals and revocations are recorded in the audit log with target type `plugin`, so owners can review who approved or rejected a package later.
-The dedicated admin view is available at `/admin/plugins/audit`.
+Supported events are `auth.login`, `auth.devLogin`, and `app.access`; wildcard
+subscriptions are rejected. Payloads use event-specific allowlists and exclude
+email addresses, display names, Microsoft identifiers, internal call context, and
+arbitrary caller fields.
 
-## Surfaces
+Webhook URLs must use HTTPS on port 443 with no embedded credentials. FrontDoor
+resolves all addresses immediately before connecting, rejects private, loopback,
+link-local, metadata, mapped, reserved, and mixed DNS answers, pins the validated
+address for the connection, does not follow redirects, and limits request size and
+duration. Backend secrets are stored with AES-256-GCM. Set a stable 32+ character
+`PLUGIN_SECRET_ENCRYPTION_KEY`; otherwise `JWT_SECRET` is used as a
+rotation-coupled fallback.
 
-Useful built-in surfaces include:
+## Operations, backup, and migration
 
-- `layout.nav.desktop`
-- `layout.nav.mobile`
-- `layout.accountMenu`
-- `home.hero.after`
-- `home.controls.after`
-- `home.catalog.after`
-- `admin.header.actions`
-- `admin.page.top`
-- `admin.page.bottom`
-- `customization.page.top`
-- `customization.page.bottom`
+- Set `PLUGIN_ASSET_DIR` to persistent storage; Docker Compose uses `/data/plugins`.
+- FrontDoor backups include the registry and immutable plugin artifacts. Restore
+  them together and retain the encryption key used for backend secrets.
+- Back up the database and plugin asset directory before an upgrade or rollback.
+- Legacy remote-entry plugins are not migrated to executable packages. Repackage
+  the reviewed module, import it, and approve the new digest.
+- A legacy plaintext backend secret is never sent; re-enter it once so FrontDoor
+  can store an encrypted value.
+- Revocation, import, update, deletion, runtime authorisation, delivery, and
+  delivery failures are written to the plugin audit trail without secret values.
+
+Useful surfaces include `layout.nav.desktop`, `layout.nav.mobile`,
+`layout.accountMenu`, `home.hero.after`, `home.controls.before`,
+`home.controls.after`, `home.catalog.before`, `home.catalog.after`,
+`admin.header.actions`, `admin.page.top`, `admin.page.bottom`,
+`customization.page.top`, `customization.page.bottom`,
+`customization.section.sidebar`, and `customization.section.body`.

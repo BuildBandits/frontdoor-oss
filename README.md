@@ -120,6 +120,7 @@ App: http://localhost:3001
 | `AVATAR_CACHE_DIR` | Disk cache for user avatars and metadata | `./data/avatar-cache` |
 | `APP_ICON_CACHE_DIR` | Disk cache for uploaded app icons and pasted SVG assets | `./data/app-icon-cache` |
 | `BRANDING_ASSET_DIR` | Disk storage for the optional company logo | `./data/branding` |
+| `PLUGIN_ASSET_DIR` | Persistent storage for immutable, content-addressed plugin artifacts | `./data/plugins` |
 | `AVATAR_CACHE_TTL_DAYS` | Refresh interval for cached Microsoft 365 / Gravatar avatars | `14` |
 | `AVATAR_CACHE_MISS_TTL_DAYS` | Retry interval when no avatar was found | `30` |
 | `BASE_DOMAIN` | Base domain (no protocol) | `frontdoor.local` |
@@ -130,6 +131,7 @@ App: http://localhost:3001
 | `AZURE_TENANT_ID` | Azure AD Tenant ID | - |
 | `AZURE_REDIRECT_URI` | SSO callback redirect URI | - |
 | `JWT_SECRET` | JWT signing secret | - |
+| `PLUGIN_SECRET_ENCRYPTION_KEY` | AES-GCM key material for plugin backend secrets (32+ characters; falls back to `JWT_SECRET`) | - |
 | `ENTRA_GROUP_SYNC` | Discover Entra group memberships at login and enable admin import/force-sync flows | `false` |
 | `JWT_EXPIRES_IN` | JWT token duration | `7d` |
 | `ADMIN_EMAILS` | Comma-separated owner emails (auto-promoted) | - |
@@ -153,6 +155,7 @@ Recommended but optional:
 - `ADMIN_EMAILS`
 - `ADMIN_API_KEY`
 - `JWT_EXPIRES_IN`
+- `PLUGIN_SECRET_ENCRYPTION_KEY` so JWT rotation does not invalidate encrypted plugin backend secrets
 - Tenant default time zone from `Personalizza` if you want something other than UTC
 
 If one of the required values is missing or malformed, the container now fails fast at startup with a clear log entry instead of surfacing a runtime auth error later.
@@ -276,6 +279,7 @@ Frontdoor startup configuration:
   AZURE_TENANT_ID=[set]
   AZURE_REDIRECT_URI=https://frontdoor.contoso.com/api/auth/microsoft/callback
   JWT_SECRET=[set]
+  PLUGIN_SECRET_ENCRYPTION_KEY=[set]
   ADMIN_EMAILS=1 owner configured
   ENTRA_GROUP_SYNC=true
 ```

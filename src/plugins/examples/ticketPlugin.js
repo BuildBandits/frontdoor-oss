@@ -8,7 +8,17 @@ export const manifest = definePluginManifest({
   version: '1.1.0',
   description: 'A realistic support plugin with quick actions, a ticket hub, settings, and admin surfaces.',
   author: 'FrontDoor',
-  permissions: ['actions.write', 'routes.write', 'surfaces.write'],
+  permissions: [
+    'actions.write',
+    'routes.write',
+    'surfaces.write',
+    'navigation.write',
+    'user.read',
+    'branding.read',
+    'language.read',
+    'navigation.use',
+    'notifications.write',
+  ],
   roles: ['owner', 'admin'],
 });
 

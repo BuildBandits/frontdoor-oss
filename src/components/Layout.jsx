@@ -55,9 +55,8 @@ export default function Layout({ children }) {
   const showHomeNav = role !== 'user';
   const showLogoutAction = !hideLoginPage;
 
-  const handleLogout = () => {
-    logout();
-    window.location.href = '/login';
+  const handleLogout = async () => {
+    await logout();
   };
 
   const handleTakeTour = () => {

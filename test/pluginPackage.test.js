@@ -54,7 +54,7 @@ export default { register };`,
     assert.equal(getRuntimePlugins().length, 0);
 
     db.prepare("UPDATE branding_settings SET plugins_enabled = 1 WHERE id = 'default'").run();
-    assert.equal(getRuntimePlugins().length, 1);
+    assert.equal(getRuntimePlugins({ role: 'owner' }).length, 1);
   } finally {
     deletePluginRegistry('package-plugin');
   }

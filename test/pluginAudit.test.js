@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import db from '../server/db.js';
 import {
   approvePluginRegistry,
+  importPluginBundle,
   revokePluginApproval,
-  upsertPluginRegistry,
 } from '../server/services/plugins.js';
 
 beforeEach(() => {
@@ -13,13 +13,14 @@ beforeEach(() => {
   db.prepare('DELETE FROM rbac_audit_logs').run();
 });
 
-test('logs plugin approval and revocation in the RBAC audit trail', () => {
-  upsertPluginRegistry({
-    id: 'audit-plugin',
-    name: 'Audit Plugin',
-    version: '1.0.0',
-    entry: 'https://plugins.example.com/plugin.mjs',
-    approved: false,
+test('logs plugin approval and revocation in the RBAC audit trail', async () => {
+  await importPluginBundle({
+    manifest: {
+      id: 'audit-plugin',
+      name: 'Audit Plugin',
+      version: '1.0.0',
+    },
+    moduleSource: 'export function register() {}',
   });
 
   approvePluginRegistry('audit-plugin', 'owner-1');
@@ -32,11 +33,13 @@ test('logs plugin approval and revocation in the RBAC audit trail', () => {
     ORDER BY id
   `).all();
 
-  assert.equal(rows.length, 2);
-  assert.equal(rows[0].action, 'approve');
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0].action, 'import');
   assert.equal(rows[0].target_id, 'audit-plugin');
-  assert.equal(rows[1].action, 'revoke');
+  assert.equal(rows[1].action, 'approve');
   assert.equal(rows[1].target_id, 'audit-plugin');
-  assert.match(rows[0].details || '', /"approved":true/);
-  assert.match(rows[1].details || '', /"approved":false/);
+  assert.equal(rows[2].action, 'revoke');
+  assert.equal(rows[2].target_id, 'audit-plugin');
+  assert.match(rows[1].details || '', /"approved":true/);
+  assert.match(rows[2].details || '', /"approved":false/);
 });

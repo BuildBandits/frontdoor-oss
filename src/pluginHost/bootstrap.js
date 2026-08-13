@@ -1,14 +1,6 @@
 import api from '../services/api';
 import { addPluginLoadError, loadPluginBundle, setPluginBootstrapState } from './registry';
 
-function splitSourceList(value) {
-  if (!value) return [];
-  return String(value)
-    .split(/[\n,]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 function inferPluginIdFromUrl(url) {
   try {
     const parsed = new URL(url, window.location.href);
@@ -19,21 +11,12 @@ function inferPluginIdFromUrl(url) {
   }
 }
 
-async function loadManifestFromUrl(url) {
-  const response = await fetch(url, { credentials: 'omit' });
-  if (!response.ok) {
-    throw new Error(`Failed to load plugin manifest ${url} (${response.status})`);
-  }
-  const manifest = await response.json();
-  return {
-    ...manifest,
-    source: manifest.source || url,
-    url,
-  };
-}
-
 async function loadModuleFromUrl(url) {
-  const module = await import(/* @vite-ignore */ url);
+  const parsed = new URL(url, window.location.origin);
+  if (parsed.origin !== window.location.origin || !parsed.pathname.startsWith('/api/plugins/files/')) {
+    throw new Error('Plugin modules must use an authenticated same-origin artifact URL');
+  }
+  const module = await import(/* @vite-ignore */ parsed.href);
   const defaultExport = module.default;
   return {
     manifest: module.manifest
@@ -100,52 +83,10 @@ export async function bootstrapPlugins(runtimeApi = {}) {
 
     await loadServerPlugins(runtimeApi);
 
-    const manifestUrls = splitSourceList(import.meta.env.VITE_FRONTDOOR_PLUGIN_MANIFESTS);
-    const moduleUrls = splitSourceList(import.meta.env.VITE_FRONTDOOR_PLUGIN_MODULES);
-
-    for (const manifestUrl of manifestUrls) {
-      try {
-        const manifest = await loadManifestFromUrl(manifestUrl);
-        if (!manifest.entry) {
-          throw new Error(`Plugin manifest ${manifestUrl} is missing an entry field`);
-        }
-        const fallbackId = manifest.id || inferPluginIdFromUrl(manifest.entry || manifestUrl);
-        const pluginModule = await loadModuleFromUrl(new URL(manifest.entry, manifestUrl).href);
-        await loadPluginBundle({
-          manifest,
-          register: pluginModule.register,
-          onUnload: pluginModule.onUnload,
-        }, runtimeApi, {
-          id: fallbackId,
-          name: manifest.name || fallbackId,
-          source: manifest.source || manifestUrl,
-        });
-      } catch (error) {
-        addPluginLoadError({
-          source: manifestUrl,
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
-    for (const moduleUrl of moduleUrls) {
-      try {
-        const inferredId = inferPluginIdFromUrl(moduleUrl);
-        const pluginModule = await loadModuleFromUrl(moduleUrl);
-        await loadPluginBundle(pluginModule, runtimeApi, {
-          id: inferredId,
-          name: pluginModule.manifest?.name || inferredId,
-          source: moduleUrl,
-        });
-      } catch (error) {
-        addPluginLoadError({
-          source: moduleUrl,
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
-    if (String(import.meta.env.VITE_FRONTDOOR_ENABLE_SAMPLE_PLUGIN || '').toLowerCase() === 'true') {
+    if (
+      import.meta.env.DEV
+      && String(import.meta.env.VITE_FRONTDOOR_ENABLE_SAMPLE_PLUGIN || '').toLowerCase() === 'true'
+    ) {
       try {
         const samplePlugin = await import('../plugins/examples/ticketPlugin');
         await loadPluginBundle(samplePlugin, runtimeApi, {

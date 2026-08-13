@@ -57,6 +57,7 @@ export function getStartupConfig() {
   const azureTenantId = process.env.AZURE_TENANT_ID || '';
   const azureRedirectUri = process.env.AZURE_REDIRECT_URI || 'https://frontdoor.local/api/auth/microsoft/callback';
   const jwtSecret = process.env.JWT_SECRET || '';
+  const pluginSecretEncryptionKey = process.env.PLUGIN_SECRET_ENCRYPTION_KEY || '';
   const adminEmails = process.env.ADMIN_EMAILS || '';
   const brandingAssetDir = process.env.BRANDING_ASSET_DIR || './data/branding';
 
@@ -75,6 +76,7 @@ export function getStartupConfig() {
     AZURE_TENANT_ID: isSet(azureTenantId) ? REDACTED : '[missing]',
     AZURE_REDIRECT_URI: azureRedirectUri,
     JWT_SECRET: isSet(jwtSecret) ? REDACTED : '[missing]',
+    PLUGIN_SECRET_ENCRYPTION_KEY: isSet(pluginSecretEncryptionKey) ? REDACTED : '[JWT_SECRET fallback]',
     ADMIN_EMAILS: adminEmails ? `${adminEmails.split(',').filter(Boolean).length} owner configured` : '[empty]',
   };
 }
@@ -129,6 +131,15 @@ export function validateStartupEnv() {
   }
   if (isPlaceholderJwtSecret(process.env.JWT_SECRET) && !devLogin) {
     errors.push('JWT_SECRET is set to a known placeholder value; generate a unique secret before starting the server');
+  }
+  if (
+    isSet(process.env.PLUGIN_SECRET_ENCRYPTION_KEY)
+    && process.env.PLUGIN_SECRET_ENCRYPTION_KEY.trim().length < 32
+  ) {
+    errors.push('PLUGIN_SECRET_ENCRYPTION_KEY must be at least 32 characters');
+  }
+  if (!isSet(process.env.PLUGIN_SECRET_ENCRYPTION_KEY)) {
+    warnings.push('PLUGIN_SECRET_ENCRYPTION_KEY is not set; encrypted plugin backend secrets will use JWT_SECRET as a rotation-coupled fallback');
   }
   if (!isSet(process.env.ADMIN_EMAILS)) {
     warnings.push('ADMIN_EMAILS is empty; no user will be auto-promoted to owner on first login');

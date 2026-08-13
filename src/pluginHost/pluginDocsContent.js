@@ -1,7 +1,7 @@
 export const PLUGIN_DOC_ENV_HINTS = [
-  'VITE_FRONTDOOR_PLUGIN_MANIFESTS',
-  'VITE_FRONTDOOR_PLUGIN_MODULES',
-  'VITE_FRONTDOOR_ENABLE_SAMPLE_PLUGIN',
+  'PLUGIN_ASSET_DIR=/data/plugins',
+  'PLUGIN_SECRET_ENCRYPTION_KEY=<stable 32+ character secret>',
+  'VITE_FRONTDOOR_ENABLE_SAMPLE_PLUGIN=true (development only)',
 ];
 
 export function manifestExample() {
@@ -10,8 +10,7 @@ export function manifestExample() {
   "name": "Ticket Plugin",
   "version": "1.0.0",
   "description": "Adds a ticket creation action, route and surface",
-  "entry": "/api/plugins/files/ticket-plugin/1.0.0/<release>/index.mjs",
-  "permissions": ["actions.write", "routes.write", "surfaces.write"],
+  "permissions": ["actions.write", "routes.write", "surfaces.write", "notifications.write"],
   "roles": ["owner", "admin"],
   "backend": {
     "enabled": true,
@@ -37,15 +36,7 @@ export function packageExample() {
 }
 
 export function moduleExample() {
-  return `import { definePlugin, definePluginManifest } from '../pluginHost/sdk.js';
-
-export const manifest = definePluginManifest({
-  id: 'ticket-plugin',
-  name: 'Ticket Plugin',
-  version: '1.0.0',
-});
-
-export function register(api) {
+  return `export function register(api) {
   api.registerAction({
     id: 'create-ticket',
     label: 'Create Ticket',
@@ -55,8 +46,7 @@ export function register(api) {
   });
 }
 
-export default definePlugin({
-  manifest,
-  register,
-});`;
+export function onUnload({ reason }) {
+  console.info('Ticket plugin unloaded:', reason);
+}`;
 }

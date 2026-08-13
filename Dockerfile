@@ -36,7 +36,12 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     && chown frontdoor:frontdoor /data
 
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+    DATABASE_PATH=/data/frontdoor.db \
+    AVATAR_CACHE_DIR=/data/avatar-cache \
+    APP_ICON_CACHE_DIR=/data/app-icon-cache \
+    BRANDING_ASSET_DIR=/data/branding \
+    PLUGIN_ASSET_DIR=/data/plugins
 EXPOSE 3001
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

@@ -106,12 +106,14 @@ describe('backup service', () => {
       appIconDir: makeTempDir('frontdoor-backup-app-icons-src-'),
       brandingDir: makeTempDir('frontdoor-backup-branding-src-'),
       avatarCacheDir: makeTempDir('frontdoor-backup-avatars-src-'),
+      pluginAssetDir: makeTempDir('frontdoor-backup-plugins-src-'),
     };
 
     restoreDirs = {
       appIconDir: makeTempDir('frontdoor-backup-app-icons-dst-'),
       brandingDir: makeTempDir('frontdoor-backup-branding-dst-'),
       avatarCacheDir: makeTempDir('frontdoor-backup-avatars-dst-'),
+      pluginAssetDir: makeTempDir('frontdoor-backup-plugins-dst-'),
     };
   });
 
@@ -162,6 +164,7 @@ describe('backup service', () => {
     writeFile(sourceDirs.brandingDir, 'company-logo.svg', '<svg viewBox="0 0 24 24"></svg>');
     writeFile(sourceDirs.avatarCacheDir, 'user-1.png', Buffer.from([1, 2, 3]));
     writeFile(sourceDirs.avatarCacheDir, 'user-1.json', JSON.stringify({ source: 'gravatar', fileName: 'user-1.png' }));
+    writeFile(sourceDirs.pluginAssetDir, 'sample-plugin/1.0.0/digest/index.mjs', 'export function register() {}');
 
     const progressEvents = [];
     const { archive, snapshot } = await createBackupArchive({
@@ -171,14 +174,15 @@ describe('backup service', () => {
     });
 
     assert.equal(snapshot.summary.tableCount > 0, true);
-    assert.equal(snapshot.summary.fileCount, 4);
+    assert.equal(snapshot.summary.fileCount, 5);
     assert.equal(Buffer.isBuffer(archive), true);
-    assert.deepEqual(progressEvents.map((event) => event.stage), ['database', 'app-icons', 'branding', 'avatars']);
+    assert.deepEqual(progressEvents.map((event) => event.stage), ['database', 'app-icons', 'branding', 'avatars', 'plugins']);
     assert.equal(progressEvents.at(-1)?.progress, 100);
 
     writeFile(restoreDirs.appIconDir, 'stale.txt', 'old');
     writeFile(restoreDirs.brandingDir, 'stale.txt', 'old');
     writeFile(restoreDirs.avatarCacheDir, 'stale.txt', 'old');
+    writeFile(restoreDirs.pluginAssetDir, 'stale.txt', 'old');
 
     const result = await restoreBackupArchive(archive, {
       dbHandle: restoreDb,
@@ -187,7 +191,7 @@ describe('backup service', () => {
 
     assert.equal(result.restoredTables > 0, true);
     assert.equal(result.restoredRows > 0, true);
-    assert.equal(result.restoredFiles, 4);
+    assert.equal(result.restoredFiles, 5);
 
     const restoredUser = restoreDb.prepare('SELECT email, display_name, role FROM users WHERE id = ?').get('user-1');
     assert.deepEqual(toPlainObject(restoredUser), {
@@ -214,8 +218,11 @@ describe('backup service', () => {
     assert.equal(fs.existsSync(path.join(restoreDirs.brandingDir, 'company-logo.svg')), true);
     assert.equal(fs.existsSync(path.join(restoreDirs.avatarCacheDir, 'user-1.png')), true);
     assert.equal(fs.existsSync(path.join(restoreDirs.avatarCacheDir, 'user-1.json')), true);
+    assert.equal(fs.existsSync(path.join(restoreDirs.pluginAssetDir, 'sample-plugin/1.0.0/digest/index.mjs')), true);
+    assert.equal(fs.statSync(path.join(restoreDirs.pluginAssetDir, 'sample-plugin/1.0.0/digest/index.mjs')).mode & 0o777, 0o440);
     assert.equal(fs.existsSync(path.join(restoreDirs.appIconDir, 'stale.txt')), false);
     assert.equal(fs.existsSync(path.join(restoreDirs.brandingDir, 'stale.txt')), false);
     assert.equal(fs.existsSync(path.join(restoreDirs.avatarCacheDir, 'stale.txt')), false);
+    assert.equal(fs.existsSync(path.join(restoreDirs.pluginAssetDir, 'stale.txt')), false);
   });
 });

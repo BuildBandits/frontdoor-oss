@@ -6,6 +6,10 @@
 .env
 .env.*
 coverage
+.tmp
+data
+playwright-report
+test-results
 *.db
 *.key
 *.log

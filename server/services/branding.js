@@ -312,7 +312,9 @@ export async function updateBrandingSettings(input = {}) {
   const showEntraAppMode = input.showEntraAppMode === undefined
     ? (current?.show_entra_app_mode ?? 1)
     : (input.showEntraAppMode ? 1 : 0);
-  const pluginsEnabled = 0;
+  const pluginsEnabled = input.pluginsEnabled === undefined
+    ? (current?.plugins_enabled ?? 0)
+    : (input.pluginsEnabled ? 1 : 0);
 
   let logoFileName = current?.logo_file_name || null;
   let logoContentType = current?.logo_content_type || null;
