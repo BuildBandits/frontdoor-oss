@@ -1,6 +1,6 @@
 # FrontDoor plugin hardening plan
 
-Status: active
+Status: completed on 2026-08-13 for the reviewed first-party plugin trust model
 
 Branch: `hardening/plugin-system-shippable`
 
@@ -152,6 +152,11 @@ include secrets in logs or API responses.
 - run i18n, build, dependency audit, and targeted security regression tests;
 - document migration from legacy entries, backup/rollback, and known residual
   risks; publish a final ship/no-ship report.
+
+Result: the complete Node 22 gate, production build, Chromium E2E suite,
+dependency audit, Docker image build, and non-root container smoke test passed.
+The ship decision and residual trust boundary are recorded in
+`security/security-audit-20260813-plugin-system.md`.
 
 ## Required test matrix
 
