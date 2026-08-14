@@ -95,16 +95,24 @@ This is the recommended way to explore and develop on Frontdoor without configur
 
 ## Quick Start (Docker)
 
+The Docker quick start is a local demo and does not require Microsoft Entra:
+
 ```bash
-# 1. Configure environment
+# 1. Enable the loopback-only local demo profile
 cp .env.example.docker .env
-# Edit .env with your Azure AD credentials
 
 # 2. Build and run
 docker compose up --build
 ```
 
-App: http://localhost:3001
+Open http://localhost:3001 and use the **Dev Login** panel to enter as
+`owner`, `admin`, `admin_readonly`, or `user`.
+
+The example binds port 3001 to `127.0.0.1`, leaves Azure credentials empty,
+disables Entra group sync, and uses the development-only JWT fallback. Do not
+expose this profile to a network. For a real deployment, use
+`NODE_ENV=production`, set `DEV_LOGIN=false`, generate a unique
+32+ character `JWT_SECRET`, and configure Microsoft Entra as described below.
 
 > **Dev vs Docker**: In dev mode, Vite serves the frontend on port 5173 and proxies API calls to Express on 3001. In Docker, Express serves both the built frontend and API on port 3001. The two `.env.example.*` files are pre-configured for each mode.
 
@@ -115,6 +123,7 @@ App: http://localhost:3001
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DEV_LOGIN` | Enable local dev login without Azure SSO (ignored in production) | `false` |
+| `FRONTDOOR_BIND_ADDRESS` | Host address published by Docker Compose; use `127.0.0.1` for Dev Login | `0.0.0.0` |
 | `PORT` | Express server port | `3001` |
 | `DATABASE_PATH` | SQLite file path | `./frontdoor.db` |
 | `AVATAR_CACHE_DIR` | Disk cache for user avatars and metadata | `./data/avatar-cache` |
@@ -139,6 +148,8 @@ App: http://localhost:3001
 
 For a real deployment, set at least:
 
+- `NODE_ENV=production`
+- `DEV_LOGIN=false`
 - `BASE_DOMAIN`
 - `FRONTEND_URL`
 - `CORS_ALLOWED_ORIGINS` if you want a static page or satellite app on another origin to call Frontdoor with credentials
@@ -146,7 +157,7 @@ For a real deployment, set at least:
 - `AZURE_CLIENT_SECRET`
 - `AZURE_TENANT_ID`
 - `AZURE_REDIRECT_URI`
-- `JWT_SECRET`
+- a unique `JWT_SECRET` with at least 32 characters
 - `ENTRA_GROUP_SYNC` if you want Entra group sync enabled
 Recommended but optional:
 

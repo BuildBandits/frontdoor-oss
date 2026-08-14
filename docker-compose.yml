@@ -2,11 +2,12 @@ services:
   frontdoor:
     build: .
     ports:
-      - "3001:3001"
+      - "${FRONTDOOR_BIND_ADDRESS:-0.0.0.0}:3001:3001"
     volumes:
       - frontdoor-data:/data
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-production}
+      - DEV_LOGIN=${DEV_LOGIN:-false}
       - PORT=3001
       - DATABASE_PATH=/data/frontdoor.db
       - AVATAR_CACHE_DIR=/data/avatar-cache
