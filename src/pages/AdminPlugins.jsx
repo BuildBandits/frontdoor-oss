@@ -14,7 +14,7 @@ import {
   Trash2,
   PlayCircle,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import api from '../services/api';
 import Tooltip from '../components/Tooltip';
 import { useAuthStore } from '../stores/authStore';

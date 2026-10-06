@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, AlertCircle, Filter, PlugZap, ShieldCheck } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
 import ClearableSearchField from '../components/ClearableSearchField';
