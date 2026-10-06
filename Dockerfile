@@ -1,5 +1,5 @@
 # Stage 1: Build frontend and production node_modules
-ARG NODE_IMAGE=node:22-bookworm-slim
+ARG NODE_IMAGE=node:24-bookworm-slim
 FROM ${NODE_IMAGE} AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
