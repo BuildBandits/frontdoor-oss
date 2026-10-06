@@ -39,17 +39,17 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return undefined;
-          if (id.includes('react-router') || id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler') || id.includes('@remix-run/router')) {
-            return 'vendor-react';
-          }
-          if (id.includes('lucide-react')) return 'vendor-icons';
-          if (id.includes('@dnd-kit')) return 'vendor-dnd';
-          if (id.includes('dompurify') || id.includes('axios') || id.includes('zustand') || id.includes('clsx') || id.includes('uuid')) return 'vendor-shared';
-          return undefined;
+        // Groups pull in their dependencies recursively, so React core must win
+        // on priority; otherwise libraries importing React (e.g. @dnd-kit) absorb it.
+        codeSplitting: {
+          groups: [
+            { name: 'vendor-react', test: /[\\/]node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/, priority: 40 },
+            { name: 'vendor-icons', test: /[\\/]node_modules[\\/]lucide-react[\\/]/, priority: 30 },
+            { name: 'vendor-dnd', test: /[\\/]node_modules[\\/]@dnd-kit[\\/]/, priority: 20 },
+            { name: 'vendor-shared', test: /[\\/]node_modules[\\/](dompurify|axios|zustand|clsx|uuid)[\\/]/, priority: 10 },
+          ],
         },
       },
     },
