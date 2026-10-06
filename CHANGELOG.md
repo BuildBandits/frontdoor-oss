@@ -152,6 +152,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Plugin page crash**: restored the missing `Sparkles` icon import on the admin Plugins page so the dashboard no longer boots to a white screen with `ReferenceError: Sparkles is not defined`.
 
 ### Security
+- **Dependency security refresh**: bumped `axios` to 1.20.0, `dompurify` to 3.4.16, `react-router-dom` to 6.30.6, `qs` to 6.16.0, `body-parser` to 1.20.8 and `vite` to 8.1.6 (direct ranges and `overrides`), and refreshed the lockfile so transitive dev dependencies (`shell-quote`, `brace-expansion`, `nanoid`, `postcss`, `browserslist`, `@babel/core`, `baseline-browser-mapping`, `postcss-selector-parser`) resolve to patched versions. Closes the open Dependabot alerts that do not require a major upgrade.
 - **No user email in favorites-migration log**: the one-off `favoriteAppsMigrationFromLocalStorage` path no longer prints the user's email to the application log; it now logs only the user id and the migrated count, keeping PII out of stdout/infrastructure logs.
 - **Plugin capability boundary**: plugin packages now move through a constrained manifest/module contract and an owner approval step before they are mounted, reducing the chance of accidentally treating a third-party integration like a core feature.
 
