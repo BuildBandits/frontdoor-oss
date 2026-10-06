@@ -69,11 +69,16 @@ Internal refactors with no behavior change do not need a changelog entry.
 
 ## Testing
 
-Run the test suite before opening a PR:
+Run the same checks as CI before opening a PR:
 
 ```bash
+npm run lint
 npm test
+npm run check:i18n
+npm run build
 ```
+
+`npm run lint` must report no errors; warnings are allowed but avoid adding new ones.
 
 If you add a new endpoint or RBAC path, add coverage. Integration tests that touch SQLite are preferred over mocks for anything that crosses the persistence layer.
 

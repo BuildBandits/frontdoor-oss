@@ -28,6 +28,8 @@ export default function Layout({ children }) {
     resetHomeDesktopView,
     updatePreferredLanguage,
     resetPreferredLanguage,
+    updatePreferredTimeZone,
+    resetPreferredTimeZone,
     updatePreferredColorScheme,
     resetPreferredColorScheme,
     resetAppOrder,

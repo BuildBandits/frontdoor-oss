@@ -739,7 +739,7 @@ export default function Admin() {
     const direction = appSort.direction === 'asc' ? 1 : -1;
 
     return [...filtered].sort((a, b) => {
-      let result = 0;
+      let result;
       switch (appSort.key) {
         case 'name':
           result = compareText(a, b, 'name');

@@ -22,7 +22,7 @@ Closes #
 
 - [ ] I have read [CONTRIBUTING.md](../CONTRIBUTING.md).
 - [ ] All commits are **signed off** (DCO): `git commit -s` adds the `Signed-off-by` trailer.
-- [ ] Tests pass locally: `npm test`.
+- [ ] Lint and tests pass locally: `npm run lint` and `npm test`.
 - [ ] I updated `CHANGELOG.md` under `[Unreleased]` (unless this PR is an internal refactor with no user-visible change).
 - [ ] I updated relevant documentation (`README.md`, inline docs).
 - [ ] No PII (emails, names, tokens) in new log statements.
