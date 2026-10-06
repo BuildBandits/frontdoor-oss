@@ -4,7 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # Majors arrive as separate PRs and stay open as reminders until the matching
+    # roadmap phase (#14) lands, so leave room for minor/patch groups as well.
+    open-pull-requests-limit: 15
     groups:
       npm-minor-and-patch:
         update-types:
