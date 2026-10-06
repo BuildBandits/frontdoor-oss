@@ -44,6 +44,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Search shortcut hint**: the shared search field badge now adapts to the current platform, showing only `CTRL+K` on Windows and other non-macOS systems and only `⌘K` on macOS so the hint uses less space.
 
 ### Changed
+- **Express 5**: the server moves from `express` 4 to 5.2 (with `body-parser` 2) and `express-rate-limit` from 7 to 8. The SPA fallback route uses the Express 5 wildcard syntax (`/{*splat}`), `req.body` still defaults to `{}` when no body parser ran, rate limiters use the `limit` option name, and rejected promises in async handlers now reach the error middleware instead of becoming unhandled rejections. The `body-parser` 1.x override was dropped. Behaviour change: IPv6 clients are now rate-limited per /56 subnet (express-rate-limit 8 default).
 - **Node.js 24 runtime**: the Docker image (`node:24-bookworm-slim`), CI and `package.json` `engines` now target Node.js 24 LTS. `better-sqlite3` moves from 9 to 13, which ships N-API prebuilt binaries inside the package (no more `prebuild-install`), so `npm ci` no longer needs a native toolchain on supported platforms and the SQLite-backed tests run on current Node versions.
 - **Version bump**: Frontdoor is now on `1.2.8d` for the current branch, keeping the small-fix release cadence aligned with this work.
 - **Demo apps restore placement**: the demo-app reimport action now lives in `Personalizza > App` instead of the App list footer, so the App pagination footer can stay visually identical to Audit and Log.
