@@ -43,7 +43,7 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined;
-          if (id.includes('react-router-dom') || id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler') || id.includes('@remix-run/router')) {
+          if (id.includes('react-router') || id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler') || id.includes('@remix-run/router')) {
             return 'vendor-react';
           }
           if (id.includes('lucide-react')) return 'vendor-icons';

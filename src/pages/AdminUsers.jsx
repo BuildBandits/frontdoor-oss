@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, Wand2, Filter } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';

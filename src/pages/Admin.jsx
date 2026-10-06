@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Pencil, Trash2, X, Save, Copy, Users, ChevronDown, ChevronUp, Check, Filter, Settings, Tag } from 'lucide-react';
-import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import TagInput from '../components/TagInput';

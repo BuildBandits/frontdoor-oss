@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, resolveAppLanguage } from '../i18n';

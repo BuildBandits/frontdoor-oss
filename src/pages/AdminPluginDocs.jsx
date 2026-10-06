@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BookOpen, Boxes, Code2, ExternalLink, FileJson, PlugZap, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';

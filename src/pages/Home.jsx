@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { X, Star, LayoutGrid, List, Rows3, AppWindow, RefreshCw } from 'lucide-react';
 import {
   DndContext,

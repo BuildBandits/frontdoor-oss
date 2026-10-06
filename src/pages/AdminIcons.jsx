@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, ExternalLink, Filter, Image, RefreshCw, Tag, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
