@@ -495,7 +495,7 @@ router.post('/logout', (req, res) => {
 // duplicate this chain in satellites by decoding without verifying.
 const ssoTokenIntrospectionLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 120,
+  limit: 120,
   message: { error: 'too_many_requests' },
   standardHeaders: true,
   legacyHeaders: false,
