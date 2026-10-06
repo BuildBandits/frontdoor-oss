@@ -36,6 +36,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Search shortcut hint**: the shared search field now exposes a visible `CTRL+K / ⌘K` hint and supports a global `Ctrl/Cmd+K` shortcut that focuses the primary search input on pages that have one.
 
 ### Fixed
+- **Isolated test runs**: `npm test` now preloads `test/setup.js`, which gives every test process its own temporary SQLite database and data directories. Test files no longer race on the shared `frontdoor.db` (intermittent failures in the plugin tests), and a test run no longer writes `frontdoor.db` or `data/` into the working tree. `/data/` and SQLite `-wal`/`-shm` files are now git-ignored.
 - **Vendor chunk split**: React core (`react`, `react-dom`, `scheduler`) was being bundled into `vendor-dnd` because Vite 8's legacy `manualChunks` path lets a group absorb its dependencies recursively. The build now uses `rolldownOptions.output.codeSplitting` groups with explicit priorities, so `vendor-react` holds all of React and `vendor-dnd` (183 kB → 44 kB) only contains `@dnd-kit` and is no longer preloaded on every page.
 - **App update on internal-link**: editing an `internal-link` app no longer throws `Cannot access 'nextMode' before initialization` when the target URL is revalidated during save.
 - **Read-only admin user details**: the user detail card now hides the entire actions section for `admin_readonly` users instead of rendering blocked buttons and helper text.
