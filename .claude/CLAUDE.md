@@ -7,7 +7,7 @@
 - Roadmap is at the bottom of CHANGELOG.md, not in README
 
 ## Stack
-- Backend: Node.js 22 + Express + SQLite (better-sqlite3)
+- Backend: Node.js 24 + Express + SQLite (better-sqlite3)
 - Frontend: React 18 + Vite + Tailwind CSS + Zustand
 - Auth: Microsoft SSO (@azure/msal-node) + JWT (cookie httpOnly)
 - Deploy: Docker multi-stage

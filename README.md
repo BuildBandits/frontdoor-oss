@@ -34,7 +34,7 @@ Each app in the catalog is accessible via its target URL. The gateway handles au
 
 | Component | Technology |
 |-----------|------------|
-| Backend | Node.js 22 + Express |
+| Backend | Node.js 24 + Express |
 | Frontend | React 18 + Vite + Tailwind CSS |
 | Database | SQLite (better-sqlite3) |
 | Auth | Microsoft SSO (@azure/msal-node) + JWT |
