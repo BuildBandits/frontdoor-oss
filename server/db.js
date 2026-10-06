@@ -218,10 +218,37 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_plugin_registry_source ON plugin_registry(source);
 `);
 
-function ensureColumn(tableName, columnName, columnDefinition) {
+const ensuredColumns = [];
+
+function addColumnIfMissing(tableName, columnName, columnDefinition) {
   const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
   if (!columns.some((column) => column.name === columnName)) {
     db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition};`);
+  }
+}
+
+// Columns are ensured before the table-rebuild migrations (which copy them) and
+// again afterwards, so a rebuild with a stale column list cannot drop them.
+function ensureColumn(tableName, columnName, columnDefinition) {
+  ensuredColumns.push([tableName, columnName, columnDefinition]);
+  addColumnIfMissing(tableName, columnName, columnDefinition);
+}
+
+// Rebuilds a table (CREATE _new / copy / DROP / RENAME) atomically. foreign_keys
+// is a no-op inside a transaction, so it is toggled around it.
+function runTableRebuild(sql) {
+  const tableName = sql.match(/CREATE TABLE (\w+)_new/)?.[1] || 'unknown';
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.transaction(() => {
+      db.exec(sql);
+      const violations = db.pragma(`foreign_key_check(${tableName})`);
+      if (violations.length > 0) {
+        console.warn(`[startup][migrations] ${tableName}: ${violations.length} foreign key violation(s) after rebuild.`);
+      }
+    })();
+  } finally {
+    db.pragma('foreign_keys = ON');
   }
 }
 
@@ -300,8 +327,7 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
     const normalizeRoleSql = hasSuperadminRole || hasReadonlyRole
       ? "CASE WHEN role = 'superadmin' THEN 'owner' ELSE COALESCE(role, 'user') END"
       : "CASE WHEN role = 'admin' THEN 'owner' ELSE COALESCE(role, 'user') END";
-    db.pragma('foreign_keys = OFF');
-    db.exec(`
+    runTableRebuild(`
       CREATE TABLE users_new (
         id TEXT PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
@@ -324,14 +350,13 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       );
-      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at, is_active, last_login, last_activity_at, created_at, updated_at)
+      INSERT INTO users_new (id, email, display_name, microsoft_id, role, avatar_color, home_desktop_view, preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, last_login, last_activity_at, created_at, updated_at)
       SELECT id, email, display_name, microsoft_id, ${normalizeRoleSql},
-        avatar_color, COALESCE(home_desktop_view, 'cards'), preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, home_tour_seen_at, is_active, last_login, last_login, created_at, updated_at
+        avatar_color, COALESCE(home_desktop_view, 'cards'), preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, last_login, last_login, created_at, updated_at
       FROM users;
       DROP TABLE users;
       ALTER TABLE users_new RENAME TO users;
     `);
-    db.pragma('foreign_keys = ON');
     console.log('[startup][roles] users table migrated to role set: owner/admin/admin_readonly/user.');
   }
 
@@ -353,8 +378,7 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
   const brandingNeedLanguageMigration = brandingSchema?.sql?.includes("default_language TEXT DEFAULT 'en' CHECK(default_language IN ('en', 'it'))");
 
   if (usersNeedLanguageMigration) {
-    db.pragma('foreign_keys = OFF');
-    db.exec(`
+    runTableRebuild(`
       CREATE TABLE users_new (
         id TEXT PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
@@ -383,12 +407,10 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
       DROP TABLE users;
       ALTER TABLE users_new RENAME TO users;
     `);
-    db.pragma('foreign_keys = ON');
   }
 
   if (brandingNeedLanguageMigration) {
-    db.pragma('foreign_keys = OFF');
-    db.exec(`
+    runTableRebuild(`
       CREATE TABLE branding_settings_new (
         id TEXT PRIMARY KEY,
         hero_title_line1 TEXT NOT NULL,
@@ -413,16 +435,18 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
         plugins_enabled INTEGER DEFAULT 0,
         logo_file_name TEXT,
         logo_content_type TEXT,
+        hero_title_line1_i18n TEXT,
+        hero_title_line2_i18n TEXT,
+        hero_subtitle_i18n TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       );
-      INSERT INTO branding_settings_new (id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, default_timezone, default_color_scheme, enable_dark_mode_beta, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, plugins_enabled, logo_file_name, logo_content_type, created_at, updated_at)
-      SELECT id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, default_timezone, default_color_scheme, COALESCE(enable_dark_mode_beta, 0), use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, COALESCE(plugins_enabled, 0), logo_file_name, logo_content_type, created_at, updated_at
+      INSERT INTO branding_settings_new (id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, default_timezone, default_color_scheme, enable_dark_mode_beta, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, plugins_enabled, logo_file_name, logo_content_type, hero_title_line1_i18n, hero_title_line2_i18n, hero_subtitle_i18n, created_at, updated_at)
+      SELECT id, hero_title_line1, hero_title_line2, hero_subtitle, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, default_timezone, default_color_scheme, COALESCE(enable_dark_mode_beta, 0), use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, COALESCE(plugins_enabled, 0), logo_file_name, logo_content_type, hero_title_line1_i18n, hero_title_line2_i18n, hero_subtitle_i18n, created_at, updated_at
       FROM branding_settings;
       DROP TABLE branding_settings;
       ALTER TABLE branding_settings_new RENAME TO branding_settings;
     `);
-    db.pragma('foreign_keys = ON');
   }
 }
 
@@ -430,8 +454,7 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
 {
   const auditSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='rbac_audit_logs'").get();
   if (auditSchema && (!auditSchema.sql.includes("'app'") || !auditSchema.sql.includes("'branding'") || !auditSchema.sql.includes("'auth'") || !auditSchema.sql.includes("'plugin'"))) {
-    db.pragma('foreign_keys = OFF');
-    db.exec(`
+    runTableRebuild(`
       CREATE TABLE rbac_audit_logs_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         actor_id TEXT NOT NULL,
@@ -449,7 +472,6 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
       CREATE INDEX IF NOT EXISTS idx_rbac_audit_actor ON rbac_audit_logs(actor_id);
       CREATE INDEX IF NOT EXISTS idx_rbac_audit_target ON rbac_audit_logs(target_type, target_id);
     `);
-    db.pragma('foreign_keys = ON');
   }
 }
 
@@ -457,8 +479,7 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
 {
   const appsSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='apps'").get();
   if (appsSchema && (!appsSchema.sql.includes('entra-app') || !appsSchema.sql.includes('internal-link'))) {
-    db.pragma('foreign_keys = OFF');
-    db.exec(`
+    runTableRebuild(`
       CREATE TABLE apps_new (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -481,9 +502,13 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
       DROP TABLE apps;
       ALTER TABLE apps_new RENAME TO apps;
     `);
-    db.pragma('foreign_keys = ON');
   }
 }
+
+for (const [tableName, columnName, columnDefinition] of ensuredColumns) {
+  addColumnIfMissing(tableName, columnName, columnDefinition);
+}
+
 db.exec('UPDATE branding_settings SET show_app_mode_badges = COALESCE(show_app_mode_badges, 1)');
 db.exec("UPDATE branding_settings SET default_home_desktop_view = COALESCE(default_home_desktop_view, 'cards')");
 db.exec('UPDATE branding_settings SET default_compact_view = COALESCE(default_compact_view, 0)');
