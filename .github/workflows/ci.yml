@@ -30,14 +30,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Run unit tests
+      - name: Build frontend
+        run: npm run build
+
+      - name: Run tests
         run: npm test
 
       - name: Check i18n dictionaries
         run: npm run check:i18n
-
-      - name: Build frontend
-        run: npm run build
 
   docker:
     runs-on: ubuntu-latest
