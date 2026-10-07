@@ -6,7 +6,7 @@ import os from 'os';
 import path from 'path';
 import zlib from 'zlib';
 
-import { compareAppVersions, createBackupArchive, restoreBackupArchive } from '../server/services/backup.js';
+import { analyzeBackupArchive, compareAppVersions, createBackupArchive, restoreBackupArchive } from '../server/services/backup.js';
 
 function initSchema(database) {
   database.exec(`
@@ -335,6 +335,47 @@ describe('backup service', () => {
     assert.equal(fs.existsSync(path.join(restoreDirs.appIconDir, 'existing.svg')), true);
     const leftovers = fs.readdirSync(path.dirname(restoreDirs.appIconDir)).filter((name) => name.startsWith(`${path.basename(restoreDirs.appIconDir)}.restore-`));
     assert.deepEqual(leftovers, []);
+  });
+});
+
+describe('analyzeBackupArchive', () => {
+  it('describes an archive without touching the database or files', async () => {
+    const database = new DatabaseSync(':memory:');
+    initSchema(database);
+    database.prepare('INSERT INTO users (id, email) VALUES (?, ?)').run('live-1', 'live@example.com');
+    const archive = gzipJson({
+      version: 1,
+      createdAt: '2026-10-07T07:31:59.265Z',
+      app: { version: '1.4.0', commit: 'abc1234' },
+      database: {
+        tables: [
+          { name: 'users', columns: ['id', 'email', 'legacy_flag'], rows: [{ id: 'a', email: 'a@example.com' }, { id: 'b', email: 'b@example.com' }] },
+          { name: 'retired_table', columns: ['id'], rows: [] },
+        ],
+      },
+      buckets: [{ key: 'app-icons', files: [{ path: 'a.svg', data: Buffer.from('<svg/>').toString('base64'), size: 6 }] }],
+      summary: {},
+    });
+
+    const report = await analyzeBackupArchive(archive, { dbHandle: database, currentVersion: '1.3.1' });
+
+    assert.equal(report.sourceVersion, '1.4.0');
+    assert.equal(report.sourceCommit, 'abc1234');
+    assert.equal(report.currentVersion, '1.3.1');
+    assert.equal(report.newerThanCurrent, true);
+    assert.equal(report.createdAt, '2026-10-07T07:31:59.265Z');
+    assert.deepEqual(report.tables.find((table) => table.name === 'users'), { name: 'users', rows: 2, droppedColumns: ['legacy_flag'] });
+    assert.deepEqual(report.ignoredTables, ['retired_table']);
+    assert.ok(report.tablesNotInArchive.includes('apps'));
+    assert.deepEqual(report.buckets, [{ key: 'app-icons', files: 1, bytes: 6 }]);
+    assert.equal(report.totalRows, 2);
+    assert.deepEqual(report.warnings.sort(), ['dropped_columns', 'ignored_tables', 'newer_version']);
+    assert.deepEqual(database.prepare('SELECT id FROM users').all().map((row) => row.id), ['live-1']);
+    database.close();
+  });
+
+  it('rejects files that are not Frontdoor backups', async () => {
+    await assert.rejects(analyzeBackupArchive(Buffer.from('not gzip')), /not a valid gzipped JSON archive/);
   });
 });
 

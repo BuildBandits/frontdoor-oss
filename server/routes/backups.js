@@ -1,7 +1,7 @@
 import express from 'express';
 import db from '../db.js';
 import { authenticate, isOwner } from '../middleware/auth.js';
-import { createBackupArchive, restoreBackupArchive } from '../services/backup.js';
+import { analyzeBackupArchive, createBackupArchive, restoreBackupArchive } from '../services/backup.js';
 import { getBackupExportJob, getBackupExportJobArchive, startBackupExportJob, subscribeBackupExportJob } from '../services/backupJobs.js';
 import { respondWithError } from '../services/errors.js';
 
@@ -96,14 +96,27 @@ router.get('/export-jobs/:jobId/file', authenticate, isOwner, async (req, res) =
   res.send(job.archive);
 });
 
+const rawBackupBody = express.raw({
+  type: ['application/gzip', 'application/x-gzip', 'application/octet-stream'],
+  limit: '200mb',
+});
+
+// Dry run: describe what a restore would do without changing anything.
+router.post('/verify', authenticate, isOwner, rawBackupBody, async (req, res) => {
+  try {
+    const buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || []);
+    res.json(await analyzeBackupArchive(buffer));
+  } catch (error) {
+    console.error('Backup verification failed:', error.message);
+    respondWithError(res, error, { status: 500, code: 'failed_to_verify_backup' });
+  }
+});
+
 router.post(
   '/restore',
   authenticate,
   isOwner,
-  express.raw({
-    type: ['application/gzip', 'application/x-gzip', 'application/octet-stream'],
-    limit: '200mb',
-  }),
+  rawBackupBody,
   async (req, res) => {
     try {
       const buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || []);
