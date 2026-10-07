@@ -17,6 +17,21 @@ function safeFileName(now = new Date()) {
   return `frontdoor-backup-${now.toISOString().replace(/[:.]/g, '-')}.json.gz`;
 }
 
+// Saves a download response under the name from Content-Disposition.
+async function saveResponseAsFile(response, fallbackName) {
+  const blob = await response.blob();
+  const disposition = response.headers.get('content-disposition') || '';
+  const fileName = disposition.match(/filename="([^"]+)"/i)?.[1] || fallbackName;
+  const fileDownloadUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = fileDownloadUrl;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(fileDownloadUrl), 1000);
+}
+
 export default function AdminBackup() {
   const { user } = useAuthStore();
   const fileInputRef = useRef(null);
@@ -28,6 +43,7 @@ export default function AdminBackup() {
   const [completedStages, setCompletedStages] = useState([]);
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
+  const [databaseBusy, setDatabaseBusy] = useState(false);
   const [verifyReport, setVerifyReport] = useState(null);
   const [excludeLogs, setExcludeLogs] = useState(false);
   const [exportPassphrase, setExportPassphrase] = useState('');
@@ -179,18 +195,7 @@ export default function AdminBackup() {
         throw new Error(payload.error || copy.exportFailed);
       }
 
-      const blob = await response.blob();
-      const disposition = response.headers.get('content-disposition') || '';
-      const match = disposition.match(/filename="([^"]+)"/i);
-      const fileName = match?.[1] || safeFileName();
-      const fileDownloadUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = fileDownloadUrl;
-      anchor.download = fileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(fileDownloadUrl), 1000);
+      await saveResponseAsFile(response, safeFileName());
 
       const tables = Number.parseInt(response.headers.get('x-backup-table-count') || '0', 10) || 0;
       const files = Number.parseInt(response.headers.get('x-backup-file-count') || '0', 10) || 0;
@@ -221,6 +226,34 @@ export default function AdminBackup() {
     const file = event.target.files?.[0] || null;
     setSelectedFile(file);
     setVerifyReport(null);
+  };
+
+  const downloadDatabaseFile = async () => {
+    if (databaseBusy) return;
+    if (exportPassphrase && exportPassphrase.length < 12) {
+      pushNotice('error', copy.passphraseTooShort);
+      return;
+    }
+    if (exportPassphrase && exportPassphrase !== exportPassphraseConfirm) {
+      pushNotice('error', copy.passphraseMismatch);
+      return;
+    }
+    setDatabaseBusy(true);
+    try {
+      const response = await fetch('/api/backups/database', {
+        credentials: 'include',
+        headers: exportPassphrase ? { 'X-Backup-Passphrase': exportPassphrase } : {},
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(backupErrorMessage(payload, copy.databaseExportFailed));
+      }
+      await saveResponseAsFile(response, 'frontdoor-database.db');
+    } catch (error) {
+      pushNotice('error', error.message || copy.databaseExportFailed);
+    } finally {
+      setDatabaseBusy(false);
+    }
   };
 
   const verifyBackup = async () => {
@@ -462,6 +495,16 @@ export default function AdminBackup() {
             <Download className="h-4 w-4" />
             {downloadBusy ? copy.exportBusy : copy.exportAction}
           </button>
+          <button
+            type="button"
+            onClick={downloadDatabaseFile}
+            disabled={databaseBusy || downloadBusy}
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Database className="h-4 w-4" />
+            {databaseBusy ? copy.databaseExportBusy : copy.databaseExportAction}
+          </button>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{copy.databaseExportHelp}</p>
         </section>
 
         <section className="flex h-full flex-col rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-xs">

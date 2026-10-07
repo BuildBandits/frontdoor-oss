@@ -6,7 +6,7 @@ import os from 'os';
 import path from 'path';
 import zlib from 'zlib';
 
-import { analyzeBackupArchive, compareAppVersions, createBackupArchive, isEncryptedBackup, restoreBackupArchive } from '../server/services/backup.js';
+import { analyzeBackupArchive, compareAppVersions, createBackupArchive, exportDatabaseFile, isEncryptedBackup, restoreBackupArchive } from '../server/services/backup.js';
 
 function initSchema(database) {
   database.exec(`
@@ -417,7 +417,7 @@ describe('backup privacy options', () => {
 
     const { archive, fileName } = await createBackupArchive({ dbHandle: source, ...dirs, passphrase: 'correct horse battery' });
     assert.equal(isEncryptedBackup(archive), true);
-    assert.match(fileName, /.json.gz.enc$/);
+    assert.match(fileName, /\.json\.gz\.enc$/);
     assert.equal(archive.includes(Buffer.from('enc@example.com')), false);
 
     await assert.rejects(analyzeBackupArchive(archive, { dbHandle: target }), (error) => error.code === 'backup_passphrase_required' && error.statusCode === 400);
@@ -436,6 +436,33 @@ describe('backup privacy options', () => {
     initSchema(source);
     await assert.rejects(createBackupArchive({ dbHandle: source, ...emptyDirs(), passphrase: 'short' }), (error) => error.code === 'backup_passphrase_too_short');
     source.close();
+  });
+});
+
+describe('exportDatabaseFile', () => {
+  it('produces a consistent SQLite copy of the live database, optionally encrypted', async () => {
+    const dir = makeTempDir('frontdoor-raw-export-');
+    const source = new DatabaseSync(path.join(dir, 'live.db'));
+    initSchema(source);
+    source.prepare('INSERT INTO users (id, email) VALUES (?, ?)').run('raw-1', 'raw@example.com');
+
+    const plain = await exportDatabaseFile({ dbHandle: source });
+    assert.equal(plain.buffer.subarray(0, 15).toString('latin1'), 'SQLite format 3');
+    assert.match(plain.fileName, /^frontdoor-database-.+\.db$/);
+    const copyPath = path.join(dir, 'copy.db');
+    fs.writeFileSync(copyPath, plain.buffer);
+    const copy = new DatabaseSync(copyPath);
+    assert.equal(copy.prepare('SELECT email FROM users WHERE id = ?').get('raw-1').email, 'raw@example.com');
+    copy.close();
+
+    const encrypted = await exportDatabaseFile({ dbHandle: source, passphrase: 'raw export passphrase' });
+    assert.equal(isEncryptedBackup(encrypted.buffer), true);
+    assert.match(encrypted.fileName, /\.db\.enc$/);
+    await assert.rejects(exportDatabaseFile({ dbHandle: source, passphrase: 'short' }), (error) => error.code === 'backup_passphrase_too_short');
+
+    source.close();
+    assert.deepEqual(fs.readdirSync(dir).sort(), ['copy.db', 'live.db']);
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });
 
