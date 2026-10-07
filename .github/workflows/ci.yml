@@ -91,3 +91,22 @@ jobs:
           done
           docker logs frontdoor-ci
           exit 1
+
+      - name: Smoke test demo profile
+        run: |
+          docker compose -f docker-compose.demo.yml config --quiet
+          docker compose -f docker-compose.demo.yml config | grep -q 'host_ip: 127.0.0.1'
+          docker run -d --name frontdoor-demo -p 127.0.0.1:3002:3001 \
+            -e NODE_ENV=development -e DEV_LOGIN=true -e ENTRA_GROUP_SYNC=false \
+            -e BASE_DOMAIN=localhost -e FRONTEND_URL=http://localhost:3001 \
+            frontdoor:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3002/api/health; then
+              curl -fsS http://127.0.0.1:3002/api/auth/dev-status | grep -q '"devLogin":true'
+              docker rm -f frontdoor-demo
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs frontdoor-demo
+          exit 1
