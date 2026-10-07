@@ -225,7 +225,42 @@ test('raw database export is owner-only and can be encrypted', async () => {
   const encrypted = await request('/api/backups/database', { role: 'owner', headers: { 'X-Backup-Passphrase': 'a raw export passphrase' } });
   assert.equal(encrypted.status, 200);
   assert.match(encrypted.headers.get('content-disposition'), /\.db\.enc"/);
-  assert.equal(Buffer.from(await encrypted.arrayBuffer()).subarray(0, 8).toString('ascii'), 'FDBKENC1');
+  assert.equal(Buffer.from(await encrypted.arrayBuffer()).subarray(0, 8).toString('ascii'), 'FDBKENC2');
+});
+
+test('streamed v2 export can be checked again, and oversized uploads are refused', async () => {
+  const exported = await request('/api/backups/export?excludeLogs=true', { role: 'owner' });
+  assert.equal(exported.status, 200);
+  assert.match(exported.headers.get('content-disposition'), /\.tar\.gz"/);
+  assert.equal(exported.headers.get('x-backup-version'), '2');
+  const archive = Buffer.from(await exported.arrayBuffer());
+
+  const checked = await request('/api/backups/verify', {
+    role: 'owner',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/gzip' },
+    body: archive,
+  });
+  assert.equal(checked.status, 200);
+  const report = await checked.json();
+  assert.ok(report.tables.some((table) => table.name === 'users' && table.rows > 0));
+  assert.ok(report.tablesNotInArchive.includes('access_logs'));
+
+  const previous = process.env.BACKUP_MAX_UPLOAD_MB;
+  process.env.BACKUP_MAX_UPLOAD_MB = '1';
+  try {
+    const tooLarge = await request('/api/backups/verify', {
+      role: 'owner',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/gzip' },
+      body: Buffer.alloc(2 * 1024 * 1024, 1),
+    });
+    assert.equal(tooLarge.status, 413);
+    assert.equal((await tooLarge.json()).code, 'backup_too_large');
+  } finally {
+    if (previous === undefined) delete process.env.BACKUP_MAX_UPLOAD_MB;
+    else process.env.BACKUP_MAX_UPLOAD_MB = previous;
+  }
 });
 
 // Keep last: it replaces the users table that the other tests rely on.

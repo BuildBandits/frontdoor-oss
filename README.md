@@ -143,6 +143,7 @@ The image stores every writable path on the `/data` volume by default (`DATABASE
 | `APP_ICON_CACHE_DIR` | Disk cache for uploaded app icons and pasted SVG assets | `./data/app-icon-cache` |
 | `BRANDING_ASSET_DIR` | Disk storage for the optional company logo | `./data/branding` |
 | `PLUGIN_ASSET_DIR` | Disk storage for plugin packages (plugin system currently locked off) | `./data/plugins` |
+| `BACKUP_MAX_UPLOAD_MB` | Largest backup file accepted by *Check backup* and restore; uploads are streamed to a temporary file, not held in memory. A reverse proxy in front of Frontdoor needs a matching body size limit | `1024` |
 | `AVATAR_CACHE_TTL_DAYS` | Refresh interval for cached Microsoft 365 / Gravatar avatars | `14` |
 | `AVATAR_CACHE_MISS_TTL_DAYS` | Retry interval when no avatar was found | `30` |
 | `BASE_DOMAIN` | Base domain (no protocol) | `frontdoor.local` |
@@ -491,7 +492,7 @@ Schema changes are applied automatically at startup. Table rebuilds run inside a
 
 ## Upgrading an existing installation
 
-1. **Back up.** In **Personalizza (Customize) → Maintenance**, download a backup (database rows and schema, app icons, logo, avatars and plugin files, plus the Frontdoor version and commit that produced it). Tick *Leave out access and audit logs* for a smaller file, and set a passphrase to encrypt it; keep the passphrase safe, it cannot be recovered. With the container stopped (`docker compose stop`), also copy the SQLite file from the volume, e.g. `docker cp <container>:/data/frontdoor.db ./frontdoor.db.bak`, including `frontdoor.db-wal` if present.
+1. **Back up.** In **Personalizza (Customize) → Maintenance**, download a backup (a `.tar.gz` file with database rows and schema, app icons, logo, avatars and plugin files, plus the Frontdoor version and commit that produced it). Backups are written and read as streams, so their size is limited by disk space rather than memory; `.json.gz` files from earlier versions can still be checked and restored. Tick *Leave out access and audit logs* for a smaller file, and set a passphrase to encrypt it; keep the passphrase safe, it cannot be recovered. With the container stopped (`docker compose stop`), also copy the SQLite file from the volume, e.g. `docker cp <container>:/data/frontdoor.db ./frontdoor.db.bak`, including `frontdoor.db-wal` if present.
    For an exact copy of the database file you can also use *Download database file (.db)* on the same page, which works while Frontdoor is running. Encrypted files (`.enc`) can be decrypted with `FRONTDOOR_BACKUP_PASSPHRASE=... npm run backup:decrypt -- <file.enc>`.
 2. **Rehearse (recommended).** From a checkout of the new version, run `npm run backup:rehearse -- <backup or .db file>` (set `FRONTDOOR_BACKUP_PASSPHRASE` for `.enc` files). It rebuilds the source database in a temporary folder, runs the new version's migrations and prints schema changes, row counts and integrity checks; it exits with a non-zero code if rows would be lost or the database is damaged. Backups made before 1.3.1 carry no schema, so for those it rehearses a restore into the new schema instead. You can also start the new image locally against a copy of the database and check the `[startup]` log lines.
 3. **Upgrade.** Pull or build the new image and start it on the same `/data` volume. Migrations run on startup.

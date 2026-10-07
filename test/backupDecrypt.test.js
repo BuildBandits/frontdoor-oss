@@ -6,7 +6,9 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { encryptBackup } from '../server/services/backupCrypto.js';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { createEncryptStream, encryptBackup } from '../server/services/backupCrypto.js';
 
 const script = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'backup-decrypt.mjs');
 
@@ -38,6 +40,25 @@ test('backup:decrypt restores the original bytes and refuses wrong passphrases',
     const again = run([input], 'decrypt test passphrase');
     assert.equal(again.status, 1);
     assert.match(again.stderr, /already exists/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('backup:decrypt handles streamed encryption and removes partial output on failure', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'frontdoor-decrypt-stream-'));
+  try {
+    const plain = Buffer.alloc(200000, 9);
+    const input = path.join(dir, 'frontdoor-backup.tar.gz.enc');
+    await pipeline(Readable.from([plain]), createEncryptStream('stream decrypt passphrase'), fs.createWriteStream(input));
+
+    const wrong = run([input], 'wrong stream passphrase');
+    assert.equal(wrong.status, 1);
+    assert.equal(fs.existsSync(path.join(dir, 'frontdoor-backup.tar.gz')), false);
+
+    const ok = run([input], 'stream decrypt passphrase');
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.deepEqual(fs.readFileSync(path.join(dir, 'frontdoor-backup.tar.gz')), plain);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

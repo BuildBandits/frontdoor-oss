@@ -699,6 +699,7 @@
       "passphraseMismatch": "The two passphrases do not match.",
       "passphraseRequired": "This backup is encrypted: enter its passphrase.",
       "passphraseInvalid": "Wrong passphrase, or the backup file is damaged.",
+      "backupTooLarge": "The backup file is larger than the server accepts (BACKUP_MAX_UPLOAD_MB).",
       "restorePassphraseLabel": "Passphrase (only for encrypted backups)",
       "databaseExportAction": "Download database file (.db)",
       "databaseExportBusy": "Preparing database file...",

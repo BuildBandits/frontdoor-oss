@@ -6,7 +6,17 @@ import os from 'os';
 import path from 'path';
 import zlib from 'zlib';
 
-import { analyzeBackupArchive, compareAppVersions, createBackupArchive, exportDatabaseFile, isEncryptedBackup, restoreBackupArchive } from '../server/services/backup.js';
+import {
+  analyzeBackupArchive,
+  analyzeBackupFile,
+  compareAppVersions,
+  createBackupArchive,
+  createBackupFile,
+  exportDatabaseFile,
+  isEncryptedBackup,
+  restoreBackupArchive,
+  restoreBackupFile,
+} from '../server/services/backup.js';
 
 function initSchema(database) {
   database.exec(`
@@ -463,6 +473,121 @@ describe('exportDatabaseFile', () => {
     source.close();
     assert.deepEqual(fs.readdirSync(dir).sort(), ['copy.db', 'live.db']);
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('backup format v2 (streaming)', () => {
+  function makeEnvironment() {
+    const source = new DatabaseSync(':memory:');
+    const target = new DatabaseSync(':memory:');
+    initSchema(source);
+    initSchema(target);
+    const sourceDirs = {
+      appIconDir: makeTempDir('frontdoor-v2-icons-src-'),
+      brandingDir: makeTempDir('frontdoor-v2-branding-src-'),
+      avatarCacheDir: makeTempDir('frontdoor-v2-avatars-src-'),
+      pluginAssetDir: makeTempDir('frontdoor-v2-plugins-src-'),
+    };
+    const targetDirs = {
+      appIconDir: makeTempDir('frontdoor-v2-icons-dst-'),
+      brandingDir: makeTempDir('frontdoor-v2-branding-dst-'),
+      avatarCacheDir: makeTempDir('frontdoor-v2-avatars-dst-'),
+      pluginAssetDir: makeTempDir('frontdoor-v2-plugins-dst-'),
+    };
+    const work = makeTempDir('frontdoor-v2-work-');
+    const cleanup = () => {
+      source.close();
+      target.close();
+      for (const dir of [...Object.values(sourceDirs), ...Object.values(targetDirs), work]) fs.rmSync(dir, { recursive: true, force: true });
+    };
+    return { source, target, sourceDirs, targetDirs, work, cleanup };
+  }
+
+  const leftovers = (dirs) => Object.values(dirs).flatMap((dir) => fs.readdirSync(path.dirname(dir))
+    .filter((name) => name.startsWith(`${path.basename(dir)}.restore-`)));
+
+  it('exports, checks and restores an encrypted v2 backup', async () => {
+    const env = makeEnvironment();
+    try {
+      const insert = env.source.prepare('INSERT INTO users (id, email, display_name) VALUES (?, ?, ?)');
+      for (let i = 0; i < 1200; i += 1) insert.run(`v2-${i}`, `v2-${i}@example.com`, `Line\n"${i}"`);
+      writeFile(env.sourceDirs.appIconDir, 'icon.svg', '<svg/>');
+      writeFile(env.sourceDirs.pluginAssetDir, 'p/1.0.0/plugin.mjs', 'export default {};');
+      writeFile(env.targetDirs.avatarCacheDir, 'stale.png', 'old');
+
+      const archivePath = path.join(env.work, 'backup.tar.gz.enc');
+      const events = [];
+      const { fileName, summary } = await createBackupFile({
+        dbHandle: env.source,
+        ...env.sourceDirs,
+        passphrase: 'v2 restore passphrase',
+        outputPath: archivePath,
+        onProgress: (event) => events.push(event),
+      });
+      assert.match(fileName, /\.tar\.gz\.enc$/);
+      assert.equal(summary.fileCount, 2);
+      assert.equal(events.at(-1).progress, 100);
+
+      const report = await analyzeBackupFile(archivePath, { dbHandle: env.target, passphrase: 'v2 restore passphrase' });
+      assert.equal(report.tables.find((table) => table.name === 'users').rows, 1200);
+
+      const result = await restoreBackupFile(archivePath, { dbHandle: env.target, ...env.targetDirs, passphrase: 'v2 restore passphrase' });
+      assert.equal(result.restoredFiles, 2);
+      assert.equal(result.verification.integrity, 'ok');
+      assert.equal(env.target.prepare('SELECT COUNT(*) AS n FROM users').get().n, 1200);
+      assert.equal(env.target.prepare('SELECT display_name FROM users WHERE id = ?').get('v2-7').display_name, 'Line\n"7"');
+      assert.equal(fs.readFileSync(path.join(env.targetDirs.appIconDir, 'icon.svg'), 'utf8'), '<svg/>');
+      assert.equal(fs.existsSync(path.join(env.targetDirs.pluginAssetDir, 'p/1.0.0/plugin.mjs')), true);
+      // Folders present in the archive are replaced, even when empty in the source.
+      assert.equal(fs.existsSync(path.join(env.targetDirs.avatarCacheDir, 'stale.png')), false);
+      assert.deepEqual(leftovers(env.targetDirs), []);
+    } finally {
+      env.cleanup();
+    }
+  });
+
+  it('leaves database and files untouched on a wrong passphrase or a newer source version', async () => {
+    const env = makeEnvironment();
+    try {
+      env.source.prepare('INSERT INTO users (id, email) VALUES (?, ?)').run('incoming', 'incoming@example.com');
+      env.target.prepare('INSERT INTO users (id, email) VALUES (?, ?)').run('existing', 'existing@example.com');
+      writeFile(env.sourceDirs.appIconDir, 'new.svg', '<svg/>');
+      writeFile(env.targetDirs.appIconDir, 'existing.svg', '<svg/>');
+
+      const archivePath = path.join(env.work, 'backup.tar.gz.enc');
+      await createBackupFile({ dbHandle: env.source, ...env.sourceDirs, passphrase: 'v2 restore passphrase', outputPath: archivePath });
+
+      await assert.rejects(
+        restoreBackupFile(archivePath, { dbHandle: env.target, ...env.targetDirs, passphrase: 'not the right one!' }),
+        (error) => error.code === 'backup_passphrase_invalid',
+      );
+      await assert.rejects(
+        restoreBackupFile(archivePath, { dbHandle: env.target, ...env.targetDirs, passphrase: 'v2 restore passphrase', currentVersion: '0.1.0' }),
+        (error) => error.code === 'backup_from_newer_version',
+      );
+
+      assert.deepEqual(env.target.prepare('SELECT id FROM users').all().map((row) => row.id), ['existing']);
+      assert.deepEqual(fs.readdirSync(env.targetDirs.appIconDir), ['existing.svg']);
+      assert.deepEqual(leftovers(env.targetDirs), []);
+    } finally {
+      env.cleanup();
+    }
+  });
+
+  it('accepts v2 archives through the in-memory API too', async () => {
+    const env = makeEnvironment();
+    try {
+      env.source.prepare('INSERT INTO users (id, email) VALUES (?, ?)').run('buffered', 'buffered@example.com');
+      const archivePath = path.join(env.work, 'backup.tar.gz');
+      await createBackupFile({ dbHandle: env.source, ...env.sourceDirs, outputPath: archivePath });
+      const buffer = fs.readFileSync(archivePath);
+
+      assert.equal((await analyzeBackupArchive(buffer, { dbHandle: env.target })).totalRows, 1);
+      await restoreBackupArchive(buffer, { dbHandle: env.target, ...env.targetDirs });
+      assert.equal(env.target.prepare('SELECT email FROM users WHERE id = ?').get('buffered').email, 'buffered@example.com');
+    } finally {
+      env.cleanup();
+    }
   });
 });
 

@@ -86,3 +86,28 @@ test('backup:rehearse accepts a raw database file', async () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('backup:rehearse reads streamed (v2) archives, plain and encrypted', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'frontdoor-rehearse-v2-'));
+  try {
+    const { createBackupFile } = await import('../server/services/backup.js');
+    const plain = path.join(dir, 'current.tar.gz');
+    const encrypted = path.join(dir, 'current.tar.gz.enc');
+    await createBackupFile({ outputPath: plain });
+    await createBackupFile({ outputPath: encrypted, passphrase: 'rehearsal passphrase' });
+
+    for (const [file, env] of [[plain, {}], [encrypted, { FRONTDOOR_BACKUP_PASSPHRASE: 'rehearsal passphrase' }]]) {
+      const { status, stderr, report } = rehearse(file, env);
+      assert.equal(status, 0, stderr);
+      assert.equal(report.mode, 'archive-schema');
+      assert.ok(report.sourceVersion);
+      assert.ok(report.before.rows > 0);
+      assert.deepEqual(report.schema, { added: [], removed: [], changed: [] });
+      assert.deepEqual(report.rowCountChanges, []);
+      assert.equal(report.ok, true);
+    }
+    assert.equal(rehearse(encrypted, { FRONTDOOR_BACKUP_PASSPHRASE: 'wrong passphrase!!' }).status, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -3,6 +3,7 @@ import fsp from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import zlib from 'zlib';
+import { pipeline } from 'stream/promises';
 import db from '../db.js';
 import { getAppTimeZone } from '../config.js';
 import { AVATAR_CACHE_DIR } from './avatars.js';
@@ -10,7 +11,15 @@ import { BRANDING_ASSET_DIR } from './branding.js';
 import { APP_ICON_CACHE_DIR } from './appIcons.js';
 import { PLUGIN_ASSET_DIR } from './plugins.js';
 import { UserFacingError } from './errors.js';
-import { assertValidPassphrase, decryptBackup, encryptBackup, isEncryptedBackup } from './backupCrypto.js';
+import {
+  assertValidPassphrase,
+  createEncryptStream,
+  decryptBackup,
+  encryptBackup,
+  encryptionFormat,
+  isEncryptedBackup,
+} from './backupCrypto.js';
+import { BACKUP_FORMAT_V2, detectBackupFile, readBackupV2, readNdjsonFileSync, writeBackupV2 } from './backupFormat.js';
 
 export { assertValidPassphrase, isEncryptedBackup };
 
@@ -397,65 +406,55 @@ function parseBackupArchive(buffer, { passphrase = null } = {}) {
 
 // Describes what a restore of this archive would do, without changing anything.
 export async function analyzeBackupArchive(buffer, { dbHandle = db, currentVersion = APP_VERSION, passphrase = null } = {}) {
+  if (isV2Buffer(buffer)) {
+    return withTempFile(buffer, (filePath) => analyzeBackupFile(filePath, { dbHandle, currentVersion, passphrase }));
+  }
   const snapshot = parseBackupArchive(buffer, { passphrase });
-  const currentTables = listTables(dbHandle);
-  const archiveTables = snapshot.database.tables;
-
-  const tables = archiveTables
-    .filter((table) => currentTables.includes(table.name))
-    .map((table) => {
-      const currentColumns = new Set(listTableColumns(dbHandle, table.name));
-      return {
-        name: table.name,
-        rows: (table.rows || []).length,
-        droppedColumns: (table.columns || []).filter((column) => !currentColumns.has(column)),
-      };
-    });
-  const ignoredTables = archiveTables.map((table) => table.name).filter((name) => !currentTables.includes(name)).sort();
-  const tablesNotInArchive = currentTables.filter((name) => !archiveTables.some((table) => table.name === name));
-  const buckets = (snapshot.buckets || []).map((bucket) => ({
-    key: bucket.key,
-    files: (bucket.files || []).length,
-    bytes: (bucket.files || []).reduce((total, file) => total + (Number(file.size) || Buffer.byteLength(String(file.data || ''), 'base64')), 0),
-  }));
-  const sourceVersion = snapshot.app?.version || null;
-  const newerThanCurrent = compareAppVersions(sourceVersion, currentVersion) > 0;
-
-  const warnings = [];
-  if (newerThanCurrent) warnings.push('newer_version');
-  if (tables.some((table) => table.droppedColumns.length > 0)) warnings.push('dropped_columns');
-  if (ignoredTables.length > 0) warnings.push('ignored_tables');
-
-  return {
-    createdAt: snapshot.createdAt || null,
-    sourceVersion,
-    sourceCommit: snapshot.app?.commit || null,
+  return buildAnalysisReport({
+    dbHandle,
     currentVersion,
-    newerThanCurrent,
-    tables,
-    totalRows: tables.reduce((total, table) => total + table.rows, 0),
-    ignoredTables,
-    tablesNotInArchive,
-    buckets,
-    warnings,
-  };
+    createdAt: snapshot.createdAt,
+    app: snapshot.app,
+    archiveTables: snapshot.database.tables.map((table) => ({ name: table.name, columns: table.columns, rows: (table.rows || []).length })),
+    buckets: (snapshot.buckets || []).map((bucket) => ({
+      key: bucket.key,
+      files: (bucket.files || []).length,
+      bytes: (bucket.files || []).reduce((total, file) => total + (Number(file.size) || Buffer.byteLength(String(file.data || ''), 'base64')), 0),
+    })),
+  });
+}
+
+function timestampForFileName(iso = new Date().toISOString()) {
+  return formatBackupFileStamp(iso) || iso.replace(/[:.]/g, '-');
 }
 
 // Consistent copy of the live SQLite file (VACUUM INTO works while the app is
-// running), for exact upgrade rehearsals and forensic copies.
-export async function exportDatabaseFile({ dbHandle = db, passphrase = null } = {}) {
+// running), for exact upgrade rehearsals and forensic copies. Written to
+// outputPath as a stream (encrypted with the streamed scheme when a passphrase is set).
+export async function writeDatabaseFile({ dbHandle = db, passphrase = null, outputPath }) {
   if (passphrase) assertValidPassphrase(passphrase);
   const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'frontdoor-db-export-'));
   const target = path.join(workDir, 'frontdoor.db');
   try {
     dbHandle.prepare('VACUUM INTO ?').run(target);
-    const plain = await fsp.readFile(target);
-    const createdAt = new Date().toISOString();
-    const stamp = formatBackupFileStamp(createdAt) || createdAt.replace(/[:.]/g, '-');
-    return {
-      buffer: passphrase ? encryptBackup(plain, passphrase) : plain,
-      fileName: `frontdoor-database-${stamp}.db${passphrase ? '.enc' : ''}`,
-    };
+    if (passphrase) {
+      await pipeline(fs.createReadStream(target), createEncryptStream(passphrase), fs.createWriteStream(outputPath));
+    } else {
+      await fsp.copyFile(target, outputPath);
+    }
+    return { fileName: `frontdoor-database-${timestampForFileName()}.db${passphrase ? '.enc' : ''}` };
+  } finally {
+    await fsp.rm(workDir, { recursive: true, force: true });
+  }
+}
+
+// Buffer variant of writeDatabaseFile, for callers that need the bytes in memory.
+export async function exportDatabaseFile({ dbHandle = db, passphrase = null } = {}) {
+  const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'frontdoor-db-export-out-'));
+  try {
+    const outputPath = path.join(workDir, 'export');
+    const { fileName } = await writeDatabaseFile({ dbHandle, passphrase, outputPath });
+    return { buffer: await fsp.readFile(outputPath), fileName };
   } finally {
     await fsp.rm(workDir, { recursive: true, force: true });
   }
@@ -478,6 +477,11 @@ export async function restoreBackupArchive(buffer, {
   allowNewerVersion = false,
   passphrase = null,
 } = {}) {
+  if (isV2Buffer(buffer)) {
+    return withTempFile(buffer, (filePath) => restoreBackupFile(filePath, {
+      dbHandle, appIconDir, brandingDir, avatarCacheDir, pluginAssetDir, currentVersion, allowNewerVersion, passphrase,
+    }));
+  }
   const snapshot = parseBackupArchive(buffer, { passphrase });
   const sourceVersion = snapshot.app?.version || null;
 
@@ -546,6 +550,286 @@ export async function restoreBackupArchive(buffer, {
     restoredTables: restoreCounts.tables,
     restoredRows: restoreCounts.rows,
     restoredFiles: restoreCounts.files,
+    droppedColumns,
+    ignoredTables,
+    tablesNotInArchive,
+    verification: verifyDatabase(dbHandle),
+  };
+}
+
+// --- Format v2 (streaming, file based) ---------------------------------------
+
+// True when an in-memory buffer holds a v2 archive (plain or stream-encrypted).
+function isV2Buffer(buffer) {
+  if (encryptionFormat(buffer) === 2) return true;
+  if (!(buffer?.[0] === 0x1f && buffer?.[1] === 0x8b)) return false;
+  try {
+    const head = zlib.gunzipSync(buffer.subarray(0, 4096), { finishFlush: zlib.constants.Z_SYNC_FLUSH });
+    return head.subarray(0, 13).toString('utf8') === 'manifest.json';
+  } catch {
+    return false;
+  }
+}
+
+async function withTempFile(buffer, run) {
+  const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'frontdoor-backup-buffer-'));
+  try {
+    const filePath = path.join(workDir, 'archive');
+    await fsp.writeFile(filePath, buffer);
+    return await run(filePath);
+  } finally {
+    await fsp.rm(workDir, { recursive: true, force: true });
+  }
+}
+
+function buildAnalysisReport({ dbHandle, currentVersion, createdAt, app, archiveTables, buckets }) {
+  const currentTables = listTables(dbHandle);
+  const tables = archiveTables
+    .filter((table) => currentTables.includes(table.name))
+    .map((table) => {
+      const currentColumns = new Set(listTableColumns(dbHandle, table.name));
+      return {
+        name: table.name,
+        rows: table.rows,
+        droppedColumns: (table.columns || []).filter((column) => !currentColumns.has(column)),
+      };
+    });
+  const ignoredTables = archiveTables.map((table) => table.name).filter((name) => !currentTables.includes(name)).sort();
+  const tablesNotInArchive = currentTables.filter((name) => !archiveTables.some((table) => table.name === name));
+  const sourceVersion = app?.version || null;
+  const newerThanCurrent = compareAppVersions(sourceVersion, currentVersion) > 0;
+
+  const warnings = [];
+  if (newerThanCurrent) warnings.push('newer_version');
+  if (tables.some((table) => table.droppedColumns.length > 0)) warnings.push('dropped_columns');
+  if (ignoredTables.length > 0) warnings.push('ignored_tables');
+
+  return {
+    createdAt: createdAt || null,
+    sourceVersion,
+    sourceCommit: app?.commit || null,
+    currentVersion,
+    newerThanCurrent,
+    tables,
+    totalRows: tables.reduce((total, table) => total + table.rows, 0),
+    ignoredTables,
+    tablesNotInArchive,
+    buckets,
+    warnings,
+  };
+}
+
+/**
+ * Writes a backup in format v2 to outputPath, streaming rows and files.
+ */
+export async function createBackupFile({
+  dbHandle = db,
+  appIconDir = APP_ICON_CACHE_DIR,
+  brandingDir = BRANDING_ASSET_DIR,
+  avatarCacheDir = AVATAR_CACHE_DIR,
+  pluginAssetDir = PLUGIN_ASSET_DIR,
+  excludeLogs = false,
+  passphrase = null,
+  outputPath,
+  onProgress,
+} = {}) {
+  if (passphrase) assertValidPassphrase(passphrase);
+  const excludedTables = excludeLogs ? [...LOG_TABLES] : [];
+  const createdAt = new Date().toISOString();
+  const completed = [];
+  const { manifest } = await writeBackupV2({
+    dbHandle,
+    tables: listTables(dbHandle).filter((tableName) => !excludedTables.includes(tableName)),
+    schema: readSchema(dbHandle),
+    buckets: resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir, pluginAssetDir }),
+    app: collectAppMetadata(dbHandle),
+    options: { excludedTables },
+    createdAt,
+    outputPath,
+    passphrase,
+    onProgress: (stage) => {
+      completed.push(stage);
+      emitBackupProgress(onProgress, stage, Math.round((completed.length / BACKUP_PROGRESS_STAGES.length) * 100), [...completed]);
+    },
+  });
+  return {
+    manifest,
+    summary: manifest.summary,
+    version: BACKUP_FORMAT_V2,
+    fileName: `frontdoor-backup-${timestampForFileName(createdAt)}.tar.gz${passphrase ? '.enc' : ''}`,
+  };
+}
+
+/**
+ * Describes a backup file (v1 or v2) without changing anything.
+ */
+export async function analyzeBackupFile(filePath, { dbHandle = db, currentVersion = APP_VERSION, passphrase = null } = {}) {
+  const { format } = await detectBackupFile(filePath);
+  if (format === 1) {
+    return analyzeBackupArchive(await fsp.readFile(filePath), { dbHandle, currentVersion, passphrase });
+  }
+  const rowCounts = {};
+  const manifest = await readBackupV2(filePath, {
+    passphrase,
+    onTable: async (name, rows) => {
+      let count = 0;
+      for await (const row of rows) {
+        void row;
+        count += 1;
+      }
+      rowCounts[name] = count;
+    },
+  });
+  return buildAnalysisReport({
+    dbHandle,
+    currentVersion,
+    createdAt: manifest.createdAt,
+    app: manifest.app,
+    archiveTables: (manifest.tables || []).map((table) => ({ name: table.name, columns: table.columns, rows: rowCounts[table.name] ?? 0 })),
+    buckets: (manifest.buckets || []).map((bucket) => ({ key: bucket.key, files: bucket.files, bytes: bucket.bytes })),
+  });
+}
+
+/**
+ * Restores a backup file (v1 or v2). v2 archives are streamed: files go
+ * straight into staging folders and rows into temporary NDJSON files, then the
+ * database is replaced in one synchronous transaction and the folders swapped.
+ */
+export async function restoreBackupFile(filePath, {
+  dbHandle = db,
+  appIconDir = APP_ICON_CACHE_DIR,
+  brandingDir = BRANDING_ASSET_DIR,
+  avatarCacheDir = AVATAR_CACHE_DIR,
+  pluginAssetDir = PLUGIN_ASSET_DIR,
+  currentVersion = APP_VERSION,
+  allowNewerVersion = false,
+  passphrase = null,
+} = {}) {
+  const dirs = { appIconDir, brandingDir, avatarCacheDir, pluginAssetDir };
+  const { format } = await detectBackupFile(filePath);
+  if (format === 1) {
+    const { snapshot: _snapshot, ...result } = await restoreBackupArchive(await fsp.readFile(filePath), {
+      dbHandle, ...dirs, currentVersion, allowNewerVersion, passphrase,
+    });
+    return result;
+  }
+
+  const stamp = `${Date.now()}-${process.pid}`;
+  const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'frontdoor-restore-'));
+  const bucketByKey = new Map(resolveBackupBuckets(dirs).map((bucket) => [bucket.key, bucket]));
+  const staged = new Map();
+  const tableFiles = new Map();
+  let sourceVersion = null;
+
+  const cleanupStaging = () => Promise.all([...staged.values()].map((entry) => fsp.rm(entry.stagingDir, { recursive: true, force: true })));
+
+  let manifest;
+  try {
+    manifest = await readBackupV2(filePath, {
+      passphrase,
+      onManifest: async (value) => {
+        sourceVersion = value.app?.version || null;
+        if (!allowNewerVersion && compareAppVersions(sourceVersion, currentVersion) > 0) {
+          throw new UserFacingError(
+            `This backup was created by Frontdoor ${sourceVersion}, which is newer than the installed ${currentVersion}.`,
+            { statusCode: 409, code: 'backup_from_newer_version', details: { sourceVersion, currentVersion } },
+          );
+        }
+        // Folders present in the archive are replaced (even if empty); others stay untouched.
+        for (const archived of value.buckets || []) {
+          const bucket = bucketByKey.get(archived.key);
+          if (!bucket) continue;
+          const stagingDir = `${bucket.dir}.restore-${stamp}`;
+          await fsp.rm(stagingDir, { recursive: true, force: true });
+          await fsp.mkdir(stagingDir, { recursive: true });
+          staged.set(archived.key, { ...bucket, stagingDir, fileCount: 0 });
+        }
+      },
+      onTable: async (name, rows) => {
+        const tableFile = path.join(workDir, `${name}.ndjson`);
+        const out = fs.createWriteStream(tableFile);
+        for await (const row of rows) {
+          if (!out.write(`${JSON.stringify(row)}\n`)) await new Promise((resolve) => out.once('drain', resolve));
+        }
+        await new Promise((resolve, reject) => out.end((error) => (error ? reject(error) : resolve())));
+        tableFiles.set(name, tableFile);
+      },
+      onFile: async (bucketKey, relativePath, size, content) => {
+        const entry = staged.get(bucketKey);
+        if (!entry) return;
+        const target = path.join(entry.stagingDir, ...relativePath.split('/'));
+        await fsp.mkdir(path.dirname(target), { recursive: true });
+        await pipeline(content, fs.createWriteStream(target));
+        entry.fileCount += 1;
+      },
+    });
+  } catch (error) {
+    await cleanupStaging();
+    await fsp.rm(workDir, { recursive: true, force: true });
+    throw error;
+  }
+
+  const archiveTables = manifest.tables || [];
+  const currentTables = listTables(dbHandle);
+  const restoreOrder = currentTables.filter((tableName) => archiveTables.some((table) => table.name === tableName));
+  const ignoredTables = archiveTables.map((table) => table.name).filter((name) => !currentTables.includes(name)).sort();
+  const tablesNotInArchive = currentTables.filter((name) => !archiveTables.some((table) => table.name === name));
+  const droppedColumns = {};
+  const counts = { tables: 0, rows: 0, files: 0 };
+
+  try {
+    dbHandle.exec('PRAGMA foreign_keys = OFF');
+    try {
+      dbHandle.exec('BEGIN IMMEDIATE');
+      try {
+        for (const tableName of restoreOrder) {
+          const table = archiveTables.find((entry) => entry.name === tableName);
+          const currentColumns = new Set(listTableColumns(dbHandle, tableName));
+          const insertColumns = (table.columns || []).filter((column) => currentColumns.has(column));
+          const dropped = (table.columns || []).filter((column) => !currentColumns.has(column));
+          if (dropped.length > 0) droppedColumns[tableName] = dropped;
+
+          deleteTableRows(dbHandle, tableName);
+          resetSequenceIfPresent(dbHandle, tableName);
+          counts.tables += 1;
+          const tableFile = tableFiles.get(tableName);
+          if (insertColumns.length === 0 || !tableFile) continue;
+
+          const stmt = dbHandle.prepare(`
+            INSERT INTO ${quoteIdentifier(tableName)} (${insertColumns.map(quoteIdentifier).join(', ')})
+            VALUES (${insertColumns.map(() => '?').join(', ')})
+          `);
+          // Synchronous reads: the open transaction never yields to other requests.
+          for (const row of readNdjsonFileSync(tableFile)) {
+            stmt.run(...insertColumns.map((column) => (Object.prototype.hasOwnProperty.call(row, column) ? row[column] : null)));
+            counts.rows += 1;
+          }
+        }
+        dbHandle.exec('COMMIT');
+      } catch (error) {
+        dbHandle.exec('ROLLBACK');
+        throw error;
+      }
+    } finally {
+      dbHandle.exec('PRAGMA foreign_keys = ON');
+    }
+  } catch (error) {
+    await cleanupStaging();
+    await fsp.rm(workDir, { recursive: true, force: true });
+    throw error;
+  }
+
+  for (const entry of staged.values()) {
+    await swapStagedBucket(entry, stamp);
+    counts.files += entry.fileCount;
+  }
+  await fsp.rm(workDir, { recursive: true, force: true });
+
+  return {
+    sourceVersion,
+    restoredTables: counts.tables,
+    restoredRows: counts.rows,
+    restoredFiles: counts.files,
     droppedColumns,
     ignoredTables,
     tablesNotInArchive,
