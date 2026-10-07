@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, Database, Download, SearchCheck, Upload } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Database, Download, SearchCheck, Upload } from 'lucide-react';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import TopToastNotice from '../components/TopToastNotice';
@@ -497,16 +497,25 @@ export default function AdminBackup() {
               <Download className="h-4 w-4" />
               {downloadBusy ? copy.exportBusy : copy.exportAction}
             </button>
-            <button
-              type="button"
-              onClick={downloadDatabaseFile}
-              disabled={databaseBusy || downloadBusy}
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Database className="h-4 w-4" />
-              {databaseBusy ? copy.databaseExportBusy : copy.databaseExportAction}
-            </button>
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{copy.databaseExportHelp}</p>
+            {/* The raw .db copy is a technical tool (upgrade rehearsals, manual recovery): closed by default. */}
+            <details className="group mt-4 rounded-2xl border border-gray-100 dark:border-gray-800">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300 [&::-webkit-details-marker]:hidden">
+                {copy.advancedOptions}
+                <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="border-t border-gray-100 dark:border-gray-800 px-4 pb-4 pt-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{copy.databaseExportHelp}</p>
+                <button
+                  type="button"
+                  onClick={downloadDatabaseFile}
+                  disabled={databaseBusy || downloadBusy}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Database className="h-4 w-4" />
+                  {databaseBusy ? copy.databaseExportBusy : copy.databaseExportAction}
+                </button>
+              </div>
+            </details>
           </div>
         </section>
 

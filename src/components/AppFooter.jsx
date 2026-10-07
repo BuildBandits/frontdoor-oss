@@ -1,4 +1,4 @@
-import { APP_NAME, APP_SIGNATURE, APP_VERSION } from '../config/appInfo';
+import { APP_NAME, APP_SIGNATURE, APP_VERSION, APP_WEBSITE_URL } from '../config/appInfo';
 import { getUiStrings, normalizeLanguage } from '../i18n';
 
 export default function AppFooter({ language = 'en' }) {
@@ -25,6 +25,15 @@ export default function AppFooter({ language = 'en' }) {
                 className="font-medium text-gray-700 dark:text-gray-100 hover:text-dark dark:hover:text-white hover:underline underline-offset-2"
               >
                 {ui.footer.licenseLabel}
+              </a>
+              {' · '}
+              <a
+                href={APP_WEBSITE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-gray-700 dark:text-gray-100 hover:text-dark dark:hover:text-white hover:underline underline-offset-2"
+              >
+                {new URL(APP_WEBSITE_URL).host}
               </a>
             </p>
           </div>

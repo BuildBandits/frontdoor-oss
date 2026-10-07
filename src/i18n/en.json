@@ -708,6 +708,7 @@
       "databaseExportBusy": "Preparing database file...",
       "databaseExportFailed": "Failed to export the database file",
       "databaseExportHelp": "An exact copy of the SQLite database only (no icons, logo or avatars), for rehearsing upgrades. It uses the passphrase above if set. To use it, stop the container and copy it to /data/frontdoor.db.",
+      "advancedOptions": "Advanced options",
       "verifyAction": "Check backup",
       "verifyBusy": "Checking backup...",
       "verifyFailed": "Failed to check backup",

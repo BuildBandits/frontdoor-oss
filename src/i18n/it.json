@@ -708,6 +708,7 @@
       "databaseExportBusy": "Preparazione del file del database...",
       "databaseExportFailed": "Impossibile esportare il file del database",
       "databaseExportHelp": "Una copia esatta del solo database SQLite (senza icone, logo e avatar), per provare gli aggiornamenti. Usa la passphrase indicata sopra, se impostata. Per usarlo, ferma il container e copialo in /data/frontdoor.db.",
+      "advancedOptions": "Opzioni avanzate",
       "verifyAction": "Verifica backup",
       "verifyBusy": "Verifica del backup...",
       "verifyFailed": "Impossibile verificare il backup",
