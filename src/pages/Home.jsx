@@ -28,6 +28,7 @@ import { PLUGIN_SURFACES } from '../pluginHost/constants';
 import {
   HOME_TOUR_HOMEPAGE_DOCS_EVENT,
   HOME_TOUR_REPLAY_EVENT,
+  getHomeTourStepKeys,
   requestHomeTourAccountMenuClose,
   requestHomeTourAccountMenuOpen,
 } from '../utils/homeTour';
@@ -112,67 +113,22 @@ export default function Home() {
     [language]
   );
   const tourSteps = useMemo(() => {
-    const steps = [
-      {
-        key: 'welcome',
-        targetRef: null,
-        placement: 'center',
-        title: ui.home.tour.steps.welcome.title,
-        body: ui.home.tour.steps.welcome.body,
-      },
-      {
-        key: 'search',
-        targetRef: controlsRef,
-        title: ui.home.tour.steps.search.title,
-        body: ui.home.tour.steps.search.body,
-      },
-      {
-        key: 'catalog',
-        targetRef: catalogRef,
-        title: ui.home.tour.steps.catalog.title,
-        body: ui.home.tour.steps.catalog.body,
-      },
-      {
-        key: 'appCards',
-        targetRef: featuredAppRef,
-        title: ui.home.tour.steps.appCards.title,
-        body: ui.home.tour.steps.appCards.body,
-        spotlightRefs: [featuredFavoriteRef, featuredInfoRef],
-      },
-    ];
-    if (!isMobileViewport) {
-      steps.push({
-        key: 'reorder',
-        targetRef: featuredAppRef,
-        title: ui.home.tour.steps.reorder.title,
-        body: ui.home.tour.steps.reorder.body,
-        spotlightRefs: [featuredDragHandleRef],
-      });
-    }
-    steps.push(
-      {
-        key: 'menuButton',
-        targetRef: { current: null },
-        title: ui.home.tour.steps.menuButton.title,
-        body: ui.home.tour.steps.menuButton.body,
-      },
-      {
-        key: 'menu',
-        targetRef: { current: null },
-        title: ui.home.tour.steps.menu.title,
-        body: ui.home.tour.steps.menu.body,
-        openMenu: true,
-      },
-      {
-        key: 'homepage',
-        targetRef: null,
-        placement: 'center',
-        title: ui.home.tour.steps.homepage.title,
-        body: ui.home.tour.steps.homepage.body,
-        browserDocs: browserHomepageDocs,
-      }
-    );
-    return steps;
+    const stepOptions = {
+      welcome: { targetRef: null, placement: 'center' },
+      search: { targetRef: controlsRef },
+      catalog: { targetRef: catalogRef },
+      appCards: { targetRef: featuredAppRef, spotlightRefs: [featuredFavoriteRef, featuredInfoRef] },
+      reorder: { targetRef: featuredAppRef, spotlightRefs: [featuredDragHandleRef] },
+      menuButton: { targetRef: { current: null } },
+      menu: { targetRef: { current: null }, openMenu: true },
+      homepage: { targetRef: null, placement: 'center', browserDocs: browserHomepageDocs },
+    };
+    return getHomeTourStepKeys({ mobile: isMobileViewport }).map((key) => ({
+      key,
+      title: ui.home.tour.steps[key].title,
+      body: ui.home.tour.steps[key].body,
+      ...stepOptions[key],
+    }));
   }, [browserHomepageDocs, isMobileViewport, ui]);
   const currentTourStep = tourSteps[tourStep] || tourSteps[0];
   const totalTourSteps = tourSteps.length;
