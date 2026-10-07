@@ -122,6 +122,8 @@ cp .env.example.docker .env
 docker compose up --build
 ```
 
+To show the commit in the footer and record it in backups, pass it at build time: `COMMIT_SHA=$(git rev-parse --short HEAD) docker compose build` (or `--build-arg COMMIT_SHA=...` with `docker build`).
+
 App: http://localhost:3001
 
 The image stores every writable path on the `/data` volume by default (`DATABASE_PATH=/data/frontdoor.db`, avatar, app icon, branding and plugin directories), so data survives image upgrades.
@@ -489,7 +491,7 @@ Schema changes are applied automatically at startup. Table rebuilds run inside a
 
 ## Upgrading an existing installation
 
-1. **Back up.** In **Personalizza (Customize) → Maintenance**, download a backup (database rows plus app icons, logo and avatars). With the container stopped (`docker compose stop`), also copy the SQLite file from the volume, e.g. `docker cp <container>:/data/frontdoor.db ./frontdoor.db.bak`, including `frontdoor.db-wal` if present.
+1. **Back up.** In **Personalizza (Customize) → Maintenance**, download a backup (database rows and schema, app icons, logo, avatars and plugin files, plus the Frontdoor version and commit that produced it). With the container stopped (`docker compose stop`), also copy the SQLite file from the volume, e.g. `docker cp <container>:/data/frontdoor.db ./frontdoor.db.bak`, including `frontdoor.db-wal` if present.
 2. **Rehearse (recommended).** Start the new image locally against a copy of the database and check the `[startup]` lines in the logs; alternatively restore the backup into a fresh local installation.
 3. **Upgrade.** Pull or build the new image and start it on the same `/data` volume. Migrations run on startup.
 4. **Verify.** Sign in with Microsoft SSO, open the admin pages, and if `ENTRA_GROUP_SYNC=true` run a Force Sync.

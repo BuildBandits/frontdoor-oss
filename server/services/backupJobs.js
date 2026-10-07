@@ -1,10 +1,10 @@
 import { randomUUID } from 'crypto';
-import { BACKUP_VERSION, createBackupArchive } from './backup.js';
+import { BACKUP_PROGRESS_STAGES, BACKUP_VERSION, createBackupArchive } from './backup.js';
 
 const jobs = new Map();
 const cleanupTimers = new Map();
 const JOB_TTL_MS = 15 * 60 * 1000;
-const STEP_ORDER = ['database', 'app-icons', 'branding', 'avatars'];
+const STEP_ORDER = BACKUP_PROGRESS_STAGES;
 
 function createJobState(job) {
   return {

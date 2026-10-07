@@ -1,3 +1,4 @@
+import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
 import zlib from 'zlib';
@@ -6,20 +7,31 @@ import { getAppTimeZone } from '../config.js';
 import { AVATAR_CACHE_DIR } from './avatars.js';
 import { BRANDING_ASSET_DIR } from './branding.js';
 import { APP_ICON_CACHE_DIR } from './appIcons.js';
+import { PLUGIN_ASSET_DIR } from './plugins.js';
 import { UserFacingError } from './errors.js';
 
 const BACKUP_VERSION = 1;
-const BACKUP_PROGRESS_STAGES = ['database', 'app-icons', 'branding', 'avatars'];
+const BACKUP_PROGRESS_STAGES = ['database', 'app-icons', 'branding', 'avatars', 'plugins'];
+
+const APP_VERSION = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version || null;
+  } catch {
+    return null;
+  }
+})();
 
 function resolveBackupBuckets({
   appIconDir = APP_ICON_CACHE_DIR,
   brandingDir = BRANDING_ASSET_DIR,
   avatarCacheDir = AVATAR_CACHE_DIR,
+  pluginAssetDir = PLUGIN_ASSET_DIR,
 } = {}) {
   return [
     { key: 'app-icons', dir: appIconDir },
     { key: 'branding', dir: brandingDir },
     { key: 'avatars', dir: avatarCacheDir },
+    { key: 'plugins', dir: pluginAssetDir },
   ];
 }
 
@@ -70,9 +82,39 @@ function readTableSnapshot(dbHandle, tableName) {
   };
 }
 
+// Schema SQL as created on the source installation: startup migrations decide
+// what to rebuild by inspecting it, so it is needed to reproduce the source DB.
+function readSchema(dbHandle) {
+  return dbHandle.prepare(`
+    SELECT type, name, tbl_name AS tableName, sql
+    FROM sqlite_master
+    WHERE sql IS NOT NULL
+      AND name NOT LIKE 'sqlite_%'
+    ORDER BY CASE type WHEN 'table' THEN 0 WHEN 'index' THEN 1 ELSE 2 END, name
+  `).all().map((row) => ({ type: row.type, name: row.name, tableName: row.tableName, sql: row.sql }));
+}
+
 function collectDatabaseSnapshot(dbHandle = db) {
   const tables = listTables(dbHandle).map((tableName) => readTableSnapshot(dbHandle, tableName));
-  return { tables };
+  return { tables, schema: readSchema(dbHandle) };
+}
+
+function readSqliteVersion(dbHandle) {
+  try {
+    return dbHandle.prepare('SELECT sqlite_version() AS version').get()?.version || null;
+  } catch {
+    return null;
+  }
+}
+
+function collectAppMetadata(dbHandle) {
+  const sqlite = readSqliteVersion(dbHandle);
+  return {
+    version: APP_VERSION,
+    commit: process.env.COMMIT_SHA || process.env.VITE_COMMIT_SHA || null,
+    node: process.version,
+    sqlite,
+  };
 }
 
 function emitBackupProgress(onProgress, stage, progress, completedStages = []) {
@@ -126,11 +168,12 @@ export async function buildBackupSnapshot({
   appIconDir = APP_ICON_CACHE_DIR,
   brandingDir = BRANDING_ASSET_DIR,
   avatarCacheDir = AVATAR_CACHE_DIR,
+  pluginAssetDir = PLUGIN_ASSET_DIR,
   onProgress,
 } = {}) {
   const database = collectDatabaseSnapshot(dbHandle);
   const buckets = [];
-  const bucketDefinitions = resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir });
+  const bucketDefinitions = resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir, pluginAssetDir });
   emitBackupProgress(onProgress, 'database', 25, ['database']);
 
   for (let index = 0; index < bucketDefinitions.length; index += 1) {
@@ -154,6 +197,7 @@ export async function buildBackupSnapshot({
   return {
     version: BACKUP_VERSION,
     createdAt: new Date().toISOString(),
+    app: collectAppMetadata(dbHandle),
     database,
     buckets,
     summary,
@@ -165,9 +209,10 @@ export async function createBackupArchive({
   appIconDir = APP_ICON_CACHE_DIR,
   brandingDir = BRANDING_ASSET_DIR,
   avatarCacheDir = AVATAR_CACHE_DIR,
+  pluginAssetDir = PLUGIN_ASSET_DIR,
   onProgress,
 } = {}) {
-  const snapshot = await buildBackupSnapshot({ dbHandle, appIconDir, brandingDir, avatarCacheDir, onProgress });
+  const snapshot = await buildBackupSnapshot({ dbHandle, appIconDir, brandingDir, avatarCacheDir, pluginAssetDir, onProgress });
   const json = `${JSON.stringify(snapshot)}\n`;
   const archive = zlib.gzipSync(Buffer.from(json, 'utf8'), { level: 9 });
 
@@ -273,6 +318,7 @@ export async function restoreBackupArchive(buffer, {
   appIconDir = APP_ICON_CACHE_DIR,
   brandingDir = BRANDING_ASSET_DIR,
   avatarCacheDir = AVATAR_CACHE_DIR,
+  pluginAssetDir = PLUGIN_ASSET_DIR,
 } = {}) {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
     throw new UserFacingError('Backup file is empty');
@@ -298,7 +344,7 @@ export async function restoreBackupArchive(buffer, {
 
   const restoreOrder = listTables(dbHandle).filter((tableName) => dbTables.has(tableName));
   const restoreCounts = { tables: 0, rows: 0, files: 0 };
-  const restoreBuckets = resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir });
+  const restoreBuckets = resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir, pluginAssetDir });
 
   dbHandle.exec('PRAGMA foreign_keys = OFF');
   try {
@@ -333,4 +379,4 @@ export async function restoreBackupArchive(buffer, {
   };
 }
 
-export { BACKUP_VERSION, resolveBackupBuckets };
+export { BACKUP_PROGRESS_STAGES, BACKUP_VERSION, resolveBackupBuckets };

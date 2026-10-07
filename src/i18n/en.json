@@ -672,6 +672,7 @@
       "includesAppIcons": "App icon cache files",
       "includesBranding": "Branding logo files",
       "includesAvatars": "Avatar cache files",
+      "includesPlugins": "Plugin package files",
       "exportAction": "Download backup",
       "exportBusy": "Preparing backup...",
       "exportSuccess": "Backup ready for download: {tables} tables, {files} files, {bytes} of file data.",

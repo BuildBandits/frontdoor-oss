@@ -6,6 +6,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+- **Richer backups**: backup archives now record the Frontdoor version, commit, Node.js and SQLite versions that produced them, and the database schema (`CREATE TABLE`/index SQL) alongside the rows, so an exact copy of the source database can be rebuilt to rehearse upgrades. Plugin package files (`PLUGIN_ASSET_DIR`) are now included and restored. Archives from earlier versions still restore; folders missing from an older archive are left untouched.
+- **Commit in Docker builds**: new optional `COMMIT_SHA` build argument (passed through by `docker-compose.yml` and set by CI) shows the commit in the footer and records it in backups. Without it, the footer keeps showing the build timestamp.
+
+### Fixed
+- **App version in Docker**: the production image now contains `package.json`, which the server reads to know its own version; CI checks the image for it and for the commit.
+
 ## [1.3.0] — 2026-10-07
 
 Tech stack upgrade: Node.js 24, Express 5, MSAL Node 7, React 19, React Router 8 and Tailwind CSS 4, with no open Dependabot alerts and a clean `npm audit`. Adds CI build, lint, HTTP and Docker checks, and makes startup migrations safe for in-place upgrades of existing databases.

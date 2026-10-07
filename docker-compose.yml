@@ -1,6 +1,10 @@
 services:
   frontdoor:
-    build: .
+    build:
+      context: .
+      args:
+        # Optional: COMMIT_SHA=$(git rev-parse --short HEAD) docker compose build
+        COMMIT_SHA: ${COMMIT_SHA:-}
     ports:
       - "3001:3001"
     volumes:
