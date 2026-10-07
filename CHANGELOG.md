@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Fixed
+- **Backup page spacing**: the passphrase help text no longer touches the *Download backup* button when the export card is full; the download buttons keep a minimum gap while still sitting at the bottom of the card.
+
 ## [1.3.1] — 2026-10-07
 
 Backup and restore overhaul (streamed `.tar.gz` format with schema and app metadata, check before restore, atomic and version-aware restore, optional encryption, raw database export and an upgrade rehearsal script), automatic deactivation of users removed from Microsoft Entra, search in the Visible apps list and a local Docker demo without Entra.
