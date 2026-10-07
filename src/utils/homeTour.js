@@ -22,3 +22,18 @@ export function requestHomeTourHomepageDocs() {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new Event(HOME_TOUR_HOMEPAGE_DOCS_EVENT));
 }
+
+// Steps of the Home tour, in order. Desktop shows the drag-to-reorder step and
+// opens the account dropdown; mobile has no reordering and shows the hamburger
+// button first, since the menu lives behind it.
+export function getHomeTourStepKeys({ mobile = false } = {}) {
+  return [
+    'welcome',
+    'search',
+    'catalog',
+    'appCards',
+    ...(mobile ? ['menuButton'] : ['reorder']),
+    'menu',
+    'homepage',
+  ];
+}

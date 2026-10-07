@@ -5,6 +5,7 @@ import {
   HOME_TOUR_ACCOUNT_MENU_CLOSE_EVENT,
   HOME_TOUR_ACCOUNT_MENU_OPEN_EVENT,
   HOME_TOUR_REPLAY_EVENT,
+  getHomeTourStepKeys,
   requestHomeTourAccountMenuClose,
   requestHomeTourAccountMenuOpen,
   requestHomeTourReplay,
@@ -12,6 +13,13 @@ import {
 import { detectBrowser, getBrowserHomepageDocs } from '../src/utils/browserHomeDocs.js';
 
 describe('home tour helpers', () => {
+  it('shows the hamburger step only on mobile and the reorder step only on desktop', () => {
+    const desktop = getHomeTourStepKeys({ mobile: false });
+    const mobile = getHomeTourStepKeys({ mobile: true });
+    assert.deepEqual(desktop, ['welcome', 'search', 'catalog', 'appCards', 'reorder', 'menu', 'homepage']);
+    assert.deepEqual(mobile, ['welcome', 'search', 'catalog', 'appCards', 'menuButton', 'menu', 'homepage']);
+  });
+
   it('exposes the replay event name', () => {
     assert.equal(HOME_TOUR_REPLAY_EVENT, 'frontdoor:home-tour-replay');
   });

@@ -13,6 +13,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Raw database export under Advanced options**: on the backup page, *Download database file (.db)* moved into an *Advanced options* section that is closed by default, so the regular backup is the only prominent download. The raw copy is meant for upgrade rehearsals and manual recovery and cannot be restored from the page.
 
 ### Fixed
+- **Home tour on desktop**: the *Find the menu button* step, which points at the mobile hamburger button, was also shown on desktop where that button does not exist. It is now mobile-only, like the *Reorder the cards* step is desktop-only.
 - **Pages opened already scrolled down**: following a link from a scrolled page (for example *Open backup page* in *Customize → Maintenance*) kept the scroll position, so the new page opened halfway down. Route changes now start at the top; links to a `#section` and back/forward navigation are unchanged. The *Open backup page* button also gets dark-mode colours.
 - **Backup page spacing**: the passphrase help text no longer touches the *Download backup* button when the export card is full; the download buttons keep a minimum gap while still sitting at the bottom of the card.
 
