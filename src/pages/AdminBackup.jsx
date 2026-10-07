@@ -282,7 +282,7 @@ export default function AdminBackup() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
-        <section className="flex h-full flex-col rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+        <section className="flex h-full flex-col rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-xs">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white">
               <Download className="h-5 w-5" />
@@ -336,7 +336,7 @@ export default function AdminBackup() {
           </button>
         </section>
 
-        <section className="flex h-full flex-col rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+        <section className="flex h-full flex-col rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-xs">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500 text-white">
               <Upload className="h-5 w-5" />

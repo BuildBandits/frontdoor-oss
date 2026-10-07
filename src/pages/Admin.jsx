@@ -952,7 +952,7 @@ export default function Admin() {
             <button
               type="button"
               onClick={() => setModeFilterOpen((prev) => !prev)}
-            className={`relative inline-flex h-12 items-center w-full ${filterButtonMinWidth} pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-left text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900`}
+            className={`relative inline-flex h-12 items-center w-full ${filterButtonMinWidth} pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-left text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900`}
             >
               <Settings className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
               <span className="flex min-w-0 flex-1 items-center gap-1">
@@ -992,7 +992,7 @@ export default function Admin() {
             <button
               type="button"
               onClick={() => setTagFilterOpen((prev) => !prev)}
-              className={`relative inline-flex h-12 items-center w-full ${filterButtonMinWidth} pl-10 pr-10 border rounded-xl text-sm text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900 ${
+              className={`relative inline-flex h-12 items-center w-full ${filterButtonMinWidth} pl-10 pr-10 border rounded-xl text-sm text-left transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900 ${
                 hasTagFilters
                   ? 'border-violet-300 bg-violet-50 text-violet-900 dark:border-violet-700 dark:bg-violet-950/45 dark:text-violet-100'
                   : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300'
@@ -1044,7 +1044,7 @@ export default function Admin() {
                       onKeyDown={(event) => handleTagFilterItemKeyDown(event, 0)}
                       className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors text-violet-700 dark:text-violet-200 hover:bg-violet-50 dark:hover:bg-violet-950/30"
                     >
-                      <span className="flex h-4 w-4 items-center justify-center rounded border border-violet-300 bg-violet-100 text-violet-700 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-100" aria-hidden="true">
+                      <span className="flex h-4 w-4 items-center justify-center rounded-sm border border-violet-300 bg-violet-100 text-violet-700 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-100" aria-hidden="true">
                         <Check className="h-3 w-3" />
                       </span>
                       <span className="flex-1 font-semibold">{a.clearTagFilters}</span>
@@ -1358,7 +1358,7 @@ export default function Admin() {
                         value={form.icon}
                         onChange={(e) => setForm({ ...form, icon: e.target.value })}
                         placeholder="📦"
-                        className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
+                        className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                       />
                     </div>
                   </div>
@@ -1381,7 +1381,7 @@ export default function Admin() {
                           iconFileInputRef.current?.click();
                         }
                       }}
-                      className="rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-4 text-center cursor-pointer hover:border-accent transition-colors outline-none min-h-[180px] flex flex-col items-center justify-center gap-3"
+                      className="rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-4 text-center cursor-pointer hover:border-accent transition-colors outline-hidden min-h-[180px] flex flex-col items-center justify-center gap-3"
                     >
                       <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center overflow-hidden">
                         {iconAssetPreview ? (
@@ -1420,7 +1420,7 @@ export default function Admin() {
                           }}
                           placeholder={a.svgPlaceholder}
                           rows={4}
-                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500 resize-y"
+                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500 resize-y"
                         />
                       </div>
 
@@ -1456,7 +1456,7 @@ export default function Admin() {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder={a.nameExample}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                 />
               </div>
 
@@ -1471,7 +1471,7 @@ export default function Admin() {
                     setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') });
                   }}
                   placeholder={a.slugExample}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                 />
                 <p className="mt-1 flex items-center justify-between gap-3 text-xs text-gray-400 dark:text-gray-500">
                   <span>{a.slugHelp}</span>
@@ -1491,7 +1491,7 @@ export default function Admin() {
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   placeholder={a.descriptionPlaceholder}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                 />
               </div>
 
@@ -1502,7 +1502,7 @@ export default function Admin() {
                   value={form.target_url}
                   onChange={(e) => setForm({ ...form, target_url: e.target.value })}
                   placeholder={a.targetUrlExample}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                 />
                 {form.mode === 'internal-link' && (
                   <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
@@ -1518,12 +1518,12 @@ export default function Admin() {
                         type="checkbox"
                         checked={includeDefaultGroup}
                         onChange={(e) => setIncludeDefaultGroup(e.target.checked)}
-                        className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                        className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                       />
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium text-dark dark:text-gray-100">{a.addToDefaultGroup}</span>
-                          <span className="text-[10px] bg-accent/20 text-dark dark:text-gray-100 px-1.5 py-0.5 rounded font-medium">
+                          <span className="text-[10px] bg-accent/20 text-dark dark:text-gray-100 px-1.5 py-0.5 rounded-sm font-medium">
                             {ui.common.defaultRecommended}
                           </span>
                         </div>
@@ -1572,7 +1572,7 @@ export default function Admin() {
                       }
                     }}
                     placeholder={ui.admin.apps.enterApplicationId}
-                    className="w-full px-3 py-2 border border-violet-200 dark:border-violet-800 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 dark:focus-visible:ring-violet-600"
+                    className="w-full px-3 py-2 border border-violet-200 dark:border-violet-800 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-violet-400 dark:focus-visible:ring-violet-600"
                   />
                   <p className="text-xs text-violet-500 dark:text-violet-400 mt-1">
                     {ui.admin.apps.applicationIdHelp}
@@ -1589,7 +1589,7 @@ export default function Admin() {
                       value={form.sso_endpoint}
                       onChange={(e) => setForm({ ...form, sso_endpoint: e.target.value })}
                       placeholder="/sso"
-                      className="w-full px-3 py-2 border border-blue-200 dark:border-blue-800 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-blue-600"
+                      className="w-full px-3 py-2 border border-blue-200 dark:border-blue-800 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-blue-600"
                     />
                     </div>
                     <div>
@@ -1597,7 +1597,7 @@ export default function Admin() {
                     <select
                       value={form.sso_method}
                       onChange={(e) => setForm({ ...form, sso_method: e.target.value })}
-                      className="w-full px-3 py-2 border border-blue-200 dark:border-blue-800 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-blue-600"
+                      className="w-full px-3 py-2 border border-blue-200 dark:border-blue-800 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-blue-600"
                     >
                       <option value="GET">GET</option>
                       <option value="POST">POST</option>
@@ -1632,7 +1632,7 @@ export default function Admin() {
                     type="number"
                     value={form.sort_order}
                     onChange={(e) => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
+                    className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                   />
                 </div>
               </div>
@@ -1644,7 +1644,7 @@ export default function Admin() {
                   onChange={(e) => setForm({ ...form, long_description: e.target.value })}
                   placeholder={a.longDescriptionPlaceholder}
                   rows={4}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500 resize-y"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500 resize-y"
                 />
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{a.longDescriptionHelp}</p>
               </div>
@@ -1657,7 +1657,7 @@ export default function Admin() {
                       type="button"
                       onClick={handleSaveAndAssignGroups}
                       disabled={saving || !form.name || !form.slug || !form.target_url}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-dark dark:text-white bg-accent hover:bg-accent/80 dark:bg-accent-dark dark:hover:bg-accent-dark/90 shadow-sm shadow-accent/20 dark:shadow-black/30 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-dark dark:text-white bg-accent hover:bg-accent/80 dark:bg-accent-dark dark:hover:bg-accent-dark/90 shadow-xs shadow-accent/20 dark:shadow-black/30 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Users className="w-4 h-4" />
                       {saving ? a.saving : a.saveAndAssignGroups}
@@ -1790,16 +1790,16 @@ export default function Admin() {
                           type="checkbox"
                           checked={selected}
                           onChange={() => toggleGroupAssignment(group.id)}
-                          className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                          className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-medium text-dark dark:text-gray-100 truncate">{groupLabel(group)}</span>
-                            <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded font-medium">
+                            <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded-sm font-medium">
                               {groupSourceLabel}
                             </span>
                             {group.id === DEFAULT_GROUP_ID && (
-                              <span className="text-[10px] bg-accent/30 text-dark dark:text-gray-100 px-1.5 py-0.5 rounded font-medium">
+                              <span className="text-[10px] bg-accent/30 text-dark dark:text-gray-100 px-1.5 py-0.5 rounded-sm font-medium">
                                 default
                               </span>
                             )}

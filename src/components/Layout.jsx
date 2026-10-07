@@ -420,7 +420,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFAFA] dark:bg-gray-950">
-      <nav className="sticky top-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shadow-sm shadow-black/5">
+      <nav className="sticky top-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shadow-xs shadow-black/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between min-h-16 py-3 gap-4">
             <Link to="/" className="flex items-center gap-3 shrink-0">
@@ -563,7 +563,7 @@ export default function Layout({ children }) {
                           value={effectiveHomeView}
                           onChange={(event) => handleHomeViewChange(event.target.value)}
                           disabled={homeViewSaving}
-                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-hidden focus:ring-2 focus:ring-accent disabled:opacity-60"
                         >
                           <option value="cards">{ui.layout.homeViewCards}</option>
                           <option value="compact">{ui.layout.homeViewCompact}</option>
@@ -594,7 +594,7 @@ export default function Layout({ children }) {
                           value={effectiveLanguage}
                           onChange={(event) => handlePreferredLanguageChange(event.target.value)}
                           disabled={languageSaving}
-                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-hidden focus:ring-2 focus:ring-accent disabled:opacity-60"
                         >
                           {languageOptions.map((language) => (
                             <option key={language.code} value={language.code}>{language.label}</option>
@@ -626,7 +626,7 @@ export default function Layout({ children }) {
                           value={effectiveTimeZone}
                           onChange={(event) => handlePreferredTimeZoneChange(event.target.value)}
                           disabled={timeZoneSaving}
-                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-hidden focus:ring-2 focus:ring-accent disabled:opacity-60"
                         >
                           {timeZoneOptions.map((timeZone) => (
                             <option key={timeZone.code} value={timeZone.code}>{timeZone.label}</option>
@@ -858,7 +858,7 @@ export default function Layout({ children }) {
                     value={effectiveHomeView}
                     onChange={(event) => handleHomeViewChange(event.target.value)}
                     disabled={homeViewSaving}
-                    className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                    className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-hidden focus:ring-2 focus:ring-accent disabled:opacity-60"
                   >
                     <option value="cards">{ui.layout.homeViewCards}</option>
                     <option value="compact">{ui.layout.homeViewCompact}</option>
@@ -886,7 +886,7 @@ export default function Layout({ children }) {
                     value={effectiveLanguage}
                     onChange={(event) => handlePreferredLanguageChange(event.target.value)}
                     disabled={languageSaving}
-                    className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                    className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-hidden focus:ring-2 focus:ring-accent disabled:opacity-60"
                   >
                     {languageOptions.map((language) => (
                       <option key={language.code} value={language.code}>{language.label}</option>
@@ -915,7 +915,7 @@ export default function Layout({ children }) {
                     value={effectiveTimeZone}
                     onChange={(event) => handlePreferredTimeZoneChange(event.target.value)}
                     disabled={timeZoneSaving}
-                    className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                    className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-hidden focus:ring-2 focus:ring-accent disabled:opacity-60"
                   >
                     {timeZoneOptions.map((timeZone) => (
                       <option key={timeZone.code} value={timeZone.code}>{timeZone.label}</option>

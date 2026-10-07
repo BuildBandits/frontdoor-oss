@@ -4,7 +4,7 @@ import { getUiStrings, normalizeLanguage } from '../i18n';
 export default function AppFooter({ language = 'en' }) {
   const ui = getUiStrings(normalizeLanguage(language));
   return (
-    <footer className="border-t border-gray-100 dark:border-gray-800 bg-white/80 backdrop-blur dark:bg-gray-900 dark:backdrop-blur-none">
+    <footer className="border-t border-gray-100 dark:border-gray-800 bg-white/80 backdrop-blur-sm dark:bg-gray-900 dark:backdrop-blur-none">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">

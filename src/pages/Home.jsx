@@ -824,11 +824,11 @@ export default function Home() {
       {showHero && (
         <div
           ref={heroRef}
-          className="bg-gradient-to-br from-accent/30 via-accent/10 to-transparent dark:from-accent/15 dark:via-accent/5 dark:to-transparent rounded-3xl p-6 md:p-8 mb-8 overflow-hidden transition-shadow"
+          className="bg-linear-to-br from-accent/30 via-accent/10 to-transparent dark:from-accent/15 dark:via-accent/5 dark:to-transparent rounded-3xl p-6 md:p-8 mb-8 overflow-hidden transition-shadow"
         >
           <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
             <div>
-              <h1 className="text-2xl md:text-4xl font-extrabold text-dark dark:text-gray-100 leading-tight mb-3">
+              <h1 className="text-2xl md:text-4xl font-extrabold text-dark dark:text-gray-100 leading-tight md:leading-10 mb-3">
                 {brandingLoading || !branding ? (
                   <>
                     {ui.home.heroTitleLine1}<br />
@@ -868,7 +868,7 @@ export default function Home() {
       {/* Search + toggles + tag filters */}
       <div
         ref={controlsRef}
-        className="mb-8 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm"
+        className="mb-8 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-xs"
       >
         <div className="flex items-stretch gap-3 min-w-0">
           <ClearableSearchField
@@ -938,7 +938,7 @@ export default function Home() {
                     disabled={mobileCompactViewForced}
                     className={`flex h-12 items-center justify-center gap-1.5 px-3 rounded-xl border text-sm font-medium transition-all duration-150 active:translate-y-px active:scale-[0.99] whitespace-nowrap sm:flex-none ${
                       compactView
-                        ? 'bg-gradient-to-br from-sky-50 via-cyan-50 to-indigo-50 dark:from-sky-900/40 dark:via-cyan-900/30 dark:to-indigo-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 shadow-sm shadow-sky-200/50'
+                        ? 'bg-linear-to-br from-sky-50 via-cyan-50 to-indigo-50 dark:from-sky-900/40 dark:via-cyan-900/30 dark:to-indigo-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 shadow-xs shadow-sky-200/50'
                         : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700'
                     } ${mobileCompactViewForced ? 'opacity-70 cursor-not-allowed' : ''}`}
                     aria-label={mobileCompactViewForced ? ui.home.compactViewForcedTitle : (compactView ? ui.home.cardsLabel : ui.home.compactViewTitle)}

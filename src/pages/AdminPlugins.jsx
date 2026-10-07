@@ -658,7 +658,7 @@ export default function AdminPlugins() {
                   value={form.id}
                   onChange={(event) => setForm((current) => ({ ...current, id: event.target.value, packageSource: '' }))}
                   placeholder="ticket-plugin"
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-none transition focus:border-violet-400"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
                   required
                 />
               </label>
@@ -668,7 +668,7 @@ export default function AdminPlugins() {
                   value={form.version}
                   onChange={(event) => setForm((current) => ({ ...current, version: event.target.value, packageSource: '' }))}
                   placeholder="1.0.0"
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-none transition focus:border-violet-400"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
                   required
                 />
               </label>
@@ -681,7 +681,7 @@ export default function AdminPlugins() {
                   value={form.name}
                   onChange={(event) => setForm((current) => ({ ...current, name: event.target.value, packageSource: '' }))}
                   placeholder="Ticket Plugin"
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-none transition focus:border-violet-400"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
                   required
                 />
               </label>
@@ -691,7 +691,7 @@ export default function AdminPlugins() {
                   value={form.author}
                   onChange={(event) => setForm((current) => ({ ...current, author: event.target.value, packageSource: '' }))}
                   placeholder="FrontDoor"
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-none transition focus:border-violet-400"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
                 />
               </label>
             </div>
@@ -703,7 +703,7 @@ export default function AdminPlugins() {
                 onChange={(event) => setForm((current) => ({ ...current, description: event.target.value, packageSource: '' }))}
                 rows="3"
                 placeholder="Adds a ticket creation action, route and surface"
-                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-none transition focus:border-violet-400"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
               />
             </label>
 
@@ -714,7 +714,7 @@ export default function AdminPlugins() {
                   value={form.homepage}
                   onChange={(event) => setForm((current) => ({ ...current, homepage: event.target.value, packageSource: '' }))}
                   placeholder="https://example.com/plugin"
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-none transition focus:border-violet-400"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
                 />
               </label>
               <label className="block">
@@ -723,7 +723,7 @@ export default function AdminPlugins() {
                   value={form.entry}
                   onChange={(event) => setForm((current) => ({ ...current, entry: event.target.value, packageSource: '' }))}
                   placeholder="/api/plugins/files/ticket-plugin/1.0.0/latest/index.mjs"
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-none transition focus:border-violet-400"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
                 />
               </label>
             </div>
@@ -736,7 +736,7 @@ export default function AdminPlugins() {
                   onChange={(event) => setForm((current) => ({ ...current, permissions: event.target.value, packageSource: '' }))}
                   rows="3"
                   placeholder="actions.write&#10;routes.write&#10;surfaces.write"
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-none transition focus:border-violet-400"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
                 />
               </label>
               <label className="block">
@@ -746,7 +746,7 @@ export default function AdminPlugins() {
                   onChange={(event) => setForm((current) => ({ ...current, roles: event.target.value, packageSource: '' }))}
                   rows="3"
                   placeholder="owner&#10;admin"
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-none transition focus:border-violet-400"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
                 />
               </label>
             </div>
@@ -758,7 +758,7 @@ export default function AdminPlugins() {
                     type="checkbox"
                     checked={form.enabled}
                     onChange={(event) => setForm((current) => ({ ...current, enabled: event.target.checked, packageSource: '' }))}
-                    className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                    className="h-4 w-4 rounded-sm border-gray-300 text-violet-600 focus:ring-violet-500"
                   />
                   {t.enabledLabel}
                 </label>
@@ -767,7 +767,7 @@ export default function AdminPlugins() {
                     type="checkbox"
                     checked={form.backendEnabled}
                     onChange={(event) => setForm((current) => ({ ...current, backendEnabled: event.target.checked, packageSource: '' }))}
-                    className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                    className="h-4 w-4 rounded-sm border-gray-300 text-violet-600 focus:ring-violet-500"
                   />
                   {t.backendWebhookLabel}
                 </label>
@@ -780,7 +780,7 @@ export default function AdminPlugins() {
                     value={form.backendUrl}
                     onChange={(event) => setForm((current) => ({ ...current, backendUrl: event.target.value, packageSource: '' }))}
                     placeholder="https://plugins.example.com/frontdoor-webhook"
-                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-none transition focus:border-violet-400"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
                   />
                 </label>
                 <label className="block">
@@ -790,7 +790,7 @@ export default function AdminPlugins() {
                     onChange={(event) => setForm((current) => ({ ...current, eventSubscriptions: event.target.value, packageSource: '' }))}
                     rows="3"
                     placeholder="auth.login&#10;app.access"
-                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-none transition focus:border-violet-400"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
                   />
                 </label>
               </div>
@@ -856,7 +856,7 @@ export default function AdminPlugins() {
                 onChange={(event) => setForm((current) => ({ ...current, moduleSource: event.target.value, packageSource: '' }))}
                 rows="10"
                 placeholder={moduleExample()}
-                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-3 font-mono text-[12px] leading-6 text-dark dark:text-gray-100 outline-none transition focus:border-violet-400"
+                className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-3 font-mono text-[12px] leading-6 text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
               />
             </label>
 
@@ -939,7 +939,7 @@ export default function AdminPlugins() {
       {serverPlugins.length > 0 ? (
         <div className="space-y-4">
           {serverPlugins.map((plugin) => (
-            <article key={plugin.id} className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+            <article key={plugin.id} className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-xs">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -1150,7 +1150,7 @@ export default function AdminPlugins() {
                         type="checkbox"
                         checked={reviewAcknowledged}
                         onChange={(event) => setReviewAcknowledged(event.target.checked)}
-                        className="mt-1 h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                        className="mt-1 h-4 w-4 rounded-sm border-gray-300 text-violet-600 focus:ring-violet-500"
                       />
                       <span>
                         {t.iReviewed}

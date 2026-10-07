@@ -37,8 +37,8 @@ export default function PageNotice({
   if (!title && !message && !children) return null;
 
   return (
-    <div className={`flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-sm ${config.wrapper}`} role={role} aria-live={ariaLive}>
-      <Icon className="mt-0.5 h-5 w-5 flex-shrink-0" />
+    <div className={`flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-xs ${config.wrapper}`} role={role} aria-live={ariaLive}>
+      <Icon className="mt-0.5 h-5 w-5 shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">

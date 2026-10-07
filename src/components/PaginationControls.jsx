@@ -18,7 +18,7 @@ export default function PaginationControls({
     ? 'flex flex-col gap-3 border-b border-gray-100 dark:border-gray-800 px-4 py-3 lg:flex-row lg:items-center lg:justify-between'
     : variant === 'attached-bottom'
       ? 'flex flex-col gap-3 border-t border-gray-100 dark:border-gray-800 px-4 py-3 lg:flex-row lg:items-center lg:justify-between'
-      : 'mt-6 flex flex-col gap-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between';
+      : 'mt-6 flex flex-col gap-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-3 shadow-xs lg:flex-row lg:items-center lg:justify-between';
 
   return (
     <div className={`${variantClassName} ${className}`.trim()}>

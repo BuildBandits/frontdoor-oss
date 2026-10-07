@@ -154,7 +154,7 @@ export default function TopToastNotice({
   };
 
   return (
-    <div className={`pointer-events-none fixed inset-x-0 z-[70] flex justify-center px-4 ${positionClassName} ${className}`}>
+    <div className={`pointer-events-none fixed inset-x-0 z-70 flex justify-center px-4 ${positionClassName} ${className}`}>
       <div
         className={`pointer-events-auto relative w-[min(42rem,calc(100vw-2rem))] origin-top overflow-hidden rounded-2xl border-2 ring-1 ring-black/10 dark:ring-white/10 shadow-2xl shadow-black/15 ${config.wrapper} ${
           isClosing ? 'toast-notice-exit' : 'toast-notice-enter'
@@ -164,7 +164,7 @@ export default function TopToastNotice({
         aria-live={ariaLive}
       >
         <div className="flex items-start gap-3 px-4 py-3">
-          <Icon className="mt-0.5 h-5 w-5 flex-shrink-0" />
+          <Icon className="mt-0.5 h-5 w-5 shrink-0" />
           <div className="min-w-0 flex-1">
             {notice.title && <div className="text-sm font-semibold">{notice.title}</div>}
             {notice.message && (

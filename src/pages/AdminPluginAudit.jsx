@@ -204,7 +204,7 @@ export default function AdminPluginAudit() {
             <select
               value={selectedActorId}
               onChange={(e) => setSelectedActorId(e.target.value)}
-              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none max-w-[220px]"
+              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-hidden max-w-[220px]"
             >
               <option value="">{ui.admin.audit.allAdmins}</option>
               {adminUsers.map((currentUser) => (
@@ -220,7 +220,7 @@ export default function AdminPluginAudit() {
             <select
               value={action}
               onChange={(e) => setAction(e.target.value)}
-              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none"
+              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-hidden"
             >
               <option value="">{ui.admin.pluginAudit.allActions}</option>
               {ACTION_OPTIONS.map((value) => (
@@ -236,7 +236,7 @@ export default function AdminPluginAudit() {
             <select
               value={retentionDays}
               onChange={(e) => setRetentionDays(parseInt(e.target.value, 10))}
-              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none"
+              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-hidden"
             >
               {periodOptions.map((days) => (
                 <option key={days} value={days}>
@@ -250,7 +250,7 @@ export default function AdminPluginAudit() {
             <select
               value={pageSize}
               onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
-              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none"
+              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-hidden"
             >
               <option value={50}>50</option>
               <option value={100}>100</option>
@@ -324,7 +324,7 @@ export default function AdminPluginAudit() {
                         </div>
                       </td>
                       <td className="px-5 py-3 hidden lg:table-cell">
-                        <pre className="max-w-[420px] whitespace-pre-wrap break-words text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+                        <pre className="max-w-[420px] whitespace-pre-wrap wrap-break-word text-[11px] text-gray-500 dark:text-gray-400 font-mono">
                           {renderDetails(log.details)}
                         </pre>
                       </td>

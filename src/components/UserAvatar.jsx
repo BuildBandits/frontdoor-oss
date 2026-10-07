@@ -49,7 +49,7 @@ export default function UserAvatar({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-full flex items-center justify-center flex-shrink-0 ${className}`}
+      className={`relative overflow-hidden rounded-full flex items-center justify-center shrink-0 ${className}`}
       style={!showImage ? { backgroundColor: avatarColor || '#666' } : undefined}
     >
       {showImage ? (

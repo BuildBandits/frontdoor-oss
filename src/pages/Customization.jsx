@@ -109,7 +109,7 @@ export default function Customization() {
   const ui = useMemo(() => getUiStrings(uiLanguage), [uiLanguage]);
   const languageOptions = useMemo(() => getSupportedLanguageOptions(ui), [ui]);
   const timeZoneOptions = useMemo(() => getSupportedTimeZoneOptions(), []);
-  const selectClassName = 'flex-none w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent lg:w-[288px] shrink-0';
+  const selectClassName = 'flex-none w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent lg:w-[288px] shrink-0 disabled:opacity-70';
   const sectionRefs = useMemo(() => ({
     login: homeOptionsSectionRef,
     home: brandingSectionRef,
@@ -426,8 +426,8 @@ export default function Customization() {
     { id: 'maintenance', label: ui.customization.maintenance.title, ref: maintenanceSectionRef, icon: Wrench },
   ];
 
-  const renderSaveStatusBar = (key) => (
-    <div key={key} className="mt-6 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-950/50 px-4 py-3">
+  const renderSaveStatusBar = (key, marginClassName = 'mt-6') => (
+    <div key={key} className={`${marginClassName} rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-950/50 px-4 py-3`}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.common.changeStatus}</p>
@@ -475,7 +475,7 @@ export default function Customization() {
 
       <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
         <aside className="hidden xl:block xl:sticky xl:top-24 h-fit">
-          <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm">
+          <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-xs">
             <div className="mb-4">
               <h2 className="text-sm font-bold text-dark dark:text-gray-100">{ui.customization.navigationTitle}</h2>
               <p className="text-xs text-gray-500 dark:text-gray-400">{ui.customization.navigationSubtitle}</p>
@@ -503,7 +503,7 @@ export default function Customization() {
         </aside>
 
         <div className="flex flex-col gap-4">
-          <div className="xl:hidden rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm">
+          <div className="xl:hidden rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-xs">
             <div className="mb-3">
               <h2 className="text-sm font-bold text-dark dark:text-gray-100">{ui.customization.goToSection}</h2>
               <p className="text-xs text-gray-500 dark:text-gray-400">{ui.customization.navigationSubtitle}</p>
@@ -542,7 +542,7 @@ export default function Customization() {
                 type="checkbox"
                 checked={branding.hideLoginPage === true}
                 onChange={(e) => setBranding({ ...branding, hideLoginPage: e.target.checked })}
-                className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
               />
               <span>
                 <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.login.hideLoginPageLabel}</span>
@@ -595,7 +595,7 @@ export default function Customization() {
                               onClick={() => setHeroLang(option.code)}
                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                                 heroLang === option.code
-                                  ? 'bg-white dark:bg-gray-800 text-dark dark:text-gray-100 shadow-sm'
+                                  ? 'bg-white dark:bg-gray-800 text-dark dark:text-gray-100 shadow-xs'
                                   : 'text-gray-500 dark:text-gray-400 hover:text-dark dark:hover:text-gray-200'
                               }`}
                             >
@@ -613,7 +613,7 @@ export default function Customization() {
                           value={branding.heroTitleLine1I18n?.[heroLang] || ''}
                           placeholder={branding.heroTitleLine1}
                           onChange={(e) => setBranding({ ...branding, heroTitleLine1I18n: { ...branding.heroTitleLine1I18n, [heroLang]: e.target.value } })}
-                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
+                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                         />
                       </div>
 
@@ -624,7 +624,7 @@ export default function Customization() {
                           value={branding.heroTitleLine2I18n?.[heroLang] || ''}
                           placeholder={branding.heroTitleLine2}
                           onChange={(e) => setBranding({ ...branding, heroTitleLine2I18n: { ...branding.heroTitleLine2I18n, [heroLang]: e.target.value } })}
-                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
+                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
                         />
                       </div>
 
@@ -635,7 +635,7 @@ export default function Customization() {
                           value={branding.heroSubtitleI18n?.[heroLang] || ''}
                           placeholder={branding.heroSubtitle}
                           onChange={(e) => setBranding({ ...branding, heroSubtitleI18n: { ...branding.heroSubtitleI18n, [heroLang]: e.target.value } })}
-                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500 resize-none"
+                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500 resize-none"
                         />
                       </div>
                     </div>
@@ -735,10 +735,10 @@ export default function Customization() {
                 {brandingLoading ? (
                   <div className="h-[220px] rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
                 ) : (
-                  <div className="rounded-2xl bg-gradient-to-br from-accent/20 via-white to-white dark:from-accent-dark/20 dark:via-gray-900 dark:to-gray-950 p-4">
+                  <div className="rounded-2xl bg-linear-to-br from-accent/20 via-white to-white dark:from-accent-dark/20 dark:via-gray-900 dark:to-gray-950 p-4">
                     <div className="rounded-2xl bg-white/90 border border-white/80 dark:bg-gray-900/95 dark:border-gray-700 p-4 md:p-5 min-h-[220px] flex flex-col md:flex-row md:items-center md:justify-between gap-5">
                       <div className="min-w-0">
-                        <div className="text-2xl md:text-3xl font-extrabold text-dark dark:text-gray-100 leading-tight">
+                        <div className="text-2xl md:text-3xl font-extrabold text-dark dark:text-gray-100 leading-tight md:leading-9">
                           {branding.heroTitleLine1I18n?.[heroLang] || branding.heroTitleLine1}<br />
                           <span className="text-dark/70 dark:text-gray-400">{branding.heroTitleLine2I18n?.[heroLang] || branding.heroTitleLine2}</span>
                         </div>
@@ -768,7 +768,7 @@ export default function Customization() {
                     type="checkbox"
                     checked={branding.showHomeHero !== false}
                     onChange={(e) => setBranding({ ...branding, showHomeHero: e.target.checked })}
-                    className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                    className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                   />
                   <span>
                     <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.home.heroLabel}</span>
@@ -798,7 +798,7 @@ export default function Customization() {
                   </div>
                 </div>
 
-                {renderSaveStatusBar('home')}
+                {renderSaveStatusBar('home', '')}
               </div>
             </div>
           </section>
@@ -819,7 +819,7 @@ export default function Customization() {
                 type="checkbox"
                 checked={branding.showAppModeBadges !== false}
                 onChange={(e) => setBranding({ ...branding, showAppModeBadges: e.target.checked })}
-                className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
               />
               <span>
                 <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.apps.badgesLabel}</span>
@@ -833,7 +833,7 @@ export default function Customization() {
                   type="checkbox"
                   checked={branding.showSharedCookieMode !== false}
                   onChange={(e) => setBranding({ ...branding, showSharedCookieMode: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                  className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span>
                   <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.apps.sharedCookieLabel}</span>
@@ -846,7 +846,7 @@ export default function Customization() {
                   type="checkbox"
                   checked={branding.showRedirectSsoMode !== false}
                   onChange={(e) => setBranding({ ...branding, showRedirectSsoMode: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                  className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span>
                   <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.apps.redirectLabel}</span>
@@ -859,7 +859,7 @@ export default function Customization() {
                   type="checkbox"
                   checked={branding.showEntraAppMode !== false}
                   onChange={(e) => setBranding({ ...branding, showEntraAppMode: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                  className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span>
                   <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.apps.entraLabel}</span>
@@ -960,7 +960,7 @@ export default function Customization() {
                   type="checkbox"
                   checked={branding.use24hTimeFormat === true}
                   onChange={(e) => setBranding({ ...branding, use24hTimeFormat: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                  className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span className="min-w-0">
                   <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.preferences.timeFormatTitle}</span>
@@ -973,7 +973,7 @@ export default function Customization() {
                   type="checkbox"
                   checked={branding.useEuropeanDateFormat === true}
                   onChange={(e) => setBranding({ ...branding, useEuropeanDateFormat: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                  className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span className="min-w-0">
                   <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.preferences.dateFormatTitle}</span>
@@ -1003,7 +1003,7 @@ export default function Customization() {
                   type="checkbox"
                   checked={branding.defaultCompactView === true}
                   onChange={(e) => setBranding({ ...branding, defaultCompactView: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                  className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span>
                   <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.mobile.compactLabel}</span>
@@ -1016,7 +1016,7 @@ export default function Customization() {
                   type="checkbox"
                   checked={branding.hideHomeHeroOnMobile === true}
                   onChange={(e) => setBranding({ ...branding, hideHomeHeroOnMobile: e.target.checked })}
-                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                  className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                 />
                 <span>
                   <span className="block text-sm font-medium text-gray-700 dark:text-gray-200">{ui.customization.mobile.hideHeroLabel}</span>

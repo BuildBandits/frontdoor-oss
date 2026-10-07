@@ -219,7 +219,7 @@ export default function AdminGroupTransfer() {
       )}
 
       <div className="mt-6 grid gap-6 xl:grid-cols-2 xl:items-stretch">
-        <div className="h-full rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+        <div className="h-full rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-xs">
           <div className="mb-6">
             <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.transferAppsSelectionTitle}</h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{g.transferAppsSelectionHelp}</p>
@@ -241,7 +241,7 @@ export default function AdminGroupTransfer() {
                 <select
                   value={sourceGroupId}
                   onChange={(e) => setSourceGroupId(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-dark dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-dark dark:text-gray-100 focus:outline-hidden focus:ring-2 focus:ring-accent"
                   disabled={loadingGroups}
                 >
                   <option value="">{g.selectGroupPlaceholder}</option>
@@ -258,7 +258,7 @@ export default function AdminGroupTransfer() {
                 <select
                   value={targetGroupId}
                   onChange={(e) => setTargetGroupId(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-dark dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-dark dark:text-gray-100 focus:outline-hidden focus:ring-2 focus:ring-accent"
                   disabled={loadingGroups}
                 >
                   <option value="">{g.selectGroupPlaceholder}</option>
@@ -296,11 +296,11 @@ export default function AdminGroupTransfer() {
           </div>
         </div>
 
-        <div className="h-full rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+        <div className="h-full rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-xs">
           <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.transferAppsActionTitle}</h2>
           <div className="mt-6 space-y-4 text-sm text-gray-600 dark:text-gray-300">
             <div className="flex items-start gap-3">
-              <ArrowRightLeft className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-dark" />
+              <ArrowRightLeft className="mt-0.5 h-4 w-4 shrink-0 text-accent-dark" />
               <p>{g.transferAppsActionHelp}</p>
             </div>
             <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
@@ -331,7 +331,7 @@ export default function AdminGroupTransfer() {
           </div>
         </div>
 
-        <div className="h-full rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+        <div className="h-full rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-xs">
           <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.transferAppsSummaryTitle}</h2>
           {sourceGroup ? (
             <div className="mt-3 space-y-3">
@@ -395,7 +395,7 @@ export default function AdminGroupTransfer() {
           )}
         </div>
 
-        <div className="h-full rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+        <div className="h-full rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-xs">
           <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.targetGroupLabel}</h2>
           {targetGroup ? (
             <div className="mt-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4">

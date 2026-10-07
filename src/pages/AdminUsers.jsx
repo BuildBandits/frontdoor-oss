@@ -693,8 +693,8 @@ export default function AdminUsers() {
               >
                 <div className="flex items-center gap-3">
                   {expandedUser === user.id
-                    ? <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-                    : <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />}
+                    ? <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+                    : <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />}
                   <UserAvatar
                     userId={user.id}
                     displayName={user.display_name}
@@ -709,19 +709,19 @@ export default function AdminUsers() {
                         <span className={`font-semibold text-sm ${user.is_active ? 'text-dark dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 line-through'}`}>
                           {user.display_name || user.email}
                         </span>
-                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium ${roleBadgeClass(user.role)}`}>
+                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium ${roleBadgeClass(user.role)}`}>
                           {roleBadgeContent(user.role)}
                         </span>
                         {isComposeLockedAdmin(user) && (
-                          <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded font-medium">{u.composeBadge}</span>
+                          <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-sm font-medium">{u.composeBadge}</span>
                         )}
                         {!user.last_login && (
-                          <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5">
+                          <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-sm font-medium flex items-center gap-0.5">
                             <Clock className="w-3 h-3" />{t.noLogin}
                           </span>
                         )}
                         {!user.is_active && (
-                          <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">{t.inactive}</span>
+                          <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-sm font-medium">{t.inactive}</span>
                         )}
                       </div>
                       <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user.email}</p>
@@ -924,7 +924,7 @@ export default function AdminUsers() {
                                   >
                                     <Users className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
                                     <span className="text-sm text-dark dark:text-gray-100">{groupLabel(g)}</span>
-                                    <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">
+                                    <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-sm font-medium">
                                       {u.entraBadge}
                                     </span>
                                     {g.description && (
@@ -973,11 +973,11 @@ export default function AdminUsers() {
                                 <Users className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" />
                                 <span className="text-sm text-dark dark:text-gray-100">{group.display_name}</span>
                                 {group.is_imported ? (
-                                  <span className="text-[10px] bg-accent/10 text-accent-dark px-1.5 py-0.5 rounded font-medium">
+                                  <span className="text-[10px] bg-accent/10 text-accent-dark px-1.5 py-0.5 rounded-sm font-medium">
                                     {u.importedBadge}
                                   </span>
                                 ) : (
-                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm font-medium">
                                     {u.detectedBadge}
                                   </span>
                                 )}
@@ -1109,7 +1109,7 @@ export default function AdminUsers() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-dark dark:text-gray-100 truncate">{app.name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${appModeBadgeClass(app.mode)}`}>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-sm font-medium ${appModeBadgeClass(app.mode)}`}>
                           {appModeLabel(app.mode)}
                         </span>
                       </div>
