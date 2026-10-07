@@ -17,7 +17,8 @@
     "test": "node --import ./test/setup.js --test test/*.test.js",
     "db:seed": "node server/seed.js",
     "avatars:prewarm": "node server/scripts/prewarmAvatars.js",
-    "backup:decrypt": "node scripts/backup-decrypt.mjs"
+    "backup:decrypt": "node scripts/backup-decrypt.mjs",
+    "backup:rehearse": "node scripts/backup-rehearse.mjs"
   },
   "dependencies": {
     "@azure/msal-node": "^7.0.1",
