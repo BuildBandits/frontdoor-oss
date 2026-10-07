@@ -19,7 +19,6 @@ export default [
         ...globals.browser,
         // Injected by Vite `define` (vite.config.js).
         __APP_VERSION__: 'readonly',
-        __COMMIT_SHA__: 'readonly',
       },
       parserOptions: { ecmaFeatures: { jsx: true } },
     },

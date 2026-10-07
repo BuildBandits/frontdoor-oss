@@ -168,8 +168,7 @@
     "homeViewCompactMobileTitle": "Vista compatta forzata su mobile"
   },
   "footer": {
-    "openSourceNote": "Frontdoor è un software open source",
-    "licensedUnder": "con",
+    "licensedUnder": "Distribuito con",
     "licenseLabel": "licenza MIT"
   },
   "customization": {

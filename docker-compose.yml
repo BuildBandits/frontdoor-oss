@@ -3,7 +3,7 @@ services:
     build:
       context: .
       args:
-        # Optional: COMMIT_SHA=$(git rev-parse --short HEAD) docker compose build
+        # Optional, recorded in backups: COMMIT_SHA=$(git rev-parse --short HEAD) docker compose build
         COMMIT_SHA: ${COMMIT_SHA:-}
     ports:
       - "3001:3001"

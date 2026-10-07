@@ -1,43 +1,25 @@
-import { APP_NAME, APP_SIGNATURE, APP_VERSION, APP_WEBSITE_URL } from '../config/appInfo';
+import { APP_NAME, APP_VERSION, APP_WEBSITE_URL } from '../config/appInfo';
 import { getUiStrings, normalizeLanguage } from '../i18n';
+
+const linkClassName = 'font-semibold text-gray-700 dark:text-gray-100 hover:text-dark dark:hover:text-white hover:underline underline-offset-2';
 
 export default function AppFooter({ language = 'en' }) {
   const ui = getUiStrings(normalizeLanguage(language));
   return (
     <footer className="border-t border-gray-100 dark:border-gray-800 bg-white/80 backdrop-blur-sm dark:bg-gray-900 dark:backdrop-blur-none">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-dark dark:text-gray-100">
-              {APP_NAME}{' '}
-              <span className="text-gray-500 dark:text-gray-400">{APP_VERSION}</span>{' '}
-              (<span className="font-mono text-gray-500 dark:text-gray-400">{APP_SIGNATURE}</span>)
-            </p>
-          </div>
-
-          <div className="text-xs text-gray-500 dark:text-gray-300 md:text-right">
-            <p>
-              {ui.footer.openSourceNote} · {ui.footer.licensedUnder}{' '}
-              <a
-                href="https://opensource.org/license/mit"
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-gray-700 dark:text-gray-100 hover:text-dark dark:hover:text-white hover:underline underline-offset-2"
-              >
-                {ui.footer.licenseLabel}
-              </a>
-              {' · '}
-              <a
-                href={APP_WEBSITE_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-gray-700 dark:text-gray-100 hover:text-dark dark:hover:text-white hover:underline underline-offset-2"
-              >
-                {new URL(APP_WEBSITE_URL).host}
-              </a>
-            </p>
-          </div>
-        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-300 md:text-right">
+          <span className="text-sm">
+            <a href={APP_WEBSITE_URL} target="_blank" rel="noreferrer" className={linkClassName}>
+              {APP_NAME}
+            </a>{' '}
+            {APP_VERSION}
+          </span>
+          {' · '}{ui.footer.licensedUnder}{' '}
+          <a href="https://opensource.org/license/mit" target="_blank" rel="noreferrer" className={linkClassName}>
+            {ui.footer.licenseLabel}
+          </a>
+        </p>
       </div>
     </footer>
   );

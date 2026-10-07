@@ -1,10 +1,9 @@
 # Stage 1: Build frontend and production node_modules
 ARG NODE_IMAGE=node:24-bookworm-slim
-# Optional short commit hash shown in the footer and recorded in backups,
+# Optional short commit hash recorded in backups,
 # e.g. --build-arg COMMIT_SHA=$(git rev-parse --short HEAD).
 ARG COMMIT_SHA=
 FROM ${NODE_IMAGE} AS builder
-ARG COMMIT_SHA
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 make g++ \
@@ -14,7 +13,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN VITE_COMMIT_SHA="${COMMIT_SHA}" npm run build \
+RUN npm run build \
     && npm prune --omit=dev \
     && npm cache clean --force
 
