@@ -7,9 +7,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
-- **Website link in the footer**: the footer links to the Frontdoor website (frontdoor.buildbandits.com).
+- **Website link in the footer**: the product name in the footer links to the Frontdoor website (frontdoor.buildbandits.com).
 
 ### Changed
+- **Simpler footer**: a single line, *Frontdoor v1.3.x · Licensed under MIT license*, with the product name linking to the website. The commit hash and the "open source software" note are no longer shown; the commit is still recorded in backups when `COMMIT_SHA` is set at build time.
 - **Raw database export under Advanced options**: on the backup page, *Download database file (.db)* moved into an *Advanced options* section that is closed by default, so the regular backup is the only prominent download. The raw copy is meant for upgrade rehearsals and manual recovery and cannot be restored from the page.
 
 ### Fixed

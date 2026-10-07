@@ -132,7 +132,7 @@ cp .env.example.docker .env
 docker compose up --build
 ```
 
-To show the commit in the footer and record it in backups, pass it at build time: `COMMIT_SHA=$(git rev-parse --short HEAD) docker compose build` (or `--build-arg COMMIT_SHA=...` with `docker build`).
+To record the commit in backups, pass it at build time: `COMMIT_SHA=$(git rev-parse --short HEAD) docker compose build` (or `--build-arg COMMIT_SHA=...` with `docker build`).
 
 App: http://localhost:3001
 
