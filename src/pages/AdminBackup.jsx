@@ -29,6 +29,10 @@ export default function AdminBackup() {
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyReport, setVerifyReport] = useState(null);
+  const [excludeLogs, setExcludeLogs] = useState(false);
+  const [exportPassphrase, setExportPassphrase] = useState('');
+  const [exportPassphraseConfirm, setExportPassphraseConfirm] = useState('');
+  const [restorePassphrase, setRestorePassphrase] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [notice, setNotice] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
@@ -71,6 +75,12 @@ export default function AdminBackup() {
   }, []);
 
   const pushNotice = (type, message) => setNotice({ type, message });
+  const backupErrorMessage = (payload, fallback) => ({
+    backup_passphrase_required: copy.passphraseRequired,
+    backup_passphrase_invalid: copy.passphraseInvalid,
+    backup_passphrase_too_short: copy.passphraseTooShort,
+  })[payload?.code] || payload?.error || fallback;
+  const passphraseHeaders = () => (restorePassphrase ? { 'X-Backup-Passphrase': restorePassphrase } : {});
 
   const closeExportStream = () => {
     if (exportEventSourceRef.current) {
@@ -96,6 +106,14 @@ export default function AdminBackup() {
 
   const downloadBackup = async () => {
     if (downloadBusy) return;
+    if (exportPassphrase && exportPassphrase.length < 12) {
+      pushNotice('error', copy.passphraseTooShort);
+      return;
+    }
+    if (exportPassphrase && exportPassphrase !== exportPassphraseConfirm) {
+      pushNotice('error', copy.passphraseMismatch);
+      return;
+    }
     closeExportStream();
     if (downloadProgressResetTimer.current) {
       clearTimeout(downloadProgressResetTimer.current);
@@ -106,7 +124,7 @@ export default function AdminBackup() {
     setCompletedStages([]);
     setDownloadBusy(true);
     try {
-      const startResponse = await api.post('/backups/export-jobs');
+      const startResponse = await api.post('/backups/export-jobs', { excludeLogs, passphrase: exportPassphrase || undefined });
       const { jobId, eventsUrl, downloadUrl: archiveUrl } = startResponse.data || {};
       if (!jobId || !eventsUrl || !archiveUrl) {
         throw new Error(copy.exportFailed);
@@ -182,7 +200,7 @@ export default function AdminBackup() {
         .replace('{files}', String(files))
         .replace('{bytes}', formatBytes(bytes)));
     } catch (error) {
-      pushNotice('error', error.message || copy.exportFailed);
+      pushNotice('error', error.response?.data ? backupErrorMessage(error.response.data, copy.exportFailed) : (error.message || copy.exportFailed));
     } finally {
       closeExportStream();
       setDownloadBusy(false);
@@ -215,11 +233,11 @@ export default function AdminBackup() {
       const response = await fetch('/api/backups/verify', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': selectedFile.type || 'application/gzip' },
+        headers: { 'Content-Type': selectedFile.type || 'application/gzip', ...passphraseHeaders() },
         body: await selectedFile.arrayBuffer(),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || copy.verifyFailed);
+      if (!response.ok) throw new Error(backupErrorMessage(payload, copy.verifyFailed));
       setVerifyReport(payload);
     } catch (error) {
       setVerifyReport(null);
@@ -263,6 +281,7 @@ export default function AdminBackup() {
           credentials: 'include',
           headers: {
             'Content-Type': selectedFile.type || 'application/gzip',
+            ...passphraseHeaders(),
           },
           body,
         });
@@ -280,7 +299,7 @@ export default function AdminBackup() {
           return;
         }
         if (!response.ok) {
-          throw new Error(payload.error || copy.restoreFailed);
+          throw new Error(backupErrorMessage(payload, copy.restoreFailed));
         }
 
         const hasWarnings = Object.keys(payload.droppedColumns || {}).length > 0
@@ -375,6 +394,50 @@ export default function AdminBackup() {
             </ul>
           </div>
 
+          <div className="mt-6 space-y-4">
+            <p className="rounded-2xl border border-amber-100 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm text-amber-950 dark:text-amber-200">
+              {copy.privacyNotice}
+            </p>
+            <label className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
+              <input
+                type="checkbox"
+                checked={excludeLogs}
+                onChange={(event) => setExcludeLogs(event.target.checked)}
+                disabled={downloadBusy}
+                className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+              />
+              <span>
+                <span className="block font-medium">{copy.excludeLogsLabel}</span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400">{copy.excludeLogsHelp}</span>
+              </span>
+            </label>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200" htmlFor="backup-export-passphrase">{copy.passphraseLabel}</label>
+              <input
+                id="backup-export-passphrase"
+                type="password"
+                autoComplete="new-password"
+                value={exportPassphrase}
+                onChange={(event) => setExportPassphrase(event.target.value)}
+                disabled={downloadBusy}
+                className="block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent"
+              />
+              {exportPassphrase && (
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  aria-label={copy.passphraseConfirmLabel}
+                  placeholder={copy.passphraseConfirmLabel}
+                  value={exportPassphraseConfirm}
+                  onChange={(event) => setExportPassphraseConfirm(event.target.value)}
+                  disabled={downloadBusy}
+                  className="block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent"
+                />
+              )}
+              <p className="text-xs text-gray-500 dark:text-gray-400">{copy.passphraseHelp}</p>
+            </div>
+          </div>
+
           {(downloadBusy || downloadProgress > 0) && (
             <div className="mt-6 space-y-2">
               <div className="flex items-center justify-between gap-3 text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -421,7 +484,7 @@ export default function AdminBackup() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".json.gz,application/gzip,application/x-gzip"
+              accept=".json.gz,.enc,application/gzip,application/x-gzip,application/octet-stream"
               onChange={handleRestoreFile}
               className="block w-full cursor-pointer rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm text-gray-600 dark:text-gray-300 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
             />
@@ -444,6 +507,15 @@ export default function AdminBackup() {
                 <span>{copy.restoreNoFile}</span>
               )}
             </div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200" htmlFor="backup-restore-passphrase">{copy.restorePassphraseLabel}</label>
+            <input
+              id="backup-restore-passphrase"
+              type="password"
+              autoComplete="off"
+              value={restorePassphrase}
+              onChange={(event) => setRestorePassphrase(event.target.value)}
+              className="block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent"
+            />
           </div>
 
           <button

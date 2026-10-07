@@ -6,7 +6,7 @@ import os from 'os';
 import path from 'path';
 import zlib from 'zlib';
 
-import { analyzeBackupArchive, compareAppVersions, createBackupArchive, restoreBackupArchive } from '../server/services/backup.js';
+import { analyzeBackupArchive, compareAppVersions, createBackupArchive, isEncryptedBackup, restoreBackupArchive } from '../server/services/backup.js';
 
 function initSchema(database) {
   database.exec(`
@@ -376,6 +376,66 @@ describe('analyzeBackupArchive', () => {
 
   it('rejects files that are not Frontdoor backups', async () => {
     await assert.rejects(analyzeBackupArchive(Buffer.from('not gzip')), /not a valid gzipped JSON archive/);
+  });
+});
+
+describe('backup privacy options', () => {
+  const emptyDirs = () => ({
+    appIconDir: makeTempDir('frontdoor-privacy-icons-'),
+    brandingDir: makeTempDir('frontdoor-privacy-branding-'),
+    avatarCacheDir: makeTempDir('frontdoor-privacy-avatars-'),
+    pluginAssetDir: makeTempDir('frontdoor-privacy-plugins-'),
+  });
+
+  it('can leave access and audit logs out of the archive, keeping the target logs on restore', async () => {
+    const source = new DatabaseSync(':memory:');
+    const target = new DatabaseSync(':memory:');
+    initSchema(source);
+    initSchema(target);
+    source.prepare('INSERT INTO access_logs (user_id, app_id) VALUES (?, ?)').run('u', 'a');
+    target.prepare('INSERT INTO access_logs (user_id, app_id) VALUES (?, ?)').run('kept', 'kept');
+    const dirs = emptyDirs();
+
+    const { archive, snapshot } = await createBackupArchive({ dbHandle: source, ...dirs, excludeLogs: true });
+    assert.equal(snapshot.database.tables.some((table) => table.name === 'access_logs'), false);
+    assert.deepEqual(snapshot.options.excludedTables, ['access_logs', 'rbac_audit_logs']);
+
+    const result = await restoreBackupArchive(archive, { dbHandle: target, ...dirs });
+    assert.ok(result.tablesNotInArchive.includes('access_logs'));
+    assert.equal(target.prepare('SELECT user_id FROM access_logs').get().user_id, 'kept');
+    source.close();
+    target.close();
+  });
+
+  it('encrypts with a passphrase and needs the same passphrase to verify or restore', async () => {
+    const source = new DatabaseSync(':memory:');
+    const target = new DatabaseSync(':memory:');
+    initSchema(source);
+    initSchema(target);
+    source.prepare('INSERT INTO users (id, email) VALUES (?, ?)').run('enc-1', 'enc@example.com');
+    const dirs = emptyDirs();
+
+    const { archive, fileName } = await createBackupArchive({ dbHandle: source, ...dirs, passphrase: 'correct horse battery' });
+    assert.equal(isEncryptedBackup(archive), true);
+    assert.match(fileName, /.json.gz.enc$/);
+    assert.equal(archive.includes(Buffer.from('enc@example.com')), false);
+
+    await assert.rejects(analyzeBackupArchive(archive, { dbHandle: target }), (error) => error.code === 'backup_passphrase_required' && error.statusCode === 400);
+    await assert.rejects(analyzeBackupArchive(archive, { dbHandle: target, passphrase: 'wrong passphrase!!' }), (error) => error.code === 'backup_passphrase_invalid');
+    const report = await analyzeBackupArchive(archive, { dbHandle: target, passphrase: 'correct horse battery' });
+    assert.equal(report.totalRows, 1);
+
+    await restoreBackupArchive(archive, { dbHandle: target, ...dirs, passphrase: 'correct horse battery' });
+    assert.equal(target.prepare('SELECT email FROM users WHERE id = ?').get('enc-1').email, 'enc@example.com');
+    source.close();
+    target.close();
+  });
+
+  it('rejects passphrases that are too short', async () => {
+    const source = new DatabaseSync(':memory:');
+    initSchema(source);
+    await assert.rejects(createBackupArchive({ dbHandle: source, ...emptyDirs(), passphrase: 'short' }), (error) => error.code === 'backup_passphrase_too_short');
+    source.close();
   });
 });
 

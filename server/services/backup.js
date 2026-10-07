@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
@@ -12,6 +13,13 @@ import { UserFacingError } from './errors.js';
 
 const BACKUP_VERSION = 1;
 const BACKUP_PROGRESS_STAGES = ['database', 'app-icons', 'branding', 'avatars', 'plugins'];
+
+// Tables left out when an export is made with excludeLogs.
+const LOG_TABLES = ['access_logs', 'rbac_audit_logs'];
+// Encrypted archives: magic | salt (16) | iv (12) | GCM tag (16) | ciphertext of the gzipped JSON.
+const ENCRYPTION_MAGIC = Buffer.from('FDBKENC1', 'ascii');
+const MIN_PASSPHRASE_LENGTH = 12;
+const SCRYPT_OPTIONS = { N: 2 ** 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 
 const APP_VERSION = (() => {
   try {
@@ -94,8 +102,10 @@ function readSchema(dbHandle) {
   `).all().map((row) => ({ type: row.type, name: row.name, tableName: row.tableName, sql: row.sql }));
 }
 
-function collectDatabaseSnapshot(dbHandle = db) {
-  const tables = listTables(dbHandle).map((tableName) => readTableSnapshot(dbHandle, tableName));
+function collectDatabaseSnapshot(dbHandle = db, { excludeTables = [] } = {}) {
+  const tables = listTables(dbHandle)
+    .filter((tableName) => !excludeTables.includes(tableName))
+    .map((tableName) => readTableSnapshot(dbHandle, tableName));
   return { tables, schema: readSchema(dbHandle) };
 }
 
@@ -169,9 +179,11 @@ export async function buildBackupSnapshot({
   brandingDir = BRANDING_ASSET_DIR,
   avatarCacheDir = AVATAR_CACHE_DIR,
   pluginAssetDir = PLUGIN_ASSET_DIR,
+  excludeLogs = false,
   onProgress,
 } = {}) {
-  const database = collectDatabaseSnapshot(dbHandle);
+  const excludedTables = excludeLogs ? [...LOG_TABLES] : [];
+  const database = collectDatabaseSnapshot(dbHandle, { excludeTables: excludedTables });
   const buckets = [];
   const bucketDefinitions = resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir, pluginAssetDir });
   emitBackupProgress(onProgress, 'database', 25, ['database']);
@@ -198,6 +210,7 @@ export async function buildBackupSnapshot({
     version: BACKUP_VERSION,
     createdAt: new Date().toISOString(),
     app: collectAppMetadata(dbHandle),
+    options: { excludedTables },
     database,
     buckets,
     summary,
@@ -210,17 +223,67 @@ export async function createBackupArchive({
   brandingDir = BRANDING_ASSET_DIR,
   avatarCacheDir = AVATAR_CACHE_DIR,
   pluginAssetDir = PLUGIN_ASSET_DIR,
+  excludeLogs = false,
+  passphrase = null,
   onProgress,
 } = {}) {
-  const snapshot = await buildBackupSnapshot({ dbHandle, appIconDir, brandingDir, avatarCacheDir, pluginAssetDir, onProgress });
+  if (passphrase) assertValidPassphrase(passphrase);
+  const snapshot = await buildBackupSnapshot({ dbHandle, appIconDir, brandingDir, avatarCacheDir, pluginAssetDir, excludeLogs, onProgress });
   const json = `${JSON.stringify(snapshot)}\n`;
-  const archive = zlib.gzipSync(Buffer.from(json, 'utf8'), { level: 9 });
+  const gzipped = zlib.gzipSync(Buffer.from(json, 'utf8'), { level: 9 });
+  const archive = passphrase ? encryptBackup(gzipped, passphrase) : gzipped;
+  const stamp = formatBackupFileStamp(snapshot.createdAt) || snapshot.createdAt.replace(/[:.]/g, '-');
 
   return {
     archive,
     snapshot,
-    fileName: `frontdoor-backup-${formatBackupFileStamp(snapshot.createdAt) || snapshot.createdAt.replace(/[:.]/g, '-')}.json.gz`,
+    fileName: `frontdoor-backup-${stamp}.json.gz${passphrase ? '.enc' : ''}`,
   };
+}
+
+export function assertValidPassphrase(passphrase) {
+  if (typeof passphrase !== 'string' || passphrase.length < MIN_PASSPHRASE_LENGTH) {
+    throw new UserFacingError(`The backup passphrase must be at least ${MIN_PASSPHRASE_LENGTH} characters long.`, {
+      code: 'backup_passphrase_too_short',
+      details: { minLength: MIN_PASSPHRASE_LENGTH },
+    });
+  }
+}
+
+export function isEncryptedBackup(buffer) {
+  return Buffer.isBuffer(buffer) && buffer.length > ENCRYPTION_MAGIC.length
+    && buffer.subarray(0, ENCRYPTION_MAGIC.length).equals(ENCRYPTION_MAGIC);
+}
+
+function encryptBackup(plain, passphrase) {
+  const salt = crypto.randomBytes(16);
+  const iv = crypto.randomBytes(12);
+  const key = crypto.scryptSync(passphrase, salt, 32, SCRYPT_OPTIONS);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plain), cipher.final()]);
+  return Buffer.concat([ENCRYPTION_MAGIC, salt, iv, cipher.getAuthTag(), ciphertext]);
+}
+
+function decryptBackup(buffer, passphrase) {
+  if (!passphrase) {
+    throw new UserFacingError('This backup is encrypted: enter its passphrase.', { code: 'backup_passphrase_required' });
+  }
+  let offset = ENCRYPTION_MAGIC.length;
+  const salt = buffer.subarray(offset, offset + 16);
+  offset += 16;
+  const iv = buffer.subarray(offset, offset + 12);
+  offset += 12;
+  const tag = buffer.subarray(offset, offset + 16);
+  offset += 16;
+  const ciphertext = buffer.subarray(offset);
+  try {
+    const key = crypto.scryptSync(passphrase, salt, 32, SCRYPT_OPTIONS);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  } catch {
+    throw new UserFacingError('Wrong passphrase, or the backup file is damaged.', { code: 'backup_passphrase_invalid' });
+  }
 }
 
 function normalizeBackupSnapshot(payload) {
@@ -360,14 +423,15 @@ async function swapStagedBucket(staged, stamp) {
   }
 }
 
-function parseBackupArchive(buffer) {
+function parseBackupArchive(buffer, { passphrase = null } = {}) {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
     throw new UserFacingError('Backup file is empty');
   }
+  const gzipped = isEncryptedBackup(buffer) ? decryptBackup(buffer, passphrase) : buffer;
 
   let parsed;
   try {
-    parsed = JSON.parse(zlib.gunzipSync(buffer).toString('utf8'));
+    parsed = JSON.parse(zlib.gunzipSync(gzipped).toString('utf8'));
   } catch {
     throw new UserFacingError('Backup file is not a valid gzipped JSON archive');
   }
@@ -379,8 +443,8 @@ function parseBackupArchive(buffer) {
 }
 
 // Describes what a restore of this archive would do, without changing anything.
-export async function analyzeBackupArchive(buffer, { dbHandle = db, currentVersion = APP_VERSION } = {}) {
-  const snapshot = parseBackupArchive(buffer);
+export async function analyzeBackupArchive(buffer, { dbHandle = db, currentVersion = APP_VERSION, passphrase = null } = {}) {
+  const snapshot = parseBackupArchive(buffer, { passphrase });
   const currentTables = listTables(dbHandle);
   const archiveTables = snapshot.database.tables;
 
@@ -439,8 +503,9 @@ export async function restoreBackupArchive(buffer, {
   pluginAssetDir = PLUGIN_ASSET_DIR,
   currentVersion = APP_VERSION,
   allowNewerVersion = false,
+  passphrase = null,
 } = {}) {
-  const snapshot = parseBackupArchive(buffer);
+  const snapshot = parseBackupArchive(buffer, { passphrase });
   const sourceVersion = snapshot.app?.version || null;
 
   if (!allowNewerVersion && compareAppVersions(sourceVersion, currentVersion) > 0) {
