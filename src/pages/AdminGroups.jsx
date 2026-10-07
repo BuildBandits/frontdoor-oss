@@ -312,16 +312,18 @@ export default function AdminGroups() {
       const summary = res.data;
       const errorCount = summary.errors?.length || 0;
       const firstError = summary.errors?.[0];
-      const baseMessage = g.forceSyncComplete
+      const parts = [g.forceSyncComplete
         .replace('{usersSynced}', summary.usersSynced)
         .replace('{usersConsidered}', summary.usersConsidered)
-        .replace('{discoveredGroups}', summary.discoveredGroups);
-      showToast(
-        errorCount > 0
-          ? `${baseMessage}. ${errorCount} errori${firstError?.name ? `, primo gruppo ${firstError.name}` : ''}${firstError?.message ? `: ${firstError.message}` : ''}${firstError?.hint ? ` (${firstError.hint})` : ''}`
-          : baseMessage,
-        errorCount > 0 ? 'error' : 'success',
-      );
+        .replace('{discoveredGroups}', summary.discoveredGroups)];
+      if (summary.usersNotFound > 0) {
+        parts.push(g.forceSyncUsersNotFound.replace('{count}', summary.usersNotFound));
+      }
+      if (errorCount > 0) {
+        const detail = `${firstError?.message ? `: ${firstError.message}` : ''}${firstError?.hint ? ` (${firstError.hint})` : ''}`;
+        parts.push(`${g.forceSyncErrors.replace('{count}', errorCount)}${detail}`);
+      }
+      showToast(parts.join('. '), errorCount > 0 ? 'error' : summary.usersNotFound > 0 ? 'warning' : 'success');
       await loadGroups();
       await loadEntraCandidates();
     } catch (err) {

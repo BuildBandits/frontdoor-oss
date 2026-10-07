@@ -992,6 +992,8 @@
       "bulkDeleteError": "Errore nella cancellazione multipla",
       "forceSyncComplete": "Sync completata: {usersSynced}/{usersConsidered} utenti, {discoveredGroups} gruppi",
       "forceSyncError": "Errore durante Force Sync",
+      "forceSyncUsersNotFound": "{count} utenti non trovati nella directory, saltati",
+      "forceSyncErrors": "{count} errori",
       "entraGroupImported": "Gruppo Entra importato",
       "entraGroupsImported": "Gruppi Entra importati",
       "importEntraGroupsError": "Errore durante l'import dei gruppi Entra",

@@ -83,6 +83,15 @@ async function acquireGraphAppToken() {
   return response.accessToken;
 }
 
+function graphErrorCode(body) {
+  try {
+    const code = JSON.parse(body)?.error?.code;
+    return typeof code === 'string' && /^[A-Za-z_.]{1,80}$/.test(code) ? code : null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchGraphPage(url, accessToken) {
   const response = await fetch(url, {
     headers: {
@@ -93,7 +102,9 @@ async function fetchGraphPage(url, accessToken) {
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
-    const error = new Error(`Graph API error ${response.status} for ${url}`);
+    // The message reaches the UI and the audit log: no URL, so no object IDs.
+    const code = graphErrorCode(body);
+    const error = new Error(`Microsoft Graph request failed with status ${response.status}${code ? ` (${code})` : ''}`);
     error.status = response.status;
     error.body = body;
     error.hint = formatGraphAccessHint(error, url.includes('/users/') ? 'force-sync' : 'login');
@@ -434,11 +445,12 @@ export function importEntraGroups(groupIds) {
   return syncTransaction();
 }
 
-export async function forceSyncAllEntraUsers() {
+export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppToken } = {}) {
   if (!isEntraGroupSyncEnabled()) {
     return {
       usersConsidered: 0,
       usersSynced: 0,
+      usersNotFound: 0,
       discoveredGroups: 0,
       membershipsAdded: 0,
       membershipsRemoved: 0,
@@ -449,12 +461,12 @@ export async function forceSyncAllEntraUsers() {
   const users = db.prepare(`
     SELECT id, email, microsoft_id
     FROM users
-    WHERE microsoft_id IS NOT NULL
+    WHERE microsoft_id IS NOT NULL AND is_active = 1
     ORDER BY email
   `).all();
 
   const errors = [];
-  const accessToken = await acquireGraphAppToken();
+  const accessToken = await acquireToken();
 
   let tenantGroupsDiscovered = 0;
   try {
@@ -475,6 +487,7 @@ export async function forceSyncAllEntraUsers() {
     return {
       usersConsidered: 0,
       usersSynced: 0,
+      usersNotFound: 0,
       discoveredGroups: tenantGroupsDiscovered,
       membershipsAdded: 0,
       membershipsRemoved: 0,
@@ -485,6 +498,7 @@ export async function forceSyncAllEntraUsers() {
   }
 
   let usersSynced = 0;
+  let usersNotFound = 0;
   let membershipsAdded = 0;
   let membershipsRemoved = 0;
 
@@ -496,10 +510,14 @@ export async function forceSyncAllEntraUsers() {
       membershipsAdded += result.membershipsAdded;
       membershipsRemoved += result.membershipsRemoved;
     } catch (error) {
+      // Deleted from the directory: not a sync failure. Local memberships are left as they are.
+      if (error.status === 404) {
+        usersNotFound += 1;
+        continue;
+      }
       const hint = formatGraphAccessHint(error, 'force-sync');
       errors.push({
         userId: user.id,
-        microsoftId: user.microsoft_id,
         message: error.message,
         ...(hint ? { hint } : {}),
       });
@@ -509,6 +527,7 @@ export async function forceSyncAllEntraUsers() {
   return {
     usersConsidered: users.length,
     usersSynced,
+    usersNotFound,
     discoveredGroups: tenantGroupsDiscovered,
     membershipsAdded,
     membershipsRemoved,

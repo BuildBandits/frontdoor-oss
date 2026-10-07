@@ -17,6 +17,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Commit in Docker builds**: new optional `COMMIT_SHA` build argument (passed through by `docker-compose.yml` and set by CI) shows the commit in the footer and records it in backups. Without it, the footer keeps showing the build timestamp.
 
 ### Fixed
+- **Entra force sync and deleted users**: users removed from Microsoft Entra (Graph `404`) no longer count as sync errors. They are skipped, their local memberships are left unchanged, and *Admin → Groups* reports them separately as a warning ("N users not found in the directory, skipped"); the count is also stored in the audit log. Deactivated users are no longer synced. Permission (`401`/`403`), throttling, server and network errors are still reported as errors with the existing hints. Graph error messages shown in the UI and stored in the audit log no longer contain request URLs or Entra object IDs, only the status and Graph error code, and the error count text is now translated.
 - **App version in Docker**: the production image now contains `package.json`, which the server reads to know its own version; CI checks the image for it and for the commit.
 
 ## [1.3.0] — 2026-10-07

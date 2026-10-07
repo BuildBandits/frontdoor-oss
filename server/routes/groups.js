@@ -108,6 +108,7 @@ router.post('/entra/force-sync', authenticate, isAdminEditor, async (req, res) =
     logRbacAudit(req.user.id, 'sync', 'group', null, {
       usersSynced: result.usersSynced,
       usersConsidered: result.usersConsidered,
+      usersNotFound: result.usersNotFound,
       discoveredGroups: result.discoveredGroups,
       errors: result.errors,
     });

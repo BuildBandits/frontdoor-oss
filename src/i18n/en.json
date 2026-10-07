@@ -992,6 +992,8 @@
       "bulkDeleteError": "Error during bulk deletion",
       "forceSyncComplete": "Sync complete: {usersSynced}/{usersConsidered} users, {discoveredGroups} groups",
       "forceSyncError": "Error during force sync",
+      "forceSyncUsersNotFound": "{count} users not found in the directory, skipped",
+      "forceSyncErrors": "{count} errors",
       "entraGroupImported": "Entra group imported",
       "entraGroupsImported": "Entra groups imported",
       "importEntraGroupsError": "Error importing Entra groups",
