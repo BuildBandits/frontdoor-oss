@@ -82,7 +82,8 @@ export default function Tooltip({
     ? cloneElement(children, {
         ref: (node) => {
           anchorRef.current = node;
-          const { ref } = children;
+          // React 19: ref is a regular prop; element.ref is deprecated.
+          const { ref } = children.props;
           if (typeof ref === 'function') {
             ref(node);
           } else if (ref && typeof ref === 'object') {
