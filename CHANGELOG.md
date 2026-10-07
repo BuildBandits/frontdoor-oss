@@ -6,9 +6,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
-### Fixed
-- **Project name**: the name is now spelled *Frontdoor* everywhere (documentation, trademark and governance files, GitHub templates, the plugin admin placeholder and the example plugin), replacing the inconsistent *FrontDoor*.
-
 ## [1.3.0] — 2026-10-07
 
 Tech stack upgrade: Node.js 24, Express 5, MSAL Node 7, React 19, React Router 8 and Tailwind CSS 4, with no open Dependabot alerts and a clean `npm audit`. Adds CI build, lint, HTTP and Docker checks, and makes startup migrations safe for in-place upgrades of existing databases.
