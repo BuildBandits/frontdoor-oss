@@ -1,7 +1,7 @@
 {
   "name": "oss-frontdoor",
   "version": "1.3.0",
-  "description": "Authentication gateway and app catalog for self-hosted projects",
+  "description": "Self-hosted authentication gateway and app catalog with Microsoft Entra ID SSO, RBAC and per-group app visibility",
   "type": "module",
   "engines": {
     "node": ">=24"
@@ -53,16 +53,22 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "git+https://github.com/BuildBandits/frontdoor-oss.git"
+  },
+  "homepage": "https://frontdoor.buildbandits.com",
+  "bugs": {
+    "url": "https://github.com/BuildBandits/frontdoor-oss/issues"
   },
   "keywords": [
-    "auth",
-    "gateway",
+    "authentication",
     "sso",
-    "microsoft",
-    "azure-ad",
+    "single-sign-on",
     "app-catalog",
-    "rbac"
+    "gateway",
+    "microsoft-entra-id",
+    "azure-ad",
+    "rbac",
+    "self-hosted"
   ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",
