@@ -485,6 +485,8 @@
       "selectableGroups": "gruppi eliminabili",
       "selected": "selezionati",
       "appVisibleCount": "applicazioni disponibili per questo utente",
+      "visibleAppsSearchPlaceholder": "Cerca app, slug o descrizione...",
+      "visibleAppsNoResults": "Nessuna app visibile corrisponde alla ricerca",
       "appMode": "Modo",
       "link": "Link",
       "internalLink": "Link interno",

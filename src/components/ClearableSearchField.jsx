@@ -36,6 +36,7 @@ export default function ClearableSearchField({
   searchShortcutLabel,
   onKeyDown,
   clearLabel = 'Clear search',
+  restoreOnEscape = true,
 }) {
   const lastClearedValueRef = useRef('');
   const visibleSearchShortcutLabel = resolveSearchShortcutLabel(searchShortcutLabel);
@@ -50,7 +51,7 @@ export default function ClearableSearchField({
         return;
       }
 
-      if (lastClearedValueRef.current) {
+      if (restoreOnEscape && lastClearedValueRef.current) {
         event.preventDefault();
         event.stopPropagation();
         onChange(lastClearedValueRef.current);
