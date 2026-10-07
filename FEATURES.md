@@ -167,7 +167,7 @@ SQLite (better-sqlite3) in WAL mode with foreign-key enforcement. Schema covers 
 ## Deployment
 
 - **Docker multi-stage** build (Node 24 base, production image).
-- **Node.js 24** runtime, **Express** server, **Vite** build for the React frontend.
+- **Node.js 24** runtime, **Express 5** server, **Vite 8** build for the **React 19** frontend styled with **Tailwind CSS 4**.
 - Configuration through `.env`:
   - Node-mode example: `.env.example.node`
   - Docker-mode example: `.env.example.docker`
