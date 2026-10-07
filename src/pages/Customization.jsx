@@ -1266,7 +1266,7 @@ export default function Customization() {
                   </div>
                   <RouterLink
                     to="/admin/backup"
-                    className="inline-flex w-full lg:w-[240px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
+                    className="inline-flex w-full lg:w-[240px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
                   >
                     <Save className="h-4 w-4" />
                     {ui.customization.maintenance.openBackupRestore}

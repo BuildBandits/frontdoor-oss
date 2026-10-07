@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Fixed
+- **Pages opened already scrolled down**: following a link from a scrolled page (for example *Open backup page* in *Customize → Maintenance*) kept the scroll position, so the new page opened halfway down. Route changes now start at the top; links to a `#section` and back/forward navigation are unchanged. The *Open backup page* button also gets dark-mode colours.
 - **Backup page spacing**: the passphrase help text no longer touches the *Download backup* button when the export card is full; the download buttons keep a minimum gap while still sitting at the bottom of the card.
 
 ## [1.3.1] — 2026-10-07
