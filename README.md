@@ -113,6 +113,16 @@ This is the recommended way to explore and develop on Frontdoor without configur
 
 ## Quick Start (Docker)
 
+### Local demo (no Microsoft Entra)
+
+```bash
+docker compose -f docker-compose.demo.yml up --build
+```
+
+Open http://localhost:3001 and use the **Dev Login** panel to sign in as `owner`, `admin`, `admin_readonly` or `user`. No `.env` file is needed: `docker-compose.demo.yml` enables Dev Login, disables Entra group sync, uses its own data volume and publishes the port on `127.0.0.1` only. Dev Login lets anyone choose any role and signs tokens with a public fallback secret, so never expose this profile to a network or put it behind a reverse proxy. Remove it with `docker compose -f docker-compose.demo.yml down -v`.
+
+### Deployment
+
 ```bash
 # 1. Configure environment
 cp .env.example.docker .env
@@ -163,6 +173,7 @@ The image stores every writable path on the `/data` volume by default (`DATABASE
 
 For a real deployment, set at least:
 
+- `NODE_ENV=production` (already set by `docker-compose.yml`; Dev Login is always off in production)
 - `BASE_DOMAIN`
 - `FRONTEND_URL`
 - `CORS_ALLOWED_ORIGINS` if you want a static page or satellite app on another origin to call Frontdoor with credentials
@@ -170,7 +181,7 @@ For a real deployment, set at least:
 - `AZURE_CLIENT_SECRET`
 - `AZURE_TENANT_ID`
 - `AZURE_REDIRECT_URI`
-- `JWT_SECRET`
+- a unique `JWT_SECRET` of at least 32 characters
 - `ENTRA_GROUP_SYNC` if you want Entra group sync enabled
 Recommended but optional:
 
