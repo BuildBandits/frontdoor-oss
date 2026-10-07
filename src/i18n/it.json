@@ -609,7 +609,6 @@
       "docsOpen": "Mostra documentazione",
       "docsClose": "Nascondi documentazione",
       "failedLoadServerRegistry": "Impossibile caricare il registro server dei plugin",
-      "invalidPackageJson": "JSON del pacchetto non valido",
       "packageValidation": "Validazione pacchetto",
       "packageName": "Pacchetto",
       "failedExportZip": "Impossibile esportare l'archivio ZIP",

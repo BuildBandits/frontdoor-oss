@@ -609,7 +609,6 @@
       "docsOpen": "Show documentation",
       "docsClose": "Hide documentation",
       "failedLoadServerRegistry": "Failed to load server plugin registry",
-      "invalidPackageJson": "Invalid package JSON",
       "packageValidation": "Package validation",
       "packageName": "Package",
       "failedExportZip": "Failed to export ZIP archive",

@@ -1,5 +1,4 @@
 import { ConfidentialClientApplication } from '@azure/msal-node';
-import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { UserFacingError } from './errors.js';
 

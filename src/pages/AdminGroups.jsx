@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useEffectEvent, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Eye, Plus, Shield, Trash2, X, Save, Users, ChevronDown, ChevronRight, AppWindow, Pencil, Clock, RefreshCw, Layers3, ArrowRightLeft, Filter } from 'lucide-react';
 import api from '../services/api';
@@ -114,7 +114,7 @@ export default function AdminGroups() {
       showToast(t.errorLoadingGroups, 'error');
     }
     setLoading(false);
-  }, []);
+  }, [t]);
 
   const loadEntraCandidates = useCallback(async () => {
     setEntraCandidatesLoading(true);
@@ -125,7 +125,7 @@ export default function AdminGroups() {
       showToast(err.response?.data?.error || t.errorLoadingGroups, 'error');
     }
     setEntraCandidatesLoading(false);
-  }, []);
+  }, [t]);
 
   useEffect(() => { loadGroups(); }, [loadGroups]);
   useEffect(() => {
@@ -141,13 +141,16 @@ export default function AdminGroups() {
       cancelled = true;
     };
   }, []);
+  // Effect events: run the latest handlers without re-running the route-state effects.
+  const openIncomingGroup = useEffectEvent((groupId) => openGroupAndScroll(groupId, true));
+  const openIncomingEntraImport = useEffectEvent((groupIds, search) => openEntraImport(groupIds, search));
   useEffect(() => {
     const incomingSearch = location.state?.groupSearch;
     const incomingGroupId = location.state?.openGroupDetail;
     if (!incomingSearch && !incomingGroupId) return;
     if (incomingSearch) setGroupSearch(incomingSearch);
     if (incomingGroupId) {
-      void openGroupAndScroll(incomingGroupId, true);
+      void openIncomingGroup(incomingGroupId);
     }
     navigate(location.pathname, { replace: true, state: null });
   }, [location.state, location.pathname, navigate]);
@@ -168,7 +171,7 @@ export default function AdminGroups() {
     return () => document.removeEventListener('click', closeMenu);
   }, [showCreateMenu]);
 
-  const closeCurrentModal = () => {
+  const closeCurrentModal = useCallback(() => {
     if (showCreate) {
       setShowCreate(false);
       setNewName('');
@@ -201,7 +204,7 @@ export default function AdminGroups() {
       setAllApps([]);
       setAppSearch('');
     }
-  };
+  }, [showCreate, showEntraImport, showAddMembers, showAddGroups, showAddApps]);
 
   const activeModal = showCreate
     ? 'create'
@@ -242,7 +245,7 @@ export default function AdminGroups() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeModal, activeModalDirty, confirmDialog, showCreate, showEntraImport, showAddMembers, showAddGroups, showAddApps, newName, newDesc, selectedEntraGroups.length, selectedLinkedGroupIds.length, selectedLinkedEntraGroupIds.length]);
+  }, [activeModal, activeModalDirty, confirmDialog, closeCurrentModal, t]);
 
   const loadGroupDetail = async (groupId) => {
     setDetailLoading(true);
@@ -343,7 +346,7 @@ export default function AdminGroups() {
   useEffect(() => {
     const incomingGroupId = location.state?.openEntraImport;
     if (!incomingGroupId) return;
-    openEntraImport([incomingGroupId], location.state?.entraSearch || '');
+    openIncomingEntraImport([incomingGroupId], location.state?.entraSearch || '');
     navigate(location.pathname, { replace: true, state: null });
   }, [location.state, location.pathname, navigate]);
 

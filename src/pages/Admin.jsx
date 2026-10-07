@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Pencil, Trash2, X, Save, Copy, Users, ChevronDown, ChevronUp, Check, Filter, Settings, Tag } from 'lucide-react';
-import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import TagInput from '../components/TagInput';
@@ -98,7 +98,7 @@ export default function Admin() {
     setTagFilterSearch('');
   }, [tagFilterOpen]);
 
-  const pushNotice = (type, message) => setPageNotice({ type, message });
+  const pushNotice = useCallback((type, message) => setPageNotice({ type, message }), []);
   const pushAppSaveNotice = (type, message) => {
     const noticeId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
@@ -180,7 +180,7 @@ export default function Admin() {
     setEditing('new');
   };
 
-  const openEdit = (app) => {
+  const openEdit = useCallback((app) => {
     if (!canEdit) {
       pushNotice('error', t.readOnly);
       return;
@@ -207,7 +207,7 @@ export default function Admin() {
     setIncludeDefaultGroup(true);
     setClonedGroupIds([]);
     setEditing(app);
-  };
+  }, [canEdit, pushNotice, t]);
 
   const populateClonedApp = (cloned, { includeDefaultGroup: includeDefaultGroupDefault = false } = {}) => {
     setAppSaveNotice(null);
@@ -375,7 +375,7 @@ export default function Admin() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [editing, appModalDirty, confirmDialog]);
+  }, [editing, appModalDirty, confirmDialog, t]);
 
   useEffect(() => {
     if (!pendingGroupAssignApp || confirmDialog) return undefined;
@@ -395,7 +395,7 @@ export default function Admin() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [pendingGroupAssignApp, hasPendingGroupAssignmentChanges, confirmDialog]);
+  }, [pendingGroupAssignApp, hasPendingGroupAssignmentChanges, confirmDialog, t]);
 
   const applyIconAssetFile = (file) => {
     if (!file) return;
