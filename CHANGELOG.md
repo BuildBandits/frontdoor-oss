@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Fixed
+- **Project name**: the name is now spelled *Frontdoor* everywhere (documentation, trademark and governance files, GitHub templates, the plugin admin placeholder and the example plugin), replacing the inconsistent *FrontDoor*.
+
 ## [1.3.0] — 2026-10-07
 
 Tech stack upgrade: Node.js 24, Express 5, MSAL Node 7, React 19, React Router 8 and Tailwind CSS 4, with no open Dependabot alerts and a clean `npm audit`. Adds CI build, lint, HTTP and Docker checks, and makes startup migrations safe for in-place upgrades of existing databases.
@@ -206,7 +209,7 @@ Covers the changes shipped as 1.2.2 through 1.2.8d (tags `v1.2.8` and `v1.2.8c` 
   - `.env.example.node` now ships with `DEV_LOGIN=true` by default
   - `.env.example.docker` documents the variable (commented out, no effect in production)
 - **`FEATURES.md`**: structured feature map of the project organized by capability area (auth, app catalog, connection modes, RBAC, personalization, branding, logs, audit, retention, media library, backup, bulk API, i18n, security, deployment). Linked from the README as the entry point for contributors and evaluators looking for a complete overview without scrolling the full changelog.
-- **OSS-readiness documentation**: `CONTRIBUTING.md` (with DCO sign-off requirement), `GOVERNANCE.md`, `MAINTAINERS.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), `TRADEMARK.md` (common-law trademark policy for FrontDoor™), GitHub pull-request and issue templates under `.github/`. `SECURITY.md` rewritten as a vulnerability-disclosure policy (the previous content, an audit report, has been removed and remains accessible via git history). `README.md` now links to Contributing, Security, Brand and trademark sections.
+- **OSS-readiness documentation**: `CONTRIBUTING.md` (with DCO sign-off requirement), `GOVERNANCE.md`, `MAINTAINERS.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), `TRADEMARK.md` (common-law trademark policy for Frontdoor™), GitHub pull-request and issue templates under `.github/`. `SECURITY.md` rewritten as a vulnerability-disclosure policy (the previous content, an audit report, has been removed and remains accessible via git history). `README.md` now links to Contributing, Security, Brand and trademark sections.
 
 ### Changed
 - **Changelog**: rewrote and reorganized the file. Releases are now ordered newest-first per Keep a Changelog. Items that were previously parked under `[Unreleased]` have been redistributed into the release where they actually shipped (1.1.1 or 1.1.0) based on commit dates, so the historical record matches what was actually deployed.

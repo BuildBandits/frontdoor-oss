@@ -21,7 +21,7 @@ test('imports a plugin package from one JSON payload and keeps it pending until 
       name: 'Package Plugin',
       version: '1.0.0',
       description: 'A single-file package example for third-party installations',
-      author: 'FrontDoor',
+      author: 'Frontdoor',
       permissions: ['actions.write', 'routes.write', 'surfaces.write'],
       roles: ['owner', 'admin'],
       backend: {

@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a reproducible bug in FrontDoor
+about: Report a reproducible bug in Frontdoor
 title: "[bug] "
 labels: ["bug"]
 assignees: []
@@ -33,7 +33,7 @@ Before opening a bug:
 
 ## Environment
 
-- FrontDoor version / commit:
+- Frontdoor version / commit:
 - Deployment: Node.js / Docker / Docker Compose
 - Node version (if running locally):
 - Browser (if frontend bug):

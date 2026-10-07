@@ -1,4 +1,4 @@
-<!-- Thanks for contributing to FrontDoor! Please fill in the sections below. -->
+<!-- Thanks for contributing to Frontdoor! Please fill in the sections below. -->
 
 ## Summary
 

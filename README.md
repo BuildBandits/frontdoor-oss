@@ -507,8 +507,8 @@ For vulnerability reports, please follow the private disclosure process describe
 
 ## Brand and trademark
 
-**FrontDoor™** is an unregistered trademark claimed by the project's original authors. The MIT license covers the source code; it does not grant rights to use the FrontDoor name, logo, or brand identity. See [TRADEMARK.md](TRADEMARK.md) for fair-use guidance and how to request permission.
+**Frontdoor™** is an unregistered trademark claimed by the project's original authors. The MIT license covers the source code; it does not grant rights to use the Frontdoor name, logo, or brand identity. See [TRADEMARK.md](TRADEMARK.md) for fair-use guidance and how to request permission.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). The MIT license covers the source code; for the **FrontDoor™** name and brand see [TRADEMARK.md](TRADEMARK.md).
+MIT — see [LICENSE](LICENSE). The MIT license covers the source code; for the **Frontdoor™** name and brand see [TRADEMARK.md](TRADEMARK.md).

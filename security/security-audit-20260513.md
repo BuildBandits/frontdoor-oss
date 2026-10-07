@@ -153,7 +153,7 @@ Findings consapevolmente non fixati. Documentati qui perché la decisione resti 
 
 **File:** `server/routes/auth.js:228`
 **Descrizione:** `domain: .${baseDomain}` condivide il cookie con tutti i subdomain. In caso di subdomain takeover il cookie è esposto.
-**Motivazione del won't fix:** il wildcard è **funzionalmente richiesto** dalla modalità shared-cookie SSO, che è un valore di prodotto centrale di FrontDoor. Il rischio si gestisce a livello di hygiene DNS (controllare i subdomain dell'organizzazione), non di codice applicativo.
+**Motivazione del won't fix:** il wildcard è **funzionalmente richiesto** dalla modalità shared-cookie SSO, che è un valore di prodotto centrale di Frontdoor. Il rischio si gestisce a livello di hygiene DNS (controllare i subdomain dell'organizzazione), non di codice applicativo.
 
 ---
 

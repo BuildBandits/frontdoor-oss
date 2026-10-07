@@ -675,7 +675,7 @@ export default function AdminPlugins() {
                 <input
                   value={form.author}
                   onChange={(event) => setForm((current) => ({ ...current, author: event.target.value, packageSource: '' }))}
-                  placeholder="FrontDoor"
+                  placeholder="Frontdoor"
                   className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
                 />
               </label>

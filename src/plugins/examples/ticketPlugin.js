@@ -7,7 +7,7 @@ export const manifest = definePluginManifest({
   name: 'Ticket Plugin',
   version: '1.1.0',
   description: 'A realistic support plugin with quick actions, a ticket hub, settings, and admin surfaces.',
-  author: 'FrontDoor',
+  author: 'Frontdoor',
   permissions: ['actions.write', 'routes.write', 'surfaces.write'],
   roles: ['owner', 'admin'],
 });
@@ -44,7 +44,7 @@ function TicketCenterPage({ pluginApi }) {
       ),
       createElement('div', { className: 'rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-950/40 p-4' },
         createElement('div', { className: 'text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500' }, 'Branding title'),
-        createElement('div', { className: 'mt-1 font-semibold text-dark dark:text-gray-100' }, pluginApi.getBranding()?.heroTitleLine1 || 'FrontDoor')
+        createElement('div', { className: 'mt-1 font-semibold text-dark dark:text-gray-100' }, pluginApi.getBranding()?.heroTitleLine1 || 'Frontdoor')
       )
     )
   );

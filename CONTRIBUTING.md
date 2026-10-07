@@ -1,4 +1,4 @@
-# Contributing to FrontDoor
+# Contributing to Frontdoor
 
 Thanks for your interest in contributing. This document covers the basics: how to get set up, how to propose a change, and the rules every contribution must follow.
 

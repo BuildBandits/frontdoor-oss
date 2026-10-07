@@ -1,6 +1,6 @@
 # Security Policy
 
-FrontDoor sits in front of internal applications and handles authentication. We take security reports seriously.
+Frontdoor sits in front of internal applications and handles authentication. We take security reports seriously.
 
 ## Supported versions
 
@@ -47,7 +47,7 @@ We follow coordinated disclosure. Once a fix is released, we publish a brief adv
 
 In scope:
 
-- The FrontDoor server (`server/`) and frontend (`src/`).
+- The Frontdoor server (`server/`) and frontend (`src/`).
 - Default Docker image and deployment configuration.
 - Authentication, authorization, RBAC, and audit-log handling.
 - HTML sanitization paths and input validation.
@@ -61,7 +61,7 @@ Out of scope:
 
 ## Security audit log
 
-Substantial security work on FrontDoor — formal audits, large hardening passes, post-incident reviews — is recorded in the [`security/`](security/) folder as a dated markdown file (`security-audit-YYYYMMDD.md` or `security-incident-YYYYMMDD-<slug>.md`). Each file should capture, at minimum:
+Substantial security work on Frontdoor — formal audits, large hardening passes, post-incident reviews — is recorded in the [`security/`](security/) folder as a dated markdown file (`security-audit-YYYYMMDD.md` or `security-incident-YYYYMMDD-<slug>.md`). Each file should capture, at minimum:
 
 - Date, scope, and trigger of the work (scheduled audit, pre-release pass, response to a report).
 - Findings with severity, current status (fixed / mitigated / accepted / open), and the commit SHAs that resolve them.

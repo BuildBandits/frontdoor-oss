@@ -1,6 +1,6 @@
 # Code of Conduct
 
-FrontDoor adopts the [Contributor Covenant, version 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/) as its code of conduct.
+Frontdoor adopts the [Contributor Covenant, version 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/) as its code of conduct.
 
 The full text is maintained upstream at the link above. By participating in this project — through issues, discussions, pull requests, or any other channel — you agree to abide by it.
 
