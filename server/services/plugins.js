@@ -45,6 +45,15 @@ function normalizePluginId(value) {
   return id;
 }
 
+// Lookups by id (e.g. from a URL) treat a malformed id as "not found" instead of throwing.
+function tryNormalizePluginId(value) {
+  try {
+    return normalizePluginId(value);
+  } catch {
+    return null;
+  }
+}
+
 function validateExternalUrl(value, fieldName, { allowRelative = false } = {}) {
   if (value === undefined || value === null || value === '') return null;
   if (allowRelative && (/^[./]/.test(value) || value.startsWith('/'))) {
@@ -274,7 +283,9 @@ export function getRuntimePlugins() {
 }
 
 export function getPluginRegistryById(id) {
-  const row = db.prepare('SELECT * FROM plugin_registry WHERE id = ?').get(normalizePluginId(id));
+  const normalizedId = tryNormalizePluginId(id);
+  if (!normalizedId) return null;
+  const row = db.prepare('SELECT * FROM plugin_registry WHERE id = ?').get(normalizedId);
   return rowToPluginRecord(row);
 }
 
@@ -417,11 +428,11 @@ export async function importPluginBundle(input = {}) {
 }
 
 export function approvePluginRegistry(id, actorId = null) {
-  const normalizedId = normalizePluginId(id);
-  const existing = getPluginRegistryById(normalizedId);
+  const existing = getPluginRegistryById(id);
   if (!existing) {
     return null;
   }
+  const normalizedId = existing.id;
   db.prepare(`
     UPDATE plugin_registry
     SET approved = 1,
@@ -440,11 +451,11 @@ export function approvePluginRegistry(id, actorId = null) {
 }
 
 export function revokePluginApproval(id, actorId = null) {
-  const normalizedId = normalizePluginId(id);
-  const existing = getPluginRegistryById(normalizedId);
+  const existing = getPluginRegistryById(id);
   if (!existing) {
     return null;
   }
+  const normalizedId = existing.id;
   db.prepare(`
     UPDATE plugin_registry
     SET approved = 0,
@@ -463,9 +474,9 @@ export function revokePluginApproval(id, actorId = null) {
 }
 
 export function deletePluginRegistry(id) {
-  const normalizedId = normalizePluginId(id);
-  const existing = getPluginRegistryById(normalizedId);
+  const existing = getPluginRegistryById(id);
   if (!existing) return false;
+  const normalizedId = existing.id;
   if (existing.entry && isLocalPluginEntry(existing.entry)) {
     void removeLocalPluginBundle(existing.entry).catch(() => {});
   }
