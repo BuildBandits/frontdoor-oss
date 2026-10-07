@@ -182,6 +182,34 @@ test('backup verify describes an archive for owners only and changes nothing', a
   assert.equal(bad.status, 400);
 });
 
+test('backup export options and encrypted archives over HTTP', async () => {
+  const { createBackupArchive } = await import('../server/services/backup.js');
+  const tooShort = await request('/api/backups/export-jobs', {
+    role: 'owner',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ passphrase: 'short' }),
+  });
+  assert.equal(tooShort.status, 400);
+  assert.equal((await tooShort.json()).code, 'backup_passphrase_too_short');
+
+  const { archive } = await createBackupArchive({ passphrase: 'an http test passphrase', excludeLogs: true });
+  const verify = (headers = {}) => request('/api/backups/verify', {
+    role: 'owner',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...headers },
+    body: archive,
+  });
+
+  const locked = await verify();
+  assert.equal(locked.status, 400);
+  assert.equal((await locked.json()).code, 'backup_passphrase_required');
+  const unlocked = await verify({ 'X-Backup-Passphrase': 'an http test passphrase' });
+  assert.equal(unlocked.status, 200);
+  const report = await unlocked.json();
+  assert.ok(report.tablesNotInArchive.includes('access_logs'));
+});
+
 // Keep last: it replaces the users table that the other tests rely on.
 test('backup restore refuses newer archives unless allowed and reports whether the session survives', async () => {
   const owner = db.prepare('SELECT * FROM users WHERE id = ?').get('http-test-owner');

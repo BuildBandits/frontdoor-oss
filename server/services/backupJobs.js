@@ -54,7 +54,7 @@ function updateJob(job, patch) {
   return state;
 }
 
-function createBackupJob() {
+function createBackupJob({ excludeLogs = false, passphrase = null } = {}) {
   const job = {
     id: randomUUID(),
     status: 'queued',
@@ -82,6 +82,8 @@ function createBackupJob() {
       });
 
       const { archive, snapshot, fileName } = await createBackupArchive({
+        excludeLogs,
+        passphrase,
         onProgress: ({ stage, progress, completedStages }) => {
           updateJob(job, {
             status: 'running',
@@ -117,8 +119,8 @@ function createBackupJob() {
   return createJobState(job);
 }
 
-export function startBackupExportJob() {
-  return createBackupJob();
+export function startBackupExportJob(options = {}) {
+  return createBackupJob(options);
 }
 
 export function getBackupExportJob(jobId) {
