@@ -32,6 +32,7 @@ export default function AdminUsers() {
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [showVisibleApps, setShowVisibleApps] = useState(false);
+  const [visibleAppsSearch, setVisibleAppsSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [brandingLanguage, setBrandingLanguage] = useState('en');
   const [brandingTimeZone, setBrandingTimeZone] = useState('UTC');
@@ -302,6 +303,11 @@ export default function AdminUsers() {
   const entraGroups = userDetail?.groups?.filter((g) => g.source === 'entra') || [];
   const detectedEntraGroups = userDetail?.entraGroups || [];
   const visibleApps = userDetail?.visibleApps || [];
+  const visibleAppsQuery = visibleAppsSearch.trim().toLowerCase();
+  const filteredVisibleApps = visibleAppsQuery
+    ? visibleApps.filter((app) => [app.name, app.slug, app.description]
+      .some((value) => typeof value === 'string' && value.toLowerCase().includes(visibleAppsQuery)))
+    : visibleApps;
   const appModeLabel = (mode) => {
     if (mode === 'redirect') return t.redirectSso;
     if (mode === 'internal-link') return t.internalLink;
@@ -769,7 +775,10 @@ export default function AdminUsers() {
                             userDetail.visibleAppCount > 0 ? (
                               <button
                                 type="button"
-                                onClick={() => setShowVisibleApps(true)}
+                                onClick={() => {
+                                  setVisibleAppsSearch('');
+                                  setShowVisibleApps(true);
+                                }}
                                 className="inline-flex items-center gap-1 text-dark dark:text-gray-100 font-medium hover:text-accent-dark hover:underline"
                               >
                                 {userDetail.visibleAppCount}
@@ -1081,21 +1090,40 @@ export default function AdminUsers() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-lg font-bold text-dark dark:text-gray-100">{t.visibleApps}</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{visibleApps.length} {t.appVisibleCount}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  {visibleAppsQuery ? `${filteredVisibleApps.length} / ${visibleApps.length}` : visibleApps.length} {t.appVisibleCount}
+                </p>
               </div>
               <button onClick={() => setShowVisibleApps(false)} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            {visibleApps.length > 0 && (
+              <ClearableSearchField
+                className="mb-4"
+                value={visibleAppsSearch}
+                onChange={setVisibleAppsSearch}
+                placeholder={t.visibleAppsSearchPlaceholder}
+                clearLabel={ui.common.clearSearch}
+                restoreOnEscape={false}
+                autoFocus
+              />
+            )}
+
             {visibleApps.length === 0 ? (
               <div className="text-center py-10 text-gray-400 dark:text-gray-500">
                 <Users className="w-10 h-10 mx-auto mb-2 opacity-40" />
                 <p className="text-sm font-medium">{t.noVisibleApps}</p>
               </div>
+            ) : filteredVisibleApps.length === 0 ? (
+              <div className="text-center py-10 text-gray-400 dark:text-gray-500">
+                <Users className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                <p className="text-sm font-medium">{t.visibleAppsNoResults}</p>
+              </div>
             ) : (
               <div className="space-y-2">
-                {visibleApps.map((app) => (
+                {filteredVisibleApps.map((app) => (
                   <button
                     key={app.id}
                     type="button"
