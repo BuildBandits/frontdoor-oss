@@ -1,5 +1,9 @@
 import { randomUUID } from 'crypto';
-import { BACKUP_PROGRESS_STAGES, BACKUP_VERSION, createBackupArchive } from './backup.js';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { BACKUP_PROGRESS_STAGES, createBackupFile } from './backup.js';
+import { BACKUP_FORMAT_V2 } from './backupFormat.js';
 
 const jobs = new Map();
 const cleanupTimers = new Map();
@@ -29,6 +33,12 @@ function publish(job) {
   return state;
 }
 
+function removeJob(job) {
+  jobs.delete(job.id);
+  cleanupTimers.delete(job.id);
+  if (job.filePath) fs.rm(job.filePath, { force: true }, () => {});
+}
+
 function scheduleCleanup(job) {
   if (cleanupTimers.has(job.id)) {
     clearTimeout(cleanupTimers.get(job.id));
@@ -39,10 +49,8 @@ function scheduleCleanup(job) {
     return;
   }
 
-  const timer = setTimeout(() => {
-    jobs.delete(job.id);
-    cleanupTimers.delete(job.id);
-  }, JOB_TTL_MS);
+  // The archive file lives in the temp dir until the job expires.
+  const timer = setTimeout(() => removeJob(job), JOB_TTL_MS);
   timer.unref?.();
   cleanupTimers.set(job.id, timer);
 }
@@ -63,9 +71,9 @@ function createBackupJob({ excludeLogs = false, passphrase = null } = {}) {
     completedStages: [],
     message: 'Preparing backup',
     fileName: null,
-    version: BACKUP_VERSION,
+    version: BACKUP_FORMAT_V2,
     summary: null,
-    archive: null,
+    filePath: null,
     error: null,
     listeners: new Set(),
   };
@@ -73,6 +81,7 @@ function createBackupJob({ excludeLogs = false, passphrase = null } = {}) {
   publish(job);
 
   job.promise = (async () => {
+    const outputPath = path.join(os.tmpdir(), `frontdoor-export-${job.id}`);
     try {
       updateJob(job, {
         status: 'running',
@@ -81,9 +90,10 @@ function createBackupJob({ excludeLogs = false, passphrase = null } = {}) {
         message: 'Collecting database snapshot',
       });
 
-      const { archive, snapshot, fileName } = await createBackupArchive({
+      const { fileName, summary, version } = await createBackupFile({
         excludeLogs,
         passphrase,
+        outputPath,
         onProgress: ({ stage, progress, completedStages }) => {
           updateJob(job, {
             status: 'running',
@@ -102,11 +112,12 @@ function createBackupJob({ excludeLogs = false, passphrase = null } = {}) {
         completedStages: STEP_ORDER,
         message: 'Backup ready',
         fileName,
-        version: snapshot.version,
-        summary: snapshot.summary,
-        archive,
+        version,
+        summary,
+        filePath: outputPath,
       });
     } catch (error) {
+      fs.rm(outputPath, { force: true }, () => {});
       updateJob(job, {
         status: 'error',
         stage: 'error',
@@ -143,12 +154,12 @@ export function subscribeBackupExportJob(jobId, listener) {
 
 export function getBackupExportJobArchive(jobId) {
   const job = jobs.get(jobId);
-  if (!job || job.status !== 'done' || !job.archive) {
+  if (!job || job.status !== 'done' || !job.filePath) {
     return null;
   }
 
   return {
-    archive: job.archive,
+    filePath: job.filePath,
     fileName: job.fileName,
     version: job.version,
     summary: job.summary,

@@ -13,8 +13,8 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function safeFileName(now = new Date()) {
-  return `frontdoor-backup-${now.toISOString().replace(/[:.]/g, '-')}.json.gz`;
+function safeFileName(encrypted, now = new Date()) {
+  return `frontdoor-backup-${now.toISOString().replace(/[:.]/g, '-')}.tar.gz${encrypted ? '.enc' : ''}`;
 }
 
 // Saves a download response under the name from Content-Disposition.
@@ -95,6 +95,7 @@ export default function AdminBackup() {
     backup_passphrase_required: copy.passphraseRequired,
     backup_passphrase_invalid: copy.passphraseInvalid,
     backup_passphrase_too_short: copy.passphraseTooShort,
+    backup_too_large: copy.backupTooLarge,
   })[payload?.code] || payload?.error || fallback;
   const passphraseHeaders = () => (restorePassphrase ? { 'X-Backup-Passphrase': restorePassphrase } : {});
 
@@ -195,7 +196,7 @@ export default function AdminBackup() {
         throw new Error(payload.error || copy.exportFailed);
       }
 
-      await saveResponseAsFile(response, safeFileName());
+      await saveResponseAsFile(response, safeFileName(Boolean(exportPassphrase)));
 
       const tables = Number.parseInt(response.headers.get('x-backup-table-count') || '0', 10) || 0;
       const files = Number.parseInt(response.headers.get('x-backup-file-count') || '0', 10) || 0;
@@ -266,8 +267,8 @@ export default function AdminBackup() {
       const response = await fetch('/api/backups/verify', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': selectedFile.type || 'application/gzip', ...passphraseHeaders() },
-        body: await selectedFile.arrayBuffer(),
+        headers: { 'Content-Type': 'application/octet-stream', ...passphraseHeaders() },
+        body: selectedFile,
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(backupErrorMessage(payload, copy.verifyFailed));
@@ -308,15 +309,14 @@ export default function AdminBackup() {
     const runRestore = async ({ allowNewer = false } = {}) => {
       setRestoreBusy(true);
       try {
-        const body = await selectedFile.arrayBuffer();
         const response = await fetch(`/api/backups/restore${allowNewer ? '?allowNewer=true' : ''}`, {
           method: 'POST',
           credentials: 'include',
           headers: {
-            'Content-Type': selectedFile.type || 'application/gzip',
+            'Content-Type': 'application/octet-stream',
             ...passphraseHeaders(),
           },
-          body,
+          body: selectedFile,
         });
 
         const payload = await response.json().catch(() => ({}));
@@ -527,7 +527,7 @@ export default function AdminBackup() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".json.gz,.enc,application/gzip,application/x-gzip,application/octet-stream"
+              accept=".tar.gz,.tgz,.json.gz,.enc,application/gzip,application/x-gzip,application/octet-stream"
               onChange={handleRestoreFile}
               className="block w-full cursor-pointer rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm text-gray-600 dark:text-gray-300 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
             />

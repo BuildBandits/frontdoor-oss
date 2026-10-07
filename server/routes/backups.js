@@ -1,18 +1,33 @@
 import express from 'express';
+import fs from 'fs';
+import fsp from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import { randomUUID } from 'crypto';
+import { pipeline } from 'stream/promises';
 import db from '../db.js';
 import { authenticate, isOwner } from '../middleware/auth.js';
 import {
-  analyzeBackupArchive,
+  analyzeBackupFile,
   assertValidPassphrase,
-  createBackupArchive,
-  exportDatabaseFile,
+  createBackupFile,
   isEncryptedBackup,
-  restoreBackupArchive,
+  restoreBackupFile,
+  writeDatabaseFile,
 } from '../services/backup.js';
 import { getBackupExportJob, getBackupExportJobArchive, startBackupExportJob, subscribeBackupExportJob } from '../services/backupJobs.js';
-import { respondWithError } from '../services/errors.js';
+import { respondWithError, UserFacingError } from '../services/errors.js';
 
 const router = express.Router();
+
+function maxUploadBytes() {
+  const megabytes = Number.parseInt(process.env.BACKUP_MAX_UPLOAD_MB || '', 10);
+  return (Number.isFinite(megabytes) && megabytes > 0 ? megabytes : 1024) * 1024 * 1024;
+}
+
+function tempPath(prefix) {
+  return path.join(os.tmpdir(), `${prefix}-${randomUUID()}`);
+}
 
 // Passphrases travel in a header (never in the URL) and are never logged.
 function readPassphrase(req) {
@@ -27,22 +42,88 @@ function readExportOptions(req, source) {
   return { excludeLogs, passphrase };
 }
 
-function archiveContentType(archive) {
-  return isEncryptedBackup(archive) ? 'application/octet-stream' : 'application/gzip';
+async function readHead(filePath) {
+  const handle = await fsp.open(filePath, 'r');
+  try {
+    const head = Buffer.alloc(8);
+    await handle.read(head, 0, 8, 0);
+    return head;
+  } finally {
+    await handle.close();
+  }
+}
+
+// Streams an uploaded backup to a temporary file instead of buffering it in memory.
+async function receiveUpload(req) {
+  const declared = Number.parseInt(req.get('content-length') || '', 10);
+  const limit = maxUploadBytes();
+  if (Number.isFinite(declared) && declared > limit) {
+    throw new UserFacingError('The backup file is too large.', { statusCode: 413, code: 'backup_too_large' });
+  }
+  const filePath = tempPath('frontdoor-upload');
+  let received = 0;
+  try {
+    await pipeline(
+      req,
+      async function* limitSize(source) {
+        for await (const chunk of source) {
+          received += chunk.length;
+          if (received > limit) throw new UserFacingError('The backup file is too large.', { statusCode: 413, code: 'backup_too_large' });
+          yield chunk;
+        }
+      },
+      fs.createWriteStream(filePath),
+    );
+  } catch (error) {
+    await fsp.rm(filePath, { force: true });
+    throw error;
+  }
+  if (received === 0) {
+    await fsp.rm(filePath, { force: true });
+    throw new UserFacingError('Backup file is empty');
+  }
+  return filePath;
+}
+
+// Sends a file as a download and removes it afterwards when requested.
+function sendFile(res, filePath, { contentType, fileName, headers = {}, removeAfter = false }) {
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
+  const stream = fs.createReadStream(filePath);
+  const done = () => {
+    if (removeAfter) fs.rm(filePath, { force: true }, () => {});
+  };
+  stream.on('error', (error) => {
+    done();
+    res.destroy(error);
+  });
+  res.on('close', done);
+  stream.pipe(res);
+}
+
+function summaryHeaders(version, summary) {
+  return {
+    'X-Backup-Version': String(version),
+    'X-Backup-Table-Count': String(summary?.tableCount ?? 0),
+    'X-Backup-File-Count': String(summary?.fileCount ?? 0),
+    'X-Backup-File-Bytes': String(summary?.fileBytes ?? 0),
+  };
 }
 
 router.get('/export', authenticate, isOwner, async (req, res) => {
+  const outputPath = tempPath('frontdoor-export');
   try {
     const { excludeLogs, passphrase } = readExportOptions(req, { excludeLogs: req.query.excludeLogs });
-    const { archive, snapshot, fileName } = await createBackupArchive({ excludeLogs, passphrase });
-    res.setHeader('Content-Type', archiveContentType(archive));
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.setHeader('X-Backup-Version', String(snapshot.version));
-    res.setHeader('X-Backup-Table-Count', String(snapshot.summary.tableCount));
-    res.setHeader('X-Backup-File-Count', String(snapshot.summary.fileCount));
-    res.setHeader('X-Backup-File-Bytes', String(snapshot.summary.fileBytes));
-    res.send(archive);
+    const { fileName, summary, version } = await createBackupFile({ excludeLogs, passphrase, outputPath });
+    sendFile(res, outputPath, {
+      contentType: passphrase ? 'application/octet-stream' : 'application/gzip',
+      fileName,
+      headers: summaryHeaders(version, summary),
+      removeAfter: true,
+    });
   } catch (error) {
+    await fsp.rm(outputPath, { force: true });
     console.error('Backup export failed:', error.message);
     respondWithError(res, error, { status: 500, code: 'failed_to_create_backup' });
   }
@@ -50,12 +131,17 @@ router.get('/export', authenticate, isOwner, async (req, res) => {
 
 // Raw SQLite copy for upgrade rehearsals; optional passphrase in X-Backup-Passphrase.
 router.get('/database', authenticate, isOwner, async (req, res) => {
+  const outputPath = tempPath('frontdoor-database');
   try {
-    const { buffer, fileName } = await exportDatabaseFile({ passphrase: readPassphrase(req) });
-    res.setHeader('Content-Type', isEncryptedBackup(buffer) ? 'application/octet-stream' : 'application/vnd.sqlite3');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.send(buffer);
+    const passphrase = readPassphrase(req);
+    const { fileName } = await writeDatabaseFile({ passphrase, outputPath });
+    sendFile(res, outputPath, {
+      contentType: passphrase ? 'application/octet-stream' : 'application/vnd.sqlite3',
+      fileName,
+      removeAfter: true,
+    });
   } catch (error) {
+    await fsp.rm(outputPath, { force: true });
     console.error('Database export failed:', error.message);
     respondWithError(res, error, { status: 500, code: 'failed_to_export_database' });
   }
@@ -125,49 +211,43 @@ router.get('/export-jobs/:jobId/file', authenticate, isOwner, async (req, res) =
     return;
   }
 
-  res.setHeader('Content-Type', archiveContentType(job.archive));
-  res.setHeader('Content-Disposition', `attachment; filename="${job.fileName}"`);
-  res.setHeader('X-Backup-Version', String(job.version));
-  res.setHeader('X-Backup-Table-Count', String(job.summary.tableCount));
-  res.setHeader('X-Backup-File-Count', String(job.summary.fileCount));
-  res.setHeader('X-Backup-File-Bytes', String(job.summary.fileBytes));
-  res.send(job.archive);
-});
-
-const rawBackupBody = express.raw({
-  type: ['application/gzip', 'application/x-gzip', 'application/octet-stream'],
-  limit: '200mb',
+  // The job keeps the file until it expires, so the download can be retried.
+  sendFile(res, job.filePath, {
+    contentType: isEncryptedBackup(await readHead(job.filePath)) ? 'application/octet-stream' : 'application/gzip',
+    fileName: job.fileName,
+    headers: summaryHeaders(job.version, job.summary),
+  });
 });
 
 // Dry run: describe what a restore would do without changing anything.
-router.post('/verify', authenticate, isOwner, rawBackupBody, async (req, res) => {
+router.post('/verify', authenticate, isOwner, async (req, res) => {
+  let uploadPath = null;
   try {
-    const buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || []);
-    res.json(await analyzeBackupArchive(buffer, { passphrase: readPassphrase(req) }));
+    uploadPath = await receiveUpload(req);
+    res.json(await analyzeBackupFile(uploadPath, { passphrase: readPassphrase(req) }));
   } catch (error) {
     console.error('Backup verification failed:', error.message);
     respondWithError(res, error, { status: 500, code: 'failed_to_verify_backup' });
+  } finally {
+    if (uploadPath) await fsp.rm(uploadPath, { force: true });
   }
 });
 
-router.post(
-  '/restore',
-  authenticate,
-  isOwner,
-  rawBackupBody,
-  async (req, res) => {
-    try {
-      const buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || []);
-      const allowNewerVersion = req.query.allowNewer === 'true';
-      const { snapshot: _snapshot, ...result } = await restoreBackupArchive(buffer, { allowNewerVersion, passphrase: readPassphrase(req) });
-      // The restored users table may no longer contain the owner who started the restore.
-      const sessionValid = Boolean(db.prepare('SELECT 1 FROM users WHERE id = ? AND is_active = 1').get(req.user.id));
-      res.json({ ...result, sessionValid });
-    } catch (error) {
-      console.error('Backup restore failed:', error.message);
-      respondWithError(res, error, { status: 500, code: 'failed_to_restore_backup' });
-    }
+router.post('/restore', authenticate, isOwner, async (req, res) => {
+  let uploadPath = null;
+  try {
+    uploadPath = await receiveUpload(req);
+    const allowNewerVersion = req.query.allowNewer === 'true';
+    const result = await restoreBackupFile(uploadPath, { allowNewerVersion, passphrase: readPassphrase(req) });
+    // The restored users table may no longer contain the owner who started the restore.
+    const sessionValid = Boolean(db.prepare('SELECT 1 FROM users WHERE id = ? AND is_active = 1').get(req.user.id));
+    res.json({ ...result, sessionValid });
+  } catch (error) {
+    console.error('Backup restore failed:', error.message);
+    respondWithError(res, error, { status: 500, code: 'failed_to_restore_backup' });
+  } finally {
+    if (uploadPath) await fsp.rm(uploadPath, { force: true });
   }
-);
+});
 
 export default router;
