@@ -49,8 +49,15 @@ export function getSupportedLanguageOptions(ui) {
   }));
 }
 
+// Cached per language so callers get a stable object: components call this during
+// render and pass the result (or values derived from it) to hook dependency lists.
+const uiStringsCache = new Map();
+
 export function getUiStrings(language) {
   const normalized = normalizeLanguage(language);
-  return deepMerge(en, DICTIONARIES[normalized] || {});
+  if (!uiStringsCache.has(normalized)) {
+    uiStringsCache.set(normalized, deepMerge(en, DICTIONARIES[normalized] || {}));
+  }
+  return uiStringsCache.get(normalized);
 }
 
