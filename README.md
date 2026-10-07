@@ -34,12 +34,13 @@ Each app in the catalog is accessible via its target URL. The gateway handles au
 
 | Component | Technology |
 |-----------|------------|
-| Backend | Node.js 24 + Express |
-| Frontend | React 18 + Vite + Tailwind CSS |
-| Database | SQLite (better-sqlite3) |
-| Auth | Microsoft SSO (@azure/msal-node) + JWT |
-| State | Zustand |
-| Deploy | Docker multi-stage |
+| Backend | Node.js 24 LTS + Express 5 |
+| Frontend | React 19 + React Router 8 + Vite 8 + Tailwind CSS 4 |
+| Database | SQLite (better-sqlite3 13) |
+| Auth | Microsoft SSO (@azure/msal-node 7) + JWT |
+| State | Zustand 5 |
+| Quality | ESLint, Node test runner (unit + HTTP), GitHub Actions CI, Dependabot |
+| Deploy | Docker multi-stage (`node:24-bookworm-slim`) |
 
 ## Features
 
@@ -63,6 +64,8 @@ See [FEATURES.md](FEATURES.md) for the full capability map. Highlights:
 
 ## Quick Start (Node.js)
 
+Requires **Node.js 24** or newer.
+
 ```bash
 # 1. Install dependencies
 npm install
@@ -76,6 +79,21 @@ npm run dev
 ```
 
 Frontend: http://localhost:5173 | API: http://localhost:3001
+
+The backend restarts automatically when files in `server/` or `shared/` change (Node's built-in `--watch`).
+
+### Checks
+
+CI runs the same commands on every pull request; run them before opening one:
+
+```bash
+npm run lint         # ESLint (no errors allowed)
+npm test             # unit and HTTP tests, each test process gets its own temporary database
+npm run check:i18n   # English and Italian dictionaries stay aligned
+npm run build        # production frontend build
+```
+
+CI also builds the Docker image and smoke-tests it (`/api/health` and the SPA shell).
 
 ### Dev Login (no Azure required)
 
@@ -106,6 +124,8 @@ docker compose up --build
 
 App: http://localhost:3001
 
+The image stores every writable path on the `/data` volume by default (`DATABASE_PATH=/data/frontdoor.db`, avatar, app icon, branding and plugin directories), so data survives image upgrades.
+
 > **Dev vs Docker**: In dev mode, Vite serves the frontend on port 5173 and proxies API calls to Express on 3001. In Docker, Express serves both the built frontend and API on port 3001. The two `.env.example.*` files are pre-configured for each mode.
 
 ## Configuration
@@ -120,6 +140,7 @@ App: http://localhost:3001
 | `AVATAR_CACHE_DIR` | Disk cache for user avatars and metadata | `./data/avatar-cache` |
 | `APP_ICON_CACHE_DIR` | Disk cache for uploaded app icons and pasted SVG assets | `./data/app-icon-cache` |
 | `BRANDING_ASSET_DIR` | Disk storage for the optional company logo | `./data/branding` |
+| `PLUGIN_ASSET_DIR` | Disk storage for plugin packages (plugin system currently locked off) | `./data/plugins` |
 | `AVATAR_CACHE_TTL_DAYS` | Refresh interval for cached Microsoft 365 / Gravatar avatars | `14` |
 | `AVATAR_CACHE_MISS_TTL_DAYS` | Retry interval when no avatar was found | `30` |
 | `BASE_DOMAIN` | Base domain (no protocol) | `frontdoor.local` |
@@ -442,7 +463,7 @@ Use `exp` to scope the local satellite session: `min(default_session_ttl, exp - 
 
 ## Database
 
-SQLite with 9 tables:
+SQLite with 15 tables:
 
 | Table | Description |
 |-------|-------------|
@@ -455,8 +476,26 @@ SQLite with 9 tables:
 | `entra_group_cache` | Discovered Entra groups available for admin import |
 | `entra_user_group_memberships` | Cached Entra memberships per user |
 | `rbac_audit_logs` | Audit trail for RBAC and privileged platform actions |
+| `group_group_memberships` | Linked groups: members of a child group inherit the parent group's apps |
+| `group_entra_group_memberships` | Entra groups linked to a Frontdoor group |
+| `branding_settings` | Customization settings (hero texts per language, logo, Home and login behaviour, feature toggles) |
+| `media_assets` | Index of uploaded app icons and branding logos stored on disk |
+| `auth_pending_states` | Short-lived OAuth `state` values for in-flight SSO logins |
+| `plugin_registry` | Plugin manifests and approvals (plugin system currently locked off) |
 
 On first startup with an empty DB, example apps are seeded automatically.
+
+Schema changes are applied automatically at startup. Table rebuilds run inside a transaction, so an interrupted upgrade never leaves a table missing or half-copied.
+
+## Upgrading an existing installation
+
+1. **Back up.** In **Personalizza (Customize) → Maintenance**, download a backup (database rows plus app icons, logo and avatars). With the container stopped (`docker compose stop`), also copy the SQLite file from the volume, e.g. `docker cp <container>:/data/frontdoor.db ./frontdoor.db.bak`, including `frontdoor.db-wal` if present.
+2. **Rehearse (recommended).** Start the new image locally against a copy of the database and check the `[startup]` lines in the logs; alternatively restore the backup into a fresh local installation.
+3. **Upgrade.** Pull or build the new image and start it on the same `/data` volume. Migrations run on startup.
+4. **Verify.** Sign in with Microsoft SSO, open the admin pages, and if `ENTRA_GROUP_SYNC=true` run a Force Sync.
+5. **Roll back if needed.** Start the previous image and restore the backup taken in step 1.
+
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
 
 ## Contributing
 

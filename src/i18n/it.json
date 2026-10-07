@@ -351,7 +351,7 @@
       "openPluginDocs": "Documentazione plugin",
       "openPluginDocsHelp": "Consulta il contratto del manifest, gli esempi di modulo e gli hint del loader senza toccare il flusso di installazione.",
       "killSwitchTitle": "Abilita i plugin per Frontdoor",
-      "killSwitchHelp": "Questa checkbox è visibile per lavori futuri, ma in 1.2.8b resta bloccata su OFF. Frontdoor core resta disponibile e non carica pagine, surface o hook dei plugin.",
+      "killSwitchHelp": "Questa checkbox è visibile per lavori futuri, ma per ora resta bloccata su OFF. Frontdoor core resta disponibile e non carica pagine, surface o hook dei plugin.",
       "killSwitchOn": "Abilitati",
       "killSwitchOff": "Disabilitati"
     },
