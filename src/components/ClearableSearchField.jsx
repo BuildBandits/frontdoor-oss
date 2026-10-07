@@ -82,7 +82,7 @@ export default function ClearableSearchField({
           placeholder={placeholder}
           autoFocus={autoFocus}
           data-frontdoor-search-target={searchShortcutTarget || undefined}
-          className={`min-w-0 flex-1 h-full border-0 bg-transparent p-0 text-sm leading-none text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 dark:text-gray-100 dark:placeholder:text-gray-500 ${inputClassName}`}
+          className={`min-w-0 flex-1 h-full border-0 bg-transparent p-0 text-sm leading-none text-gray-900 placeholder:text-gray-400 focus:outline-hidden focus:ring-0 dark:text-gray-100 dark:placeholder:text-gray-500 ${inputClassName}`}
         />
         <div className="flex items-center gap-2 shrink-0">
           {searchShortcutTarget && visibleSearchShortcutLabel && (

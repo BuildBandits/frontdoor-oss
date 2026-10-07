@@ -283,7 +283,7 @@ export default function AdminAudit() {
                         </div>
                       </td>
                       <td className="px-5 py-3 hidden lg:table-cell">
-                        <pre className="max-w-[420px] whitespace-pre-wrap break-words text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+                        <pre className="max-w-[420px] whitespace-pre-wrap wrap-break-word text-[11px] text-gray-500 dark:text-gray-400 font-mono">
                           {renderDetails(log.details)}
                         </pre>
                       </td>

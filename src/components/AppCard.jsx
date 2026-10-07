@@ -64,7 +64,7 @@ const AppCard = forwardRef(function AppCard(
                 e.stopPropagation();
                 handleClick();
               }}
-              className="shrink-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40"
+              className="shrink-0 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-accent/40"
               aria-label={getLabel('openAppNamed', app.name)}
             >
               <AppIcon app={app} className="w-8 h-8" textClassName="text-xl" alt={app.name} />
@@ -99,18 +99,18 @@ const AppCard = forwardRef(function AppCard(
 
           <div className="flex items-center gap-1 shrink-0">
             {showModeBadges && isSharedCookie && (
-              <span className="text-[10px] font-medium text-accent-dark bg-accent/10 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              <span className="text-[10px] font-medium text-accent-dark bg-accent/10 px-1.5 py-0.5 rounded-sm flex items-center gap-0.5">
                 <Lock className="w-2.5 h-2.5" />{labels?.ssoBadgeShort}
               </span>
             )}
             {showModeBadges && isEntraApp && (
-              <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">{getLabel('entraBadgeShort')}</span>
+              <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-sm">{getLabel('entraBadgeShort')}</span>
             )}
             {showModeBadges && isExternal && (
-              <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{getLabel('externalBadgeShort')}</span>
+              <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-sm">{getLabel('externalBadgeShort')}</span>
             )}
             {showModeBadges && isInternalLink && (
-              <span className="text-[10px] font-medium text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 px-1.5 py-0.5 rounded">{getLabel('internalLinkBadgeShort')}</span>
+              <span className="text-[10px] font-medium text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 px-1.5 py-0.5 rounded-sm">{getLabel('internalLinkBadgeShort')}</span>
             )}
             {hasLongDesc && (
               <Tooltip content={getLabel('appInfo')}>
@@ -180,7 +180,7 @@ const AppCard = forwardRef(function AppCard(
                 e.stopPropagation();
                 handleClick();
               }}
-              className="shrink-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/40"
+              className="shrink-0 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-accent/40"
               aria-label={getLabel('openAppNamed', app.name)}
             >
               <AppIcon app={app} className="w-12 h-12" textClassName="text-4xl" alt={app.name} />
@@ -214,18 +214,18 @@ const AppCard = forwardRef(function AppCard(
               </Tooltip>
             )}
             {showModeBadges && isSharedCookie && (
-              <span className="text-[10px] font-medium text-accent-dark bg-accent/10 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              <span className="text-[10px] font-medium text-accent-dark bg-accent/10 px-1.5 py-0.5 rounded-sm flex items-center gap-0.5">
                 <Lock className="w-2.5 h-2.5" />{labels?.ssoBadgeShort}
               </span>
             )}
             {showModeBadges && isEntraApp && (
-              <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">{getLabel('entraBadgeShort')}</span>
+              <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-sm">{getLabel('entraBadgeShort')}</span>
             )}
             {showModeBadges && isExternal && (
-              <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{getLabel('externalBadgeShort')}</span>
+              <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-sm">{getLabel('externalBadgeShort')}</span>
             )}
             {showModeBadges && isInternalLink && (
-              <span className="text-[10px] font-medium text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 px-1.5 py-0.5 rounded">{getLabel('internalLinkBadgeShort')}</span>
+              <span className="text-[10px] font-medium text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 px-1.5 py-0.5 rounded-sm">{getLabel('internalLinkBadgeShort')}</span>
             )}
           </div>
         </div>

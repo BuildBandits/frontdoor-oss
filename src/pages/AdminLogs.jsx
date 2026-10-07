@@ -209,7 +209,7 @@ export default function AdminLogs() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
                       <span className="text-sm font-medium text-dark dark:text-gray-100 truncate">{app.name}</span>
-                      <span className="text-xs text-gray-400 dark:text-gray-500 ml-2 flex-shrink-0">
+                      <span className="text-xs text-gray-400 dark:text-gray-500 ml-2 shrink-0">
                         {app.access_count} {ui.admin.logs.accessSummary} &middot; {app.unique_users} {ui.admin.logs.usersSummary}
                       </span>
                     </div>

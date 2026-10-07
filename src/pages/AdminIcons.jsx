@@ -291,7 +291,7 @@ export default function AdminIcons() {
         </div>
       )}
 
-      <div className="mb-6 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm">
+      <div className="mb-6 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-xs">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="flex-1 min-w-[240px]">
             <ClearableSearchField
@@ -310,7 +310,7 @@ export default function AdminIcons() {
             <select
               value={kindFilter}
               onChange={(e) => handleKindChange(e.target.value)}
-              className="bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none"
+              className="bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-hidden"
             >
               <option value="all">{ui.common.all}</option>
               <option value="app-icon">{ui.admin.icons.kindAppIcon}</option>
@@ -324,7 +324,7 @@ export default function AdminIcons() {
             <select
               value={pageSize}
               onChange={(e) => handlePageSizeChange(parseInt(e.target.value, 10))}
-              className="bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-none"
+              className="bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-hidden"
             >
               <option value={25}>25</option>
               <option value={50}>50</option>
@@ -346,19 +346,19 @@ export default function AdminIcons() {
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm">
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-xs">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{ui.admin.icons.totalAssets}</p>
           <p className="mt-1 text-2xl font-bold text-dark dark:text-gray-100">{counts.total}</p>
         </div>
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm">
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-xs">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{ui.admin.icons.totalAppIcons}</p>
           <p className="mt-1 text-2xl font-bold text-dark dark:text-gray-100">{counts.appIcon}</p>
         </div>
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm">
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-xs">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{ui.admin.icons.totalBrandingLogos}</p>
           <p className="mt-1 text-2xl font-bold text-dark dark:text-gray-100">{counts.brandingLogo}</p>
         </div>
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm">
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-xs">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{ui.admin.icons.totalOrphanAssets}</p>
           <p className="mt-1 text-2xl font-bold text-dark dark:text-gray-100">{counts.orphanAssets}</p>
         </div>
@@ -371,7 +371,7 @@ export default function AdminIcons() {
           ))}
         </div>
       ) : assets.length === 0 ? (
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-6 py-16 text-center text-gray-400 dark:text-gray-500 shadow-sm">
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-6 py-16 text-center text-gray-400 dark:text-gray-500 shadow-xs">
           <Image className="mx-auto mb-3 w-12 h-12 opacity-40" />
           <p className="text-lg font-medium">{ui.admin.icons.emptyTitle}</p>
           <p className="mt-1 text-sm">{ui.admin.icons.emptyBody}</p>
@@ -379,8 +379,8 @@ export default function AdminIcons() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {visibleAssets.map((asset) => (
-            <article key={asset.id} className="overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
-              <div className="aspect-[4/3] bg-gradient-to-br from-gray-50 via-white to-gray-100 p-4">
+            <article key={asset.id} className="overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs">
+              <div className="aspect-4/3 bg-linear-to-br from-gray-50 via-white to-gray-100 p-4">
                 <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 bg-white/70 p-4">
                   <AssetPreview asset={asset} missingLabel={ui.admin.icons.missingFile} />
                 </div>
@@ -542,7 +542,7 @@ export default function AdminIcons() {
       )}
 
       {pagination.pages > 1 && (
-        <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-3 shadow-xs lg:flex-row lg:items-center lg:justify-between">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {ui.admin.icons.paginationSummary
               .replace('{page}', pagination.page)

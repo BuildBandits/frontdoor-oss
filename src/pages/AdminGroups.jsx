@@ -1119,23 +1119,23 @@ export default function AdminGroups() {
                         toggleGroupSelection(group.id);
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                      className="rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                     />
                   )}
                   {expandedGroup === group.id
-                    ? <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-                    : <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />}
+                    ? <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+                    : <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="truncate font-semibold text-sm text-dark dark:text-gray-100">{groupLabel(group)}</span>
                       {group.source !== 'entra' && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-medium">{g.localBadge}</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-sm font-medium">{g.localBadge}</span>
                       )}
                       {group.source === 'entra' && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded-sm font-medium">{g.entraBadge}</span>
                       )}
                       {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) > 0 && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-accent/10 dark:bg-accent-dark/20 text-accent-dark dark:text-gray-100 px-1.5 py-0.5 rounded font-medium">
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-accent/10 dark:bg-accent-dark/20 text-accent-dark dark:text-gray-100 px-1.5 py-0.5 rounded-sm font-medium">
                           <Layers3 className="w-3 h-3" />
                           {g.compositeBadge}
                         </span>
@@ -1147,16 +1147,16 @@ export default function AdminGroups() {
                     {group.description && <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">{group.description}</p>}
                   </div>
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex items-center gap-3 shrink-0">
                   <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
-                    <Users className="w-3.5 h-3.5 flex-shrink-0" /> {group.member_count}
+                    <Users className="w-3.5 h-3.5 shrink-0" /> {group.member_count}
                   </span>
                   <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
-                    <AppWindow className="w-3.5 h-3.5 flex-shrink-0" /> {group.app_count}
+                    <AppWindow className="w-3.5 h-3.5 shrink-0" /> {group.app_count}
                   </span>
                   {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) > 0 && (
                     <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
-                      <Layers3 className="w-3.5 h-3.5 flex-shrink-0" /> {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0)}
+                      <Layers3 className="w-3.5 h-3.5 shrink-0" /> {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0)}
                     </span>
                   )}
                   {group.id !== DEFAULT_GROUP_ID && (
@@ -1192,7 +1192,7 @@ export default function AdminGroups() {
                                 value={editName}
                                 onChange={(e) => setEditName(e.target.value)}
                                 disabled={group.id === DEFAULT_GROUP_ID || isEntraGroup(group)}
-                                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-gray-50 disabled:text-gray-400"
+                                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-accent disabled:bg-gray-50 disabled:text-gray-400"
                               />
                             </div>
                             <div className="flex-1">
@@ -1201,7 +1201,7 @@ export default function AdminGroups() {
                                 type="text"
                                 value={editDesc}
                                 onChange={(e) => setEditDesc(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-accent"
                               />
                             </div>
                             <div className="flex items-end gap-2">
@@ -1285,16 +1285,16 @@ export default function AdminGroups() {
                                   <p className="text-xs mt-1">{g.linkedGroupsHint}</p>
                                 </div>
                               ) : (
-                                <div className="space-y-2 overflow-y-auto pr-3 [scrollbar-gutter:stable] xl:h-full">
+                                <div className="space-y-2 overflow-y-auto pr-3 scrollbar-gutter-stable xl:h-full">
                                   {linkedGroups.map((childGroup) => (
                                     <div key={childGroup.id} className="flex items-center justify-between py-1.5">
                                       <div className="flex items-center gap-2 min-w-0">
-                                        <Layers3 className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                                        <Layers3 className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
                                         <div className="min-w-0">
                                           <div className="flex items-center gap-2 flex-wrap">
                                             <span className="text-sm text-dark dark:text-gray-100 truncate">{groupLabel(childGroup)}</span>
                                             {childGroup.source === 'entra' && (
-                                              <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                                              <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded-sm font-medium">{g.entraBadge}</span>
                                             )}
                                           </div>
                                           {childGroup.description && (
@@ -1322,11 +1322,11 @@ export default function AdminGroups() {
                                         {linkedEntraGroups.map((childGroup) => (
                                           <div key={childGroup.entra_group_id} className="flex items-center justify-between py-1.5">
                                             <div className="flex items-center gap-2 min-w-0">
-                                              <Layers3 className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                                              <Layers3 className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
                                               <div className="min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                   <span className="text-sm text-dark dark:text-gray-100 truncate">{childGroup.display_name || childGroup.entra_group_id}</span>
-                                                  <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                                                  <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded-sm font-medium">{g.entraBadge}</span>
                                                 </div>
                                                 {childGroup.description && (
                                                   <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{childGroup.description}</p>
@@ -1415,7 +1415,7 @@ export default function AdminGroups() {
                                   <p className="text-xs mt-1">{!isEntraGroup(group) && totalLinkedGroupCount > 0 ? g.linkedGroupsHint : t.memberAssignedHelp}</p>
                                 </div>
                               ) : (
-                                <div className={`space-y-2 overflow-y-auto pr-3 [scrollbar-gutter:stable] ${isEntraGroup(group) ? 'max-h-[260px]' : 'xl:h-full'}`}>
+                                <div className={`space-y-2 overflow-y-auto pr-3 scrollbar-gutter-stable ${isEntraGroup(group) ? 'max-h-[260px]' : 'xl:h-full'}`}>
                                   {groupDetail.members.map((m) => (
                                     <div key={m.id} className="flex items-center justify-between py-1.5">
                                       <div className="flex items-center gap-2">
@@ -1430,22 +1430,22 @@ export default function AdminGroups() {
                                         <div>
                                           <span className="text-sm text-dark dark:text-gray-100">{m.display_name || m.email}</span>
                                           {m.role === 'owner' && (
-                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-medium">{g.ownerBadge}</span>
+                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-sm font-medium">{g.ownerBadge}</span>
                                           )}
                                           {m.role === 'admin' && (
-                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none gap-1 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none gap-1 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm font-medium">
                                               <Shield className="w-3 h-3" />
                                               {g.adminBadge}
                                             </span>
                                           )}
                                           {m.role === 'admin_readonly' && (
-                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-medium">
+                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-sm font-medium">
                                               <Eye className="w-3 h-3" />
                                               {t.readOnlyRole}
                                             </span>
                                           )}
                                           {!m.last_login && (
-                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none gap-0.5 text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium">
+                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none gap-0.5 text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-sm font-medium">
                                               <Clock className="w-3 h-3" />{t.noLogin}
                                             </span>
                                           )}
@@ -1492,7 +1492,7 @@ export default function AdminGroups() {
                               <p className="text-xs mt-1">{(linkedGroups.length + linkedEntraGroups.length) > 0 ? g.linkedGroupsHelp : t.appAssignedHelp}</p>
                             </div>
                           ) : (
-                            <div className={`space-y-2 overflow-y-auto pr-3 [scrollbar-gutter:stable] ${isEntraGroup(group) ? 'max-h-[260px]' : 'xl:flex-1 xl:min-h-0'}`}>
+                            <div className={`space-y-2 overflow-y-auto pr-3 scrollbar-gutter-stable ${isEntraGroup(group) ? 'max-h-[260px]' : 'xl:flex-1 xl:min-h-0'}`}>
                               {groupDetail.apps.map((a) => (
                                 <div key={a.id} className="flex items-center justify-between py-1.5">
                                   <div className="flex items-center gap-2">
@@ -1552,7 +1552,7 @@ export default function AdminGroups() {
                   onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                   placeholder={g.groupNameExample}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-accent"
                   autoFocus
                 />
               </div>
@@ -1564,7 +1564,7 @@ export default function AdminGroups() {
                   onChange={(e) => setNewDesc(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                   placeholder={g.optional}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-accent"
                 />
               </div>
             </div>
@@ -1652,16 +1652,16 @@ export default function AdminGroups() {
                           checked={selected || group.is_imported}
                           disabled={group.is_imported}
                           onChange={() => toggleEntraGroupSelection(group.entra_group_id)}
-                          className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                          className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-medium text-dark dark:text-gray-100 truncate">{group.display_name}</span>
-                            <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                            <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded-sm font-medium">{g.entraBadge}</span>
                             {group.is_imported ? (
-                              <span className="text-[10px] bg-accent/10 text-accent-dark px-1.5 py-0.5 rounded font-medium">{g.alreadyImported}</span>
+                              <span className="text-[10px] bg-accent/10 text-accent-dark px-1.5 py-0.5 rounded-sm font-medium">{g.alreadyImported}</span>
                             ) : (
-                              <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">{g.onlyEntraDetected}</span>
+                              <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm font-medium">{g.onlyEntraDetected}</span>
                             )}
                           </div>
                           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">{group.entra_group_id}</p>
@@ -1796,13 +1796,13 @@ export default function AdminGroups() {
                             type="checkbox"
                             checked={selectedLinkedGroupIds.includes(group.id)}
                             onChange={() => toggleLinkedGroupSelection(group.id)}
-                            className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                            className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-sm font-medium text-dark dark:text-gray-100 truncate">{groupLabel(group)}</span>
                               {group.source === 'entra' && (
-                                <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                                <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded-sm font-medium">{g.entraBadge}</span>
                               )}
                             </div>
                             <div className="text-xs text-gray-400 dark:text-gray-500 font-mono truncate">{group.id}</div>
@@ -1827,12 +1827,12 @@ export default function AdminGroups() {
                               type="checkbox"
                               checked={selectedLinkedEntraGroupIds.includes(group.entra_group_id)}
                               onChange={() => toggleLinkedEntraGroupSelection(group.entra_group_id)}
-                              className="mt-1 rounded border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
+                              className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
                             />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-sm font-medium text-dark dark:text-gray-100 truncate">{group.display_name || group.entra_group_id}</span>
-                                <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded font-medium">{g.entraBadge}</span>
+                                <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded-sm font-medium">{g.entraBadge}</span>
                               </div>
                               <div className="text-xs text-gray-400 dark:text-gray-500 font-mono truncate">{group.entra_group_id}</div>
                               {group.description && <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{group.description}</div>}

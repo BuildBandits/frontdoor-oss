@@ -121,7 +121,7 @@ export default function Tooltip({
             left: `${coords.left}px`,
             transform: coords.transform,
           }}
-          className={`pointer-events-none z-50 inline-block max-w-[min(22rem,calc(100vw-2rem))] whitespace-normal break-words rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs leading-relaxed text-gray-700 shadow-xl shadow-black/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 ${tooltipClassName}`}
+          className={`pointer-events-none z-50 inline-block max-w-[min(22rem,calc(100vw-2rem))] whitespace-normal wrap-break-word rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs leading-relaxed text-gray-700 shadow-xl shadow-black/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 ${tooltipClassName}`}
         >
           {content}
         </span>,

@@ -175,7 +175,7 @@ export default function TagInput({
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           placeholder={value.length === 0 ? resolvedPlaceholder : ''}
-          className="flex-1 min-w-[100px] text-sm outline-none bg-transparent py-0.5 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+          className="flex-1 min-w-[100px] text-sm outline-hidden bg-transparent py-0.5 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
         />
       </div>
 

@@ -17,7 +17,7 @@ function TicketCenterPage({ pluginApi }) {
 
   return createElement(
     'div',
-    { className: 'mx-auto max-w-4xl rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm' },
+    { className: 'mx-auto max-w-4xl rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-xs' },
     createElement('div', { className: 'flex flex-col gap-4 md:flex-row md:items-start md:justify-between' },
       createElement('div', null,
         createElement('div', { className: 'inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-950/35 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300' }, 'Ticket Plugin'),
@@ -55,7 +55,7 @@ function TicketSettingsPage({ pluginApi }) {
 
   return createElement(
     'div',
-    { className: 'mx-auto max-w-4xl rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm' },
+    { className: 'mx-auto max-w-4xl rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-xs' },
     createElement('div', { className: 'flex flex-col gap-4 md:flex-row md:items-start md:justify-between' },
       createElement('div', null,
         createElement('div', { className: 'inline-flex items-center rounded-full bg-sky-50 dark:bg-sky-950/35 px-3 py-1 text-xs font-semibold text-sky-700 dark:text-sky-300' }, 'Ticket Plugin'),
