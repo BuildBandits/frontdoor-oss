@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import zlib from 'node:zlib';
 import jwt from 'jsonwebtoken';
 
 process.env.JWT_SECRET ||= 'http-test-secret-0123456789abcdef';
@@ -154,4 +155,38 @@ test('SSO init reports 501 when Microsoft SSO is not configured', async () => {
   const res = await request('/api/auth/microsoft');
   assert.equal(res.status, 501);
   assert.deepEqual(await res.json(), { error: 'Microsoft SSO not configured' });
+});
+
+// Keep last: it replaces the users table that the other tests rely on.
+test('backup restore refuses newer archives unless allowed and reports whether the session survives', async () => {
+  const owner = db.prepare('SELECT * FROM users WHERE id = ?').get('http-test-owner');
+  const archive = (version, users) => zlib.gzipSync(Buffer.from(JSON.stringify({
+    version: 1,
+    createdAt: new Date().toISOString(),
+    app: { version },
+    database: { tables: [{ name: 'users', columns: Object.keys(owner), rows: users }] },
+    buckets: [],
+    summary: {},
+  })));
+  const restore = (body, query = '') => request(`/api/backups/restore${query}`, {
+    role: 'owner',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/gzip' },
+    body,
+  });
+
+  const refused = await restore(archive('99.0.0', [owner]));
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).code, 'backup_from_newer_version');
+
+  const kept = await restore(archive('99.0.0', [owner]), '?allowNewer=true');
+  assert.equal(kept.status, 200);
+  const keptBody = await kept.json();
+  assert.equal(keptBody.sessionValid, true);
+  assert.equal(keptBody.verification.integrity, 'ok');
+
+  const otherUser = { ...owner, id: 'restored-only-user', email: 'restored@http-test.local' };
+  const lost = await restore(archive('1.0.0', [otherUser]));
+  assert.equal(lost.status, 200);
+  assert.equal((await lost.json()).sessionValid, false);
 });

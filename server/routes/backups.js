@@ -1,4 +1,5 @@
 import express from 'express';
+import db from '../db.js';
 import { authenticate, isOwner } from '../middleware/auth.js';
 import { createBackupArchive, restoreBackupArchive } from '../services/backup.js';
 import { getBackupExportJob, getBackupExportJobArchive, startBackupExportJob, subscribeBackupExportJob } from '../services/backupJobs.js';
@@ -106,8 +107,11 @@ router.post(
   async (req, res) => {
     try {
       const buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || []);
-      const { snapshot: _snapshot, ...result } = await restoreBackupArchive(buffer);
-      res.json(result);
+      const allowNewerVersion = req.query.allowNewer === 'true';
+      const { snapshot: _snapshot, ...result } = await restoreBackupArchive(buffer, { allowNewerVersion });
+      // The restored users table may no longer contain the owner who started the restore.
+      const sessionValid = Boolean(db.prepare('SELECT 1 FROM users WHERE id = ? AND is_active = 1').get(req.user.id));
+      res.json({ ...result, sessionValid });
     } catch (error) {
       console.error('Backup restore failed:', error.message);
       respondWithError(res, error, { status: 500, code: 'failed_to_restore_backup' });
