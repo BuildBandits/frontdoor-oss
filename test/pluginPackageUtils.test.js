@@ -14,7 +14,7 @@ test('builds a self-contained plugin package from form state', () => {
     name: 'Package Plugin',
     version: '1.2.3',
     description: 'A package export example',
-    author: 'FrontDoor',
+    author: 'Frontdoor',
     homepage: 'https://example.com/plugin',
     entry: '',
     permissions: 'actions.write\nroutes.write',
@@ -49,7 +49,7 @@ test('builds a plugin package from a registry record', () => {
     backendUrl: '',
     eventSubscriptions: [],
     manifest: {
-      author: 'FrontDoor',
+      author: 'Frontdoor',
     },
   });
 

@@ -1,6 +1,6 @@
 # Maintainers
 
-Current maintainers of FrontDoor. See [GOVERNANCE.md](GOVERNANCE.md) for the decision process and how maintainers are added or removed.
+Current maintainers of Frontdoor. See [GOVERNANCE.md](GOVERNANCE.md) for the decision process and how maintainers are added or removed.
 
 ## Active
 

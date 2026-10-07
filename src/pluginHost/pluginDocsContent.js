@@ -28,7 +28,7 @@ export function packageExample() {
     "name": "Ticket Plugin",
     "version": "1.0.0",
     "description": "Adds a ticket console, quick actions and a summary surface.",
-    "author": "FrontDoor",
+    "author": "Frontdoor",
     "permissions": ["actions.write", "routes.write", "surfaces.write"],
     "roles": ["owner", "admin"]
   },

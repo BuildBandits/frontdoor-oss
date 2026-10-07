@@ -1,10 +1,10 @@
 # Governance
 
-FrontDoor is an open-source project maintained by its original authors. This document describes who decides what, how decisions are made, and how the project is released.
+Frontdoor is an open-source project maintained by its original authors. This document describes who decides what, how decisions are made, and how the project is released.
 
 ## Maintainers
 
-FrontDoor is co-maintained by its two original authors. Up-to-date names and GitHub handles are listed in [MAINTAINERS.md](MAINTAINERS.md).
+Frontdoor is co-maintained by its two original authors. Up-to-date names and GitHub handles are listed in [MAINTAINERS.md](MAINTAINERS.md).
 
 A maintainer's responsibilities:
 
@@ -41,13 +41,13 @@ Contribution mechanics (DCO, branching, PR template) are in [CONTRIBUTING.md](CO
 
 ## Commercial use
 
-FrontDoor is MIT-licensed (see [LICENSE](LICENSE)). The license places no restriction on commercial use of the source code.
+Frontdoor is MIT-licensed (see [LICENSE](LICENSE)). The license places no restriction on commercial use of the source code.
 
 In addition:
 
-- Organizations are free to self-host FrontDoor without contacting the maintainers.
+- Organizations are free to self-host Frontdoor without contacting the maintainers.
 - The maintainers may offer paid support, installation, hosting, and custom integrations to third parties. These offerings are operated under a separate commercial entity and are not a condition for using the project.
-- Use of the **FrontDoor™** name and brand is governed separately by [TRADEMARK.md](TRADEMARK.md). The MIT license does not grant trademark rights.
+- Use of the **Frontdoor™** name and brand is governed separately by [TRADEMARK.md](TRADEMARK.md). The MIT license does not grant trademark rights.
 
 ## Adding or removing maintainers
 
