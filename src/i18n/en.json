@@ -689,6 +689,14 @@
       "restoreSuccess": "Backup restored: {tables} tables, {rows} rows and {files} files.",
       "restoreFailed": "Failed to restore backup",
       "restoreMissingFile": "Choose a backup file first",
+      "restoreDroppedColumns": "{count} column(s) in the backup do not exist in this version and were skipped.",
+      "restoreIgnoredTables": "Tables in the backup that this version does not have were skipped: {tables}.",
+      "restoreTablesNotInArchive": "Tables not in the backup were left unchanged: {tables}.",
+      "restoreVerificationIssues": "The post-restore check found issues ({count} foreign key violation(s)); review the data before relying on it.",
+      "restoreReloading": "Reloading…",
+      "restoreSignInAgain": "Your account is not in the restored data: sign in again.",
+      "restoreNewerTitle": "Backup from a newer version",
+      "restoreNewerMessage": "This backup was created by Frontdoor {source}, newer than the installed {current}. Restoring it may drop data this version does not know about. Restore anyway?",
       "clearFile": "Clear file"
     },
     "apps": {

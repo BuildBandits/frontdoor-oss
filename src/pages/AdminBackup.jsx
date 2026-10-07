@@ -208,42 +208,77 @@ export default function AdminBackup() {
       return;
     }
 
+    const describeRestore = (payload) => {
+      const lines = [copy.restoreSuccess
+        .replace('{tables}', String(payload.restoredTables || 0))
+        .replace('{rows}', String(payload.restoredRows || 0))
+        .replace('{files}', String(payload.restoredFiles || 0))];
+      const droppedCount = Object.values(payload.droppedColumns || {}).reduce((total, columns) => total + columns.length, 0);
+      if (droppedCount > 0) lines.push(copy.restoreDroppedColumns.replace('{count}', String(droppedCount)));
+      if (payload.ignoredTables?.length) lines.push(copy.restoreIgnoredTables.replace('{tables}', payload.ignoredTables.join(', ')));
+      if (payload.tablesNotInArchive?.length) lines.push(copy.restoreTablesNotInArchive.replace('{tables}', payload.tablesNotInArchive.join(', ')));
+      const verification = payload.verification || {};
+      if ((verification.integrity && verification.integrity !== 'ok') || verification.foreignKeyViolations > 0) {
+        lines.push(copy.restoreVerificationIssues.replace('{count}', String(verification.foreignKeyViolations || 0)));
+      }
+      lines.push(payload.sessionValid ? copy.restoreReloading : copy.restoreSignInAgain);
+      return lines.join(' ');
+    };
+
+    const runRestore = async ({ allowNewer = false } = {}) => {
+      setRestoreBusy(true);
+      try {
+        const body = await selectedFile.arrayBuffer();
+        const response = await fetch(`/api/backups/restore${allowNewer ? '?allowNewer=true' : ''}`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': selectedFile.type || 'application/gzip',
+          },
+          body,
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (response.status === 409 && payload.code === 'backup_from_newer_version') {
+          setConfirmDialog({
+            title: copy.restoreNewerTitle,
+            message: copy.restoreNewerMessage
+              .replace('{source}', payload.details?.sourceVersion || '?')
+              .replace('{current}', payload.details?.currentVersion || '?'),
+            confirmLabel: copy.restoreAction,
+            onConfirm: async () => runRestore({ allowNewer: true }),
+          });
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(payload.error || copy.restoreFailed);
+        }
+
+        const hasWarnings = Object.keys(payload.droppedColumns || {}).length > 0
+          || payload.ignoredTables?.length > 0
+          || payload.verification?.foreignKeyViolations > 0
+          || (payload.verification?.integrity && payload.verification.integrity !== 'ok');
+        pushNotice(hasWarnings ? 'warning' : 'success', describeRestore(payload));
+        clearSelectedFile();
+        window.setTimeout(() => {
+          if (payload.sessionValid) {
+            window.location.reload();
+          } else {
+            window.location.assign('/login');
+          }
+        }, hasWarnings ? 6000 : 2500);
+      } catch (error) {
+        pushNotice('error', error.message || copy.restoreFailed);
+      } finally {
+        setRestoreBusy(false);
+      }
+    };
+
     setConfirmDialog({
       title: copy.restoreConfirmTitle,
       message: copy.restoreConfirmMessage,
       confirmLabel: copy.restoreAction,
-      onConfirm: async () => {
-        setRestoreBusy(true);
-        try {
-          const body = await selectedFile.arrayBuffer();
-          const response = await fetch('/api/backups/restore', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': selectedFile.type || 'application/gzip',
-            },
-            body,
-          });
-
-          const payload = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            throw new Error(payload.error || copy.restoreFailed);
-          }
-
-          pushNotice('success', copy.restoreSuccess
-            .replace('{tables}', String(payload.restoredTables || 0))
-            .replace('{rows}', String(payload.restoredRows || 0))
-            .replace('{files}', String(payload.restoredFiles || 0)));
-          clearSelectedFile();
-          window.setTimeout(() => {
-            window.location.assign('/login');
-          }, 1500);
-        } catch (error) {
-          pushNotice('error', error.message || copy.restoreFailed);
-        } finally {
-          setRestoreBusy(false);
-        }
-      },
+      onConfirm: async () => runRestore(),
     });
   };
 

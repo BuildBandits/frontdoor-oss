@@ -264,12 +264,13 @@ function resetSequenceIfPresent(dbHandle, tableName) {
 function restoreTableSnapshot(dbHandle, tableSnapshot) {
   const currentColumns = new Set(listTableColumns(dbHandle, tableSnapshot.name));
   const insertColumns = tableSnapshot.columns.filter((column) => currentColumns.has(column));
+  const droppedColumns = tableSnapshot.columns.filter((column) => !currentColumns.has(column));
 
   deleteTableRows(dbHandle, tableSnapshot.name);
   resetSequenceIfPresent(dbHandle, tableSnapshot.name);
 
   if (insertColumns.length === 0) {
-    return 0;
+    return { inserted: 0, droppedColumns };
   }
 
   const insertSql = `
@@ -284,33 +285,86 @@ function restoreTableSnapshot(dbHandle, tableSnapshot) {
     inserted += 1;
   }
 
-  return inserted;
+  return { inserted, droppedColumns };
 }
 
-async function clearBucketDirectory(bucketDir) {
-  await fsp.mkdir(bucketDir, { recursive: true });
-  const entries = await fsp.readdir(bucketDir, { withFileTypes: true }).catch(() => []);
-  await Promise.all(entries.map((entry) => fsp.rm(path.join(bucketDir, entry.name), { recursive: true, force: true })));
+function parseAppVersion(value) {
+  const match = /^v?(\d+)\.(\d+)\.(\d+)([a-z]*)/i.exec(String(value || '').trim());
+  if (!match) return null;
+  return { parts: match.slice(1, 4).map(Number), suffix: match[4].toLowerCase() };
 }
 
-async function restoreBucketFiles(bucket, files) {
+// Compares Frontdoor versions such as 1.2.8, 1.2.8c and 1.3.0. Returns 0 when
+// either side is missing or unparseable, so unknown versions never block a restore.
+export function compareAppVersions(left, right) {
+  const a = parseAppVersion(left);
+  const b = parseAppVersion(right);
+  if (!a || !b) return 0;
+  for (let index = 0; index < 3; index += 1) {
+    if (a.parts[index] !== b.parts[index]) return a.parts[index] > b.parts[index] ? 1 : -1;
+  }
+  if (a.suffix === b.suffix) return 0;
+  return a.suffix > b.suffix ? 1 : -1;
+}
+
+function assertSafeBucketPaths(bucketKey, files) {
   for (const file of files || []) {
     if (typeof file.path !== 'string' || !file.path || file.path.includes('..') || path.isAbsolute(file.path)) {
-      throw new UserFacingError(`Invalid backup file path in bucket ${bucket.key}`);
+      throw new UserFacingError(`Invalid backup file path in bucket ${bucketKey}`);
     }
   }
+}
 
-  await clearBucketDirectory(bucket.dir);
-
-  let restored = 0;
+// Writes a bucket into a sibling staging directory, so the live directory is only
+// replaced once every file has been written and the database restore committed.
+async function stageBucketFiles(bucket, files, stamp) {
+  const stagingDir = `${bucket.dir}.restore-${stamp}`;
+  await fsp.rm(stagingDir, { recursive: true, force: true });
+  await fsp.mkdir(stagingDir, { recursive: true });
   for (const file of files || []) {
-    const absolutePath = path.join(bucket.dir, file.path.replaceAll('/', path.sep));
+    const absolutePath = path.join(stagingDir, file.path.replaceAll('/', path.sep));
     await fsp.mkdir(path.dirname(absolutePath), { recursive: true });
     await fsp.writeFile(absolutePath, Buffer.from(file.data || '', 'base64'));
-    restored += 1;
   }
+  return { ...bucket, stagingDir, fileCount: (files || []).length };
+}
 
-  return restored;
+async function copyDirectoryContents(sourceDir, targetDir) {
+  await fsp.mkdir(targetDir, { recursive: true });
+  const entries = await fsp.readdir(targetDir, { withFileTypes: true }).catch(() => []);
+  await Promise.all(entries.map((entry) => fsp.rm(path.join(targetDir, entry.name), { recursive: true, force: true })));
+  await fsp.cp(sourceDir, targetDir, { recursive: true });
+}
+
+async function swapStagedBucket(staged, stamp) {
+  const previousDir = `${staged.dir}.restore-previous-${stamp}`;
+  let movedPrevious = false;
+  try {
+    await fsp.mkdir(path.dirname(staged.dir), { recursive: true });
+    if (fs.existsSync(staged.dir)) {
+      await fsp.rename(staged.dir, previousDir);
+      movedPrevious = true;
+    }
+    await fsp.rename(staged.stagingDir, staged.dir);
+  } catch {
+    // The directory may be a mount point or locked (Windows): fall back to an in-place copy.
+    if (movedPrevious && !fs.existsSync(staged.dir)) {
+      await fsp.rename(previousDir, staged.dir).catch(() => {});
+      movedPrevious = false;
+    }
+    await copyDirectoryContents(staged.stagingDir, staged.dir);
+    await fsp.rm(staged.stagingDir, { recursive: true, force: true });
+  }
+  if (movedPrevious) {
+    await fsp.rm(previousDir, { recursive: true, force: true });
+  }
+}
+
+function verifyDatabase(dbHandle) {
+  const integrityRows = dbHandle.prepare('PRAGMA integrity_check').all();
+  const integrity = integrityRows.map((row) => Object.values(row)[0]).join('; ') || 'unknown';
+  const foreignKeyViolations = dbHandle.prepare('PRAGMA foreign_key_check').all().length;
+  return { integrity, foreignKeyViolations };
 }
 
 export async function restoreBackupArchive(buffer, {
@@ -319,6 +373,8 @@ export async function restoreBackupArchive(buffer, {
   brandingDir = BRANDING_ASSET_DIR,
   avatarCacheDir = AVATAR_CACHE_DIR,
   pluginAssetDir = PLUGIN_ASSET_DIR,
+  currentVersion = APP_VERSION,
+  allowNewerVersion = false,
 } = {}) {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
     throw new UserFacingError('Backup file is empty');
@@ -332,50 +388,81 @@ export async function restoreBackupArchive(buffer, {
     throw new UserFacingError('Backup file is not a valid gzipped JSON archive');
   }
   const snapshot = normalizeBackupSnapshot(parsed);
-  const dbTables = new Map(snapshot.database.tables.map((table) => [table.name, table]));
+  const sourceVersion = snapshot.app?.version || null;
 
-  for (const bucket of snapshot.buckets) {
-    for (const file of bucket.files || []) {
-      if (typeof file.path !== 'string' || !file.path || file.path.includes('..') || path.isAbsolute(file.path)) {
-        throw new UserFacingError(`Invalid backup file path in bucket ${bucket.key}`);
-      }
-    }
+  if (!allowNewerVersion && compareAppVersions(sourceVersion, currentVersion) > 0) {
+    throw new UserFacingError(
+      `This backup was created by Frontdoor ${sourceVersion}, which is newer than the installed ${currentVersion}.`,
+      { statusCode: 409, code: 'backup_from_newer_version', details: { sourceVersion, currentVersion } },
+    );
   }
 
-  const restoreOrder = listTables(dbHandle).filter((tableName) => dbTables.has(tableName));
-  const restoreCounts = { tables: 0, rows: 0, files: 0 };
-  const restoreBuckets = resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir, pluginAssetDir });
+  for (const bucket of snapshot.buckets) {
+    assertSafeBucketPaths(bucket.key, bucket.files);
+  }
 
+  const dbTables = new Map(snapshot.database.tables.map((table) => [table.name, table]));
+  const currentTables = listTables(dbHandle);
+  const restoreOrder = currentTables.filter((tableName) => dbTables.has(tableName));
+  const ignoredTables = [...dbTables.keys()].filter((tableName) => !currentTables.includes(tableName)).sort();
+  const tablesNotInArchive = currentTables.filter((tableName) => !dbTables.has(tableName));
+  const restoreCounts = { tables: 0, rows: 0, files: 0 };
+  const droppedColumns = {};
+  const stamp = `${Date.now()}-${process.pid}`;
+
+  // 1. Stage every bucket first: a failure here leaves database and files untouched.
+  const staged = [];
+  try {
+    for (const bucket of resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir, pluginAssetDir })) {
+      const sourceBucket = snapshot.buckets.find((entry) => entry.key === bucket.key);
+      if (!sourceBucket) continue; // Older archives: leave folders they do not contain untouched.
+      staged.push(await stageBucketFiles(bucket, sourceBucket.files, stamp));
+    }
+  } catch (error) {
+    await Promise.all(staged.map((entry) => fsp.rm(entry.stagingDir, { recursive: true, force: true })));
+    for (const bucket of resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir, pluginAssetDir })) {
+      await fsp.rm(`${bucket.dir}.restore-${stamp}`, { recursive: true, force: true });
+    }
+    throw error;
+  }
+
+  // 2. Replace the database rows in a single transaction.
   dbHandle.exec('PRAGMA foreign_keys = OFF');
   try {
     dbHandle.exec('BEGIN IMMEDIATE');
     try {
       for (const tableName of restoreOrder) {
-        restoreCounts.rows += restoreTableSnapshot(dbHandle, dbTables.get(tableName));
+        const { inserted, droppedColumns: dropped } = restoreTableSnapshot(dbHandle, dbTables.get(tableName));
+        restoreCounts.rows += inserted;
         restoreCounts.tables += 1;
+        if (dropped.length > 0) droppedColumns[tableName] = dropped;
       }
       dbHandle.exec('COMMIT');
     } catch (error) {
       dbHandle.exec('ROLLBACK');
+      await Promise.all(staged.map((entry) => fsp.rm(entry.stagingDir, { recursive: true, force: true })));
       throw error;
     }
   } finally {
     dbHandle.exec('PRAGMA foreign_keys = ON');
   }
 
-  for (const bucket of restoreBuckets) {
-    const sourceBucket = snapshot.buckets.find((entry) => entry.key === bucket.key);
-    if (!sourceBucket) {
-      continue;
-    }
-    restoreCounts.files += await restoreBucketFiles(bucket, sourceBucket.files);
+  // 3. Swap the staged folders in.
+  for (const entry of staged) {
+    await swapStagedBucket(entry, stamp);
+    restoreCounts.files += entry.fileCount;
   }
 
   return {
     snapshot,
+    sourceVersion,
     restoredTables: restoreCounts.tables,
     restoredRows: restoreCounts.rows,
     restoredFiles: restoreCounts.files,
+    droppedColumns,
+    ignoredTables,
+    tablesNotInArchive,
+    verification: verifyDatabase(dbHandle),
   };
 }
 

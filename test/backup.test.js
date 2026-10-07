@@ -6,7 +6,7 @@ import os from 'os';
 import path from 'path';
 import zlib from 'zlib';
 
-import { createBackupArchive, restoreBackupArchive } from '../server/services/backup.js';
+import { compareAppVersions, createBackupArchive, restoreBackupArchive } from '../server/services/backup.js';
 
 function initSchema(database) {
   database.exec(`
@@ -75,6 +75,10 @@ function initSchema(database) {
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);
+}
+
+function gzipJson(value) {
+  return zlib.gzipSync(Buffer.from(JSON.stringify(value)));
 }
 
 function makeTempDir(prefix) {
@@ -255,5 +259,93 @@ describe('backup service', () => {
     assert.equal(restoreDb.prepare('SELECT email FROM users WHERE id = ?').get('legacy-1').email, 'legacy@example.com');
     // Buckets missing from an older archive are left untouched.
     assert.equal(fs.existsSync(path.join(restoreDirs.pluginAssetDir, 'kept.txt')), true);
+  });
+
+  it('reports dropped columns, ignored tables and tables missing from the archive, and verifies the result', async () => {
+    const archive = gzipJson({
+      version: 1,
+      createdAt: '2026-10-07T07:31:59.265Z',
+      app: { version: '1.3.0' },
+      database: {
+        tables: [
+          { name: 'users', columns: ['id', 'email', 'legacy_flag'], rows: [{ id: 'report-1', email: 'report@example.com', legacy_flag: 1 }] },
+          { name: 'retired_table', columns: ['id'], rows: [{ id: 'x' }] },
+        ],
+      },
+      buckets: [],
+      summary: {},
+    });
+
+    const result = await restoreBackupArchive(archive, { dbHandle: restoreDb, ...restoreDirs, currentVersion: '1.3.0' });
+
+    assert.equal(result.sourceVersion, '1.3.0');
+    assert.deepEqual(result.droppedColumns, { users: ['legacy_flag'] });
+    assert.deepEqual(result.ignoredTables, ['retired_table']);
+    assert.ok(result.tablesNotInArchive.includes('apps'));
+    assert.ok(!result.tablesNotInArchive.includes('users'));
+    // users was replaced but user_group_members (not in the archive) still points at
+    // user-1 from the first test: the post-restore check must surface that orphan.
+    assert.deepEqual(result.verification, { integrity: 'ok', foreignKeyViolations: 1 });
+  });
+
+  it('refuses an archive from a newer Frontdoor version unless explicitly allowed', async () => {
+    const archive = gzipJson({
+      version: 1,
+      createdAt: '2026-10-07T07:31:59.265Z',
+      app: { version: '1.4.0' },
+      database: { tables: [{ name: 'users', columns: ['id', 'email'], rows: [{ id: 'newer-1', email: 'newer@example.com' }] }] },
+      buckets: [],
+      summary: {},
+    });
+
+    await assert.rejects(
+      restoreBackupArchive(archive, { dbHandle: restoreDb, ...restoreDirs, currentVersion: '1.3.0' }),
+      (error) => error.statusCode === 409 && error.code === 'backup_from_newer_version',
+    );
+    assert.equal(restoreDb.prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get('newer-1').n, 0);
+
+    const result = await restoreBackupArchive(archive, { dbHandle: restoreDb, ...restoreDirs, currentVersion: '1.3.0', allowNewerVersion: true });
+    assert.equal(result.restoredRows, 1);
+  });
+
+  it('leaves database and files untouched when the archive files cannot be written', async () => {
+    restoreDb.exec('DELETE FROM users');
+    restoreDb.prepare('INSERT INTO users (id, email) VALUES (?, ?)').run('keep-1', 'keep@example.com');
+    writeFile(restoreDirs.appIconDir, 'existing.svg', '<svg/>');
+
+    // "clash" is both a file and a directory in the archive, so staging the bucket fails.
+    const archive = gzipJson({
+      version: 1,
+      createdAt: '2026-10-07T07:31:59.265Z',
+      app: { version: '1.3.0' },
+      database: { tables: [{ name: 'users', columns: ['id', 'email'], rows: [{ id: 'new-1', email: 'new@example.com' }] }] },
+      buckets: [{
+        key: 'app-icons',
+        files: [
+          { path: 'clash', data: Buffer.from('a').toString('base64') },
+          { path: 'clash/inner.svg', data: Buffer.from('b').toString('base64') },
+        ],
+      }],
+      summary: {},
+    });
+
+    await assert.rejects(restoreBackupArchive(archive, { dbHandle: restoreDb, ...restoreDirs, currentVersion: '1.3.0' }));
+
+    assert.deepEqual(restoreDb.prepare('SELECT id FROM users ORDER BY id').all().map((row) => row.id), ['keep-1']);
+    assert.equal(fs.existsSync(path.join(restoreDirs.appIconDir, 'existing.svg')), true);
+    const leftovers = fs.readdirSync(path.dirname(restoreDirs.appIconDir)).filter((name) => name.startsWith(`${path.basename(restoreDirs.appIconDir)}.restore-`));
+    assert.deepEqual(leftovers, []);
+  });
+});
+
+describe('compareAppVersions', () => {
+  it('orders release numbers and letter suffixes', () => {
+    assert.equal(compareAppVersions('1.3.0', '1.3.0'), 0);
+    assert.equal(compareAppVersions('1.2.8d', '1.3.0'), -1);
+    assert.equal(compareAppVersions('1.3.1', '1.3.0'), 1);
+    assert.equal(compareAppVersions('1.2.8c', '1.2.8'), 1);
+    assert.equal(compareAppVersions('1.2.8c', '1.2.8d'), -1);
+    assert.equal(compareAppVersions('1.10.0', '1.9.9'), 1);
+    assert.equal(compareAppVersions(null, '1.3.0'), 0);
   });
 });
