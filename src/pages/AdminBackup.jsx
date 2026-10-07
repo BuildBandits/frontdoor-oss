@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, Database, Download, Upload } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, Database, Download, SearchCheck, Upload } from 'lucide-react';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import TopToastNotice from '../components/TopToastNotice';
@@ -27,6 +27,8 @@ export default function AdminBackup() {
   const [downloadStage, setDownloadStage] = useState('idle');
   const [completedStages, setCompletedStages] = useState([]);
   const [restoreBusy, setRestoreBusy] = useState(false);
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [verifyReport, setVerifyReport] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [notice, setNotice] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
@@ -46,7 +48,8 @@ export default function AdminBackup() {
     };
   }, []);
 
-  const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
+  const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
+  const ui = getUiStrings(language);
   const copy = ui.admin.backup;
   const backupSnapshotSteps = useMemo(() => ([
     { stage: 'database', label: copy.includesDatabase },
@@ -85,6 +88,7 @@ export default function AdminBackup() {
 
   const clearSelectedFile = () => {
     setSelectedFile(null);
+    setVerifyReport(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -198,6 +202,31 @@ export default function AdminBackup() {
   const handleRestoreFile = (event) => {
     const file = event.target.files?.[0] || null;
     setSelectedFile(file);
+    setVerifyReport(null);
+  };
+
+  const verifyBackup = async () => {
+    if (!selectedFile || verifyBusy) {
+      if (!selectedFile) pushNotice('error', copy.restoreMissingFile);
+      return;
+    }
+    setVerifyBusy(true);
+    try {
+      const response = await fetch('/api/backups/verify', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': selectedFile.type || 'application/gzip' },
+        body: await selectedFile.arrayBuffer(),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || copy.verifyFailed);
+      setVerifyReport(payload);
+    } catch (error) {
+      setVerifyReport(null);
+      pushNotice('error', error.message || copy.verifyFailed);
+    } finally {
+      setVerifyBusy(false);
+    }
   };
 
   const restoreBackup = async () => {
@@ -416,6 +445,51 @@ export default function AdminBackup() {
               )}
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={verifyBackup}
+            disabled={verifyBusy || !selectedFile}
+            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <SearchCheck className="h-4 w-4" />
+            {verifyBusy ? copy.verifyBusy : copy.verifyAction}
+          </button>
+
+          {verifyReport && (
+            <div className="mt-4 space-y-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 text-sm text-gray-700 dark:text-gray-200" role="status">
+              <p className="font-semibold text-dark dark:text-gray-100">{copy.verifyTitle}</p>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+                <dt className="text-gray-500 dark:text-gray-400">{copy.verifyCreated}</dt>
+                <dd>{verifyReport.createdAt ? new Date(verifyReport.createdAt).toLocaleString(language) : '-'}</dd>
+                <dt className="text-gray-500 dark:text-gray-400">{copy.verifySourceVersion}</dt>
+                <dd>{verifyReport.sourceVersion ? `${verifyReport.sourceVersion}${verifyReport.sourceCommit ? ` (${verifyReport.sourceCommit})` : ''}` : copy.verifyUnknownVersion}</dd>
+                <dt className="text-gray-500 dark:text-gray-400">{copy.verifyCurrentVersion}</dt>
+                <dd>{verifyReport.currentVersion || '-'}</dd>
+                <dt className="text-gray-500 dark:text-gray-400">{copy.verifyData}</dt>
+                <dd>{copy.verifyTotals.replace('{tables}', String(verifyReport.tables.length)).replace('{rows}', String(verifyReport.totalRows))}</dd>
+                {verifyReport.buckets.map((bucket) => (
+                  <Fragment key={bucket.key}>
+                    <dt className="text-gray-500 dark:text-gray-400">{({ database: copy.includesDatabase, 'app-icons': copy.includesAppIcons, branding: copy.includesBranding, avatars: copy.includesAvatars, plugins: copy.includesPlugins })[bucket.key] || bucket.key}</dt>
+                    <dd>{copy.verifyFiles.replace('{files}', String(bucket.files)).replace('{bytes}', formatBytes(bucket.bytes))}</dd>
+                  </Fragment>
+                ))}
+              </dl>
+              {verifyReport.newerThanCurrent && (
+                <p className="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-amber-800 dark:text-amber-200">
+                  {copy.restoreNewerMessage.replace('{source}', verifyReport.sourceVersion).replace('{current}', verifyReport.currentVersion)}
+                </p>
+              )}
+              {verifyReport.tables.some((table) => table.droppedColumns.length > 0) && (
+                <p>{copy.verifyDroppedColumns} {verifyReport.tables.filter((table) => table.droppedColumns.length > 0).map((table) => `${table.name}: ${table.droppedColumns.join(', ')}`).join('; ')}</p>
+              )}
+              {verifyReport.ignoredTables.length > 0 && <p>{copy.verifyIgnoredTables} {verifyReport.ignoredTables.join(', ')}</p>}
+              {verifyReport.tablesNotInArchive.length > 0 && <p>{copy.verifyTablesNotInArchive} {verifyReport.tablesNotInArchive.join(', ')}</p>}
+              {verifyReport.warnings.length === 0 && verifyReport.tablesNotInArchive.length === 0 && (
+                <p className="text-emerald-700 dark:text-emerald-300">{copy.verifyNoIssues}</p>
+              )}
+            </div>
+          )}
 
           <button
             type="button"

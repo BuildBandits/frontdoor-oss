@@ -360,6 +360,70 @@ async function swapStagedBucket(staged, stamp) {
   }
 }
 
+function parseBackupArchive(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw new UserFacingError('Backup file is empty');
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(zlib.gunzipSync(buffer).toString('utf8'));
+  } catch {
+    throw new UserFacingError('Backup file is not a valid gzipped JSON archive');
+  }
+  const snapshot = normalizeBackupSnapshot(parsed);
+  for (const bucket of snapshot.buckets) {
+    assertSafeBucketPaths(bucket.key, bucket.files);
+  }
+  return snapshot;
+}
+
+// Describes what a restore of this archive would do, without changing anything.
+export async function analyzeBackupArchive(buffer, { dbHandle = db, currentVersion = APP_VERSION } = {}) {
+  const snapshot = parseBackupArchive(buffer);
+  const currentTables = listTables(dbHandle);
+  const archiveTables = snapshot.database.tables;
+
+  const tables = archiveTables
+    .filter((table) => currentTables.includes(table.name))
+    .map((table) => {
+      const currentColumns = new Set(listTableColumns(dbHandle, table.name));
+      return {
+        name: table.name,
+        rows: (table.rows || []).length,
+        droppedColumns: (table.columns || []).filter((column) => !currentColumns.has(column)),
+      };
+    });
+  const ignoredTables = archiveTables.map((table) => table.name).filter((name) => !currentTables.includes(name)).sort();
+  const tablesNotInArchive = currentTables.filter((name) => !archiveTables.some((table) => table.name === name));
+  const buckets = (snapshot.buckets || []).map((bucket) => ({
+    key: bucket.key,
+    files: (bucket.files || []).length,
+    bytes: (bucket.files || []).reduce((total, file) => total + (Number(file.size) || Buffer.byteLength(String(file.data || ''), 'base64')), 0),
+  }));
+  const sourceVersion = snapshot.app?.version || null;
+  const newerThanCurrent = compareAppVersions(sourceVersion, currentVersion) > 0;
+
+  const warnings = [];
+  if (newerThanCurrent) warnings.push('newer_version');
+  if (tables.some((table) => table.droppedColumns.length > 0)) warnings.push('dropped_columns');
+  if (ignoredTables.length > 0) warnings.push('ignored_tables');
+
+  return {
+    createdAt: snapshot.createdAt || null,
+    sourceVersion,
+    sourceCommit: snapshot.app?.commit || null,
+    currentVersion,
+    newerThanCurrent,
+    tables,
+    totalRows: tables.reduce((total, table) => total + table.rows, 0),
+    ignoredTables,
+    tablesNotInArchive,
+    buckets,
+    warnings,
+  };
+}
+
 function verifyDatabase(dbHandle) {
   const integrityRows = dbHandle.prepare('PRAGMA integrity_check').all();
   const integrity = integrityRows.map((row) => Object.values(row)[0]).join('; ') || 'unknown';
@@ -376,18 +440,7 @@ export async function restoreBackupArchive(buffer, {
   currentVersion = APP_VERSION,
   allowNewerVersion = false,
 } = {}) {
-  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
-    throw new UserFacingError('Backup file is empty');
-  }
-
-  let parsed;
-  try {
-    const json = zlib.gunzipSync(buffer).toString('utf8');
-    parsed = JSON.parse(json);
-  } catch {
-    throw new UserFacingError('Backup file is not a valid gzipped JSON archive');
-  }
-  const snapshot = normalizeBackupSnapshot(parsed);
+  const snapshot = parseBackupArchive(buffer);
   const sourceVersion = snapshot.app?.version || null;
 
   if (!allowNewerVersion && compareAppVersions(sourceVersion, currentVersion) > 0) {
@@ -395,10 +448,6 @@ export async function restoreBackupArchive(buffer, {
       `This backup was created by Frontdoor ${sourceVersion}, which is newer than the installed ${currentVersion}.`,
       { statusCode: 409, code: 'backup_from_newer_version', details: { sourceVersion, currentVersion } },
     );
-  }
-
-  for (const bucket of snapshot.buckets) {
-    assertSafeBucketPaths(bucket.key, bucket.files);
   }
 
   const dbTables = new Map(snapshot.database.tables.map((table) => [table.name, table]));

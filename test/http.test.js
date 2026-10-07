@@ -157,6 +157,31 @@ test('SSO init reports 501 when Microsoft SSO is not configured', async () => {
   assert.deepEqual(await res.json(), { error: 'Microsoft SSO not configured' });
 });
 
+test('backup verify describes an archive for owners only and changes nothing', async () => {
+  const usersBefore = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  const body = zlib.gzipSync(Buffer.from(JSON.stringify({
+    version: 1,
+    createdAt: new Date().toISOString(),
+    app: { version: '1.0.0' },
+    database: { tables: [{ name: 'users', columns: ['id', 'email'], rows: [{ id: 'v-1', email: 'v@example.com' }] }] },
+    buckets: [],
+    summary: {},
+  })));
+  const send = (role) => request('/api/backups/verify', { role, method: 'POST', headers: { 'Content-Type': 'application/gzip' }, body });
+
+  assert.equal((await send('admin')).status, 403);
+  const res = await send('owner');
+  assert.equal(res.status, 200);
+  const report = await res.json();
+  assert.equal(report.sourceVersion, '1.0.0');
+  assert.equal(report.totalRows, 1);
+  assert.equal(report.newerThanCurrent, false);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, usersBefore);
+
+  const bad = await request('/api/backups/verify', { role: 'owner', method: 'POST', headers: { 'Content-Type': 'application/gzip' }, body: Buffer.from('nope') });
+  assert.equal(bad.status, 400);
+});
+
 // Keep last: it replaces the users table that the other tests rely on.
 test('backup restore refuses newer archives unless allowed and reports whether the session survives', async () => {
   const owner = db.prepare('SELECT * FROM users WHERE id = ?').get('http-test-owner');
