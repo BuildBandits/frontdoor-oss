@@ -210,6 +210,24 @@ test('backup export options and encrypted archives over HTTP', async () => {
   assert.ok(report.tablesNotInArchive.includes('access_logs'));
 });
 
+test('raw database export is owner-only and can be encrypted', async () => {
+  assert.equal((await request('/api/backups/database', { role: 'admin' })).status, 403);
+
+  const plain = await request('/api/backups/database', { role: 'owner' });
+  assert.equal(plain.status, 200);
+  assert.match(plain.headers.get('content-disposition'), /frontdoor-database-.+\.db"/);
+  const body = Buffer.from(await plain.arrayBuffer());
+  assert.equal(body.subarray(0, 15).toString('latin1'), 'SQLite format 3');
+
+  const tooShort = await request('/api/backups/database', { role: 'owner', headers: { 'X-Backup-Passphrase': 'short' } });
+  assert.equal(tooShort.status, 400);
+
+  const encrypted = await request('/api/backups/database', { role: 'owner', headers: { 'X-Backup-Passphrase': 'a raw export passphrase' } });
+  assert.equal(encrypted.status, 200);
+  assert.match(encrypted.headers.get('content-disposition'), /\.db\.enc"/);
+  assert.equal(Buffer.from(await encrypted.arrayBuffer()).subarray(0, 8).toString('ascii'), 'FDBKENC1');
+});
+
 // Keep last: it replaces the users table that the other tests rely on.
 test('backup restore refuses newer archives unless allowed and reports whether the session survives', async () => {
   const owner = db.prepare('SELECT * FROM users WHERE id = ?').get('http-test-owner');

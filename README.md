@@ -492,6 +492,7 @@ Schema changes are applied automatically at startup. Table rebuilds run inside a
 ## Upgrading an existing installation
 
 1. **Back up.** In **Personalizza (Customize) → Maintenance**, download a backup (database rows and schema, app icons, logo, avatars and plugin files, plus the Frontdoor version and commit that produced it). Tick *Leave out access and audit logs* for a smaller file, and set a passphrase to encrypt it; keep the passphrase safe, it cannot be recovered. With the container stopped (`docker compose stop`), also copy the SQLite file from the volume, e.g. `docker cp <container>:/data/frontdoor.db ./frontdoor.db.bak`, including `frontdoor.db-wal` if present.
+   For an exact copy of the database file you can also use *Download database file (.db)* on the same page, which works while Frontdoor is running. Encrypted files (`.enc`) can be decrypted with `FRONTDOOR_BACKUP_PASSPHRASE=... npm run backup:decrypt -- <file.enc>`.
 2. **Rehearse (recommended).** Start the new image locally against a copy of the database and check the `[startup]` lines in the logs; alternatively restore the backup into a fresh local installation.
 3. **Upgrade.** Pull or build the new image and start it on the same `/data` volume. Migrations run on startup.
 4. **Verify.** Sign in with Microsoft SSO, open the admin pages, and if `ENTRA_GROUP_SYNC=true` run a Force Sync.

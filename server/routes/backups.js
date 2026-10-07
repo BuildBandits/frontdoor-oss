@@ -5,6 +5,7 @@ import {
   analyzeBackupArchive,
   assertValidPassphrase,
   createBackupArchive,
+  exportDatabaseFile,
   isEncryptedBackup,
   restoreBackupArchive,
 } from '../services/backup.js';
@@ -44,6 +45,19 @@ router.get('/export', authenticate, isOwner, async (req, res) => {
   } catch (error) {
     console.error('Backup export failed:', error.message);
     respondWithError(res, error, { status: 500, code: 'failed_to_create_backup' });
+  }
+});
+
+// Raw SQLite copy for upgrade rehearsals; optional passphrase in X-Backup-Passphrase.
+router.get('/database', authenticate, isOwner, async (req, res) => {
+  try {
+    const { buffer, fileName } = await exportDatabaseFile({ passphrase: readPassphrase(req) });
+    res.setHeader('Content-Type', isEncryptedBackup(buffer) ? 'application/octet-stream' : 'application/vnd.sqlite3');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error('Database export failed:', error.message);
+    respondWithError(res, error, { status: 500, code: 'failed_to_export_database' });
   }
 });
 
