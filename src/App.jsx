@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router';
 import { useAuthStore } from './stores/authStore';
 import Layout from './components/Layout';
+import ScrollToTop from './components/ScrollToTop';
 import api from './services/api';
 import { getUiStrings, normalizeLanguage } from './i18n';
 import { useColorScheme } from './hooks/useColorScheme';
@@ -124,6 +125,7 @@ function AppRoutes() {
 
   return (
     <Suspense fallback={<div className="p-8 text-sm text-gray-500 dark:text-gray-400">{ui.common.loading}</div>}>
+      <ScrollToTop />
       <Routes>
         {coreRoutes.map((route) => {
           const isPluginAdminRoute = route.path.startsWith('/admin/plugins');
