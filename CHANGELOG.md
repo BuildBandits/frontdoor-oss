@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+## [1.3.1] — 2026-10-07
+
+Backup and restore overhaul (streamed `.tar.gz` format with schema and app metadata, check before restore, atomic and version-aware restore, optional encryption, raw database export and an upgrade rehearsal script), automatic deactivation of users removed from Microsoft Entra, search in the Visible apps list and a local Docker demo without Entra.
+
 ### Added
 - **Richer backups**: backup archives now record the Frontdoor version, commit, Node.js and SQLite versions that produced them, and the database schema (`CREATE TABLE`/index SQL) alongside the rows, so an exact copy of the source database can be rebuilt to rehearse upgrades. Plugin package files (`PLUGIN_ASSET_DIR`) are now included and restored. Archives from earlier versions still restore; folders missing from an older archive are left untouched.
 - **Safer restore**: restoring a backup created by a newer Frontdoor version now asks for confirmation (HTTP `409 backup_from_newer_version` unless `?allowNewer=true`). Files are written to staging folders before the database transaction and swapped in only after it commits, so a failure leaves both database and files unchanged. The result reports skipped columns, archive tables this version does not have, tables missing from the archive (left unchanged), an `integrity_check` / `foreign_key_check` of the restored database, and whether the signed-in owner still exists; the page reloads in place when the session survives and asks to sign in again otherwise.
@@ -511,4 +515,4 @@ Covers the changes shipped as 1.2.2 through 1.2.8d (tags `v1.2.8` and `v1.2.8c` 
 - [x] Dark mode (light, dark and auto per user)
 - [x] i18n support (English and Italian)
 - [ ] Enable the plugin platform (currently locked off)
-- [ ] Backup and restore improvements (#44)
+- [x] Backup and restore improvements (#44)
