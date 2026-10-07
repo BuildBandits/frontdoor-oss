@@ -3,6 +3,20 @@ import { X } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, resolveAppLanguage } from '../i18n';
 
+const normalizeTag = (tag) => tag.trim().toLowerCase();
+
+const normalizeValue = (tags) => {
+  const seen = new Set();
+  const normalized = [];
+  for (const tag of tags) {
+    const next = normalizeTag(tag);
+    if (!next || seen.has(next)) continue;
+    seen.add(next);
+    normalized.push(next);
+  }
+  return normalized;
+};
+
 export default function TagInput({
   value = [],
   onChange,
@@ -22,20 +36,6 @@ export default function TagInput({
   const resolvedSuggestionsLabel = suggestionsLabel || ui.admin.apps.tagSuggestionsTitle;
   const resolvedAvailableTagsLabel = availableTagsLabel || ui.admin.apps.availableTagsTitle;
   const resolvedUseSuggestionLabel = useSuggestionLabel || ui.admin.apps.useExistingTag;
-
-  const normalizeTag = (tag) => tag.trim().toLowerCase();
-
-  const normalizeValue = (tags) => {
-    const seen = new Set();
-    const normalized = [];
-    for (const tag of tags) {
-      const next = normalizeTag(tag);
-      if (!next || seen.has(next)) continue;
-      seen.add(next);
-      normalized.push(next);
-    }
-    return normalized;
-  };
 
   const addTag = (text) => {
     const tag = normalizeTag(text);

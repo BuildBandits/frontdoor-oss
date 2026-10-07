@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useState } from 'react';
 import {
   AlertCircle,
   Boxes,
@@ -141,32 +141,7 @@ export default function AdminPlugins() {
   const backendEnabledCount = serverPlugins.filter((plugin) => plugin.backendEnabled).length;
   const enabledServerCount = serverPlugins.filter((plugin) => plugin.enabled && plugin.approved).length;
 
-  const manifestPreview = useMemo(() => ({
-    id: form.id.trim(),
-    name: form.name.trim(),
-    version: form.version.trim() || '1.0.0',
-    description: form.description.trim(),
-    author: form.author.trim(),
-    homepage: form.homepage.trim(),
-    entry: form.entry.trim(),
-    permissions: splitInputList(form.permissions),
-    roles: splitInputList(form.roles),
-    backend: {
-      enabled: form.backendEnabled,
-      url: form.backendUrl.trim(),
-      eventSubscriptions: splitInputList(form.eventSubscriptions),
-    },
-  }), [form]);
-  const parsedPackagePreview = useMemo(() => {
-    if (!form.packageSource.trim()) return null;
-    try {
-      return JSON.parse(form.packageSource);
-    } catch {
-      return { error: t.invalidPackageJson };
-    }
-  }, [form.packageSource, t.invalidPackageJson]);
   const draftPackage = useMemo(() => buildPluginPackageFromForm(form), [form]);
-  const draftPackageAnalysis = useMemo(() => analyzePluginPackage(draftPackage), [draftPackage]);
 
   async function loadServerPlugins() {
     try {
@@ -179,8 +154,12 @@ export default function AdminPlugins() {
     }
   }
 
-  useEffect(() => {
+  const loadInitialPlugins = useEffectEvent(() => {
     void loadServerPlugins();
+  });
+
+  useEffect(() => {
+    loadInitialPlugins();
   }, []);
 
   function resetForm() {
@@ -629,6 +608,12 @@ export default function AdminPlugins() {
           </div>
         </div>
       </div>
+
+      {serverError && (
+        <div className="mb-6 rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-700 dark:text-red-300" role="alert">
+          {serverError}
+        </div>
+      )}
 
       {serverMessage && (
         <div className={`mb-6 rounded-2xl border px-4 py-3 text-sm ${

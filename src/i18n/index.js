@@ -3,7 +3,6 @@ import it from './it.json' with { type: 'json' };
 import {
   DEFAULT_LANGUAGE,
   SUPPORTED_LANGUAGES,
-  SUPPORTED_LANGUAGE_CODES,
   isSupportedLanguage,
 } from '../../shared/languages.js';
 

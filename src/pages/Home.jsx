@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useEffectEvent, useMemo, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { X, Star, LayoutGrid, List, Rows3, AppWindow, RefreshCw } from 'lucide-react';
 import {
@@ -468,7 +468,7 @@ export default function Home() {
       window.removeEventListener('resize', updateSpotlight);
       window.removeEventListener('scroll', updateSpotlight, true);
     };
-  }, [currentTourStep, tourOpen]);
+  }, [currentTourStep, isMobileViewport, tourOpen]);
 
   const toggleFavorite = useCallback((appId) => {
     setFavorites((prev) => {
@@ -643,34 +643,36 @@ export default function Home() {
     setTourStep((value) => Math.min(totalTourSteps - 1, value + 1));
   };
 
+  // Effect event: always uses the latest step handlers without re-subscribing on every render.
+  const onTourKeyDown = useEffectEvent((event) => {
+    const activeElement = document.activeElement;
+    const isTypingField = activeElement && (
+      activeElement.tagName === 'INPUT'
+      || activeElement.tagName === 'TEXTAREA'
+      || activeElement.tagName === 'SELECT'
+      || activeElement.isContentEditable
+    );
+
+    if (isTypingField) return;
+
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      handleTourNext();
+    }
+
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      handleTourPrevious();
+    }
+  });
+
   useEffect(() => {
     if (!tourOpen) return undefined;
 
-    const onKeyDown = (event) => {
-      const activeElement = document.activeElement;
-      const isTypingField = activeElement && (
-        activeElement.tagName === 'INPUT'
-        || activeElement.tagName === 'TEXTAREA'
-        || activeElement.tagName === 'SELECT'
-        || activeElement.isContentEditable
-      );
-
-      if (isTypingField) return;
-
-      if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        handleTourNext();
-      }
-
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        handleTourPrevious();
-      }
-    };
-
+    const onKeyDown = (event) => onTourKeyDown(event);
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleTourNext, handleTourPrevious, tourOpen]);
+  }, [tourOpen]);
 
   const handleToggleGroupByTag = async () => {
     if (mobileCompactViewForced) return;

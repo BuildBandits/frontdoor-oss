@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { BookOpen, ChevronRight, Database, Eye, HardDrive, Home, Image, LogIn, PlugZap, RotateCcw, Save, Settings, ShieldCheck, Smartphone, SlidersHorizontal, Trash2, Type, Users, Wrench } from 'lucide-react';
 import { Link as RouterLink, useLocation } from 'react-router';
 import api from '../services/api';
@@ -300,9 +300,13 @@ export default function Customization() {
     });
   };
 
-  useEffect(() => {
+  const loadInitialData = useEffectEvent(() => {
     loadBranding();
     loadCacheStats();
+  });
+
+  useEffect(() => {
+    loadInitialData();
   }, []);
 
   useEffect(() => {

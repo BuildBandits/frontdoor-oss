@@ -159,11 +159,6 @@ function removePluginEntries(pluginId) {
   }
 }
 
-function canUseAccess(access, roles) {
-  if (Array.isArray(roles) && roles.length > 0) return true;
-  return access === PLUGIN_ACCESS.AUTHENTICATED;
-}
-
 function renderIcon(icon) {
   if (!icon) return null;
   if (typeof icon === 'string') {

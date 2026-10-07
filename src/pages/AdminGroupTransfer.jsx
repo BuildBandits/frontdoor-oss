@@ -29,7 +29,6 @@ export default function AdminGroupTransfer() {
 
   const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
   const ui = getUiStrings(language);
-  const t = ui.admin.common;
   const g = ui.admin.groups;
 
   useEffect(() => {
