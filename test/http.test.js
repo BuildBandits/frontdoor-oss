@@ -126,6 +126,29 @@ test('query strings with bracket syntax do not break handlers', async () => {
   assert.ok(Array.isArray((await res.json()).logs));
 });
 
+test('plugin routes answer 404, not 500, for malformed plugin ids', async () => {
+  // The UI keeps the plugin system locked off; enable it in the isolated test DB.
+  db.prepare("UPDATE branding_settings SET plugins_enabled = 1 WHERE id = 'default'").run();
+  try {
+    const badId = encodeURIComponent('__Not A Valid Id__');
+    const json = { 'Content-Type': 'application/json' };
+    const cases = [
+      ['GET', `/api/plugins/${badId}`],
+      ['DELETE', `/api/plugins/${badId}`],
+      ['POST', `/api/plugins/${badId}/approve`],
+      ['POST', `/api/plugins/${badId}/revoke`],
+      ['POST', `/api/plugins/${badId}/test-event/auth.login`],
+    ];
+    for (const [method, pathname] of cases) {
+      const res = await request(pathname, { role: 'owner', method, headers: json, body: method === 'GET' ? undefined : '{}' });
+      assert.equal(res.status, 404, `${method} ${pathname}`);
+      assert.deepEqual(await res.json(), { error: 'Plugin not found' }, `${method} ${pathname}`);
+    }
+  } finally {
+    db.prepare("UPDATE branding_settings SET plugins_enabled = 0 WHERE id = 'default'").run();
+  }
+});
+
 test('SSO init reports 501 when Microsoft SSO is not configured', async () => {
   // The MSAL client is built at import time from AZURE_* env vars, which tests do not set.
   const res = await request('/api/auth/microsoft');
