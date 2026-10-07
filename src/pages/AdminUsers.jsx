@@ -267,6 +267,7 @@ export default function AdminUsers() {
     if (filterRole !== 'all' && u.role !== filterRole) return false;
     if (filterActive === 'active' && !u.is_active) return false;
     if (filterActive === 'inactive' && u.is_active) return false;
+    if (filterActive === 'entraMissing' && !u.entra_missing_since) return false;
     if (filterPersonalization === 'customized' && !hasAtLeastOnePersonalization(u)) return false;
     if (filterPersonalization === 'none' && hasAtLeastOnePersonalization(u)) return false;
     if (search.trim()) {
@@ -632,6 +633,7 @@ export default function AdminUsers() {
               { value: 'all', label: t.allStatuses },
               { value: 'active', label: t.activeOnly },
               { value: 'inactive', label: t.inactiveOnly },
+              { value: 'entraMissing', label: u.entraMissingOnly },
             ]}
             className="min-w-[190px]"
           />
@@ -729,6 +731,11 @@ export default function AdminUsers() {
                         {!user.is_active && (
                           <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-sm font-medium">{t.inactive}</span>
                         )}
+                        {user.entra_missing_since && (
+                          <Tooltip content={u.entraMissingSince.replace('{date}', formatDate(user.entra_missing_since))}>
+                            <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 px-1.5 py-0.5 rounded-sm font-medium">{u.entraMissingBadge}</span>
+                          </Tooltip>
+                        )}
                       </div>
                       <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user.email}</p>
                     </div>
@@ -766,6 +773,11 @@ export default function AdminUsers() {
                             t.status,
                             userDetail.user.is_active ? t.active : t.inactive,
                             { valueClassName: userDetail.user.is_active ? 'text-accent-dark font-medium' : 'text-red-500 font-medium' }
+                          )}
+                          {userDetail.user.entra_missing_since && renderInfoRow(
+                            u.entraMissingLabel,
+                            formatDate(userDetail.user.entra_missing_since),
+                            { valueClassName: 'text-amber-600 dark:text-amber-400 font-medium' }
                           )}
                           {renderInfoRow(t.registered, formatDate(userDetail.user.created_at))}
                           {renderInfoRow(t.lastLogin, formatDate(userDetail.user.last_login))}

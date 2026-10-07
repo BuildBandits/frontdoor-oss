@@ -316,8 +316,13 @@ export default function AdminGroups() {
         .replace('{usersSynced}', summary.usersSynced)
         .replace('{usersConsidered}', summary.usersConsidered)
         .replace('{discoveredGroups}', summary.discoveredGroups)];
-      if (summary.usersNotFound > 0) {
-        parts.push(g.forceSyncUsersNotFound.replace('{count}', summary.usersNotFound));
+      const usersDeactivated = summary.usersDeactivated || 0;
+      const usersKeptActive = (summary.usersNotFound || 0) - usersDeactivated;
+      if (usersDeactivated > 0) {
+        parts.push(g.forceSyncUsersDeactivated.replace('{count}', usersDeactivated));
+      }
+      if (usersKeptActive > 0) {
+        parts.push(g.forceSyncUsersKeptActive.replace('{count}', usersKeptActive));
       }
       if (errorCount > 0) {
         const detail = `${firstError?.message ? `: ${firstError.message}` : ''}${firstError?.hint ? ` (${firstError.hint})` : ''}`;

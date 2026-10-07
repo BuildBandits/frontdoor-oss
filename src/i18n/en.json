@@ -55,6 +55,7 @@
       "sso_failed": "Authentication failed. Try again.",
       "sso_init_failed": "Microsoft connection failed. Try again.",
       "invalid_state": "Session expired. Try again.",
+      "account_disabled": "Your Frontdoor account is disabled. Contact your administrator.",
       "generic": "An error occurred. Try again."
     }
   },
@@ -994,7 +995,8 @@
       "bulkDeleteError": "Error during bulk deletion",
       "forceSyncComplete": "Sync complete: {usersSynced}/{usersConsidered} users, {discoveredGroups} groups",
       "forceSyncError": "Error during force sync",
-      "forceSyncUsersNotFound": "{count} users not found in the directory, skipped",
+      "forceSyncUsersDeactivated": "{count} users no longer found in Microsoft Entra were deactivated (Users, status \"Not found in Entra\")",
+      "forceSyncUsersKeptActive": "{count} users not found in Microsoft Entra were kept active because they are the configured owner or the last administrator",
       "forceSyncErrors": "{count} errors",
       "entraGroupImported": "Entra group imported",
       "entraGroupsImported": "Entra groups imported",
@@ -1089,6 +1091,10 @@
       "personalizationFilterLabel": "Personalizations",
       "allPersonalizationStates": "All",
       "personalizedOnly": "With customizations",
+      "entraMissingOnly": "Not found in Entra",
+      "entraMissingBadge": "Not in Entra",
+      "entraMissingSince": "Not found in Microsoft Entra since {date}",
+      "entraMissingLabel": "Not found in Entra since",
       "noPersonalizations": "Without customizations",
       "homeView": "Home view",
       "languageSetting": "Language",

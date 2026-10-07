@@ -104,11 +104,15 @@ router.post('/entra/import', authenticate, isAdminEditor, (req, res) => {
 
 router.post('/entra/force-sync', authenticate, isAdminEditor, async (req, res) => {
   try {
-    const result = await forceSyncAllEntraUsers();
+    const { deactivatedUsers, ...result } = await forceSyncAllEntraUsers();
+    for (const user of deactivatedUsers) {
+      logRbacAudit(req.user.id, 'deactivate', 'user_status', user.id, { email: user.email, role: user.role, reason: 'not_found_in_entra' });
+    }
     logRbacAudit(req.user.id, 'sync', 'group', null, {
       usersSynced: result.usersSynced,
       usersConsidered: result.usersConsidered,
       usersNotFound: result.usersNotFound,
+      usersDeactivated: result.usersDeactivated,
       discoveredGroups: result.discoveredGroups,
       errors: result.errors,
     });
