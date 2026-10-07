@@ -227,11 +227,22 @@ router.get('/microsoft/callback', async (req, res) => {
       user = db.prepare('SELECT * FROM users WHERE email = ? AND is_active = 1').get(email);
     }
 
+    // A deactivated account (by an admin, or because it was missing from Entra)
+    // stays blocked until an admin reactivates it; creating a new one would clash
+    // with its email and Microsoft ID.
+    if (!user) {
+      const disabled = db.prepare('SELECT id FROM users WHERE (microsoft_id = ? OR email = ?) AND is_active = 0').get(microsoftId, email);
+      if (disabled) {
+        console.warn(`Login refused for deactivated user [${disabled.id}]`);
+        return res.redirect(`${frontendUrl}/login?error=account_disabled`);
+      }
+    }
+
     if (user) {
       // Existing user (either pre-registered or returning) — update profile
       const shouldPromote = adminEmails.includes(email.toLowerCase()) && user.role !== 'owner';
       db.prepare(
-        `UPDATE users SET microsoft_id = ?, display_name = ?, last_login = datetime('now'), last_activity_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
+        `UPDATE users SET microsoft_id = ?, display_name = ?, entra_missing_since = NULL, last_login = datetime('now'), last_activity_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
       ).run(microsoftId, displayName, user.id);
       if (shouldPromote) {
         db.prepare(`UPDATE users SET role = 'owner', updated_at = datetime('now') WHERE id = ?`).run(user.id);

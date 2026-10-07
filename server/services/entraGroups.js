@@ -106,6 +106,7 @@ async function fetchGraphPage(url, accessToken) {
     const code = graphErrorCode(body);
     const error = new Error(`Microsoft Graph request failed with status ${response.status}${code ? ` (${code})` : ''}`);
     error.status = response.status;
+    error.graphCode = code;
     error.body = body;
     error.hint = formatGraphAccessHint(error, url.includes('/users/') ? 'force-sync' : 'login');
     throw error;
@@ -445,12 +446,37 @@ export function importEntraGroups(groupIds) {
   return syncTransaction();
 }
 
+function isProtectedFromAutoDeactivation(user) {
+  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean);
+  if (adminEmails.includes((user.email || '').trim().toLowerCase())) return true;
+  if (!['owner', 'admin'].includes(user.role)) return false;
+  const otherEditors = db.prepare("SELECT COUNT(*) AS count FROM users WHERE role IN ('owner', 'admin') AND is_active = 1 AND id != ?").get(user.id).count;
+  return otherEditors === 0;
+}
+
+// A user Graph no longer finds is deactivated (history kept), unless that would
+// lock out the compose owner or the last active admin editor.
+function handleUserMissingFromEntra(user) {
+  if (isProtectedFromAutoDeactivation(user)) {
+    db.prepare("UPDATE users SET entra_missing_since = COALESCE(entra_missing_since, datetime('now')) WHERE id = ?").run(user.id);
+    return false;
+  }
+  db.prepare(`
+    UPDATE users
+    SET is_active = 0, entra_missing_since = COALESCE(entra_missing_since, datetime('now')), updated_at = datetime('now')
+    WHERE id = ?
+  `).run(user.id);
+  return true;
+}
+
 export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppToken } = {}) {
   if (!isEntraGroupSyncEnabled()) {
     return {
       usersConsidered: 0,
       usersSynced: 0,
       usersNotFound: 0,
+      usersDeactivated: 0,
+      deactivatedUsers: [],
       discoveredGroups: 0,
       membershipsAdded: 0,
       membershipsRemoved: 0,
@@ -459,7 +485,7 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
   }
 
   const users = db.prepare(`
-    SELECT id, email, microsoft_id
+    SELECT id, email, role, microsoft_id, entra_missing_since
     FROM users
     WHERE microsoft_id IS NOT NULL AND is_active = 1
     ORDER BY email
@@ -488,6 +514,8 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
       usersConsidered: 0,
       usersSynced: 0,
       usersNotFound: 0,
+      usersDeactivated: 0,
+      deactivatedUsers: [],
       discoveredGroups: tenantGroupsDiscovered,
       membershipsAdded: 0,
       membershipsRemoved: 0,
@@ -499,6 +527,7 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
 
   let usersSynced = 0;
   let usersNotFound = 0;
+  const deactivatedUsers = [];
   let membershipsAdded = 0;
   let membershipsRemoved = 0;
 
@@ -506,13 +535,19 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
     try {
       const groups = await fetchEntraGroupsForUserId(user.microsoft_id, accessToken);
       const result = syncUserEntraGroups(user.id, groups);
+      if (user.entra_missing_since) {
+        db.prepare('UPDATE users SET entra_missing_since = NULL WHERE id = ?').run(user.id);
+      }
       usersSynced += 1;
       membershipsAdded += result.membershipsAdded;
       membershipsRemoved += result.membershipsRemoved;
     } catch (error) {
-      // Deleted from the directory: not a sync failure. Local memberships are left as they are.
-      if (error.status === 404) {
+      // Deleted from the directory: not a sync failure. The user is deactivated,
+      // memberships and history are kept so an admin can still review or delete them.
+      // Only Graph's "resource not found" counts: any other 404 is a real error.
+      if (error.status === 404 && error.graphCode === 'Request_ResourceNotFound') {
         usersNotFound += 1;
+        if (handleUserMissingFromEntra(user)) deactivatedUsers.push({ id: user.id, email: user.email, role: user.role });
         continue;
       }
       const hint = formatGraphAccessHint(error, 'force-sync');
@@ -528,6 +563,8 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
     usersConsidered: users.length,
     usersSynced,
     usersNotFound,
+    usersDeactivated: deactivatedUsers.length,
+    deactivatedUsers,
     discoveredGroups: tenantGroupsDiscovered,
     membershipsAdded,
     membershipsRemoved,

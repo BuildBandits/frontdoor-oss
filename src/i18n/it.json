@@ -55,6 +55,7 @@
       "sso_failed": "Errore durante l'autenticazione. Riprova.",
       "sso_init_failed": "Errore di connessione con Microsoft. Riprova.",
       "invalid_state": "Sessione scaduta. Riprova.",
+      "account_disabled": "Il tuo account Frontdoor è disattivato. Contatta l'amministratore.",
       "generic": "Si è verificato un errore. Riprova."
     }
   },
@@ -994,7 +995,8 @@
       "bulkDeleteError": "Errore nella cancellazione multipla",
       "forceSyncComplete": "Sync completata: {usersSynced}/{usersConsidered} utenti, {discoveredGroups} gruppi",
       "forceSyncError": "Errore durante Force Sync",
-      "forceSyncUsersNotFound": "{count} utenti non trovati nella directory, saltati",
+      "forceSyncUsersDeactivated": "{count} utenti non più presenti in Microsoft Entra sono stati disattivati (Utenti, stato \"Non trovati in Entra\")",
+      "forceSyncUsersKeptActive": "{count} utenti non trovati in Microsoft Entra sono rimasti attivi perché sono l'owner configurato o l'ultimo amministratore",
       "forceSyncErrors": "{count} errori",
       "entraGroupImported": "Gruppo Entra importato",
       "entraGroupsImported": "Gruppi Entra importati",
@@ -1089,6 +1091,10 @@
       "personalizationFilterLabel": "Personalizzazioni",
       "allPersonalizationStates": "Tutte",
       "personalizedOnly": "Con personalizzazioni",
+      "entraMissingOnly": "Non trovati in Entra",
+      "entraMissingBadge": "Non in Entra",
+      "entraMissingSince": "Non trovato in Microsoft Entra dal {date}",
+      "entraMissingLabel": "Non trovato in Entra dal",
       "noPersonalizations": "Senza personalizzazioni",
       "homeView": "Vista Home",
       "languageSetting": "Lingua",

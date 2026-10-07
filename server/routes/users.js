@@ -34,7 +34,7 @@ router.get('/', authenticate, isAdminViewer, (req, res) => {
   const users = db
     .prepare(`
       SELECT u.id, u.email, u.display_name, u.role, u.avatar_color, u.is_active, u.last_login, u.last_activity_at, u.created_at,
-        u.home_desktop_view, u.preferred_language, u.preferred_timezone, u.preferred_color_scheme, u.app_order, u.app_order_updated_at,
+        u.entra_missing_since, u.home_desktop_view, u.preferred_language, u.preferred_timezone, u.preferred_color_scheme, u.app_order, u.app_order_updated_at,
         (SELECT COUNT(*) FROM user_group_members WHERE user_id = u.id) AS group_count
       FROM users u ORDER BY u.display_name
     `)
@@ -148,7 +148,7 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
 // Get single user with group memberships (viewer roles only)
 router.get('/:id', authenticate, isAdminViewer, (req, res) => {
   const user = db
-    .prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, last_login, last_activity_at, created_at FROM users WHERE id = ?')
+    .prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, entra_missing_since, last_login, last_activity_at, created_at FROM users WHERE id = ?')
     .get(req.params.id);
 
   if (!user) return res.status(404).json({ error: 'User not found' });
@@ -285,7 +285,12 @@ router.put('/:id/active', authenticate, isAdminEditor, (req, res) => {
     return res.status(400).json({ error: 'Cannot deactivate the last active admin editor' });
   }
 
-  db.prepare('UPDATE users SET is_active = ?, updated_at = datetime(\'now\') WHERE id = ?').run(activeValue, id);
+  // Reactivating clears the "not found in Entra" mark; the next force sync sets it again if the user is still missing.
+  db.prepare(`
+    UPDATE users
+    SET is_active = ?, entra_missing_since = CASE WHEN ? = 1 THEN NULL ELSE entra_missing_since END, updated_at = datetime('now')
+    WHERE id = ?
+  `).run(activeValue, activeValue, id);
   logRbacAudit(req.user.id, activeValue ? 'activate' : 'deactivate', 'user_status', id, { email: user.email, role: user.role });
   res.json({ is_active: activeValue });
 });

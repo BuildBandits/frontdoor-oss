@@ -323,6 +323,8 @@ If `ENTRA_GROUP_SYNC=true`, Frontdoor discovers Microsoft Entra groups at login 
 
 Because of the app-only calls, your app registration must have the Microsoft Graph **application** permissions listed in Step 4 (`User.Read.All`, `GroupMember.Read.All`, optionally `Group.Read.All`), all with admin consent. The first time you enable `ENTRA_GROUP_SYNC=true`, add the permissions in Azure, grant consent, then trigger a fresh login or Force Sync to populate the cache.
 
+Force Sync also handles people who left the organization: when Graph answers `404 Request_ResourceNotFound` for a linked user, Frontdoor deactivates that user (groups, preferences and access history are kept) and marks them as *Not found in Entra* in **Admin → Users**, where the status filter lists them and they can be deleted for good or reactivated. The owners listed in `ADMIN_EMAILS` and the last active administrator are only marked, never deactivated. Deactivated users cannot sign in until an admin reactivates them; the mark is cleared when the user is found again or reactivated.
+
 Important: discovery and import are separate steps. If you delete imported Entra groups from Frontdoor's local database, they will not be recreated automatically as active RBAC groups on the next login. They must first be rediscovered by a successful login or Force Sync, then imported again from the Entra import modal.
 
 ### Azure Entra ID (formerly Azure AD) Setup

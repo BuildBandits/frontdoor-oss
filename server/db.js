@@ -562,6 +562,9 @@ db.exec(`
     AND TRIM(COALESCE(app_order, '')) <> ''
 `);
 
+// Set by the Entra force sync when Microsoft Graph no longer finds the user (after the users table rebuilds above).
+ensureColumn('users', 'entra_missing_since', 'entra_missing_since TEXT');
+
 // --- RBAC Bootstrap: "default" group + backfill ---
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
 

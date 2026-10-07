@@ -121,6 +121,25 @@ test('role guards: admin viewers read, editors write, owners only for logs', asy
   assert.equal((await request('/api/logs/audit', { role: 'owner' })).status, 200);
 });
 
+test('users not found in Entra are listed with their mark, and reactivation clears it', async () => {
+  db.prepare("INSERT INTO users (id, email, display_name, role, is_active, entra_missing_since) VALUES ('http-test-gone', 'gone@http-test.local', 'Gone', 'user', 0, '2026-10-01 08:00:00')").run();
+
+  const list = await (await request('/api/users', { role: 'admin' })).json();
+  assert.equal(list.users.find((user) => user.id === 'http-test-gone').entra_missing_since, '2026-10-01 08:00:00');
+  const detail = await (await request('/api/users/http-test-gone', { role: 'admin' })).json();
+  assert.equal(detail.user.entra_missing_since, '2026-10-01 08:00:00');
+
+  const reactivate = await request('/api/users/http-test-gone/active', {
+    role: 'admin',
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_active: true }),
+  });
+  assert.equal(reactivate.status, 200);
+  assert.deepEqual(db.prepare('SELECT is_active, entra_missing_since FROM users WHERE id = ?').get('http-test-gone'), { is_active: 1, entra_missing_since: null });
+  db.prepare("DELETE FROM users WHERE id = 'http-test-gone'").run();
+});
+
 test('query strings with bracket syntax do not break handlers', async () => {
   const res = await request('/api/logs/audit?actor_ids[]=1&q[a]=b&page=1', { role: 'owner' });
   assert.equal(res.status, 200);
