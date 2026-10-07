@@ -7,8 +7,8 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "concurrently \"vite\" \"nodemon server/index.js\"",
-    "dev:server": "nodemon server/index.js",
+    "dev": "concurrently \"vite\" \"node --watch-path=server --watch-path=shared server/index.js\"",
+    "dev:server": "node --watch-path=server --watch-path=shared server/index.js",
     "dev:client": "vite",
     "build": "vite build",
     "lint": "eslint .",
@@ -74,7 +74,6 @@
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
-    "nodemon": "^3.0.3",
     "postcss": "^8.5.29",
     "tailwindcss": "^4.3.3",
     "vite": "^8.1.6"
