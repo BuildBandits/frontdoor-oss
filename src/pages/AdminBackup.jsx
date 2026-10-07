@@ -53,6 +53,7 @@ export default function AdminBackup() {
     { stage: 'app-icons', label: copy.includesAppIcons },
     { stage: 'branding', label: copy.includesBranding },
     { stage: 'avatars', label: copy.includesAvatars },
+    { stage: 'plugins', label: copy.includesPlugins },
   ]), [copy]);
 
   useEffect(() => () => {

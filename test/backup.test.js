@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import zlib from 'zlib';
 
 import { createBackupArchive, restoreBackupArchive } from '../server/services/backup.js';
 
@@ -106,12 +107,14 @@ describe('backup service', () => {
       appIconDir: makeTempDir('frontdoor-backup-app-icons-src-'),
       brandingDir: makeTempDir('frontdoor-backup-branding-src-'),
       avatarCacheDir: makeTempDir('frontdoor-backup-avatars-src-'),
+      pluginAssetDir: makeTempDir('frontdoor-backup-plugins-src-'),
     };
 
     restoreDirs = {
       appIconDir: makeTempDir('frontdoor-backup-app-icons-dst-'),
       brandingDir: makeTempDir('frontdoor-backup-branding-dst-'),
       avatarCacheDir: makeTempDir('frontdoor-backup-avatars-dst-'),
+      pluginAssetDir: makeTempDir('frontdoor-backup-plugins-dst-'),
     };
   });
 
@@ -162,6 +165,7 @@ describe('backup service', () => {
     writeFile(sourceDirs.brandingDir, 'company-logo.svg', '<svg viewBox="0 0 24 24"></svg>');
     writeFile(sourceDirs.avatarCacheDir, 'user-1.png', Buffer.from([1, 2, 3]));
     writeFile(sourceDirs.avatarCacheDir, 'user-1.json', JSON.stringify({ source: 'gravatar', fileName: 'user-1.png' }));
+    writeFile(sourceDirs.pluginAssetDir, 'ticket-plugin/1.0.0/release/plugin.mjs', 'export default {};');
 
     const progressEvents = [];
     const { archive, snapshot } = await createBackupArchive({
@@ -171,14 +175,23 @@ describe('backup service', () => {
     });
 
     assert.equal(snapshot.summary.tableCount > 0, true);
-    assert.equal(snapshot.summary.fileCount, 4);
+    assert.equal(snapshot.summary.fileCount, 5);
     assert.equal(Buffer.isBuffer(archive), true);
-    assert.deepEqual(progressEvents.map((event) => event.stage), ['database', 'app-icons', 'branding', 'avatars']);
+    assert.deepEqual(progressEvents.map((event) => event.stage), ['database', 'app-icons', 'branding', 'avatars', 'plugins']);
+
+    const packageVersion = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+    assert.equal(snapshot.app.version, packageVersion);
+    assert.equal(snapshot.app.node, process.version);
+    assert.match(snapshot.app.sqlite, /^\d+\.\d+\.\d+/);
+    const usersSchema = snapshot.database.schema.find((entry) => entry.type === 'table' && entry.name === 'users');
+    assert.match(usersSchema.sql, /CREATE TABLE users/);
+    assert.ok(snapshot.database.schema.every((entry) => !entry.name.startsWith('sqlite_')));
     assert.equal(progressEvents.at(-1)?.progress, 100);
 
     writeFile(restoreDirs.appIconDir, 'stale.txt', 'old');
     writeFile(restoreDirs.brandingDir, 'stale.txt', 'old');
     writeFile(restoreDirs.avatarCacheDir, 'stale.txt', 'old');
+    writeFile(restoreDirs.pluginAssetDir, 'stale.txt', 'old');
 
     const result = await restoreBackupArchive(archive, {
       dbHandle: restoreDb,
@@ -187,7 +200,7 @@ describe('backup service', () => {
 
     assert.equal(result.restoredTables > 0, true);
     assert.equal(result.restoredRows > 0, true);
-    assert.equal(result.restoredFiles, 4);
+    assert.equal(result.restoredFiles, 5);
 
     const restoredUser = restoreDb.prepare('SELECT email, display_name, role FROM users WHERE id = ?').get('user-1');
     assert.deepEqual(toPlainObject(restoredUser), {
@@ -217,5 +230,30 @@ describe('backup service', () => {
     assert.equal(fs.existsSync(path.join(restoreDirs.appIconDir, 'stale.txt')), false);
     assert.equal(fs.existsSync(path.join(restoreDirs.brandingDir, 'stale.txt')), false);
     assert.equal(fs.existsSync(path.join(restoreDirs.avatarCacheDir, 'stale.txt')), false);
+    assert.equal(fs.existsSync(path.join(restoreDirs.pluginAssetDir, 'ticket-plugin/1.0.0/release/plugin.mjs')), true);
+    assert.equal(fs.existsSync(path.join(restoreDirs.pluginAssetDir, 'stale.txt')), false);
+  });
+
+  it('restores archives made before app metadata, schema and plugin files were exported', async () => {
+    const legacy = {
+      version: 1,
+      createdAt: '2026-10-07T07:31:59.265Z',
+      database: {
+        tables: [{ name: 'users', columns: ['id', 'email', 'role'], rows: [{ id: 'legacy-1', email: 'legacy@example.com', role: 'user' }] }],
+      },
+      buckets: [{ key: 'avatars', files: [] }],
+      summary: { tableCount: 1, rowCount: 1, fileCount: 0, fileBytes: 0 },
+    };
+    writeFile(restoreDirs.pluginAssetDir, 'kept.txt', 'kept');
+
+    const result = await restoreBackupArchive(zlib.gzipSync(Buffer.from(JSON.stringify(legacy))), {
+      dbHandle: restoreDb,
+      ...restoreDirs,
+    });
+
+    assert.equal(result.restoredRows, 1);
+    assert.equal(restoreDb.prepare('SELECT email FROM users WHERE id = ?').get('legacy-1').email, 'legacy@example.com');
+    // Buckets missing from an older archive are left untouched.
+    assert.equal(fs.existsSync(path.join(restoreDirs.pluginAssetDir, 'kept.txt')), true);
   });
 });

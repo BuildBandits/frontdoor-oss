@@ -1,6 +1,10 @@
 # Stage 1: Build frontend and production node_modules
 ARG NODE_IMAGE=node:24-bookworm-slim
+# Optional short commit hash shown in the footer and recorded in backups,
+# e.g. --build-arg COMMIT_SHA=$(git rev-parse --short HEAD).
+ARG COMMIT_SHA=
 FROM ${NODE_IMAGE} AS builder
+ARG COMMIT_SHA
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 make g++ \
@@ -10,12 +14,13 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN npm run build \
+RUN VITE_COMMIT_SHA="${COMMIT_SHA}" npm run build \
     && npm prune --omit=dev \
     && npm cache clean --force
 
 # Stage 2: Production
 FROM ${NODE_IMAGE}
+ARG COMMIT_SHA
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gosu \
@@ -31,6 +36,8 @@ COPY --from=builder --chown=frontdoor:frontdoor /app/node_modules ./node_modules
 COPY --from=builder --chown=frontdoor:frontdoor /app/dist ./dist/
 COPY --chown=frontdoor:frontdoor server/ ./server/
 COPY --chown=frontdoor:frontdoor shared/ ./shared/
+# package.json provides the app version recorded in backups.
+COPY --chown=frontdoor:frontdoor package.json ./
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
@@ -42,7 +49,8 @@ ENV NODE_ENV=production \
     AVATAR_CACHE_DIR=/data/avatar-cache \
     APP_ICON_CACHE_DIR=/data/app-icon-cache \
     BRANDING_ASSET_DIR=/data/branding \
-    PLUGIN_ASSET_DIR=/data/plugins
+    PLUGIN_ASSET_DIR=/data/plugins \
+    COMMIT_SHA=${COMMIT_SHA}
 EXPOSE 3001
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

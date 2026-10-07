@@ -672,6 +672,7 @@
       "includesAppIcons": "File della cache icone app",
       "includesBranding": "File dei loghi branding",
       "includesAvatars": "File della cache avatar",
+      "includesPlugins": "File dei pacchetti plugin",
       "exportAction": "Scarica backup",
       "exportBusy": "Preparazione backup...",
       "exportSuccess": "Backup pronto per il download: {tables} tabelle, {files} file, {bytes} di dati file.",
