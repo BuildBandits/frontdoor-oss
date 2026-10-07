@@ -401,7 +401,7 @@ export default function AdminBackup() {
       <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
         <section className="flex h-full flex-col rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-xs">
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 dark:bg-slate-700 text-white">
               <Download className="h-5 w-5" />
             </div>
             <div className="flex-1">
@@ -490,7 +490,7 @@ export default function AdminBackup() {
             type="button"
             onClick={downloadBackup}
             disabled={downloadBusy}
-            className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-dark px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-dark px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Download className="h-4 w-4" />
             {downloadBusy ? copy.exportBusy : copy.exportAction}
@@ -518,7 +518,7 @@ export default function AdminBackup() {
             </div>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-950">
+          <div className="mt-6 rounded-2xl border border-amber-100 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm text-amber-950 dark:text-amber-200">
             {copy.restoreWarning}
           </div>
 
