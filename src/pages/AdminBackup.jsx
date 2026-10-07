@@ -486,25 +486,28 @@ export default function AdminBackup() {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={downloadBackup}
-            disabled={downloadBusy}
-            className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-dark px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" />
-            {downloadBusy ? copy.exportBusy : copy.exportAction}
-          </button>
-          <button
-            type="button"
-            onClick={downloadDatabaseFile}
-            disabled={databaseBusy || downloadBusy}
-            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Database className="h-4 w-4" />
-            {databaseBusy ? copy.databaseExportBusy : copy.databaseExportAction}
-          </button>
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{copy.databaseExportHelp}</p>
+          {/* Pushed to the bottom of the card, with a minimum gap when the card is full. */}
+          <div className="mt-auto pt-6">
+            <button
+              type="button"
+              onClick={downloadBackup}
+              disabled={downloadBusy}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-dark px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" />
+              {downloadBusy ? copy.exportBusy : copy.exportAction}
+            </button>
+            <button
+              type="button"
+              onClick={downloadDatabaseFile}
+              disabled={databaseBusy || downloadBusy}
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Database className="h-4 w-4" />
+              {databaseBusy ? copy.databaseExportBusy : copy.databaseExportAction}
+            </button>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{copy.databaseExportHelp}</p>
+          </div>
         </section>
 
         <section className="flex h-full flex-col rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-xs">
