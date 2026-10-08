@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Changed
+- **Docker: `.env` reaches the container**: `docker-compose.yml` now loads the whole `.env` file (`env_file`, optional, Docker Compose 2.24 or later), so variables documented for Docker but missing from the compose list — `CORS_ALLOWED_ORIGINS`, `TIMEZONE`, `BACKUP_MAX_UPLOAD_MB`, `JWT_ISSUER`, the avatar cache TTLs — now take effect. Every value already listed under `environment` keeps its precedence, so existing installations behave as before; review `.env` for variables you did not mean to apply. ([#85](https://github.com/BuildBandits/frontdoor-oss/issues/85))
+- **Smaller, hardened Docker image**: frontend-only packages (React, React Router, Zustand, lucide-react, dnd-kit, axios, clsx) moved to `devDependencies`, so they are no longer shipped in the runtime image; the image has its own `HEALTHCHECK` and OCI labels; the compose service runs with `no-new-privileges`; the entrypoint changes ownership only of files under `/data` that need it instead of the whole volume at every start; the build context leaves out local data, WAL files, docs and security notes. CI now also validates the production compose file. ([#85](https://github.com/BuildBandits/frontdoor-oss/issues/85))
+
 ### Added
 - **Filter groups by source**: *Admin → Groups* has a *Source* filter (All, Local, Microsoft Entra, each with its count) that works together with the search; the *default* group counts as local. ([#95](https://github.com/BuildBandits/frontdoor-oss/issues/95))
 - **Sign-ins hidden in Audit**: administrator sign-in events are hidden by default on *Audit*, so the list shows actual changes; *Show sign-ins* brings them back and the choice is remembered in the browser. `GET /api/logs/audit` accepts `exclude_target_types` (comma-separated) so pagination counts stay correct. ([#92](https://github.com/BuildBandits/frontdoor-oss/issues/92))

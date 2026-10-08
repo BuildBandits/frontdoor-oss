@@ -52,5 +52,12 @@ ENV NODE_ENV=production \
     COMMIT_SHA=${COMMIT_SHA}
 EXPOSE 3001
 
+LABEL org.opencontainers.image.title="Frontdoor" \
+      org.opencontainers.image.source="https://github.com/BuildBandits/frontdoor-oss" \
+      org.opencontainers.image.licenses="MIT"
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD ["node", "-e", "fetch('http://localhost:3001/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "server/index.js"]

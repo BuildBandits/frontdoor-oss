@@ -92,6 +92,14 @@ jobs:
           docker logs frontdoor-ci
           exit 1
 
+      - name: Validate production compose file
+        run: |
+          # No .env in CI: env_file is optional, and the variables are only interpolated.
+          docker compose -f docker-compose.yml config --quiet
+          cp .env.example.docker .env
+          docker compose -f docker-compose.yml config | grep -q 'AVATAR_CACHE_TTL_DAYS'
+          rm .env
+
       - name: Smoke test demo profile
         run: |
           docker compose -f docker-compose.demo.yml config --quiet

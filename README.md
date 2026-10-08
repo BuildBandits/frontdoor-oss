@@ -164,7 +164,7 @@ The image stores every writable path on the `/data` volume by default (`DATABASE
 | `AZURE_TENANT_ID` | Azure AD Tenant ID | - |
 | `AZURE_REDIRECT_URI` | SSO callback redirect URI | - |
 | `JWT_SECRET` | JWT signing secret | - |
-| `ENTRA_GROUP_SYNC` | Discover Entra group memberships at login and enable admin import/force-sync flows | `false` |
+| `ENTRA_GROUP_SYNC` | Discover Entra group memberships at login and enable admin import/force-sync flows | `false` (`true` in `docker-compose.yml`) |
 | `ENTRA_TENANT_REFRESH_MINUTES` | Minimum minutes between two refreshes of the tenant-wide Entra group catalog triggered by sign-ins (force sync always refreshes it; `0` refreshes at every sign-in) | `360` |
 | `JWT_EXPIRES_IN` | JWT token duration | `7d` |
 | `ADMIN_EMAILS` | Comma-separated owner emails (auto-promoted) | - |
@@ -260,6 +260,8 @@ To prewarm the avatar cache for existing users, run:
 ```bash
 npm run avatars:prewarm
 ```
+
+In Docker, run it as the app user so the cached files keep the right owner: `docker compose exec -u frontdoor frontdoor npm run avatars:prewarm`.
 
 If you want the utility or the `Personalizza` refresh action to fetch Microsoft 365 photos for existing users, grant the app the Microsoft Graph application permission `ProfilePhoto.Read.All` and admin consent.
 
@@ -512,6 +514,7 @@ Schema changes are applied automatically at startup. Table rebuilds run inside a
    For an exact copy of the database file you can also use *Download database file (.db)* under *Advanced options* on the same page, which works while Frontdoor is running. Encrypted files (`.enc`) can be decrypted with `FRONTDOOR_BACKUP_PASSPHRASE=... npm run backup:decrypt -- <file.enc>`.
 2. **Rehearse (recommended).** From a checkout of the new version, run `npm run backup:rehearse -- <backup or .db file>` (set `FRONTDOOR_BACKUP_PASSPHRASE` for `.enc` files). It rebuilds the source database in a temporary folder, runs the new version's migrations and prints schema changes, row counts and integrity checks; it exits with a non-zero code if rows would be lost or the database is damaged. Backups made before 1.3.1 carry no schema, so for those it rehearses a restore into the new schema instead. You can also start the new image locally against a copy of the database and check the `[startup]` log lines.
 3. **Upgrade.** Pull or build the new image and start it on the same `/data` volume. Migrations run on startup.
+   Newer versions of `docker-compose.yml` pass the whole `.env` file to the container (`env_file`, Docker Compose 2.24 or later), so variables such as `CORS_ALLOWED_ORIGINS`, `TIMEZONE` or `BACKUP_MAX_UPLOAD_MB` set in `.env` now take effect. The values already listed under `environment` are unchanged and keep their precedence; review `.env` for variables you did not mean to apply. With a customized compose file, add the same `env_file` block or keep listing the variables explicitly.
 4. **Verify.** Sign in with Microsoft SSO, open the admin pages, and if `ENTRA_GROUP_SYNC=true` run a Force Sync.
 5. **Roll back if needed.** Start the previous image and restore the backup taken in step 1.
 
