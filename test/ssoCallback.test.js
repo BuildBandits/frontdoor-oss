@@ -65,3 +65,53 @@ test('an active user signing in clears the "not found in Entra" mark', async (t)
   assert.match(res.headers.get('set-cookie') || '', /frontdoor_token=/);
   assert.equal(db.prepare("SELECT entra_missing_since FROM users WHERE id = 'sso-back'").get().entra_missing_since, null);
 });
+
+test('sign-in start sends a PKCE challenge and binds the state to the browser', async (t) => {
+  let authRequest = null;
+  t.mock.method(ConfidentialClientApplication.prototype, 'getAuthCodeUrl', async (request) => {
+    authRequest = request;
+    return 'https://login.example.test/authorize';
+  });
+
+  const res = await realFetch(`${baseUrl}/api/auth/microsoft`, { redirect: 'manual' });
+  assert.equal(res.status, 302);
+  assert.equal(authRequest.codeChallengeMethod, 'S256');
+  assert.match(authRequest.codeChallenge, /^[A-Za-z0-9_-]{43}$/);
+
+  const nonceCookie = res.headers.getSetCookie().find((cookie) => cookie.startsWith('frontdoor_auth_nonce='));
+  assert.ok(nonceCookie, 'nonce cookie missing');
+  assert.match(nonceCookie, /HttpOnly/);
+  assert.match(nonceCookie, /Path=\/api\/auth\/microsoft/);
+
+  const row = db.prepare('SELECT code_verifier, browser_nonce_hash FROM auth_pending_states WHERE state = ?').get(authRequest.state);
+  assert.ok(row.code_verifier);
+  assert.match(row.browser_nonce_hash, /^[0-9a-f]{64}$/);
+});
+
+test('the callback requires the browser nonce and passes the PKCE verifier', async (t) => {
+  const crypto = await import('node:crypto');
+  const nonce = 'browser-nonce-value';
+  const hash = crypto.createHash('sha256').update(nonce).digest('hex');
+  const insert = (state) => db.prepare('INSERT INTO auth_pending_states (state, code_verifier, browser_nonce_hash) VALUES (?, ?, ?)').run(state, 'verifier-123', hash);
+  const callback = (state, cookie) => realFetch(`${baseUrl}/api/auth/microsoft/callback?code=test-code&state=${state}`, {
+    redirect: 'manual',
+    headers: cookie ? { Cookie: `frontdoor_auth_nonce=${cookie}` } : {},
+  });
+
+  insert('pkce-missing');
+  assert.equal((await callback('pkce-missing')).headers.get('location'), 'http://localhost:3001/login?error=invalid_state');
+  insert('pkce-wrong');
+  assert.equal((await callback('pkce-wrong', 'another-nonce')).headers.get('location'), 'http://localhost:3001/login?error=invalid_state');
+
+  let tokenRequest = null;
+  t.mock.method(ConfidentialClientApplication.prototype, 'acquireTokenByCode', async (request) => {
+    tokenRequest = request;
+    throw new Error('stop after token request');
+  });
+  insert('pkce-ok');
+  const res = await callback('pkce-ok', nonce);
+  assert.equal(tokenRequest.codeVerifier, 'verifier-123');
+  assert.equal(res.headers.get('location'), 'http://localhost:3001/login?error=sso_failed');
+  // A state can be used once.
+  assert.equal((await callback('pkce-ok', nonce)).headers.get('location'), 'http://localhost:3001/login?error=invalid_state');
+});

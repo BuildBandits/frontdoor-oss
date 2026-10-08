@@ -8,7 +8,7 @@ Legend: 🛡️ owner-only · 🔧 admin-only · 🕶️ hidden (no nav entry)
 
 ## Authentication & SSO
 
-- **Microsoft Entra ID (Azure AD) SSO** via OAuth 2.0 Authorization Code flow with PKCE and state validation (`@azure/msal-node`).
+- **Microsoft Entra ID (Azure AD) SSO** via OAuth 2.0 Authorization Code flow with PKCE (S256) and a single-use, browser-bound state (`@azure/msal-node`).
 - **JWT session cookie** (`httpOnly`, signed) — frontend never sees the raw token.
 - **DEV_LOGIN mode** — local development without Azure AD, switched on via env var.
 - **Token introspection** endpoint (`POST /api/auth/verify-sso-token`) for satellite apps that do not share the JWT secret.

@@ -567,6 +567,10 @@ db.exec(`
 // Set by the Entra force sync when Microsoft Graph no longer finds the user (after the users table rebuilds above).
 ensureColumn('users', 'entra_missing_since', 'entra_missing_since TEXT');
 
+// PKCE verifier and browser-binding nonce (hashed) for pending Microsoft sign-ins.
+ensureColumn('auth_pending_states', 'code_verifier', 'code_verifier TEXT');
+ensureColumn('auth_pending_states', 'browser_nonce_hash', 'browser_nonce_hash TEXT');
+
 // --- RBAC Bootstrap: "default" group + backfill ---
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
 
