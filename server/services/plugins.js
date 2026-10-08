@@ -432,6 +432,7 @@ export function approvePluginRegistry(id, actorId = null) {
   if (!existing) {
     return null;
   }
+  if (existing.approved) return existing;
   const normalizedId = existing.id;
   db.prepare(`
     UPDATE plugin_registry
@@ -455,6 +456,7 @@ export function revokePluginApproval(id, actorId = null) {
   if (!existing) {
     return null;
   }
+  if (!existing.approved) return existing;
   const normalizedId = existing.id;
   db.prepare(`
     UPDATE plugin_registry

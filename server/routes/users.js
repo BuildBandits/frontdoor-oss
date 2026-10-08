@@ -238,6 +238,10 @@ router.put('/:id/role', authenticate, isAdminEditor, (req, res) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
+  if (user.role === normalizedRole) {
+    return res.json({ role: normalizedRole });
+  }
+
   if (isComposeLockedAdmin(user.email) && normalizedRole !== ROLE_OWNER) {
     return res.status(400).json({ error: 'Compose owner cannot be changed from the webapp' });
   }
@@ -251,7 +255,10 @@ router.put('/:id/role', authenticate, isAdminEditor, (req, res) => {
   }
 
   db.prepare('UPDATE users SET role = ?, updated_at = datetime(\'now\') WHERE id = ?').run(normalizedRole, id);
-  logRbacAudit(req.user.id, 'update', 'role', id, { email: user.email, from: user.role, to: normalizedRole });
+  logRbacAudit(req.user.id, 'update', 'role', id, {
+    email: user.email,
+    changes: [{ field: 'role', from: user.role, to: normalizedRole }],
+  });
   res.json({ role: normalizedRole });
 });
 
@@ -270,6 +277,11 @@ router.put('/:id/active', authenticate, isAdminEditor, (req, res) => {
   }
 
   const activeValue = is_active ? 1 : 0;
+
+  // Nothing to change: same status, and no "missing from Entra" mark left to clear on reactivation.
+  if (user.is_active === activeValue && !(activeValue && user.entra_missing_since)) {
+    return res.json({ is_active: activeValue });
+  }
 
   if (isComposeLockedAdmin(user.email) && !activeValue) {
     return res.status(400).json({ error: 'Compose owner cannot be deactivated from the webapp' });
@@ -325,7 +337,7 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
   });
   deleteAll();
-  logRbacAudit(req.user.id, 'delete', 'user_status', id, { email: user.email, role: user.role });
+  logRbacAudit(req.user.id, 'delete', 'user_status', id, { name: user.display_name, email: user.email, role: user.role });
 
   res.json({ deleted: true });
 });

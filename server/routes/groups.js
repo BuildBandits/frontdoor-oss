@@ -8,6 +8,7 @@ import { getDescendantGroupIds } from '../services/groupHierarchy.js';
 import { transferGroupApps } from '../services/groupAppTransfer.js';
 import { iconUrlForApp } from '../services/appIcons.js';
 import { respondWithError } from '../services/errors.js';
+import { diffAuditFields } from '../services/auditDetails.js';
 
 const router = express.Router();
 
@@ -249,9 +250,16 @@ router.put('/:id', authenticate, isAdminEditor, (req, res) => {
     if (conflict) return res.status(409).json({ error: 'A group with this name already exists' });
   }
 
-  db.prepare('UPDATE user_groups SET name = COALESCE(?, name), description = COALESCE(?, description) WHERE id = ?')
-    .run(cleanName, cleanDesc, req.params.id);
-  logRbacAudit(req.user.id, 'update', 'group', req.params.id, { name: cleanName, description: cleanDesc });
+  const next = {
+    name: cleanName ?? group.name,
+    description: cleanDesc ?? group.description,
+  };
+  const changes = diffAuditFields(group, next, ['name', 'description']);
+  if (changes.length > 0) {
+    db.prepare('UPDATE user_groups SET name = ?, description = ? WHERE id = ?')
+      .run(next.name, next.description, req.params.id);
+    logRbacAudit(req.user.id, 'update', 'group', req.params.id, { name: next.name, changes });
+  }
 
   const updated = db.prepare('SELECT * FROM user_groups WHERE id = ?').get(req.params.id);
   res.json({ group: updated });
@@ -575,17 +583,19 @@ router.post('/:id/apps/transfer', authenticate, isAdminEditor, (req, res) => {
     mode,
   });
 
-  logRbacAudit(req.user.id, mode === 'move' ? 'move_apps' : 'copy_apps', 'permission', sourceGroup.id, {
-    sourceGroupId: sourceGroup.id,
-    sourceGroupName: sourceGroup.name,
-    targetGroupId: targetGroup.id,
-    targetGroupName: targetGroup.name,
-    mode: result.mode,
-    appIds: result.appIds,
-    sourceCount: result.sourceCount,
-    addedCount: result.addedCount,
-    removedCount: result.removedCount,
-  });
+  if (result.addedCount > 0 || result.removedCount > 0) {
+    logRbacAudit(req.user.id, mode === 'move' ? 'move_apps' : 'copy_apps', 'permission', sourceGroup.id, {
+      sourceGroupId: sourceGroup.id,
+      sourceGroupName: sourceGroup.name,
+      targetGroupId: targetGroup.id,
+      targetGroupName: targetGroup.name,
+      mode: result.mode,
+      appIds: result.appIds,
+      sourceCount: result.sourceCount,
+      addedCount: result.addedCount,
+      removedCount: result.removedCount,
+    });
+  }
 
   res.json({
     message: mode === 'move'
