@@ -12,6 +12,7 @@ import { getAccessibleGroupIdsForUser } from '../services/groupHierarchy.js';
 import { iconUrlForApp, parseAppIconPayload, readAppIconAssetDataUrl, removeAppIconAsset, saveAppIconAsset, serveAppIconForApp } from '../services/appIcons.js';
 import { getBrandingSettings } from '../services/branding.js';
 import { dispatchPluginEvent } from '../services/plugins.js';
+import { respondWithError } from '../services/errors.js';
 import { isValidEntraApplicationId, normalizeEntraApplicationId } from '../../shared/entra.js';
 import { APP_SLUG_ERROR_CODES, normalizeAppSlug, validateAppSlug } from '../../shared/appSlug.js';
 import { TARGET_URL_ERROR_CODES, validateTargetUrl } from '../../shared/targetUrl.js';
@@ -555,7 +556,7 @@ router.post('/', authenticate, isAdminEditor, async (req, res) => {
     if (createdAppId) {
       removeAppIconAsset(createdAppId).catch(() => {});
     }
-    res.status(500).json({ error: 'Failed to create app', code: 'failed_to_create_app' });
+    respondWithError(res, error, { status: 500, code: 'failed_to_create_app' });
   }
 });
 
@@ -660,7 +661,7 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
     res.json({ app });
   } catch (error) {
     console.error('Update app failed:', error.message);
-    res.status(500).json({ error: 'Failed to update app', code: 'failed_to_update_app' });
+    respondWithError(res, error, { status: 500, code: 'failed_to_update_app' });
   }
 });
 

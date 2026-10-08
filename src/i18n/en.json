@@ -1513,6 +1513,7 @@
     "group_name_too_short": "The group name must be at least 2 characters long.",
     "group_not_found": "Group not found.",
     "groups_not_found": "One or more groups were not found.",
+    "icon_unsupported_type": "The icon must be a PNG, JPEG, GIF, WEBP, BMP, AVIF, ICO or SVG image.",
     "insufficient_permissions": "You do not have permission to do this.",
     "internal_server_error": "Something went wrong on the server. Try again.",
     "invalid_app_mode": "The app mode is not valid.",
