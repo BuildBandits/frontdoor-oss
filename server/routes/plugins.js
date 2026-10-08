@@ -27,7 +27,7 @@ router.use((req, res, next) => {
     return next();
   }
 
-  return res.status(404).json({ error: 'Plugin system is disabled' });
+  return res.status(404).json({ error: 'Plugin system is disabled', code: 'plugin_system_disabled' });
 });
 
 router.get('/', authenticate, isAdminViewer, (_req, res) => {
@@ -37,7 +37,7 @@ router.get('/', authenticate, isAdminViewer, (_req, res) => {
 router.get('/:id', authenticate, isAdminViewer, (req, res) => {
   const plugin = getPluginRegistryById(req.params.id);
   if (!plugin) {
-    return res.status(404).json({ error: 'Plugin not found' });
+    return res.status(404).json({ error: 'Plugin not found', code: 'plugin_not_found' });
   }
   return res.json({ plugin });
 });
@@ -47,7 +47,10 @@ router.post('/', authenticate, isAdminEditor, (req, res) => {
     const plugin = upsertPluginRegistry(req.body || {});
     return res.status(201).json({ plugin });
   } catch (error) {
-    return res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to create plugin' });
+    return res.status(400).json({
+      error: error instanceof Error ? error.message : 'Failed to create plugin',
+      code: error?.code || 'failed_to_create_plugin',
+    });
   }
 });
 
@@ -56,7 +59,10 @@ router.post('/import', authenticate, isAdminEditor, async (req, res) => {
     const plugin = await importPluginBundle(req.body || {});
     return res.status(201).json({ plugin });
   } catch (error) {
-    return res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to import plugin' });
+    return res.status(400).json({
+      error: error instanceof Error ? error.message : 'Failed to import plugin',
+      code: error?.code || 'failed_to_import_plugin',
+    });
   }
 });
 
@@ -68,14 +74,17 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
     });
     return res.json({ plugin });
   } catch (error) {
-    return res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to update plugin' });
+    return res.status(400).json({
+      error: error instanceof Error ? error.message : 'Failed to update plugin',
+      code: error?.code || 'failed_to_update_plugin',
+    });
   }
 });
 
 router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   const removed = deletePluginRegistry(req.params.id);
   if (!removed) {
-    return res.status(404).json({ error: 'Plugin not found' });
+    return res.status(404).json({ error: 'Plugin not found', code: 'plugin_not_found' });
   }
   return res.json({ deleted: true });
 });
@@ -83,7 +92,7 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
 router.post('/:id/test-event/:eventName', authenticate, isAdminEditor, async (req, res) => {
   const plugin = getPluginRegistryById(req.params.id);
   if (!plugin) {
-    return res.status(404).json({ error: 'Plugin not found' });
+    return res.status(404).json({ error: 'Plugin not found', code: 'plugin_not_found' });
   }
 
   const summary = await dispatchPluginEvent(req.params.eventName, req.body?.payload || {}, {
@@ -98,7 +107,7 @@ router.post('/:id/test-event/:eventName', authenticate, isAdminEditor, async (re
 router.post('/:id/approve', authenticate, isOwner, (req, res) => {
   const plugin = approvePluginRegistry(req.params.id, req.user.id);
   if (!plugin) {
-    return res.status(404).json({ error: 'Plugin not found' });
+    return res.status(404).json({ error: 'Plugin not found', code: 'plugin_not_found' });
   }
   return res.json({ plugin });
 });
@@ -106,7 +115,7 @@ router.post('/:id/approve', authenticate, isOwner, (req, res) => {
 router.post('/:id/revoke', authenticate, isOwner, (req, res) => {
   const plugin = revokePluginApproval(req.params.id, req.user.id);
   if (!plugin) {
-    return res.status(404).json({ error: 'Plugin not found' });
+    return res.status(404).json({ error: 'Plugin not found', code: 'plugin_not_found' });
   }
   return res.json({ plugin });
 });

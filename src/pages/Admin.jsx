@@ -11,7 +11,8 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import PaginationControls from '../components/PaginationControls';
-import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { apiErrorMessage } from '../utils/apiErrors';
 import { normalizeEntraApplicationId } from '../../shared/entra.js';
 import { normalizeAppSlug, suggestAppSlug } from '../../shared/appSlug.js';
 import PluginSurface from '../pluginHost/PluginSurface';
@@ -152,7 +153,8 @@ export default function Admin() {
       });
   };
 
-  const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
+  const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
+  const ui = getUiStrings(language);
   const t = ui.admin.common;
   const a = ui.admin.apps;
 
@@ -262,7 +264,7 @@ export default function Admin() {
       populateClonedApp(cloned, { includeDefaultGroup: false });
       pushNotice('success', a.duplicateNotice);
     } catch (err) {
-      pushNotice('error', err.response?.data?.error || err.message || t.cloneFailed);
+      pushNotice('error', apiErrorMessage(err, ui, t.cloneFailed));
     }
     setCloning(false);
   };
@@ -279,7 +281,7 @@ export default function Admin() {
       populateClonedApp(cloned, { includeDefaultGroup: false });
       pushNotice('success', a.duplicateNotice);
     } catch (err) {
-      pushNotice('error', err.response?.data?.error || err.message || t.cloneFailed);
+      pushNotice('error', apiErrorMessage(err, ui, t.cloneFailed));
     }
     setCloning(false);
   };
@@ -528,7 +530,7 @@ export default function Admin() {
         }
       }
     } catch (err) {
-      pushAppSaveNotice('error', err.response?.data?.error || err.message || t.errorSaving);
+      pushAppSaveNotice('error', apiErrorMessage(err, ui, t.errorSaving));
     }
     setSaving(false);
   };
@@ -556,7 +558,7 @@ export default function Admin() {
           loadApps();
           pushNotice('success', a.appDeleted.replace('{name}', app.name));
         } catch (err) {
-          pushNotice('error', err.response?.data?.error || t.errorSaving);
+          pushNotice('error', apiErrorMessage(err, ui, t.errorSaving));
         }
       },
     });
@@ -571,7 +573,7 @@ export default function Admin() {
       await api.put(`/apps/${app.id}`, { is_active: app.is_active ? 0 : 1 });
       loadApps();
     } catch (err) {
-      pushNotice('error', err.response?.data?.error || t.errorSaving);
+      pushNotice('error', apiErrorMessage(err, ui, t.errorSaving));
     }
   };
 
@@ -734,7 +736,7 @@ export default function Admin() {
       );
     });
 
-    const compareText = (a, b, key) => (a?.[key] || '').toString().localeCompare((b?.[key] || '').toString(), 'it', { sensitivity: 'base' });
+    const compareText = (a, b, key) => (a?.[key] || '').toString().localeCompare((b?.[key] || '').toString(), language, { sensitivity: 'base' });
     const compareNumber = (a, b, key) => (Number(a?.[key] || 0) - Number(b?.[key] || 0));
     const direction = appSort.direction === 'asc' ? 1 : -1;
 
@@ -767,7 +769,7 @@ export default function Admin() {
       }
       return result * direction;
     });
-  }, [apps, appSearch, appModeFilter, appSort, showOnlyOrphanApps, selectedTagFilters]);
+  }, [apps, appSearch, appModeFilter, appSort, showOnlyOrphanApps, selectedTagFilters, language]);
   const pagination = useMemo(() => ({
     page,
     pages: Math.max(1, Math.ceil(filteredApps.length / pageSize)),
@@ -862,7 +864,7 @@ export default function Admin() {
           .replace('{removed}', String(res.data?.removed ?? 0))
       );
     } catch (err) {
-      pushNotice('error', err.response?.data?.error || a.groupAssignmentError);
+      pushNotice('error', apiErrorMessage(err, ui, a.groupAssignmentError));
     } finally {
       setAssigningGroups(false);
     }
@@ -1163,7 +1165,7 @@ export default function Admin() {
             page={pagination.page}
             pages={pagination.pages}
             total={pagination.total}
-            summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} ${ui.nav.apps.toLowerCase()}`}
+            summary={formatMessage(a.pageSummary, pagination)}
             previousLabel={ui.common.previous}
             nextLabel={ui.common.next}
             onPrevious={() => setPage((current) => Math.max(1, current - 1))}
@@ -1283,7 +1285,7 @@ export default function Admin() {
             page={pagination.page}
             pages={pagination.pages}
             total={pagination.total}
-            summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} ${ui.nav.apps.toLowerCase()}`}
+            summary={formatMessage(a.pageSummary, pagination)}
             previousLabel={ui.common.previous}
             nextLabel={ui.common.next}
             onPrevious={() => setPage((current) => Math.max(1, current - 1))}
@@ -1778,7 +1780,7 @@ export default function Admin() {
                 <div className="grid gap-2 sm:grid-cols-2 max-h-[48vh] overflow-y-auto pr-1">
                   {filteredGroups.map((group) => {
                     const selected = groupAssignSelection.includes(group.id);
-                    const groupSourceLabel = group.source === 'entra' ? 'Entra' : 'Locale';
+                    const groupSourceLabel = group.source === 'entra' ? ui.admin.groups.entraBadge : ui.admin.groups.localBadge;
                     return (
                       <label
                         key={group.id}
@@ -1800,7 +1802,7 @@ export default function Admin() {
                             </span>
                             {group.id === DEFAULT_GROUP_ID && (
                               <span className="text-[10px] bg-accent/30 text-dark dark:text-gray-100 px-1.5 py-0.5 rounded-sm font-medium">
-                                default
+                                {ui.admin.groups.defaultBadge}
                               </span>
                             )}
                           </div>
@@ -1820,7 +1822,7 @@ export default function Admin() {
                   onClick={closeGroupAssignmentModal}
                   className="px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
                 >
-                  Salta
+                  {a.skipGroupAssignment}
                 </button>
                 <button
                   type="button"

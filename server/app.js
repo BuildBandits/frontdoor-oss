@@ -76,7 +76,7 @@ export function createApp() {
   app.use('/api/auth/microsoft', rateLimit({
     windowMs: parsePositiveInt('AUTH_RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000),
     limit: parsePositiveInt('AUTH_RATE_LIMIT_MAX', 5000),
-    message: { error: 'Too many login attempts, try again later' },
+    message: { error: 'Too many login attempts, try again later', code: 'too_many_login_attempts' },
     standardHeaders: true,
     legacyHeaders: false,
   }));
@@ -86,7 +86,7 @@ export function createApp() {
   const rbacMutationLimiter = rateLimit({
     windowMs: parsePositiveInt('RBAC_RATE_LIMIT_WINDOW_MS', 60 * 1000),
     limit: parsePositiveInt('RBAC_RATE_LIMIT_MAX', 500),
-    message: { error: 'Too many RBAC operations, try again later' },
+    message: { error: 'Too many RBAC operations, try again later', code: 'too_many_requests' },
     skip: (req) => req.method === 'GET',
     standardHeaders: true,
     legacyHeaders: false,

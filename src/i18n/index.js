@@ -60,7 +60,6 @@ export function getUiStrings(language) {
   return uiStringsCache.get(normalized);
 }
 
-
 /** Replace `{name}` placeholders in a UI string; unknown placeholders are left as is. */
 export function formatMessage(template, values = {}) {
   return String(template ?? '').replace(/\{(\w+)\}/g, (match, key) => (

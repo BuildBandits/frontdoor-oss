@@ -13,8 +13,8 @@ import { iconUrlForApp, parseAppIconPayload, readAppIconAssetDataUrl, removeAppI
 import { getBrandingSettings } from '../services/branding.js';
 import { dispatchPluginEvent } from '../services/plugins.js';
 import { isValidEntraApplicationId, normalizeEntraApplicationId } from '../../shared/entra.js';
-import { normalizeAppSlug, validateAppSlug } from '../../shared/appSlug.js';
-import { validateTargetUrl } from '../../shared/targetUrl.js';
+import { APP_SLUG_ERROR_CODES, normalizeAppSlug, validateAppSlug } from '../../shared/appSlug.js';
+import { TARGET_URL_ERROR_CODES, validateTargetUrl } from '../../shared/targetUrl.js';
 
 const router = express.Router();
 
@@ -63,7 +63,7 @@ router.get('/:slug/sso-redirect', authenticate, (req, res) => {
     .get(req.params.slug);
 
   if (!app) {
-    return res.status(404).json({ error: 'App not found' });
+    return res.status(404).json({ error: 'App not found', code: 'app_not_found' });
   }
 
   // RBAC check: user must have group permission (applies to every mode)
@@ -74,7 +74,7 @@ router.get('/:slug/sso-redirect', authenticate, (req, res) => {
       WHERE app_id = ? AND group_id IN (${accessibleGroupIds.map(() => '?').join(', ')})
     `).get(app.id, ...accessibleGroupIds)
     : null;
-  if (!hasAccess) return res.status(403).json({ error: 'Access denied' });
+  if (!hasAccess) return res.status(403).json({ error: 'Access denied', code: 'access_denied' });
 
   // Log access (every mode)
   try {
@@ -173,7 +173,7 @@ router.get('/:slug/entra-redirect', authenticate, (req, res) => {
     .get(req.params.slug);
 
   if (!app || app.mode !== 'entra-app') {
-    return res.status(404).json({ error: 'Entra app not found' });
+    return res.status(404).json({ error: 'Entra app not found', code: 'entra_app_not_found' });
   }
 
   // RBAC check: user must have group permission
@@ -184,7 +184,7 @@ router.get('/:slug/entra-redirect', authenticate, (req, res) => {
       WHERE app_id = ? AND group_id IN (${accessibleGroupIds.map(() => '?').join(', ')})
     `).get(app.id, ...accessibleGroupIds)
     : null;
-  if (!hasAccess) return res.status(403).json({ error: 'Access denied' });
+  if (!hasAccess) return res.status(403).json({ error: 'Access denied', code: 'access_denied' });
 
   // Log access
   try {
@@ -228,7 +228,7 @@ router.post('/:slug/track-access', authenticate, (req, res) => {
     .prepare('SELECT id FROM apps WHERE slug = ? AND is_active = 1')
     .get(req.params.slug);
 
-  if (!app) return res.status(404).json({ error: 'App not found' });
+  if (!app) return res.status(404).json({ error: 'App not found', code: 'app_not_found' });
 
   // RBAC check: user must have group permission on this app
   const accessibleGroupIds = getAccessibleGroupIdsForUser(req.user.id);
@@ -238,7 +238,7 @@ router.post('/:slug/track-access', authenticate, (req, res) => {
       WHERE app_id = ? AND group_id IN (${accessibleGroupIds.map(() => '?').join(', ')})
     `).get(app.id, ...accessibleGroupIds)
     : null;
-  if (!hasAccess) return res.status(403).json({ error: 'Access denied' });
+  if (!hasAccess) return res.status(403).json({ error: 'Access denied', code: 'access_denied' });
 
   try {
     db.prepare(
@@ -246,7 +246,7 @@ router.post('/:slug/track-access', authenticate, (req, res) => {
     ).run(req.user.id, app.id, req.ip, req.get('user-agent'));
   } catch (e) {
     console.error('Access log write failed:', e.message);
-    return res.status(500).json({ error: 'Access log write failed' });
+    return res.status(500).json({ error: 'Access log write failed', code: 'access_log_write_failed' });
   }
 
   void dispatchPluginEvent('app.access', {
@@ -272,7 +272,7 @@ router.post('/:slug/track-access', authenticate, (req, res) => {
 router.post('/:id/clone', authenticate, isAdminEditor, async (req, res) => {
   const existing = db.prepare('SELECT * FROM apps WHERE id = ?').get(req.params.id);
   if (!existing) {
-    return res.status(404).json({ error: 'App not found' });
+    return res.status(404).json({ error: 'App not found', code: 'app_not_found' });
   }
 
   const groupIds = db.prepare('SELECT group_id FROM app_permissions WHERE app_id = ? ORDER BY group_id')
@@ -343,7 +343,7 @@ router.post('/restore-defaults', authenticate, isAdminEditor, (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Restore default demo apps failed:', error.message);
-    res.status(500).json({ error: 'Failed to restore default demo apps' });
+    res.status(500).json({ error: 'Failed to restore default demo apps', code: 'failed_to_restore_demo_apps' });
   }
 });
 
@@ -477,45 +477,45 @@ router.post('/', authenticate, isAdminEditor, async (req, res) => {
       : [];
 
     if (!name || !slug || !target_url) {
-      return res.status(400).json({ error: 'name, slug, and target_url are required' });
+      return res.status(400).json({ error: 'name, slug, and target_url are required', code: 'app_required_fields' });
     }
 
     const slugError = validateAppSlug(slug);
-    if (slugError) return res.status(400).json({ error: slugError });
+    if (slugError) return res.status(400).json({ error: slugError, code: APP_SLUG_ERROR_CODES[slugError] || 'slug_invalid' });
 
     if (mode && !['redirect', 'redirect-plain', 'internal-link', 'shared-cookie', 'entra-app'].includes(mode)) {
-      return res.status(400).json({ error: 'mode must be redirect, redirect-plain, internal-link, shared-cookie, or entra-app' });
+      return res.status(400).json({ error: 'mode must be redirect, redirect-plain, internal-link, shared-cookie, or entra-app', code: 'invalid_app_mode' });
     }
     if (sso_method && !['GET', 'POST'].includes(sso_method)) {
-      return res.status(400).json({ error: 'sso_method must be GET or POST' });
+      return res.status(400).json({ error: 'sso_method must be GET or POST', code: 'invalid_sso_method' });
     }
 
     const requestedMode = mode || 'redirect-plain';
     if (!isAppModeEnabled(requestedMode)) {
-      return res.status(400).json({ error: 'Selected app mode is disabled by personalization settings' });
+      return res.status(400).json({ error: 'Selected app mode is disabled by personalization settings', code: 'app_mode_disabled' });
     }
 
     const urlError = validateTargetUrl(target_url, requestedMode);
-    if (urlError) return res.status(400).json({ error: urlError });
+    if (urlError) return res.status(400).json({ error: urlError, code: TARGET_URL_ERROR_CODES[urlError] || 'target_url_invalid' });
 
     const normalizedSsoEndpoint = requestedMode === 'entra-app'
       ? normalizeEntraEndpoint(sso_endpoint)
       : (sso_endpoint || '/sso');
     if (requestedMode === 'entra-app' && !isValidEntraApplicationId(normalizedSsoEndpoint)) {
-      return res.status(400).json({ error: 'Enter a valid MyApps Application ID or launcher URL' });
+      return res.status(400).json({ error: 'Enter a valid MyApps Application ID or launcher URL', code: 'entra_application_id_invalid' });
     }
 
     if (normalizedGroupIds.length > 0) {
       const placeholders = normalizedGroupIds.map(() => '?').join(', ');
       const existingGroups = db.prepare(`SELECT id FROM user_groups WHERE id IN (${placeholders})`).all(...normalizedGroupIds);
       if (existingGroups.length !== normalizedGroupIds.length) {
-        return res.status(400).json({ error: 'One or more selected groups were not found' });
+        return res.status(400).json({ error: 'One or more selected groups were not found', code: 'groups_not_found' });
       }
     }
 
     const existing = db.prepare('SELECT id FROM apps WHERE slug = ?').get(slug);
     if (existing) {
-      return res.status(409).json({ error: 'An app with this slug already exists' });
+      return res.status(409).json({ error: 'An app with this slug already exists', code: 'app_slug_taken' });
     }
 
     const id = uuidv4();
@@ -555,7 +555,7 @@ router.post('/', authenticate, isAdminEditor, async (req, res) => {
     if (createdAppId) {
       removeAppIconAsset(createdAppId).catch(() => {});
     }
-    res.status(500).json({ error: 'Failed to create app' });
+    res.status(500).json({ error: 'Failed to create app', code: 'failed_to_create_app' });
   }
 });
 
@@ -567,18 +567,18 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
 
     const existing = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
     if (!existing) {
-      return res.status(404).json({ error: 'App not found' });
+      return res.status(404).json({ error: 'App not found', code: 'app_not_found' });
     }
 
     if (slug !== undefined) {
       const slugError = validateAppSlug(slug);
-      if (slugError) return res.status(400).json({ error: slugError });
+      if (slugError) return res.status(400).json({ error: slugError, code: APP_SLUG_ERROR_CODES[slugError] || 'slug_invalid' });
     }
 
     if (slug && slug !== existing.slug) {
       const slugConflict = db.prepare('SELECT id FROM apps WHERE slug = ? AND id != ?').get(slug, id);
       if (slugConflict) {
-        return res.status(409).json({ error: 'An app with this slug already exists' });
+        return res.status(409).json({ error: 'An app with this slug already exists', code: 'app_slug_taken' });
       }
     }
 
@@ -586,25 +586,25 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
 
     if (target_url !== undefined) {
       const urlError = validateTargetUrl(target_url, nextMode);
-      if (urlError) return res.status(400).json({ error: urlError });
+      if (urlError) return res.status(400).json({ error: urlError, code: TARGET_URL_ERROR_CODES[urlError] || 'target_url_invalid' });
     }
 
     if (mode !== undefined && !['redirect', 'redirect-plain', 'internal-link', 'shared-cookie', 'entra-app'].includes(mode)) {
-      return res.status(400).json({ error: 'mode must be redirect, redirect-plain, internal-link, shared-cookie, or entra-app' });
+      return res.status(400).json({ error: 'mode must be redirect, redirect-plain, internal-link, shared-cookie, or entra-app', code: 'invalid_app_mode' });
     }
     if (sso_method !== undefined && !['GET', 'POST'].includes(sso_method)) {
-      return res.status(400).json({ error: 'sso_method must be GET or POST' });
+      return res.status(400).json({ error: 'sso_method must be GET or POST', code: 'invalid_sso_method' });
     }
 
     if (mode !== undefined && mode !== existing.mode && !isAppModeEnabled(mode)) {
-      return res.status(400).json({ error: 'Selected app mode is disabled by personalization settings' });
+      return res.status(400).json({ error: 'Selected app mode is disabled by personalization settings', code: 'app_mode_disabled' });
     }
 
     const normalizedSsoEndpoint = nextMode === 'entra-app'
       ? normalizeEntraEndpoint(sso_endpoint !== undefined ? sso_endpoint : existing.sso_endpoint)
       : (sso_endpoint !== undefined ? sso_endpoint : existing.sso_endpoint);
     if (nextMode === 'entra-app' && !isValidEntraApplicationId(normalizedSsoEndpoint)) {
-      return res.status(400).json({ error: 'Enter a valid MyApps Application ID or launcher URL' });
+      return res.status(400).json({ error: 'Enter a valid MyApps Application ID or launcher URL', code: 'entra_application_id_invalid' });
     }
 
     const iconChange = await applyAppIconChange(id, existing, {
@@ -660,7 +660,7 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
     res.json({ app });
   } catch (error) {
     console.error('Update app failed:', error.message);
-    res.status(500).json({ error: 'Failed to update app' });
+    res.status(500).json({ error: 'Failed to update app', code: 'failed_to_update_app' });
   }
 });
 
@@ -671,11 +671,11 @@ router.post('/:id/groups', authenticate, isAdminEditor, (req, res) => {
 
   const app = db.prepare('SELECT id FROM apps WHERE id = ?').get(id);
   if (!app) {
-    return res.status(404).json({ error: 'App not found' });
+    return res.status(404).json({ error: 'App not found', code: 'app_not_found' });
   }
 
   if (!Array.isArray(groupIds)) {
-    return res.status(400).json({ error: 'groupIds must be an array' });
+    return res.status(400).json({ error: 'groupIds must be an array', code: 'invalid_group_ids' });
   }
 
   const normalizedGroupIds = [...new Set(groupIds.filter((groupId) => typeof groupId === 'string' && groupId.trim()))];
@@ -686,7 +686,7 @@ router.post('/:id/groups', authenticate, isAdminEditor, (req, res) => {
     : [];
 
   if (existingGroups.length !== normalizedGroupIds.length) {
-    return res.status(400).json({ error: 'One or more selected groups were not found' });
+    return res.status(400).json({ error: 'One or more selected groups were not found', code: 'groups_not_found' });
   }
 
   const currentGroupIds = db.prepare('SELECT group_id FROM app_permissions WHERE app_id = ? ORDER BY group_id')
@@ -732,7 +732,7 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   const { id } = req.params;
   const existing = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
   if (!existing) {
-    return res.status(404).json({ error: 'App not found' });
+    return res.status(404).json({ error: 'App not found', code: 'app_not_found' });
   }
 
   const deleteAll = db.transaction(() => {
@@ -750,12 +750,12 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
 function requireBulkApiKey(req, res) {
   const expected = process.env.ADMIN_API_KEY;
   if (!expected) {
-    res.status(503).json({ error: 'ADMIN_API_KEY not configured on server' });
+    res.status(503).json({ error: 'ADMIN_API_KEY not configured on server', code: 'admin_api_key_not_configured' });
     return false;
   }
   const apiKey = req.headers['x-api-key'];
   if (!apiKey || apiKey !== expected) {
-    res.status(401).json({ error: 'Invalid or missing API key' });
+    res.status(401).json({ error: 'Invalid or missing API key', code: 'api_key_invalid' });
     return false;
   }
   return true;
@@ -791,7 +791,7 @@ router.post('/bulk', (req, res) => {
 
   const { apps: appList } = req.body;
   if (!Array.isArray(appList)) {
-    return res.status(400).json({ error: 'apps must be an array' });
+    return res.status(400).json({ error: 'apps must be an array', code: 'invalid_apps_payload' });
   }
 
   const results = [];

@@ -15,7 +15,7 @@ export const authenticate = (req, res, next) => {
     }
 
     if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
+      return res.status(401).json({ error: 'No token provided', code: 'not_authenticated' });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -29,19 +29,19 @@ export const authenticate = (req, res, next) => {
       .get(decoded.userId);
 
     if (!user) {
-      return res.status(401).json({ error: 'User not found or inactive' });
+      return res.status(401).json({ error: 'User not found or inactive', code: 'user_not_found_or_inactive' });
     }
 
     req.user = { ...user, timeZone: getAppTimeZone() };
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ error: 'Invalid token' });
+      return res.status(401).json({ error: 'Invalid token', code: 'invalid_token' });
     }
     if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expired' });
+      return res.status(401).json({ error: 'Token expired', code: 'token_expired' });
     }
-    return res.status(500).json({ error: 'Authentication error' });
+    return res.status(500).json({ error: 'Authentication error', code: 'authentication_error' });
   }
 };
 
@@ -49,10 +49,10 @@ export const authenticate = (req, res, next) => {
 export const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({ error: 'Not authenticated' });
+      return res.status(401).json({ error: 'Not authenticated', code: 'not_authenticated' });
     }
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
+      return res.status(403).json({ error: 'Insufficient permissions', code: 'insufficient_permissions' });
     }
     next();
   };

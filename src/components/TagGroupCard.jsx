@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { formatMessage } from '../i18n';
 
-export default function TagGroupCard({ tag, count, isOpen, onToggle }) {
+export default function TagGroupCard({ tag, count, isOpen, onToggle, ui }) {
   return (
     <button
       onClick={onToggle}
@@ -16,7 +17,7 @@ export default function TagGroupCard({ tag, count, isOpen, onToggle }) {
             {tag}
           </span>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-            {count} {count === 1 ? 'app' : 'app'}
+            {formatMessage(count === 1 ? ui.home.appCountOne : ui.home.appCount, { count })}
           </p>
         </div>
         {isOpen ? (

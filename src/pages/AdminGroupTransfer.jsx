@@ -6,6 +6,7 @@ import PageNotice from '../components/PageNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { apiErrorMessage } from '../utils/apiErrors';
 
 function groupLabel(group) {
   return group?.entra_display_name || group?.name || '';
@@ -162,7 +163,7 @@ export default function AdminGroupTransfer() {
         } catch (error) {
           setPageNotice({
             type: 'error',
-            message: error.response?.data?.error || g.transferFailed,
+            message: apiErrorMessage(error, ui, g.transferFailed),
           });
         } finally {
           setConfirmBusy(false);

@@ -5,15 +5,17 @@ import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import TopToastNotice from '../components/TopToastNotice';
 import { useAuthStore } from '../stores/authStore';
-import { getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatMessage, getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { apiErrorMessage } from '../utils/apiErrors';
 import { getSupportedTimeZoneOptions, normalizeTimeZone } from '../../shared/timeZones.js';
 import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
 
+// Hero texts default to the translated Home copy (see emptyBrandingFor).
 const emptyBranding = {
-  heroTitleLine1: 'Your apps,',
-  heroTitleLine2: 'all in one place.',
-  heroSubtitle: 'Quickly access all the tools and platforms in your workspace.',
+  heroTitleLine1: '',
+  heroTitleLine2: '',
+  heroSubtitle: '',
   showHomeHero: true,
   hideHomeHeroOnMobile: false,
   showAppModeBadges: true,
@@ -58,6 +60,16 @@ const heroI18nKeys = ['heroTitleLine1I18n', 'heroTitleLine2I18n', 'heroSubtitleI
 
 // Ensure each per-language hero map has the default-language slot populated from the
 // scalar value, so the editor starts from the current text and existing behavior is preserved.
+function emptyBrandingFor(language) {
+  const home = getUiStrings(language).home;
+  return {
+    ...emptyBranding,
+    heroTitleLine1: home.heroTitleLine1,
+    heroTitleLine2: home.heroTitleLine2,
+    heroSubtitle: home.heroSubtitle,
+  };
+}
+
 function seedHeroMaps(branding) {
   const lang = branding?.defaultLanguage || 'en';
   const seed = (map, scalar) => {
@@ -77,8 +89,8 @@ export default function Customization() {
   const { user } = useAuthStore();
   const location = useLocation();
   const isOwner = user?.role === 'owner';
-  const [branding, setBranding] = useState(emptyBranding);
-  const [initialBranding, setInitialBranding] = useState(emptyBranding);
+  const [branding, setBranding] = useState(() => emptyBrandingFor(user?.preferredLanguage));
+  const [initialBranding, setInitialBranding] = useState(() => emptyBrandingFor(user?.preferredLanguage));
   const [uiLanguage, setUiLanguage] = useState('en');
   const [heroLang, setHeroLang] = useState('en');
   const [brandingLoading, setBrandingLoading] = useState(true);
@@ -155,7 +167,7 @@ export default function Customization() {
     setBrandingLoading(true);
     api.get('/branding')
       .then((res) => {
-        const next = seedHeroMaps(res.data.branding || emptyBranding);
+        const next = seedHeroMaps(res.data.branding || emptyBrandingFor(user?.preferredLanguage));
         setBranding(next);
         setInitialBranding(next);
         setHeroLang(next.defaultLanguage || 'en');
@@ -166,8 +178,9 @@ export default function Customization() {
         setRemoveBrandingLogo(false);
       })
       .catch(() => {
-        setBranding(emptyBranding);
-        setInitialBranding(emptyBranding);
+        const fallback = emptyBrandingFor(user?.preferredLanguage);
+        setBranding(fallback);
+        setInitialBranding(fallback);
         setUiLanguage(resolveAppLanguage(user?.preferredLanguage, 'en'));
         setBrandingLogoPreview(null);
       })
@@ -216,10 +229,10 @@ export default function Customization() {
         : ui.customization.maintenance.avatarCacheCleared;
       pushSaveNotice(
         'success',
-        `${cacheCleared}. ${ui.customization.maintenance.avatarCacheReloadNotice}`
+        formatMessage(ui.common.twoSentences, { first: cacheCleared, second: ui.customization.maintenance.avatarCacheReloadNotice })
       );
     } catch (err) {
-      pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorRefreshingAvatarCache);
+      pushSaveNotice('error', apiErrorMessage(err, ui, ui.admin.common.errorRefreshingAvatarCache));
     }
     setAvatarRefreshing(false);
   };
@@ -232,9 +245,9 @@ export default function Customization() {
       const message = res.data?.removed
         ? ui.customization.maintenance.appIconCacheClearedWithCount.replace('{count}', res.data.removed)
         : ui.customization.maintenance.appIconCacheCleared;
-      pushSaveNotice('success', `${message}. ${ui.customization.maintenance.appIconCacheReloadNotice}`);
+      pushSaveNotice('success', formatMessage(ui.common.twoSentences, { first: message, second: ui.customization.maintenance.appIconCacheReloadNotice }));
     } catch (err) {
-      pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorSaving);
+      pushSaveNotice('error', apiErrorMessage(err, ui, ui.admin.common.errorSaving));
     }
     setIconCacheCleaning(false);
   };
@@ -248,10 +261,10 @@ export default function Customization() {
         : ui.customization.maintenance.accessLogCleared;
       pushSaveNotice(
         'success',
-        `${clearedMessage}. ${ui.customization.maintenance.accessLogReloadNotice}`
+        formatMessage(ui.common.twoSentences, { first: clearedMessage, second: ui.customization.maintenance.accessLogReloadNotice })
       );
     } catch (err) {
-      pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorSaving);
+      pushSaveNotice('error', apiErrorMessage(err, ui, ui.admin.common.errorSaving));
     }
     setAccessLogPurging(false);
   };
@@ -267,9 +280,9 @@ export default function Customization() {
             .replace('{bytes}', formatBytes(reclaimedBytes))
             .replace('{pages}', String(res.data?.reclaimedPages || 0))
         : ui.customization.maintenance.databaseCompacted;
-      pushSaveNotice('success', `${reclaimedMessage}. ${ui.customization.maintenance.databaseCompactionReloadNotice}`);
+      pushSaveNotice('success', formatMessage(ui.common.twoSentences, { first: reclaimedMessage, second: ui.customization.maintenance.databaseCompactionReloadNotice }));
     } catch (err) {
-      pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorSaving);
+      pushSaveNotice('error', apiErrorMessage(err, ui, ui.admin.common.errorSaving));
     }
     setDatabaseCompacting(false);
   };
@@ -289,10 +302,13 @@ export default function Customization() {
           const res = await api.post('/apps/restore-defaults');
           pushSaveNotice(
             'success',
-            `${ui.admin.apps.restoreDemoSuccess}. ${ui.admin.apps.restoreDemoSummary.replace('{created}', res.data.created).replace('{updated}', res.data.updated)}`
+            formatMessage(ui.common.twoSentences, {
+              first: ui.admin.apps.restoreDemoSuccess,
+              second: formatMessage(ui.admin.apps.restoreDemoSummary, res.data),
+            })
           );
         } catch (err) {
-          pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorSaving);
+          pushSaveNotice('error', apiErrorMessage(err, ui, ui.admin.common.errorSaving));
         } finally {
           setRestoringDemoApps(false);
         }
@@ -367,7 +383,7 @@ export default function Customization() {
       };
 
       const res = await api.put('/branding', payload);
-      const next = seedHeroMaps(res.data.branding || emptyBranding);
+      const next = seedHeroMaps(res.data.branding || emptyBrandingFor(user?.preferredLanguage));
       setBranding(next);
       setInitialBranding(next);
       setUiLanguage(resolveAppLanguage(user?.preferredLanguage, next.defaultLanguage));
@@ -379,11 +395,11 @@ export default function Customization() {
       pushSaveNotice(
         'success',
         retentionChanged
-          ? `${ui.common.changesSaved}. ${ui.customization.preferences.logRetentionNextCleanup}`
+          ? formatMessage(ui.common.twoSentences, { first: ui.common.changesSaved, second: ui.customization.preferences.logRetentionNextCleanup })
           : ui.common.changesSaved
       );
     } catch (err) {
-      pushSaveNotice('error', err.response?.data?.error || ui.admin.common.errorSaving);
+      pushSaveNotice('error', apiErrorMessage(err, ui, ui.admin.common.errorSaving));
     }
     setBrandingSaving(false);
   };

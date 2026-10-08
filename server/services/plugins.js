@@ -34,13 +34,20 @@ function pickList(primary, fallback) {
   return [];
 }
 
+// Validation errors carry a stable `code` so the UI can translate them.
+function pluginError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
 function normalizePluginId(value) {
   const id = String(value ?? '').trim().toLowerCase();
   if (!id) {
-    throw new Error('Plugin id is required');
+    throw pluginError('plugin_id_required', 'Plugin id is required');
   }
   if (!/^[a-z0-9][a-z0-9-_]*$/.test(id)) {
-    throw new Error('Plugin id must use lowercase letters, numbers, hyphens, or underscores');
+    throw pluginError('plugin_id_invalid', 'Plugin id must use lowercase letters, numbers, hyphens, or underscores');
   }
   return id;
 }
@@ -54,7 +61,9 @@ function tryNormalizePluginId(value) {
   }
 }
 
+// Returns an Error (with a code) for an invalid URL, or null when the value is acceptable.
 function validateExternalUrl(value, fieldName, { allowRelative = false } = {}) {
+  const codePrefix = fieldName === 'backendUrl' ? 'backend_url' : fieldName;
   if (value === undefined || value === null || value === '') return null;
   if (allowRelative && (/^[./]/.test(value) || value.startsWith('/'))) {
     return null;
@@ -63,15 +72,15 @@ function validateExternalUrl(value, fieldName, { allowRelative = false } = {}) {
   try {
     parsed = new URL(value);
   } catch {
-    return `${fieldName} must be a valid URL`;
+    return pluginError(`plugin_${codePrefix}_invalid`, `${fieldName} must be a valid URL`);
   }
 
   if (!['http:', 'https:'].includes(parsed.protocol)) {
-    return `${fieldName} must use http or https`;
+    return pluginError(`plugin_${codePrefix}_protocol`, `${fieldName} must use http or https`);
   }
 
   if (/^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|0\.0\.0\.0|localhost|169\.254\.)/.test(parsed.hostname)) {
-    return `${fieldName} cannot point to a private network`;
+    return pluginError(`plugin_${codePrefix}_private_network`, `${fieldName} cannot point to a private network`);
   }
 
   return null;
@@ -83,7 +92,7 @@ function parsePluginPackage(input = {}) {
     try {
       bytes = Uint8Array.from(Buffer.from(String(input.packageZipBase64), 'base64'));
     } catch {
-      throw new Error('Plugin package ZIP must be valid base64');
+      throw pluginError('plugin_package_zip_invalid_base64', 'Plugin package ZIP must be valid base64');
     }
     const archive = extractPluginPackageZip(bytes);
     return {
@@ -104,13 +113,13 @@ function parsePluginPackage(input = {}) {
         try {
           return JSON.parse(rawPackage);
         } catch {
-          throw new Error('Plugin package must be valid JSON');
+          throw pluginError('plugin_package_invalid_json', 'Plugin package must be valid JSON');
         }
       })()
     : rawPackage;
 
   if (!packageObject || typeof packageObject !== 'object' || Array.isArray(packageObject)) {
-    throw new Error('Plugin package must be a JSON object');
+    throw pluginError('plugin_package_not_object', 'Plugin package must be a JSON object');
   }
 
   const manifest = packageObject.manifest && typeof packageObject.manifest === 'object'
@@ -171,7 +180,7 @@ function normalizeManifest(input = {}, fallback = {}) {
   const entry = String(manifest.entry || fallback.entry || '').trim();
   const entryError = entry ? validateExternalUrl(entry, 'entry', { allowRelative: true }) : null;
   if (entryError) {
-    throw new Error(entryError);
+    throw entryError;
   }
 
   return {
@@ -294,11 +303,11 @@ export function upsertPluginRegistry(input = {}) {
   const backendUrl = String(input.backendUrl || input.backend?.url || manifest.backend.url || '').trim();
   const backendError = validateExternalUrl(backendUrl, 'backendUrl');
   if (backendError) {
-    throw new Error(backendError);
+    throw backendError;
   }
 
   if (manifest.backend.enabled && !backendUrl) {
-    throw new Error('backendUrl is required when backend support is enabled');
+    throw pluginError('plugin_backend_url_required', 'backendUrl is required when backend support is enabled');
   }
 
   const enabled = input.enabled === undefined ? true : Boolean(input.enabled);
@@ -409,7 +418,7 @@ export async function importPluginBundle(input = {}) {
   }
 
   if (!entry) {
-    throw new Error('Plugin entry is required. Provide an entry URL or upload a module source.');
+    throw pluginError('plugin_entry_required', 'Plugin entry is required. Provide an entry URL or upload a module source.');
   }
 
   const plugin = upsertPluginRegistry({

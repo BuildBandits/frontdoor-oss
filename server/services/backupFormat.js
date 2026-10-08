@@ -197,7 +197,7 @@ export async function detectBackupFile(filePath) {
     if (first.subarray(0, 13).toString('utf8') === 'manifest.json') return { format: 2, encrypted: false };
     if (first.toString('utf8').trimStart().startsWith('{')) return { format: 1, encrypted: false };
   }
-  throw new UserFacingError('Backup file is not a valid Frontdoor backup');
+  throw new UserFacingError('Backup file is not a valid Frontdoor backup', { code: 'backup_invalid' });
 }
 
 // Reads an NDJSON file synchronously, one row at a time. Used inside database
@@ -253,7 +253,7 @@ async function* ndjsonRows(content) {
  */
 export async function readBackupV2(filePath, { passphrase = null, onManifest, onSchema, onTable, onFile } = {}) {
   const { format, encrypted } = await detectBackupFile(filePath);
-  if (format !== 2) throw new UserFacingError('Not a v2 backup file');
+  if (format !== 2) throw new UserFacingError('Not a v2 backup file', { code: 'backup_invalid' });
   const source = encrypted ? await createDecryptStream(filePath, passphrase) : fs.createReadStream(filePath);
   const gunzip = zlib.createGunzip();
   source.on('error', (error) => gunzip.destroy(error));
@@ -267,7 +267,7 @@ export async function readBackupV2(filePath, { passphrase = null, onManifest, on
         for await (const part of content) parts.push(part);
         const value = JSON.parse(Buffer.concat(parts).toString('utf8'));
         if (name === 'manifest.json') {
-          if (value?.format !== BACKUP_FORMAT_V2) throw new UserFacingError(`Unsupported backup format: ${value?.format ?? 'missing'}`);
+          if (value?.format !== BACKUP_FORMAT_V2) throw new UserFacingError(`Unsupported backup format: ${value?.format ?? 'missing'}`, { code: 'backup_format_unsupported' });
           manifest = value;
           await onManifest?.(value);
         } else {
@@ -275,11 +275,11 @@ export async function readBackupV2(filePath, { passphrase = null, onManifest, on
         }
         return;
       }
-      if (!manifest) throw new UserFacingError('Backup manifest is missing');
+      if (!manifest) throw new UserFacingError('Backup manifest is missing', { code: 'backup_invalid' });
 
       const tableMatch = /^database\/([^/]+)\.ndjson$/.exec(name);
       if (tableMatch) {
-        if (!TABLE_NAME_RE.test(tableMatch[1])) throw new UserFacingError('Invalid table name in backup');
+        if (!TABLE_NAME_RE.test(tableMatch[1])) throw new UserFacingError('Invalid table name in backup', { code: 'backup_invalid' });
         await onTable?.(tableMatch[1], ndjsonRows(content));
         return;
       }
@@ -287,7 +287,7 @@ export async function readBackupV2(filePath, { passphrase = null, onManifest, on
       const fileMatch = /^files\/([^/]+)\/(.+)$/.exec(name);
       if (fileMatch) {
         if (!BUCKET_KEY_RE.test(fileMatch[1]) || !isSafeRelativePath(fileMatch[2])) {
-          throw new UserFacingError(`Invalid backup file path in bucket ${fileMatch[1]}`);
+          throw new UserFacingError(`Invalid backup file path in bucket ${fileMatch[1]}`, { code: 'backup_invalid_file_path' });
         }
         await onFile?.(fileMatch[1], fileMatch[2], size, content);
       }
@@ -295,12 +295,12 @@ export async function readBackupV2(filePath, { passphrase = null, onManifest, on
   } catch (error) {
     if (error?.expose) throw error;
     if (encrypted && error?.code === 'backup_passphrase_invalid') throw error;
-    if (error instanceof SyntaxError) throw new UserFacingError('Backup file contains invalid data');
+    if (error instanceof SyntaxError) throw new UserFacingError('Backup file contains invalid data', { code: 'backup_invalid' });
     if (error?.code === 'Z_DATA_ERROR' || error?.code === 'Z_BUF_ERROR' || /Unexpected end/.test(error?.message || '')) {
-      throw new UserFacingError('Backup file is truncated or damaged');
+      throw new UserFacingError('Backup file is truncated or damaged', { code: 'backup_damaged' });
     }
     throw error;
   }
-  if (!manifest) throw new UserFacingError('Backup manifest is missing');
+  if (!manifest) throw new UserFacingError('Backup manifest is missing', { code: 'backup_invalid' });
   return manifest;
 }

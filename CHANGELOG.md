@@ -13,6 +13,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ### Changed
 - **Simpler footer**: a single line, *Frontdoor v1.3.x · Licensed under MIT license*, with the product name linking to the website. The commit hash and the "open source software" note are no longer shown; the commit is still recorded in backups when `COMMIT_SHA` is set at build time.
 - **Raw database export under Advanced options**: on the backup page, *Download database file (.db)* moved into an *Advanced options* section that is closed by default, so the regular backup is the only prominent download. The raw copy is meant for upgrade rehearsals and manual recovery and cannot be restored from the page.
+- **Error codes on every API error**: error responses now carry a stable snake_case `code` next to the unchanged `error` text (for example `{ "error": "App not found", "code": "app_not_found" }`), and fallback server errors return readable text such as *Failed to update branding* in `error` instead of the bare code. The admin pages translate these codes, so validation and server errors appear in the interface language instead of in English.
+- **Translated plugin package review**: the checks, warnings and archive errors shown when reviewing or importing a plugin package are now translated.
+- **Access log dates follow the interface language**: the access log formats timestamps in the browser with the interface locale instead of using the Italian date the server returned.
 
 ### Fixed
 - **No-op saves no longer write or audit**: saving an app, a group, a user role or status, a customization form or a plugin approval without changing anything no longer rewrites the row, bumps `updated_at` (which also reloaded the app icon for everyone) or adds an audit row. App updates now write only the columns that changed, and app and group updates record a `from → to` diff of the changed fields instead of the submitted values. App transfers between groups that move nothing are not audited.
@@ -20,6 +23,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Less personal data in sign-in audit rows**: administrator sign-ins no longer copy the email address and Microsoft ID into the audit details; the user is identified by the actor.
 - **Home tour on desktop**: the *Find the menu button* step, which points at the mobile hamburger button, was also shown on desktop where that button does not exist. It is now mobile-only, like the *Reorder the cards* step is desktop-only.
 - **Pages opened already scrolled down**: following a link from a scrolled page (for example *Open backup page* in *Customize → Maintenance*) kept the scroll position, so the new page opened halfway down. Route changes now start at the top; links to a `#section` and back/forward navigation are unchanged. The *Open backup page* button also gets dark-mode colours.
+- **Empty pagination and Refresh buttons**: the *Previous*, *Next* and *Refresh* labels used by the admin lists and plugin pages were missing from the translations, so those buttons showed only an icon.
+- **Hardcoded interface text**: a few labels were written directly in the code, in one language only: the *Local*/*default* group badges and the *Skip* button in the app group picker, the *at* in "saved on … at …" dates, avatar descriptions, the app count on tag groups ("1 app"/"5 apps"), page summaries in the apps, groups, users and access log lists, plugin confirmations and notices, and the Home banner defaults on the Customize page. They now come from the English and Italian dictionaries.
+- **App list sorting**: sorting apps by name in the admin list always used Italian collation; it now follows the interface language.
+- **Plugin form showing "none"**: editing a stored plugin with no permissions or roles filled those fields with the word "none", which was then saved as a permission or role.
 - **Backup page spacing**: the passphrase help text no longer touches the *Download backup* button when the export card is full; the download buttons keep a minimum gap while still sitting at the bottom of the card.
 
 ## [1.3.1] — 2026-10-07

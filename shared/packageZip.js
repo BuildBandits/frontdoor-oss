@@ -10,6 +10,13 @@ for (let i = 0; i < 256; i += 1) {
   CRC32_TABLE[i] = crc >>> 0;
 }
 
+// Errors carry a stable `code` so the UI can translate them; the message stays English for logs.
+function archiveError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
 function toBytes(value) {
   if (value instanceof Uint8Array) return value;
   if (value instanceof ArrayBuffer) return new Uint8Array(value);
@@ -162,7 +169,7 @@ export function parseZipArchive(input) {
   const data = toBytes(input);
   const endOffset = findEndOfCentralDirectory(data);
   if (endOffset < 0) {
-    throw new Error('Plugin archive is not a valid ZIP file');
+    throw archiveError('plugin_archive_invalid_zip', 'Plugin archive is not a valid ZIP file');
   }
 
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -175,12 +182,12 @@ export function parseZipArchive(input) {
   for (let index = 0; index < totalEntries; index += 1) {
     const signature = view.getUint32(cursor, true);
     if (signature !== 0x02014b50) {
-      throw new Error('Plugin archive central directory is invalid');
+      throw archiveError('plugin_archive_invalid_central_directory', 'Plugin archive central directory is invalid');
     }
 
     const compression = view.getUint16(cursor + 10, true);
     if (compression !== 0) {
-      throw new Error('Plugin archive uses unsupported compression');
+      throw archiveError('plugin_archive_unsupported_compression', 'Plugin archive uses unsupported compression');
     }
 
     const fileNameLength = view.getUint16(cursor + 28, true);
@@ -192,12 +199,12 @@ export function parseZipArchive(input) {
 
     const localSignature = view.getUint32(localHeaderOffset, true);
     if (localSignature !== 0x04034b50) {
-      throw new Error('Plugin archive local header is invalid');
+      throw archiveError('plugin_archive_invalid_local_header', 'Plugin archive local header is invalid');
     }
 
     const localCompression = view.getUint16(localHeaderOffset + 8, true);
     if (localCompression !== 0) {
-      throw new Error('Plugin archive uses unsupported compression');
+      throw archiveError('plugin_archive_unsupported_compression', 'Plugin archive uses unsupported compression');
     }
 
     const localFileNameLength = view.getUint16(localHeaderOffset + 26, true);
@@ -215,7 +222,7 @@ export function parseZipArchive(input) {
   }
 
   if (entries.length === 0 || centralDirectorySize < 0) {
-    throw new Error('Plugin archive is empty');
+    throw archiveError('plugin_archive_empty_archive', 'Plugin archive is empty');
   }
 
   return entries;
@@ -227,7 +234,7 @@ export function buildPluginPackageZip(packageData = {}, options = {}) {
     : packageData;
   const moduleSource = String(packageData.moduleSource || '').trim();
   if (!moduleSource) {
-    throw new Error('Plugin package ZIP requires moduleSource');
+    throw archiveError('plugin_package_module_source_required', 'Plugin package ZIP requires moduleSource');
   }
 
   const packageName = sanitizeSegment(
@@ -250,21 +257,21 @@ export function extractPluginPackageZip(input) {
   const moduleEntry = entries.find((entry) => entry.name.endsWith('/module.mjs') || entry.name === 'module.mjs');
 
   if (!manifestEntry) {
-    throw new Error('Plugin archive is missing manifest.json');
+    throw archiveError('plugin_archive_missing_manifest', 'Plugin archive is missing manifest.json');
   }
   if (!moduleEntry) {
-    throw new Error('Plugin archive is missing module.mjs');
+    throw archiveError('plugin_archive_missing_module', 'Plugin archive is missing module.mjs');
   }
 
   let manifest;
   try {
     manifest = JSON.parse(fromBytes(manifestEntry.data));
   } catch {
-    throw new Error('Plugin archive manifest.json is not valid JSON');
+    throw archiveError('plugin_archive_invalid_manifest_json', 'Plugin archive manifest.json is not valid JSON');
   }
 
   if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
-    throw new Error('Plugin archive manifest must be a JSON object');
+    throw archiveError('plugin_archive_manifest_not_object', 'Plugin archive manifest must be a JSON object');
   }
 
   return {

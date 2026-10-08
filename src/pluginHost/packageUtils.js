@@ -100,80 +100,83 @@ export function analyzePluginPackage(packageData = {}) {
   const checks = [];
   let score = 0;
 
+  // Checks and warnings carry stable keys so the UI can translate them:
+  // `key` names the check, `detailKey` names a fixed message, `detail` holds raw values.
   const requiredFields = [
     ['id', manifest.id],
     ['name', manifest.name],
     ['version', manifest.version],
   ];
 
-  for (const [label, value] of requiredFields) {
+  for (const [key, value] of requiredFields) {
     if (!toText(value)) {
-      checks.push({ label, status: 'fail', detail: 'Missing required field' });
+      checks.push({ key, status: 'fail', detailKey: 'missingRequiredField' });
       score += 4;
     } else {
-      checks.push({ label, status: 'pass', detail: toText(value) });
+      checks.push({ key, status: 'pass', detail: toText(value) });
     }
   }
 
   if (!entry && !moduleSource) {
-    checks.push({ label: 'entry/module', status: 'fail', detail: 'No entry URL or module source provided' });
+    checks.push({ key: 'entryModule', status: 'fail', detailKey: 'noEntryOrModule' });
     score += 4;
   } else if (moduleSource) {
-    checks.push({ label: 'module source', status: 'pass', detail: 'Self-contained module source included' });
+    checks.push({ key: 'moduleSource', status: 'pass', detailKey: 'moduleSourceIncluded' });
   } else if (entry.startsWith('/api/plugins/files/')) {
-    checks.push({ label: 'entry', status: 'pass', detail: 'Local Frontdoor bundle' });
+    checks.push({ key: 'entry', status: 'pass', detailKey: 'localBundle' });
   } else {
-    checks.push({ label: 'entry', status: 'warn', detail: 'External entry URL will be fetched at runtime' });
+    checks.push({ key: 'entry', status: 'warn', detailKey: 'externalEntry' });
     score += 2;
-    warnings.push('The plugin loads from an external entry URL.');
+    warnings.push('externalEntry');
   }
 
   if (backend.enabled) {
     if (backendUrl) {
-      checks.push({ label: 'backend webhook', status: 'warn', detail: backendUrl });
+      checks.push({ key: 'backendWebhook', status: 'warn', detail: backendUrl });
       score += 2;
-      warnings.push('Backend webhook delivery is enabled.');
+      warnings.push('backendWebhookEnabled');
     } else {
-      checks.push({ label: 'backend webhook', status: 'fail', detail: 'Backend is enabled but no URL is set' });
+      checks.push({ key: 'backendWebhook', status: 'fail', detailKey: 'backendUrlMissing' });
       score += 4;
     }
   } else {
-    checks.push({ label: 'backend webhook', status: 'pass', detail: 'Disabled' });
+    checks.push({ key: 'backendWebhook', status: 'pass', detailKey: 'disabled' });
   }
 
   if (permissions.length > 0) {
     const broadPermissions = permissions.filter((permission) => ['actions.write', 'routes.write', 'surfaces.write'].includes(permission));
     if (broadPermissions.length > 0) {
       checks.push({
-        label: 'permissions',
+        key: 'permissions',
         status: 'warn',
-        detail: `Broad capabilities: ${broadPermissions.join(', ')}`,
+        detailKey: 'broadCapabilities',
+        detail: broadPermissions.join(', '),
       });
       score += broadPermissions.length;
-      warnings.push('The package requests broad UI/runtime capabilities.');
+      warnings.push('broadPermissions');
     } else {
-      checks.push({ label: 'permissions', status: 'pass', detail: permissions.join(', ') });
+      checks.push({ key: 'permissions', status: 'pass', detail: permissions.join(', ') });
     }
   } else {
-    checks.push({ label: 'permissions', status: 'pass', detail: 'No permissions declared' });
+    checks.push({ key: 'permissions', status: 'pass', detailKey: 'noPermissions' });
   }
 
   if (roles.length > 0) {
-    checks.push({ label: 'visibility', status: 'pass', detail: roles.join(', ') });
+    checks.push({ key: 'visibility', status: 'pass', detail: roles.join(', ') });
   } else {
-    checks.push({ label: 'visibility', status: 'warn', detail: 'No role restriction declared' });
+    checks.push({ key: 'visibility', status: 'warn', detailKey: 'noRoleRestriction' });
     score += 1;
   }
 
   if (backendEvents.length > 0) {
-    checks.push({ label: 'backend events', status: 'pass', detail: backendEvents.join(', ') });
+    checks.push({ key: 'backendEvents', status: 'pass', detail: backendEvents.join(', ') });
   }
 
   const riskLevel = inferRiskLevel(score);
   if (riskLevel === 'high') {
-    warnings.unshift('This package is high risk and should only be approved after a careful review.');
+    warnings.unshift('highRisk');
   } else if (riskLevel === 'medium') {
-    warnings.unshift('This package has a moderate risk profile.');
+    warnings.unshift('moderateRisk');
   }
 
   return {
@@ -198,7 +201,7 @@ export function analyzePluginPackage(packageData = {}) {
       },
     },
     summary: {
-      entry: entry || 'none',
+      entry,
       moduleSource: Boolean(moduleSource),
       backendEnabled: Boolean(backend.enabled),
     },

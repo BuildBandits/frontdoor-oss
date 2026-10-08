@@ -22,6 +22,12 @@ export function isValidAppSlug(value) {
   return APP_SLUG_RE.test((value ?? '').toString().trim());
 }
 
+// Stable codes for the messages returned by validateAppSlug (the UI translates the codes).
+export const APP_SLUG_ERROR_CODES = {
+  'slug is required': 'slug_required',
+  'slug must be lowercase alphanumeric with hyphens, 1-63 chars': 'slug_invalid',
+};
+
 export function validateAppSlug(value) {
   const slug = (value ?? '').toString().trim();
   if (!slug) {

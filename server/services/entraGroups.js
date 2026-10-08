@@ -69,7 +69,7 @@ function getGraphClient() {
 async function acquireGraphAppToken() {
   const client = getGraphClient();
   if (!client) {
-    throw new UserFacingError('Microsoft Graph app credentials are not configured', { statusCode: 400 });
+    throw new UserFacingError('Microsoft Graph app credentials are not configured', { statusCode: 400, code: 'graph_credentials_missing' });
   }
 
   const response = await client.acquireTokenByClientCredential({
@@ -77,7 +77,7 @@ async function acquireGraphAppToken() {
   });
 
   if (!response?.accessToken) {
-    throw new UserFacingError('Microsoft Graph app token could not be acquired', { statusCode: 502 });
+    throw new UserFacingError('Microsoft Graph app token could not be acquired', { statusCode: 502, code: 'graph_token_failed' });
   }
 
   return response.accessToken;
@@ -420,7 +420,7 @@ export function importEntraGroups(groupIds) {
     for (const entraGroupId of uniqueGroupIds) {
       const cacheRow = cacheLookup.get(entraGroupId);
       if (!cacheRow) {
-        throw new UserFacingError(`Entra group ${entraGroupId} is not in the discovery cache`, { statusCode: 400 });
+        throw new UserFacingError(`Entra group ${entraGroupId} is not in the discovery cache`, { statusCode: 400, code: 'entra_group_not_discovered' });
       }
 
       const existing = existingByEntraId.get(entraGroupId) || null;
@@ -505,7 +505,7 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
     errors.push({
       scope: 'tenant-groups',
       message: error.message,
-      ...(hint ? { hint } : {}),
+      ...(hint ? { hint, hintCode: 'graph_group_member_read' } : {}),
     });
   }
 
@@ -554,7 +554,7 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
       errors.push({
         userId: user.id,
         message: error.message,
-        ...(hint ? { hint } : {}),
+        ...(hint ? { hint, hintCode: 'graph_group_member_read' } : {}),
       });
     }
   }
