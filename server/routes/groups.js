@@ -140,7 +140,7 @@ router.post('/bulk-delete', authenticate, isAdminEditor, (req, res) => {
     return res.status(400).json({ error: 'groupIds must contain at least one valid group id', code: 'group_ids_required' });
   }
   const placeholders = uniqueGroupIds.map(() => '?').join(', ');
-  const groups = db.prepare(`SELECT id, name FROM user_groups WHERE id IN (${placeholders})`).all(...uniqueGroupIds);
+  const groups = db.prepare(`SELECT id, name, source FROM user_groups WHERE id IN (${placeholders})`).all(...uniqueGroupIds);
 
   if (groups.length !== uniqueGroupIds.length) {
     return res.status(404).json({ error: 'One or more groups were not found', code: 'groups_not_found' });
@@ -156,6 +156,7 @@ router.post('/bulk-delete', authenticate, isAdminEditor, (req, res) => {
       db.prepare('DELETE FROM user_group_members WHERE group_id = ?').run(group.id);
       db.prepare('DELETE FROM app_permissions WHERE group_id = ?').run(group.id);
       db.prepare('DELETE FROM group_group_memberships WHERE parent_group_id = ? OR child_group_id = ?').run(group.id, group.id);
+      db.prepare('DELETE FROM group_entra_group_memberships WHERE parent_group_id = ?').run(group.id);
       db.prepare('DELETE FROM user_groups WHERE id = ?').run(group.id);
       logRbacAudit(req.user.id, 'delete', 'group', group.id, { name: group.name, bulk: true });
     }

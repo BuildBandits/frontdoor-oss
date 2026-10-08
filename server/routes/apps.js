@@ -397,7 +397,7 @@ async function applyAppIconChange(appId, existingApp, { icon, iconDataUrl, iconS
   }
 
   if (payload) {
-    const saved = await saveAppIconAsset(appId, payload, appMeta);
+    const saved = await saveAppIconAsset(appId, payload, appMeta, { currentFileName: existingApp?.icon_file_name || null });
     return {
       icon: icon || existingApp?.icon || '📦',
       icon_file_name: saved.fileName,
@@ -841,26 +841,30 @@ router.post('/bulk', (req, res) => {
           mergedTags = JSON.stringify(normalizeTagList([...existingTags, ...app.tags]));
         }
 
+        // Omitted fields keep their value; only the columns that actually change are written.
+        const requested = {
+          name: app.name,
+          description: app.description,
+          long_description: app.long_description,
+          icon: app.icon,
+          target_url: app.target_url,
+          mode: app.mode,
+          sso_endpoint: normalizedSsoEndpoint,
+          sso_method: app.sso_method,
+          tags: mergedTags,
+        };
+        const changedColumns = Object.keys(requested)
+          .filter((column) => requested[column] !== undefined && requested[column] !== null && requested[column] !== existing[column]);
+
+        if (changedColumns.length === 0) {
+          results.push({ slug: app.slug, status: 'unchanged' });
+          continue;
+        }
+
         db.prepare(`
-          UPDATE apps SET
-            name = COALESCE(?, name),
-            description = COALESCE(?, description),
-            long_description = COALESCE(?, long_description),
-            icon = COALESCE(?, icon),
-            icon_file_name = COALESCE(?, icon_file_name),
-            target_url = COALESCE(?, target_url),
-            mode = COALESCE(?, mode),
-            sso_endpoint = COALESCE(?, sso_endpoint),
-            sso_method = COALESCE(?, sso_method),
-            tags = COALESCE(?, tags),
-            updated_at = datetime('now')
+          UPDATE apps SET ${changedColumns.map((column) => `${column} = ?`).join(', ')}, updated_at = datetime('now')
           WHERE id = ?
-        `).run(
-          app.name, app.description, app.long_description, app.icon, null, app.target_url,
-          app.mode, normalizedSsoEndpoint, app.sso_method,
-          mergedTags,
-          existing.id
-        );
+        `).run(...changedColumns.map((column) => requested[column]), existing.id);
         results.push({ slug: app.slug, status: 'updated' });
       } else {
         const id = uuidv4();
