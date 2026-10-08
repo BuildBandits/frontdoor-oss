@@ -7,7 +7,7 @@ import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import PaginationControls from '../components/PaginationControls';
 import { useAuthStore } from '../stores/authStore';
-import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { formatDateTimeWithTimeZone } from '../utils/dateTime';
 import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
@@ -247,7 +247,7 @@ export default function AdminLogs() {
               page={pagination.page}
               pages={pagination.pages}
               total={pagination.total}
-              summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} log totali`}
+              summary={formatMessage(ui.admin.logs.pageSummary, pagination)}
               previousLabel={ui.common.previous}
               nextLabel={ui.common.next}
               onPrevious={() => setPage((p) => Math.max(1, p - 1))}
@@ -261,13 +261,13 @@ export default function AdminLogs() {
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.common.date}</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.nav.users}</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.nav.apps}</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hidden md:table-cell">IP</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hidden md:table-cell">{ui.admin.logs.ipAddress}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {logs.map((log) => (
                     <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="px-5 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{log.created_at_local || formatDate(log.created_at)}</td>
+                      <td className="px-5 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDate(log.created_at)}</td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
                           <UserAvatar
@@ -305,7 +305,7 @@ export default function AdminLogs() {
               page={pagination.page}
               pages={pagination.pages}
               total={pagination.total}
-              summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} log totali`}
+              summary={formatMessage(ui.admin.logs.pageSummary, pagination)}
               previousLabel={ui.common.previous}
               nextLabel={ui.common.next}
               onPrevious={() => setPage((p) => Math.max(1, p - 1))}

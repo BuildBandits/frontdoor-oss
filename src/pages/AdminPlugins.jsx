@@ -18,7 +18,8 @@ import { Link } from 'react-router';
 import api from '../services/api';
 import Tooltip from '../components/Tooltip';
 import { useAuthStore } from '../stores/authStore';
-import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { apiErrorMessage } from '../utils/apiErrors';
 import { usePluginRegistry } from '../pluginHost/registry';
 import { moduleExample } from '../pluginHost/pluginDocsContent';
 import {
@@ -50,7 +51,7 @@ const EMPTY_FORM = {
   moduleSource: '',
 };
 
-function formatList(values, emptyValue = 'none') {
+function formatList(values, emptyValue = '') {
   if (!Array.isArray(values) || values.length === 0) return emptyValue;
   return values.join(', ');
 }
@@ -137,6 +138,11 @@ export default function AdminPlugins() {
     low: t.riskLow,
   }[riskLevel] || riskLevel || t.pluginStatusUnknown);
   const translateBoolean = (value) => (value ? t.enabled : t.disabled);
+  const translateCheckDetail = (check) => (
+    check.detailKey
+      ? formatMessage(t.analysis.details[check.detailKey] || check.detailKey, { value: check.detail })
+      : check.detail
+  );
 
   const backendEnabledCount = serverPlugins.filter((plugin) => plugin.backendEnabled).length;
   const enabledServerCount = serverPlugins.filter((plugin) => plugin.enabled && plugin.approved).length;
@@ -150,7 +156,7 @@ export default function AdminPlugins() {
       setServerError('');
     } catch (error) {
       setServerPlugins([]);
-      setServerError(error?.response?.data?.error || error?.message || t.failedLoadServerRegistry);
+      setServerError(apiErrorMessage(error, ui, t.failedLoadServerRegistry));
     }
   }
 
@@ -198,7 +204,7 @@ export default function AdminPlugins() {
       }
     }
     openReviewWizard(packageData, {
-      title: `${plugin.name} package review`,
+      title: formatMessage(t.packageReviewTitle, { name: plugin.name }),
       pluginId: plugin.id,
       pluginName: plugin.name,
       canApprove: isOwner && plugin.status === 'pending',
@@ -343,7 +349,7 @@ export default function AdminPlugins() {
     } catch (error) {
       setServerMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : t.archiveReadFailed,
+        text: apiErrorMessage(error, ui, t.archiveReadFailed),
       });
     }
   }
@@ -380,7 +386,7 @@ export default function AdminPlugins() {
     } catch (error) {
       setServerMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : t.failedExportZip,
+        text: apiErrorMessage(error, ui, t.failedExportZip),
       });
     }
   }
@@ -393,14 +399,14 @@ export default function AdminPlugins() {
       const response = await api.post(`/plugins/${reviewState.pluginId}/approve`);
       setServerMessage({
         type: 'success',
-        text: `${response.data?.plugin?.name || reviewState.pluginName} ${t.pluginApprovedAndActivated}`,
+        text: formatMessage(t.pluginApprovedAndActivated, { name: response.data?.plugin?.name || reviewState.pluginName }),
       });
       closeReviewWizard();
       await loadServerPlugins();
     } catch (error) {
       setServerMessage({
         type: 'error',
-        text: error?.response?.data?.error || error?.message || t.failedApprovePlugin,
+        text: apiErrorMessage(error, ui, t.failedApprovePlugin),
       });
     } finally {
       setBusyId('');
@@ -415,14 +421,14 @@ export default function AdminPlugins() {
       setServerMessage({
         type: 'success',
         text: approved
-          ? `${response.data?.plugin?.name || plugin.name} ${t.pluginApprovedAndActivated}`
-          : `${response.data?.plugin?.name || plugin.name} ${t.pluginApprovalRevoked}`,
+          ? formatMessage(t.pluginApprovedAndActivated, { name: response.data?.plugin?.name || plugin.name })
+          : formatMessage(t.pluginApprovalRevoked, { name: response.data?.plugin?.name || plugin.name }),
       });
       await loadServerPlugins();
     } catch (error) {
       setServerMessage({
         type: 'error',
-        text: error?.response?.data?.error || error?.message || t.failedUpdatePluginApproval,
+        text: apiErrorMessage(error, ui, t.failedUpdatePluginApproval),
       });
     } finally {
       setBusyId('');
@@ -458,7 +464,7 @@ export default function AdminPlugins() {
       setServerMessage({
         type: 'success',
         text: plugin
-          ? `${plugin.name || plugin.id} ${t.pluginInstalledPendingApproval}`
+          ? formatMessage(t.pluginInstalledPendingApprovalNamed, { name: plugin.name || plugin.id })
           : t.pluginInstalledPendingApproval,
       });
       resetForm();
@@ -466,7 +472,7 @@ export default function AdminPlugins() {
     } catch (error) {
       setServerMessage({
         type: 'error',
-        text: error?.response?.data?.error || error?.message || t.failedInstallPlugin,
+        text: apiErrorMessage(error, ui, t.failedInstallPlugin),
       });
     } finally {
       setBusyId('');
@@ -474,18 +480,18 @@ export default function AdminPlugins() {
   }
 
   async function handleDelete(plugin) {
-    if (!window.confirm(`${t.delete} plugin "${plugin.name}"?`)) return;
+    if (!window.confirm(formatMessage(t.deletePluginConfirm, { name: plugin.name }))) return;
     setBusyId(plugin.id);
     setServerMessage(null);
     try {
       await api.delete(`/plugins/${plugin.id}`);
-      setServerMessage({ type: 'success', text: `${plugin.name} ${t.pluginDeleted}` });
+      setServerMessage({ type: 'success', text: formatMessage(t.pluginDeleted, { name: plugin.name }) });
       if (editingId === plugin.id) resetForm();
       await loadServerPlugins();
     } catch (error) {
       setServerMessage({
         type: 'error',
-        text: error?.response?.data?.error || error?.message || t.failedDeletePlugin,
+        text: apiErrorMessage(error, ui, t.failedDeletePlugin),
       });
     } finally {
       setBusyId('');
@@ -512,7 +518,7 @@ export default function AdminPlugins() {
     } catch (error) {
       setServerMessage({
         type: 'error',
-        text: error?.response?.data?.error || error?.message || t.failedTestPluginBackend,
+        text: apiErrorMessage(error, ui, t.failedTestPluginBackend),
       });
     } finally {
       setBusyId('');
@@ -665,7 +671,7 @@ export default function AdminPlugins() {
                 <input
                   value={form.name}
                   onChange={(event) => setForm((current) => ({ ...current, name: event.target.value, packageSource: '' }))}
-                  placeholder="Ticket Plugin"
+                  placeholder={t.namePlaceholder}
                   className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
                   required
                 />
@@ -687,7 +693,7 @@ export default function AdminPlugins() {
                 value={form.description}
                 onChange={(event) => setForm((current) => ({ ...current, description: event.target.value, packageSource: '' }))}
                 rows="3"
-                placeholder="Adds a ticket creation action, route and surface"
+                placeholder={t.descriptionPlaceholder}
                 className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950/60 px-3 py-2.5 text-sm text-dark dark:text-gray-100 outline-hidden transition focus:border-violet-400"
               />
             </label>
@@ -947,8 +953,8 @@ export default function AdminPlugins() {
                     <span><strong className="text-gray-600 dark:text-gray-300">{ui.admin.plugins.idLabel}:</strong> {plugin.id}</span>
                     <span><strong className="text-gray-600 dark:text-gray-300">{ui.admin.plugins.entryLabel}:</strong> {plugin.entry || t.none}</span>
                     <span><strong className="text-gray-600 dark:text-gray-300">{ui.admin.plugins.sourceLabel}:</strong> {plugin.source || ui.admin.plugins.localSource}</span>
-                    <span><strong className="text-gray-600 dark:text-gray-300">{ui.admin.plugins.permissionsLabel}:</strong> {formatList(plugin.permissions)}</span>
-                    <span><strong className="text-gray-600 dark:text-gray-300">{ui.admin.plugins.rolesLabel}:</strong> {formatList(plugin.roles)}</span>
+                    <span><strong className="text-gray-600 dark:text-gray-300">{ui.admin.plugins.permissionsLabel}:</strong> {formatList(plugin.permissions, t.none)}</span>
+                    <span><strong className="text-gray-600 dark:text-gray-300">{ui.admin.plugins.rolesLabel}:</strong> {formatList(plugin.roles, t.none)}</span>
                   </div>
                 </div>
 
@@ -1093,7 +1099,7 @@ export default function AdminPlugins() {
 
                   <div className="mt-5 space-y-3 text-sm text-gray-600 dark:text-gray-300">
                     <div><strong className="text-gray-700 dark:text-gray-200">{t.pluginLabel}:</strong> {reviewState.pluginName}</div>
-                    <div><strong className="text-gray-700 dark:text-gray-200">{t.entrySummaryLabel}:</strong> {reviewState.analysis.summary.entry}</div>
+                    <div><strong className="text-gray-700 dark:text-gray-200">{t.entrySummaryLabel}:</strong> {reviewState.analysis.summary.entry || t.none}</div>
                     <div><strong className="text-gray-700 dark:text-gray-200">{t.moduleSourceSummaryLabel}:</strong> {reviewState.analysis.summary.moduleSource ? t.present : t.missing}</div>
                     <div><strong className="text-gray-700 dark:text-gray-200">{t.backendSummaryLabel}:</strong> {translateBoolean(reviewState.analysis.summary.backendEnabled)}</div>
                   </div>
@@ -1102,7 +1108,7 @@ export default function AdminPlugins() {
                     <div className="mt-5 space-y-2">
                       {reviewState.analysis.warnings.map((warning) => (
                         <div key={warning} className="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/25 px-3 py-2 text-sm text-amber-800 dark:text-amber-100">
-                          {warning}
+                          {t.analysis.warnings[warning] || warning}
                         </div>
                       ))}
                     </div>
@@ -1112,7 +1118,7 @@ export default function AdminPlugins() {
                     <div className="text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500">{t.checklist}</div>
                     <div className="mt-3 space-y-2 text-sm text-gray-600 dark:text-gray-300">
                       {reviewState.analysis.checks.map((check) => (
-                        <div key={check.label} className="flex items-start gap-3">
+                        <div key={check.key} className="flex items-start gap-3">
                           <span className={`mt-0.5 inline-flex h-2.5 w-2.5 rounded-full ${
                             check.status === 'fail'
                               ? 'bg-red-500'
@@ -1121,8 +1127,8 @@ export default function AdminPlugins() {
                                 : 'bg-emerald-500'
                           }`} />
                           <div>
-                            <div className="font-semibold text-gray-700 dark:text-gray-200">{check.label}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">{check.detail}</div>
+                            <div className="font-semibold text-gray-700 dark:text-gray-200">{t.analysis.checks[check.key] || check.key}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{translateCheckDetail(check)}</div>
                           </div>
                         </div>
                       ))}

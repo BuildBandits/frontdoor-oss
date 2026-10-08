@@ -60,7 +60,7 @@ const noticeStyles = {
 export default function TopToastNotice({
   notice,
   onClose,
-  closeLabel = 'Close notice',
+  closeLabel,
   duration = 2000,
   className = '',
   positionClassName = 'top-4 sm:top-6',

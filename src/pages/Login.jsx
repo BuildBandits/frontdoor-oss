@@ -108,8 +108,8 @@ export default function Login() {
               {ui.login.title}
             </h1>
             {/*
-              Sottotitolo temporaneamente rimosso.
-              Valutiamo in seguito se reintrodurre un testo descrittivo più mirato.
+              Subtitle temporarily removed.
+              We may reintroduce a more focused description later.
             */}
           </div>
 

@@ -8,7 +8,7 @@ import AppFooter from './AppFooter';
 import UserAvatar from './UserAvatar';
 import Tooltip from './Tooltip';
 import api from '../services/api';
-import { getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatMessage, getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { getSupportedTimeZoneOptions, normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
@@ -232,6 +232,7 @@ export default function Layout({ children }) {
 
   const formatOrderTimestamp = (value) => {
     const formatted = formatDateTimeWithTimeZone(value, {
+      // Locale picks the numeric date field order (day-first vs month-first), not the UI language.
       locale: useEuropeanDateFormat ? 'it-IT' : 'en-US',
       timeZone: effectiveTimeZone,
       dateOptions: useEuropeanDateFormat
@@ -254,7 +255,7 @@ export default function Layout({ children }) {
     if (!formatted) return null;
     const date = formatted.formattedDate;
     const time = formatted.formattedTime;
-    return `${date} ${effectiveLanguage === 'it' ? 'alle' : 'at'} ${time}`;
+    return formatMessage(ui.layout.dateAtTime, { date, time });
   };
 
   const handleHomeViewChange = async (nextView) => {
@@ -398,6 +399,7 @@ export default function Layout({ children }) {
   const effectiveHomeView = user?.homeDesktopView ?? defaultHomeDesktopView;
   const hasHomeViewOverride = user?.homeDesktopView != null && user.homeDesktopView !== defaultHomeDesktopView;
   const effectiveLanguage = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
+  const ui = getUiStrings(effectiveLanguage);
   const hasPreferredLanguageOverride = user?.preferredLanguage != null
     && normalizeLanguage(user.preferredLanguage) !== normalizeLanguage(brandingLanguage);
   const effectiveTimeZone = resolveAppTimeZone(user?.preferredTimeZone, brandingTimeZone);
@@ -414,7 +416,6 @@ export default function Layout({ children }) {
   const favoriteAppsSavedLabel = favoriteAppsCount != null
     ? formatOrderTimestamp(user.favoriteAppsUpdatedAt)
     : null;
-  const ui = getUiStrings(effectiveLanguage);
   const languageOptions = getSupportedLanguageOptions(ui);
   const timeZoneOptions = getSupportedTimeZoneOptions();
 

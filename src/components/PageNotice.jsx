@@ -27,7 +27,7 @@ export default function PageNotice({
   actionLabel,
   onAction,
   onClose,
-  closeLabel = 'Close notice',
+  closeLabel,
 }) {
   const config = noticeStyles[type] || noticeStyles.info;
   const Icon = config.icon;

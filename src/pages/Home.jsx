@@ -577,7 +577,7 @@ export default function Home() {
 
   const filtersActive = search.trim().length > 0 || selectedTags.length > 0;
   const dragEnabled = !groupByTag && !filtersActive && !compactView;
-  const appCountLabel = ui.home.appCount.replace('{count}', String(filtered.length));
+  const appCountLabel = (filtered.length === 1 ? ui.home.appCountOne : ui.home.appCount).replace('{count}', String(filtered.length));
   const hideMobileCompactControls = mobileCompactViewForced;
   const tourStepIndex = tourStep;
   const isLastTourStep = tourStepIndex === totalTourSteps - 1;
@@ -983,6 +983,7 @@ export default function Home() {
                 key={tag}
                 tag={tag}
                 count={groupApps.length}
+                ui={ui}
                 isOpen={!!openGroups[tag]}
                 onToggle={() => toggleGroup(tag)}
               />

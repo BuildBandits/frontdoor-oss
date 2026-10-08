@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import TopToastNotice from '../components/TopToastNotice';
 import { useAuthStore } from '../stores/authStore';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { apiErrorMessage } from '../utils/apiErrors';
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes)) return '-';
@@ -96,7 +97,7 @@ export default function AdminBackup() {
     backup_passphrase_invalid: copy.passphraseInvalid,
     backup_passphrase_too_short: copy.passphraseTooShort,
     backup_too_large: copy.backupTooLarge,
-  })[payload?.code] || payload?.error || fallback;
+  })[payload?.code] || apiErrorMessage(payload, ui, fallback);
   const passphraseHeaders = () => (restorePassphrase ? { 'X-Backup-Passphrase': restorePassphrase } : {});
 
   const closeExportStream = () => {
@@ -175,7 +176,7 @@ export default function AdminBackup() {
 
           if (payload.status === 'error') {
             finalize();
-            reject(new Error(payload.error || copy.exportFailed));
+            reject(new Error(backupErrorMessage({ error: payload.error, code: payload.errorCode }, copy.exportFailed)));
           }
         });
 
@@ -193,7 +194,7 @@ export default function AdminBackup() {
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || copy.exportFailed);
+        throw new Error(backupErrorMessage(payload, copy.exportFailed));
       }
 
       await saveResponseAsFile(response, safeFileName(Boolean(exportPassphrase)));
