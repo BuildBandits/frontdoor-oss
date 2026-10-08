@@ -227,6 +227,7 @@ router.get('/microsoft/callback', async (req, res) => {
     // Fetch user profile from Microsoft Graph
     const graphResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
       headers: { Authorization: `Bearer ${tokenResponse.accessToken}` },
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!graphResponse.ok) {
@@ -241,7 +242,7 @@ router.get('/microsoft/callback', async (req, res) => {
     if (isEntraGroupSyncEnabled()) {
       try {
         const refresh = await refreshGroupCacheFromTenant();
-        console.log(`Entra tenant group refresh [${microsoftId}]: ${refresh.discoveredGroups} groups`);
+        if (!refresh.skipped) console.log(`Entra tenant group refresh [${microsoftId}]: ${refresh.discoveredGroups} groups`);
       } catch (error) {
         const hint = error.hint ? ` Hint: ${error.hint}` : '';
         console.warn(`Entra tenant group refresh skipped [${microsoftId}]: ${error.message}.${hint}`);
@@ -325,7 +326,7 @@ router.get('/microsoft/callback', async (req, res) => {
     }
 
     await ensureAvatarCached(
-      { id: user.id, email: user.email, microsoftId: user.microsoft_id },
+      { id: user.id, email: user.email, microsoft_id: user.microsoft_id },
       tokenResponse.accessToken
     );
 

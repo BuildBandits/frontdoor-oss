@@ -25,6 +25,7 @@ services:
       - AZURE_REDIRECT_URI=${AZURE_REDIRECT_URI:-https://frontdoor.local/api/auth/microsoft/callback}
       - JWT_SECRET=${JWT_SECRET}
       - ENTRA_GROUP_SYNC=${ENTRA_GROUP_SYNC:-true}
+      - ENTRA_TENANT_REFRESH_MINUTES=${ENTRA_TENANT_REFRESH_MINUTES:-360}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
       - ADMIN_EMAILS=${ADMIN_EMAILS:-}
       - ADMIN_API_KEY=${ADMIN_API_KEY:-}

@@ -5,6 +5,23 @@ import { UserFacingError } from './errors.js';
 const DEFAULT_SCOPES = ['User.Read', 'openid', 'profile', 'email'];
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0';
 const GRAPH_APP_SCOPES = ['https://graph.microsoft.com/.default'];
+const GRAPH_TIMEOUT_MS = 20_000;
+const GRAPH_MAX_ATTEMPTS = 4;
+const GRAPH_MAX_RETRY_DELAY_MS = 30_000;
+const GRAPH_RETRY_STATUSES = new Set([429, 503, 504]);
+
+// Same format as SQLite's datetime('now'), used by every other timestamp column.
+function sqliteNow() {
+  return new Date().toISOString().replace('T', ' ').slice(0, 19);
+}
+
+function retryDelayMs(response, attempt) {
+  const retryAfter = Number.parseInt(response?.headers?.get?.('retry-after') || '', 10);
+  const delay = Number.isFinite(retryAfter) && retryAfter >= 0 ? retryAfter * 1000 : 1000 * 2 ** attempt;
+  return Math.min(delay, GRAPH_MAX_RETRY_DELAY_MS);
+}
+
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
 function isTruthyEnv(value) {
   if (typeof value !== 'string') return false;
@@ -92,13 +109,30 @@ function graphErrorCode(body) {
   }
 }
 
-async function fetchGraphPage(url, accessToken) {
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      ConsistencyLevel: 'eventual',
-    },
-  });
+// Fetches one Graph page with a timeout, retrying throttling and temporary
+// unavailability (429/503/504) as Graph asks via Retry-After, a few times at most.
+async function fetchGraphPage(url, accessToken, { maxAttempts = GRAPH_MAX_ATTEMPTS, timeoutMs = GRAPH_TIMEOUT_MS } = {}) {
+  let response;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          ConsistencyLevel: 'eventual',
+        },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      if (error?.name !== 'TimeoutError' || attempt === maxAttempts - 1) {
+        const failure = new Error(error?.name === 'TimeoutError' ? 'Microsoft Graph request timed out' : 'Microsoft Graph request failed');
+        failure.status = null;
+        throw failure;
+      }
+      continue;
+    }
+    if (!GRAPH_RETRY_STATUSES.has(response.status) || attempt === maxAttempts - 1) break;
+    await sleep(retryDelayMs(response, attempt));
+  }
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -143,6 +177,8 @@ function formatGraphAccessHint(error, context) {
 }
 
 function upsertDiscoveredGroups(groups, seenAt) {
+  // Existing rows are rewritten only when Entra reports a different name or
+  // description, or to move last_seen_at forward at most once a day.
   const stmt = db.prepare(`
     INSERT INTO entra_group_cache (entra_group_id, display_name, description, first_seen_at, last_seen_at)
     VALUES (?, ?, ?, ?, ?)
@@ -150,6 +186,10 @@ function upsertDiscoveredGroups(groups, seenAt) {
       display_name = excluded.display_name,
       description = excluded.description,
       last_seen_at = excluded.last_seen_at
+    WHERE entra_group_cache.display_name IS NOT excluded.display_name
+      OR entra_group_cache.description IS NOT excluded.description
+      OR entra_group_cache.last_seen_at IS NULL
+      OR datetime(entra_group_cache.last_seen_at) < datetime(excluded.last_seen_at, '-1 day')
   `);
 
   for (const group of groups) {
@@ -159,15 +199,23 @@ function upsertDiscoveredGroups(groups, seenAt) {
   return groups.length;
 }
 
-function syncImportedMemberships(userId, groups, syncedAt) {
+// Imported groups and taken names, loaded once and shared by all users of a force sync.
+function loadImportedGroupContext() {
   const importedGroups = db.prepare(`
     SELECT id, name, description, entra_display_name, entra_group_id
     FROM user_groups
     WHERE source = 'entra' AND entra_group_id IS NOT NULL
   `).all();
+  return {
+    importedGroups,
+    reservedNames: new Set(db.prepare('SELECT name FROM user_groups').all().map((row) => row.name)),
+  };
+}
+
+function syncImportedMemberships(userId, groups, syncedAt, context = loadImportedGroupContext()) {
+  const { importedGroups, reservedNames } = context;
   const importedGroupIds = importedGroups.map((group) => group.id);
   const importedByEntraId = new Map(importedGroups.map((group) => [group.entra_group_id, group]));
-  const reservedNames = new Set(db.prepare('SELECT name FROM user_groups').all().map((row) => row.name));
   // Name and description are rewritten only when Entra reports different values;
   // entra_synced_at always records the sync.
   const importedGroupUpdate = db.prepare(`
@@ -323,16 +371,42 @@ export async function fetchAllTenantGroups(accessToken) {
   return normalizeGraphGroups(groups);
 }
 
-export async function refreshGroupCacheFromTenant() {
+// The tenant-wide group catalog (used to pick groups to import) is refreshed at
+// sign-in at most once per interval per process; force sync always refreshes it.
+const TENANT_REFRESH_INTERVAL_MS = (() => {
+  const minutes = Number.parseInt(process.env.ENTRA_TENANT_REFRESH_MINUTES || '', 10);
+  return (Number.isFinite(minutes) && minutes >= 0 ? minutes : 360) * 60 * 1000;
+})();
+let lastTenantRefreshAt = 0;
+let tenantRefreshInFlight = null;
+
+function storeTenantGroups(groups) {
+  const syncAt = sqliteNow();
+  const discoveredGroups = db.transaction(() => upsertDiscoveredGroups(groups, syncAt))();
+  lastTenantRefreshAt = Date.now();
+  return discoveredGroups;
+}
+
+export async function refreshGroupCacheFromTenant({ force = false } = {}) {
   if (!isEntraGroupSyncEnabled()) {
-    return { discoveredGroups: 0 };
+    return { discoveredGroups: 0, skipped: true };
   }
-  const appToken = await acquireGraphAppToken();
-  const groups = await fetchAllTenantGroups(appToken);
-  const syncAt = new Date().toISOString();
-  const syncTransaction = db.transaction(() => upsertDiscoveredGroups(groups, syncAt));
-  const discoveredGroups = syncTransaction();
-  return { discoveredGroups };
+  if (!force && lastTenantRefreshAt && Date.now() - lastTenantRefreshAt < TENANT_REFRESH_INTERVAL_MS) {
+    return { discoveredGroups: 0, skipped: true };
+  }
+  // Concurrent sign-ins share one refresh instead of each paging through the tenant.
+  if (!tenantRefreshInFlight) {
+    tenantRefreshInFlight = (async () => {
+      const appToken = await acquireGraphAppToken();
+      return storeTenantGroups(await fetchAllTenantGroups(appToken));
+    })().finally(() => { tenantRefreshInFlight = null; });
+  }
+  return { discoveredGroups: await tenantRefreshInFlight, skipped: false };
+}
+
+/** Test helper: forget when the tenant catalog was last refreshed. */
+export function resetTenantRefreshTimer() {
+  lastTenantRefreshAt = 0;
 }
 
 export async function fetchTransitiveMembersForGroupId(graphGroupId, accessToken) {
@@ -357,12 +431,12 @@ export async function fetchTransitiveMembersForGroupId(graphGroupId, accessToken
   return [...new Map(users.map((user) => [user.id, user])).values()];
 }
 
-export function syncUserEntraGroups(userId, entraGroups) {
+export function syncUserEntraGroups(userId, entraGroups, context = undefined) {
   if (!isEntraGroupSyncEnabled()) {
     return { discoveredGroups: 0, membershipsAdded: 0, membershipsRemoved: 0 };
   }
 
-  const syncAt = new Date().toISOString();
+  const syncAt = sqliteNow();
   const currentGroups = normalizeGraphGroups(entraGroups);
 
   const syncTransaction = db.transaction(() => {
@@ -375,7 +449,7 @@ export function syncUserEntraGroups(userId, entraGroups) {
     } else {
       db.prepare('DELETE FROM entra_user_group_memberships WHERE user_id = ?').run(userId);
     }
-    const { membershipsAdded, membershipsRemoved } = syncImportedMemberships(userId, currentGroups, syncAt);
+    const { membershipsAdded, membershipsRemoved } = syncImportedMemberships(userId, currentGroups, syncAt, context);
     return { discoveredGroups, membershipsAdded, membershipsRemoved };
   });
 
@@ -432,7 +506,7 @@ export function importEntraGroups(groupIds) {
     return { importedGroups: 0, skippedGroups: 0, membershipsAdded: 0 };
   }
 
-  const now = new Date().toISOString();
+  const now = sqliteNow();
   const cacheLookup = db.prepare('SELECT entra_group_id, display_name, description FROM entra_group_cache WHERE entra_group_id = ?');
   const existingGroups = db.prepare("SELECT id, name, description, entra_group_id, entra_display_name FROM user_groups WHERE source = 'entra'").all();
   const reservedNames = new Set(db.prepare('SELECT name FROM user_groups').all().map((row) => row.name));
@@ -544,10 +618,7 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
 
   let tenantGroupsDiscovered = 0;
   try {
-    const tenantGroups = await fetchAllTenantGroups(accessToken);
-    const syncAt = new Date().toISOString();
-    const tx = db.transaction(() => upsertDiscoveredGroups(tenantGroups, syncAt));
-    tenantGroupsDiscovered = tx();
+    tenantGroupsDiscovered = storeTenantGroups(await fetchAllTenantGroups(accessToken));
   } catch (error) {
     const hint = formatGraphAccessHint(error, 'force-sync');
     errors.push({
@@ -579,10 +650,11 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
   let membershipsAdded = 0;
   let membershipsRemoved = 0;
 
+  const importedGroupContext = loadImportedGroupContext();
   for (const user of users) {
     try {
       const groups = await fetchEntraGroupsForUserId(user.microsoft_id, accessToken);
-      const result = syncUserEntraGroups(user.id, groups);
+      const result = syncUserEntraGroups(user.id, groups, importedGroupContext);
       if (user.entra_missing_since) {
         db.prepare('UPDATE users SET entra_missing_since = NULL WHERE id = ?').run(user.id);
       }
