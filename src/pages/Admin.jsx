@@ -611,7 +611,12 @@ export default function Admin() {
     return [...tagSet].sort();
   }, [apps]);
   useEffect(() => {
-    setSelectedTagFilters((prev) => prev.filter((tag) => tag === UNLABELED_TAG_FILTER || allTags.includes(tag)));
+    // Keep the same array when no tag disappeared: a new array would count as a
+    // filter change and send the list back to page 1 after every reload (e.g. a save).
+    setSelectedTagFilters((prev) => {
+      const next = prev.filter((tag) => tag === UNLABELED_TAG_FILTER || allTags.includes(tag));
+      return next.length === prev.length ? prev : next;
+    });
   }, [allTags]);
   const toggleGroupAssignment = (groupId) => {
     setGroupAssignSelection((prev) => (
