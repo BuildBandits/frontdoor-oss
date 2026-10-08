@@ -11,7 +11,8 @@ import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import Tooltip from '../components/Tooltip';
 import PaginationControls from '../components/PaginationControls';
-import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { apiErrorMessage } from '../utils/apiErrors';
 import { DEFAULT_COLOR_SCHEME, normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
 import { formatDateTimeWithTimeZone } from '../utils/dateTime';
 import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
@@ -211,7 +212,7 @@ export default function AdminUsers() {
           await loadUsers();
           if (expandedUser === user.id) await loadUserDetail(user.id);
         } catch (err) {
-          showToast(err.response?.data?.error || t.errorSaving, 'error');
+          showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
         }
       },
     });
@@ -231,7 +232,7 @@ export default function AdminUsers() {
           await loadUsers();
           if (expandedUser === user.id) await loadUserDetail(user.id);
         } catch (err) {
-          showToast(err.response?.data?.error || t.errorSaving, 'error');
+          showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
         }
       },
     });
@@ -256,7 +257,7 @@ export default function AdminUsers() {
           setShowVisibleApps(false);
           await loadUsers();
         } catch (err) {
-          showToast(err.response?.data?.error || t.errorSaving, 'error');
+          showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
         }
       },
     });
@@ -437,7 +438,7 @@ export default function AdminUsers() {
           showToast(ui.common.changesSaved);
           await loadUserDetail(userDetail.user.id);
         } catch (err) {
-          showToast(err.response?.data?.error || t.errorSaving, 'error');
+          showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
         }
       },
     });
@@ -683,7 +684,7 @@ export default function AdminUsers() {
             page={pagination.page}
             pages={pagination.pages}
             total={pagination.total}
-            summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} ${ui.nav.users.toLowerCase()}`}
+            summary={formatMessage(ui.admin.users.pageSummary, pagination)}
             previousLabel={ui.common.previous}
             nextLabel={ui.common.next}
             onPrevious={() => setPage((current) => Math.max(1, current - 1))}
@@ -1089,7 +1090,7 @@ export default function AdminUsers() {
         page={pagination.page}
         pages={pagination.pages}
         total={pagination.total}
-        summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} ${ui.nav.users.toLowerCase()}`}
+        summary={formatMessage(ui.admin.users.pageSummary, pagination)}
         previousLabel={ui.common.previous}
         nextLabel={ui.common.next}
         onPrevious={() => setPage((current) => Math.max(1, current - 1))}

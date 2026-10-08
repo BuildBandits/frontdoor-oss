@@ -11,7 +11,8 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import PaginationControls from '../components/PaginationControls';
-import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { apiErrorMessage } from '../utils/apiErrors';
 
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -122,10 +123,10 @@ export default function AdminGroups() {
       const res = await api.get('/groups/entra/candidates');
       setEntraCandidates(res.data.groups || []);
     } catch (err) {
-      showToast(err.response?.data?.error || t.errorLoadingGroups, 'error');
+      showToast(apiErrorMessage(err, ui, t.errorLoadingGroups), 'error');
     }
     setEntraCandidatesLoading(false);
-  }, [t]);
+  }, [t, ui]);
 
   useEffect(() => { loadGroups(); }, [loadGroups]);
   useEffect(() => {
@@ -296,7 +297,7 @@ export default function AdminGroups() {
       showToast(g.groupCreated);
       await loadGroups();
     } catch (err) {
-      showToast(err.response?.data?.error || t.errorCreatingGroup, 'error');
+      showToast(apiErrorMessage(err, ui, t.errorCreatingGroup), 'error');
     }
     setSaving(false);
   };
@@ -325,15 +326,15 @@ export default function AdminGroups() {
         parts.push(g.forceSyncUsersKeptActive.replace('{count}', usersKeptActive));
       }
       if (errorCount > 0) {
-        const detail = `${firstError?.message ? `: ${firstError.message}` : ''}${firstError?.hint ? ` (${firstError.hint})` : ''}`;
+        const hintText = (firstError?.hintCode && g.graphHints?.[firstError.hintCode]) || firstError?.hint;
+        const detail = `${firstError?.message ? `: ${firstError.message}` : ''}${hintText ? ` (${hintText})` : ''}`;
         parts.push(`${g.forceSyncErrors.replace('{count}', errorCount)}${detail}`);
       }
       showToast(parts.join('. '), errorCount > 0 ? 'error' : summary.usersNotFound > 0 ? 'warning' : 'success');
       await loadGroups();
       await loadEntraCandidates();
     } catch (err) {
-      const hint = err.response?.data?.hint ? ` (${err.response.data.hint})` : '';
-      showToast(`${err.response?.data?.error || g.forceSyncError}${hint}`, 'error');
+      showToast(apiErrorMessage(err, ui, g.forceSyncError), 'error');
     }
     setForceSyncing(false);
   };
@@ -395,7 +396,7 @@ export default function AdminGroups() {
       await loadGroups();
       await loadEntraCandidates();
     } catch (err) {
-      showToast(err.response?.data?.error || g.importEntraGroupsError, 'error');
+      showToast(apiErrorMessage(err, ui, g.importEntraGroupsError), 'error');
     }
     setImportingEntra(false);
   };
@@ -422,7 +423,7 @@ export default function AdminGroups() {
           showToast(g.groupDeleted.replace('{name}', groupName));
           await loadGroups();
         } catch (err) {
-          showToast(err.response?.data?.error || t.errorSaving, 'error');
+          showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
         }
       },
     });
@@ -500,7 +501,7 @@ export default function AdminGroups() {
           showToast(g.bulkDeleteSuccess.replace('{count}', selectedCount).replace('{localDeleted}', localDeleted).replace('{entraDeleted}', entraDeleted));
           await loadGroups();
         } catch (err) {
-          showToast(err.response?.data?.error || g.bulkDeleteError, 'error');
+          showToast(apiErrorMessage(err, ui, g.bulkDeleteError), 'error');
         }
       },
     });
@@ -529,7 +530,7 @@ export default function AdminGroups() {
       await loadGroups();
       if (expandedGroup === editingGroup) await loadGroupDetail(editingGroup);
     } catch (err) {
-      showToast(err.response?.data?.error || t.errorSaving, 'error');
+      showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
     }
   };
 
@@ -571,7 +572,7 @@ export default function AdminGroups() {
       await loadGroupDetail(expandedGroup);
       await loadGroups();
     } catch (err) {
-      showToast(err.response?.data?.error || t.errorSaving, 'error');
+      showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
     }
   };
 
@@ -590,7 +591,7 @@ export default function AdminGroups() {
           await loadGroupDetail(expandedGroup);
           await loadGroups();
         } catch (err) {
-          showToast(err.response?.data?.error || t.errorSaving, 'error');
+          showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
         }
       },
     });
@@ -613,7 +614,7 @@ export default function AdminGroups() {
       await loadGroupDetail(expandedGroup);
       await loadGroups();
     } catch (err) {
-      showToast(err.response?.data?.error || t.errorSaving, 'error');
+      showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
     }
   };
 
@@ -632,7 +633,7 @@ export default function AdminGroups() {
           await loadGroupDetail(expandedGroup);
           await loadGroups();
         } catch (err) {
-          showToast(err.response?.data?.error || t.errorSaving, 'error');
+          showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
         }
       },
     });
@@ -664,7 +665,7 @@ export default function AdminGroups() {
       await loadGroupDetail(expandedGroup);
       await loadGroups();
     } catch (err) {
-      showToast(err.response?.data?.error || t.errorSaving, 'error');
+      showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
     }
   };
 
@@ -679,7 +680,7 @@ export default function AdminGroups() {
       await loadGroupDetail(expandedGroup);
       await loadGroups();
     } catch (err) {
-      showToast(err.response?.data?.error || t.errorSaving, 'error');
+      showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
     }
   };
 
@@ -698,7 +699,7 @@ export default function AdminGroups() {
           await loadGroupDetail(expandedGroup);
           await loadGroups();
         } catch (err) {
-          showToast(err.response?.data?.error || t.errorSaving, 'error');
+          showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
         }
       },
     });
@@ -1099,7 +1100,7 @@ export default function AdminGroups() {
             page={pagination.page}
             pages={pagination.pages}
             total={pagination.total}
-            summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} ${ui.nav.groups.toLowerCase()}`}
+            summary={formatMessage(ui.admin.groups.pageSummary, pagination)}
             previousLabel={ui.common.previous}
             nextLabel={ui.common.next}
             onPrevious={() => setPage((current) => Math.max(1, current - 1))}
@@ -1536,7 +1537,7 @@ export default function AdminGroups() {
         page={pagination.page}
         pages={pagination.pages}
         total={pagination.total}
-        summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} ${ui.nav.groups.toLowerCase()}`}
+        summary={formatMessage(ui.admin.groups.pageSummary, pagination)}
         previousLabel={ui.common.previous}
         nextLabel={ui.common.next}
         onPrevious={() => setPage((current) => Math.max(1, current - 1))}

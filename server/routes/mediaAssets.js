@@ -27,7 +27,7 @@ router.get('/:id/file', authenticate, isAdminViewer, async (req, res) => {
 router.get('/:id', authenticate, isAdminViewer, (req, res) => {
   const asset = getMediaAssetById(req.params.id);
   if (!asset) {
-    return res.status(404).json({ error: 'Media asset not found' });
+    return res.status(404).json({ error: 'Media asset not found', code: 'media_asset_not_found' });
   }
 
   return res.json({ asset });
@@ -37,7 +37,7 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   try {
     const removed = deleteMediaAssetById(req.params.id);
     if (!removed) {
-      return res.status(404).json({ error: 'Media asset not found' });
+      return res.status(404).json({ error: 'Media asset not found', code: 'media_asset_not_found' });
     }
 
     return res.json({ removed: true });
@@ -45,6 +45,7 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
     if (error?.statusCode === 409) {
       return res.status(409).json({
         error: error.message,
+        code: 'media_asset_in_use',
         usageCount: error.usageCount || 0,
       });
     }

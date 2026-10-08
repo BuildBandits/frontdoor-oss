@@ -110,8 +110,8 @@ The `/admin/customization` page covers:
 ## Audit Trail 🛡️
 
 - `rbac_audit_logs` captures privileged mutations: role changes, user activation, group/app edits, branding updates, cache refresh, backup operations.
-- Stored fields: actor, action, target type & id, JSON details, timestamp.
-- `/admin/audit` page with actor filter, period filter, and pagination matching the access-log UI.
+- Stored fields: actor, action, target type & id, JSON details, timestamp. Updates store only the fields that changed (`changes: [{ field, from, to }]`); saves that change nothing are not logged. Details keep a snapshot of the names of the users, groups and apps involved (`refs`), so rows stay readable after deletions.
+- `/admin/audit` page with actor filter, period filter, and pagination matching the access-log UI. Each row reads as a sentence (who did what to which entity, by name), with changed fields as `old → new`; the raw JSON can be copied or expanded.
 
 ## Retention 🛡️
 

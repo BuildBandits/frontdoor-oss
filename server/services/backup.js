@@ -250,19 +250,19 @@ export async function createBackupArchive({
 
 function normalizeBackupSnapshot(payload) {
   if (!payload || typeof payload !== 'object') {
-    throw new UserFacingError('Invalid backup file');
+    throw new UserFacingError('Invalid backup file', { code: 'backup_invalid' });
   }
 
   if (payload.version !== BACKUP_VERSION) {
-    throw new UserFacingError(`Unsupported backup version: ${payload.version ?? 'missing'}`);
+    throw new UserFacingError(`Unsupported backup version: ${payload.version ?? 'missing'}`, { code: 'backup_version_unsupported' });
   }
 
   if (!payload.database || !Array.isArray(payload.database.tables)) {
-    throw new UserFacingError('Backup database payload is missing');
+    throw new UserFacingError('Backup database payload is missing', { code: 'backup_invalid' });
   }
 
   if (!Array.isArray(payload.buckets)) {
-    throw new UserFacingError('Backup files payload is missing');
+    throw new UserFacingError('Backup files payload is missing', { code: 'backup_invalid' });
   }
 
   return payload;
@@ -335,7 +335,7 @@ export function compareAppVersions(left, right) {
 function assertSafeBucketPaths(bucketKey, files) {
   for (const file of files || []) {
     if (typeof file.path !== 'string' || !file.path || file.path.includes('..') || path.isAbsolute(file.path)) {
-      throw new UserFacingError(`Invalid backup file path in bucket ${bucketKey}`);
+      throw new UserFacingError(`Invalid backup file path in bucket ${bucketKey}`, { code: 'backup_invalid_file_path' });
     }
   }
 }
@@ -387,7 +387,7 @@ async function swapStagedBucket(staged, stamp) {
 
 function parseBackupArchive(buffer, { passphrase = null } = {}) {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
-    throw new UserFacingError('Backup file is empty');
+    throw new UserFacingError('Backup file is empty', { code: 'backup_empty' });
   }
   const gzipped = isEncryptedBackup(buffer) ? decryptBackup(buffer, passphrase) : buffer;
 
@@ -395,7 +395,7 @@ function parseBackupArchive(buffer, { passphrase = null } = {}) {
   try {
     parsed = JSON.parse(zlib.gunzipSync(gzipped).toString('utf8'));
   } catch {
-    throw new UserFacingError('Backup file is not a valid gzipped JSON archive');
+    throw new UserFacingError('Backup file is not a valid gzipped JSON archive', { code: 'backup_invalid' });
   }
   const snapshot = normalizeBackupSnapshot(parsed);
   for (const bucket of snapshot.buckets) {

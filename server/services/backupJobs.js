@@ -22,6 +22,7 @@ function createJobState(job) {
     version: job.version,
     summary: job.summary,
     error: job.error,
+    errorCode: job.errorCode || null,
   };
 }
 
@@ -123,6 +124,7 @@ function createBackupJob({ excludeLogs = false, passphrase = null } = {}) {
         stage: 'error',
         message: error.message || 'Failed to create backup',
         error: error.message || 'Failed to create backup',
+        errorCode: (error?.expose && error.code) || 'failed_to_create_backup',
       });
     }
   })();

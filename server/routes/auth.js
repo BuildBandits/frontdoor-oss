@@ -121,7 +121,7 @@ const SSO_REDIRECT_COOKIE_OPTS = {
 
 router.get('/microsoft', async (req, res) => {
   if (!msalClient) {
-    return res.status(501).json({ error: 'Microsoft SSO not configured' });
+    return res.status(501).json({ error: 'Microsoft SSO not configured', code: 'sso_not_configured' });
   }
 
   try {
@@ -279,11 +279,7 @@ router.get('/microsoft/callback', async (req, res) => {
     console.log(`User login via Microsoft [${user.id}]: ${user.email} (${user.display_name})${isNewUser ? ' [new]' : ''}`);
 
     if (['owner', 'admin', 'admin_readonly'].includes(user.role)) {
-      logRbacAudit(user.id, 'login', 'auth', user.id, {
-        role: user.role,
-        microsoftId: user.microsoft_id,
-        email: user.email,
-      });
+      logRbacAudit(user.id, 'login', 'auth', user.id, { role: user.role });
     }
 
     await ensureAvatarCached(
@@ -384,7 +380,7 @@ router.put('/me/preferences', authenticate, (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body, 'homeDesktopView')) {
     const { homeDesktopView } = req.body;
     if (homeDesktopView !== null && !['cards', 'compact'].includes(homeDesktopView)) {
-      return res.status(400).json({ error: 'homeDesktopView must be cards, compact, or null' });
+      return res.status(400).json({ error: 'homeDesktopView must be cards, compact, or null', code: 'invalid_home_view' });
     }
     changes.set('home_desktop_view', homeDesktopView);
   }
@@ -392,7 +388,7 @@ router.put('/me/preferences', authenticate, (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredLanguage')) {
     const { preferredLanguage } = req.body;
     if (preferredLanguage !== null && !isSupportedLanguage(preferredLanguage)) {
-      return res.status(400).json({ error: 'preferredLanguage must be a supported language or null' });
+      return res.status(400).json({ error: 'preferredLanguage must be a supported language or null', code: 'invalid_language' });
     }
     changes.set('preferred_language', preferredLanguage);
   }
@@ -400,7 +396,7 @@ router.put('/me/preferences', authenticate, (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredTimeZone')) {
     const { preferredTimeZone } = req.body;
     if (preferredTimeZone !== null && !isSupportedTimeZone(preferredTimeZone)) {
-      return res.status(400).json({ error: 'preferredTimeZone must be a supported time zone or null' });
+      return res.status(400).json({ error: 'preferredTimeZone must be a supported time zone or null', code: 'invalid_time_zone' });
     }
     changes.set('preferred_timezone', normalizeOptionalTimeZone(preferredTimeZone));
   }
@@ -408,7 +404,7 @@ router.put('/me/preferences', authenticate, (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredColorScheme')) {
     const { preferredColorScheme } = req.body;
     if (preferredColorScheme !== null && !isSupportedColorScheme(preferredColorScheme)) {
-      return res.status(400).json({ error: 'preferredColorScheme must be light, dark, auto, or null' });
+      return res.status(400).json({ error: 'preferredColorScheme must be light, dark, auto, or null', code: 'invalid_color_scheme' });
     }
     changes.set('preferred_color_scheme', preferredColorScheme);
   }
@@ -416,7 +412,7 @@ router.put('/me/preferences', authenticate, (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body, 'appOrder')) {
     const { appOrder } = req.body;
     if (appOrder !== null && !Array.isArray(appOrder)) {
-      return res.status(400).json({ error: 'appOrder must be an array or null' });
+      return res.status(400).json({ error: 'appOrder must be an array or null', code: 'invalid_app_order' });
     }
     if (Array.isArray(appOrder)) {
       const normalized = appOrder.filter((id) => typeof id === 'string' && id.trim());
@@ -434,7 +430,7 @@ router.put('/me/preferences', authenticate, (req, res) => {
     const { favoriteApps } = req.body;
     const isLocalStorageMigration = req.body.favoriteAppsMigrationFromLocalStorage === true;
     if (favoriteApps !== null && !Array.isArray(favoriteApps)) {
-      return res.status(400).json({ error: 'favoriteApps must be an array or null' });
+      return res.status(400).json({ error: 'favoriteApps must be an array or null', code: 'invalid_favorite_apps' });
     }
     if (Array.isArray(favoriteApps)) {
       const normalized = [...new Set(favoriteApps.filter((id) => typeof id === 'string' && id.trim()))];
@@ -450,13 +446,13 @@ router.put('/me/preferences', authenticate, (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body, 'homeTourSeenAt')) {
     const { homeTourSeenAt } = req.body;
     if (homeTourSeenAt !== null && typeof homeTourSeenAt !== 'string') {
-      return res.status(400).json({ error: 'homeTourSeenAt must be a string or null' });
+      return res.status(400).json({ error: 'homeTourSeenAt must be a string or null', code: 'invalid_home_tour_seen_at' });
     }
     changes.set('home_tour_seen_at', homeTourSeenAt || null);
   }
 
   if (changes.size === 0) {
-    return res.status(400).json({ error: 'No preference updates provided' });
+    return res.status(400).json({ error: 'No preference updates provided', code: 'no_preference_updates' });
   }
 
   changes.apply(db, req.user.id);
@@ -490,7 +486,7 @@ router.post('/logout', (req, res) => {
 const ssoTokenIntrospectionLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 120,
-  message: { error: 'too_many_requests' },
+  message: { error: 'too_many_requests', code: 'too_many_requests' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -504,7 +500,7 @@ router.get('/dev-status', (_req, res) => {
 // Only available when DEV_LOGIN=true and NODE_ENV !== 'production'.
 router.post('/dev-login', (req, res) => {
   if (!isDevLoginEnabled()) {
-    return res.status(404).json({ error: 'Dev login is not enabled' });
+    return res.status(404).json({ error: 'Dev login is not enabled', code: 'dev_login_disabled' });
   }
 
   const role = ['owner', 'admin', 'admin_readonly', 'user'].includes(req.body?.role)

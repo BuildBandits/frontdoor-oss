@@ -80,7 +80,7 @@ async function receiveUpload(req) {
   }
   if (received === 0) {
     await fsp.rm(filePath, { force: true });
-    throw new UserFacingError('Backup file is empty');
+    throw new UserFacingError('Backup file is empty', { code: 'backup_empty' });
   }
   return filePath;
 }
@@ -164,7 +164,7 @@ router.post('/export-jobs', authenticate, isOwner, async (req, res) => {
 router.get('/export-jobs/:jobId/events', authenticate, isOwner, async (req, res) => {
   const job = getBackupExportJob(req.params.jobId);
   if (!job) {
-    res.status(404).json({ error: 'Backup job not found' });
+    res.status(404).json({ error: 'Backup job not found', code: 'backup_job_not_found' });
     return;
   }
 
@@ -204,10 +204,10 @@ router.get('/export-jobs/:jobId/file', authenticate, isOwner, async (req, res) =
   if (!job) {
     const backupJob = getBackupExportJob(req.params.jobId);
     if (!backupJob) {
-      res.status(404).json({ error: 'Backup job not found' });
+      res.status(404).json({ error: 'Backup job not found', code: 'backup_job_not_found' });
       return;
     }
-    res.status(409).json({ error: 'Backup job is not ready yet' });
+    res.status(409).json({ error: 'Backup job is not ready yet', code: 'backup_job_not_ready' });
     return;
   }
 

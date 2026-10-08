@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useAuthStore } from '../stores/authStore';
+import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 
 const AVATAR_CACHE_VERSION_KEY = 'frontdoor_avatar_cache_version';
 
@@ -28,6 +30,8 @@ export default function UserAvatar({
   className = 'w-9 h-9',
   initialsClassName = 'text-xs',
 }) {
+  const preferredLanguage = useAuthStore((state) => state.user?.preferredLanguage);
+  const ui = getUiStrings(resolveAppLanguage(preferredLanguage, 'en'));
   const [loadFailed, setLoadFailed] = useState(false);
   const [cacheVersion, setCacheVersion] = useState(getAvatarCacheVersion());
   const avatarSrc = userId ? `/api/users/${encodeURIComponent(userId)}/avatar?v=${encodeURIComponent(cacheVersion)}` : null;
@@ -55,7 +59,7 @@ export default function UserAvatar({
       {showImage ? (
         <img
           src={avatarSrc}
-          alt={displayName ? `${displayName} avatar` : 'Avatar utente'}
+          alt={displayName ? formatMessage(ui.common.userAvatarNamed, { name: displayName }) : ui.common.userAvatar}
           className="absolute inset-0 h-full w-full object-cover"
           onError={() => setLoadFailed(true)}
         />
