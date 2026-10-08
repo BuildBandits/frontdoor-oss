@@ -165,6 +165,7 @@ The image stores every writable path on the `/data` volume by default (`DATABASE
 | `AZURE_REDIRECT_URI` | SSO callback redirect URI | - |
 | `JWT_SECRET` | JWT signing secret | - |
 | `ENTRA_GROUP_SYNC` | Discover Entra group memberships at login and enable admin import/force-sync flows | `false` |
+| `ENTRA_TENANT_REFRESH_MINUTES` | Minimum minutes between two refreshes of the tenant-wide Entra group catalog triggered by sign-ins (force sync always refreshes it; `0` refreshes at every sign-in) | `360` |
 | `JWT_EXPIRES_IN` | JWT token duration | `7d` |
 | `ADMIN_EMAILS` | Comma-separated owner emails (auto-promoted) | - |
 | `ADMIN_API_KEY` | API key for bulk endpoints | - |

@@ -229,32 +229,31 @@ async function getAvatarFileInfo(userId) {
   return { meta, fileExists, absolutePath };
 }
 
-async function fetchGraphPhoto(accessToken) {
-  const response = await fetch('https://graph.microsoft.com/v1.0/me/photo/$value', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+const AVATAR_FETCH_TIMEOUT_MS = 10_000;
 
-  if (!response.ok) {
+// Downloads an avatar image; a missing photo, an error or a slow host all mean "no photo",
+// so avatar lookups can never hold up a sign-in or a page.
+async function fetchAvatarImage(url, headers = {}) {
+  try {
+    const response = await fetch(url, { headers, signal: AbortSignal.timeout(AVATAR_FETCH_TIMEOUT_MS) });
+    if (!response.ok) return null;
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return { buffer, contentType };
+  } catch {
     return null;
   }
+}
 
-  const contentType = response.headers.get('content-type') || 'image/jpeg';
-  const buffer = Buffer.from(await response.arrayBuffer());
-  return { buffer, contentType };
+async function fetchGraphPhoto(accessToken) {
+  return fetchAvatarImage('https://graph.microsoft.com/v1.0/me/photo/$value', { Authorization: `Bearer ${accessToken}` });
 }
 
 async function fetchGraphUserPhoto(userKey, accessToken) {
-  const response = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(userKey)}/photo/$value`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const contentType = response.headers.get('content-type') || 'image/jpeg';
-  const buffer = Buffer.from(await response.arrayBuffer());
-  return { buffer, contentType };
+  return fetchAvatarImage(
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(userKey)}/photo/$value`,
+    { Authorization: `Bearer ${accessToken}` },
+  );
 }
 
 async function fetchGravatar(email) {
@@ -262,16 +261,7 @@ async function fetchGravatar(email) {
   if (!cleanEmail) return null;
 
   const hash = gravatarHash(cleanEmail);
-  const url = `https://www.gravatar.com/avatar/${hash}?s=256&d=404&r=g`;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const contentType = response.headers.get('content-type') || 'image/jpeg';
-  const buffer = Buffer.from(await response.arrayBuffer());
-  return { buffer, contentType };
+  return fetchAvatarImage(`https://www.gravatar.com/avatar/${hash}?s=256&d=404&r=g`);
 }
 
 export function getAvatarRoute(userId) {
@@ -322,9 +312,11 @@ export async function ensureAvatarCached(user, accessToken = null) {
         }
         return meta;
       }
+      // A fresh Gravatar is kept; only a sign-in (which brings a user token) tries
+      // to replace it with the Microsoft 365 photo. Stale ones are refreshed below.
       if (meta.source === 'gravatar' && isMetaFresh(meta)) {
-        if (accessToken || graphUserKey) {
-          const graphToken = accessToken || await acquireGraphAppToken().catch(() => null);
+        if (accessToken) {
+          const graphToken = accessToken;
           if (graphToken && graphUserKey) {
             const microsoftPhoto = await fetchGraphUserPhoto(graphUserKey, graphToken);
             if (microsoftPhoto?.buffer) {
