@@ -17,7 +17,8 @@ import { normalizeEntraApplicationId } from '../../shared/entra.js';
 import { normalizeAppSlug, suggestAppSlug } from '../../shared/appSlug.js';
 import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
-import { MAX_RASTER_ICON_BYTES, MAX_SVG_ICON_BYTES } from '../../shared/iconLimits.js';
+import { MAX_RASTER_ICON_BYTES, MAX_SVG_ICON_BYTES, estimateDataUrlBytes } from '../../shared/iconLimits.js';
+import { MAX_ICON_SOURCE_BYTES, downscaleIconDataUrl, isResizableIconType } from '../utils/iconImages';
 
 const emptyApp = { name: '', slug: '', description: '', long_description: '', icon: '📦', target_url: '', sort_order: 0, mode: 'redirect-plain', sso_endpoint: '', sso_method: 'GET', tags: [] };
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
@@ -403,13 +404,29 @@ export default function Admin() {
   const applyIconAssetFile = (file) => {
     if (!file) return;
     const isSvg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name);
-    if (file.size > (isSvg ? MAX_SVG_ICON_BYTES : MAX_RASTER_ICON_BYTES)) {
+    // PNG, JPEG and WebP are shrunk to MAX_ICON_DIMENSION before upload, so only the
+    // result has to fit the server limit; other types are checked as they are.
+    const resizable = isResizableIconType(file.type);
+    const maxSourceBytes = resizable ? MAX_ICON_SOURCE_BYTES : (isSvg ? MAX_SVG_ICON_BYTES : MAX_RASTER_ICON_BYTES);
+    if (file.size > maxSourceBytes) {
       pushNotice('error', a.iconTooLarge);
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result || '');
+    reader.onload = async () => {
+      let dataUrl = String(reader.result || '');
+      if (resizable) {
+        try {
+          dataUrl = await downscaleIconDataUrl(dataUrl, file.type);
+        } catch {
+          pushNotice('error', a.iconTooLarge);
+          return;
+        }
+        if (estimateDataUrlBytes(dataUrl) > MAX_RASTER_ICON_BYTES) {
+          pushNotice('error', a.iconTooLarge);
+          return;
+        }
+      }
       setIconMode('asset');
       setIconAssetDataUrl(dataUrl);
       setIconAssetPreview(dataUrl);
