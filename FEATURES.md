@@ -57,7 +57,7 @@ How Frontdoor hands the user off to a target application:
 - `internal-link` mode for rare private-IP targets that must stay reachable through Frontdoor.
 - Unlabeled-apps quick filter with live count, surfaced as a discreet badge.
 - Orphan-app warning with direct edit links for apps without group assignments.
-- Soft-delete via `is_active` (hidden from catalog without losing history).
+- Deactivate via `is_active` (hidden from the catalog, history kept); deleting an app removes it together with its permissions and access logs.
 - **Restore demo apps** — one-click reset to a seeded showcase set.
 
 ## Groups & RBAC 🔧
@@ -129,9 +129,10 @@ The `/admin/customization` page covers:
 
 ## Backup & Restore 🛡️
 
-- `/admin/backup` produces a gzipped JSON snapshot containing the database, app icons, the branding logo, and the user-avatar cache.
+- `/admin/backup` produces a streamed `.tar.gz` archive (optionally encrypted, `.tar.gz.enc`) with the database rows and schema, app icons, the branding logo, the avatar cache and plugin files, plus the Frontdoor version and commit; the export reads one consistent snapshot without blocking writes.
 - **Streaming export** via Server-Sent Events: per-stage progress (database → icons → branding → avatars) with completion checkmarks and download link.
-- **Restore upload** validates snapshot version and atomically replaces database + assets, with a destructive-action confirmation.
+- **Check before restore** describes an archive without changing anything; **restore** is atomic and version-aware, with a destructive-action confirmation. Older `.json.gz` backups can still be checked and restored.
+- Raw database export (`.db`) under *Advanced options*, and `npm run backup:rehearse` to rehearse an upgrade on a copy.
 
 ## Bulk App API
 
@@ -153,8 +154,9 @@ For CI / automation pipelines that own the app catalog:
 - **Parameterized SQL** throughout (no string interpolation).
 - **DOMPurify** sanitization for pasted SVG icons and rich text.
 - **HTML tag stripping** in user-supplied text fields.
-- **CSRF state validation** for OAuth (in-memory state with 10-minute TTL — single-instance only; multi-replica needs an external store).
-- **Rate limiting** on auth, API, RBAC mutations, and the introspection endpoint, all tunable via env vars.
+- **OAuth state** stored in SQLite (single-use, 10-minute TTL) and bound to the browser with an httpOnly nonce cookie; PKCE (S256).
+- **Cross-site request check**: requests that change data with the session cookie must come from Frontdoor or an allowlisted origin.
+- **Rate limiting** on auth, API, RBAC mutations, and the introspection endpoint; the first three are tunable via env vars, the introspection limit is fixed (120/min).
 - **No PII in logs** — emails, names, tokens never written to `console.log` / `console.error`.
 - **Environment validation** at startup with fail-fast on missing secrets.
 
@@ -179,10 +181,13 @@ SQLite (better-sqlite3) in WAL mode with foreign-key enforcement. Schema covers 
 | Path | Audience | Purpose |
 |------|----------|---------|
 | `/admin` | 🔧 admin | App CRUD, search, filters, group assignments |
-| `/admin/groups` | 🔧 admin | Local groups, Entra import / force-sync, linked groups, app-permission transfer |
+| `/admin/groups` | 🔧 admin | Local and Entra groups (source filter), Entra import / force-sync, linked groups |
+| `/admin/group-transfer` | 🕶️ 🔧 admin (editors) | Copy or move all app permissions from one group to another |
 | `/admin/users` | 🔧 admin | Users, roles, activation, group membership, visible-apps view |
 | `/admin/logs` | 🛡️ owner | Access log + top apps analytics |
 | `/admin/audit` | 🛡️ owner | RBAC audit trail |
 | `/admin/customization` | 🛡️ owner | Branding, defaults, retention, cache maintenance |
 | `/admin/backup` | 🛡️ owner | Export / restore snapshots |
 | `/admin/icons` | 🕶️ 🔧 admin | Media library browser (hidden) |
+| `/admin/plugins`, `/admin/plugins/docs` | 🔧 admin | Plugin registry and docs (platform locked off) |
+| `/admin/plugins/audit` | 🛡️ owner | Plugin audit trail |
