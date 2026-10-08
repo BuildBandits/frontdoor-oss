@@ -14,6 +14,9 @@ export default function AppIcon({ app, className = 'w-10 h-10', textClassName = 
         src={iconUrl}
         alt={alt}
         onError={() => setIconLoadFailed(true)}
+        // Decode only icons that are about to be visible: Home shows every app at once.
+        loading="lazy"
+        decoding="async"
         className={`${className} object-contain shrink-0`}
       />
     );
