@@ -326,6 +326,38 @@ export async function updateBrandingSettings(input = {}) {
     logoContentType = logo.contentType;
   }
 
+  // Column values in INSERT order (after id). Saving unchanged settings writes nothing.
+  const columnValues = {
+    hero_title_line1: heroTitleLine1,
+    hero_title_line2: heroTitleLine2,
+    hero_subtitle: heroSubtitle,
+    hero_title_line1_i18n: heroTitleLine1I18nJson,
+    hero_title_line2_i18n: heroTitleLine2I18nJson,
+    hero_subtitle_i18n: heroSubtitleI18nJson,
+    show_home_hero: showHomeHero,
+    hide_home_hero_on_mobile: hideHomeHeroOnMobile,
+    show_app_mode_badges: showAppModeBadges,
+    default_home_desktop_view: defaultHomeDesktopView,
+    default_compact_view: defaultCompactView,
+    default_language: defaultLanguage,
+    default_timezone: defaultTimeZone,
+    default_color_scheme: defaultColorScheme,
+    enable_dark_mode_beta: enableDarkModeBeta,
+    use_european_date_format: useEuropeanDateFormat,
+    use_24h_time_format: use24hTimeFormat,
+    log_retention_days: logRetentionDays,
+    hide_login_page: hideLoginPage,
+    show_shared_cookie_mode: showSharedCookieMode,
+    show_redirect_sso_mode: showRedirectSsoMode,
+    show_entra_app_mode: showEntraAppMode,
+    plugins_enabled: pluginsEnabled,
+    logo_file_name: logoFileName,
+    logo_content_type: logoContentType,
+  };
+  if (current && Object.entries(columnValues).every(([column, value]) => current[column] === value)) {
+    return { branding: getBrandingSettings(), auditDetails: null };
+  }
+
   db.prepare(`
     INSERT INTO branding_settings (
       id, hero_title_line1, hero_title_line2, hero_subtitle, hero_title_line1_i18n, hero_title_line2_i18n, hero_subtitle_i18n, show_home_hero, hide_home_hero_on_mobile, show_app_mode_badges, default_home_desktop_view, default_compact_view, default_language, default_timezone, default_color_scheme, enable_dark_mode_beta, use_european_date_format, use_24h_time_format, log_retention_days, hide_login_page, show_shared_cookie_mode, show_redirect_sso_mode, show_entra_app_mode, plugins_enabled, logo_file_name, logo_content_type, updated_at
@@ -358,34 +390,7 @@ export async function updateBrandingSettings(input = {}) {
       logo_file_name = excluded.logo_file_name,
       logo_content_type = excluded.logo_content_type,
       updated_at = datetime('now')
-  `).run(
-    BRANDING_ID,
-    heroTitleLine1,
-    heroTitleLine2,
-    heroSubtitle,
-    heroTitleLine1I18nJson,
-    heroTitleLine2I18nJson,
-    heroSubtitleI18nJson,
-    showHomeHero,
-    hideHomeHeroOnMobile,
-    showAppModeBadges,
-    defaultHomeDesktopView,
-    defaultCompactView,
-    defaultLanguage,
-    defaultTimeZone,
-    defaultColorScheme,
-    enableDarkModeBeta,
-    useEuropeanDateFormat,
-    use24hTimeFormat,
-    logRetentionDays,
-    hideLoginPage,
-    showSharedCookieMode,
-    showRedirectSsoMode,
-    showEntraAppMode,
-    pluginsEnabled,
-    logoFileName,
-    logoContentType
-  );
+  `).run(BRANDING_ID, ...Object.values(columnValues));
 
   const branding = getBrandingSettings();
   const auditDetails = buildBrandingAuditDetails(current, branding, input);

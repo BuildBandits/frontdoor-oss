@@ -14,6 +14,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Raw database export under Advanced options**: on the backup page, *Download database file (.db)* moved into an *Advanced options* section that is closed by default, so the regular backup is the only prominent download. The raw copy is meant for upgrade rehearsals and manual recovery and cannot be restored from the page.
 
 ### Fixed
+- **Fewer database writes when nothing changed**: saving data now writes only what actually changed, instead of deleting and re-inserting or rewriting values that were not touched.
+  - *Microsoft Entra sync* (at sign-in and in force sync) no longer deletes all of a user's imported-group memberships and cached Entra memberships to add them back: it removes only the groups the user left and adds only the new ones, so the *added/removed* counts in the logs are real changes. Imported groups are renamed only when Entra reports a different name or description, re-importing an unchanged group is counted as skipped, and a user already marked as missing from Entra is not marked again.
+  - *User preferences* (own and from *Admin → Users*) write only the fields whose value changed; saving the same favourites or app order no longer moves their timestamps or `updated_at`.
+  - *Customization* saves with no changes no longer rewrite the settings row or add an empty audit row.
+  - *Bulk app import* (`POST /api/apps/bulk`) writes only the changed columns of existing apps and reports apps with nothing to change as `unchanged`, so automation runs no longer mark every app as modified and reload every icon.
+  - *App icons* and *avatars*: sending the same image again keeps the stored file instead of writing a new copy.
+  - *Plugins*: saving or re-importing a plugin keeps its backend secret (the API never returns it, so clients could not send it back) and its enabled state when they are not supplied, and keeps the approval while the code, entry, permissions, roles and backend settings are unchanged; re-importing the same module reuses the stored bundle.
+  - *Startup* no longer rewrites every user and the settings row to backfill defaults; only rows still missing a value are updated.
+- **Bulk group delete** now also removes the deleted groups' linked Entra groups (as single delete already did) and reports each group's real source.
 - **Home tour on desktop**: the *Find the menu button* step, which points at the mobile hamburger button, was also shown on desktop where that button does not exist. It is now mobile-only, like the *Reorder the cards* step is desktop-only.
 - **Pages opened already scrolled down**: following a link from a scrolled page (for example *Open backup page* in *Customize → Maintenance*) kept the scroll position, so the new page opened halfway down. Route changes now start at the top; links to a `#section` and back/forward navigation are unchanged. The *Open backup page* button also gets dark-mode colours.
 - **Backup page spacing**: the passphrase help text no longer touches the *Download backup* button when the export card is full; the download buttons keep a minimum gap while still sitting at the bottom of the card.

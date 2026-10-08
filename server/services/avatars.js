@@ -195,7 +195,11 @@ async function saveAvatarBuffer(userId, buffer, contentType, source) {
   const extension = extensionFromContentType(contentType);
   const fileName = `${path.basename(userCachePrefix(userId))}.${extension}`;
   const absoluteFile = filePath(userId, extension);
-  await fsp.writeFile(absoluteFile, buffer);
+  // An unchanged photo keeps its file (and modification time); only the check time is refreshed.
+  const current = await fsp.readFile(absoluteFile).catch(() => null);
+  if (!current || !current.equals(buffer)) {
+    await fsp.writeFile(absoluteFile, buffer);
+  }
 
   const meta = {
     source,

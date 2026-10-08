@@ -509,22 +509,22 @@ for (const [tableName, columnName, columnDefinition] of ensuredColumns) {
   addColumnIfMissing(tableName, columnName, columnDefinition);
 }
 
-db.exec('UPDATE branding_settings SET show_app_mode_badges = COALESCE(show_app_mode_badges, 1)');
-db.exec("UPDATE branding_settings SET default_home_desktop_view = COALESCE(default_home_desktop_view, 'cards')");
-db.exec('UPDATE branding_settings SET default_compact_view = COALESCE(default_compact_view, 0)');
-db.exec(`UPDATE branding_settings SET default_language = COALESCE(default_language, '${DEFAULT_LANGUAGE}')`);
-db.exec("UPDATE branding_settings SET default_timezone = COALESCE(default_timezone, 'UTC')");
-db.exec('UPDATE branding_settings SET use_european_date_format = COALESCE(use_european_date_format, 0)');
-db.exec('UPDATE branding_settings SET use_24h_time_format = COALESCE(use_24h_time_format, 0)');
-db.exec('UPDATE branding_settings SET log_retention_days = COALESCE(log_retention_days, 90)');
-db.exec('UPDATE branding_settings SET show_home_hero = COALESCE(show_home_hero, 1)');
-db.exec('UPDATE branding_settings SET hide_home_hero_on_mobile = COALESCE(hide_home_hero_on_mobile, 0)');
-db.exec('UPDATE branding_settings SET hide_login_page = COALESCE(hide_login_page, 0)');
-db.exec('UPDATE branding_settings SET show_shared_cookie_mode = COALESCE(show_shared_cookie_mode, 1)');
-db.exec('UPDATE branding_settings SET show_redirect_sso_mode = COALESCE(show_redirect_sso_mode, 1)');
-db.exec('UPDATE branding_settings SET show_entra_app_mode = COALESCE(show_entra_app_mode, 1)');
-db.exec('UPDATE branding_settings SET plugins_enabled = COALESCE(plugins_enabled, 0)');
-db.exec("UPDATE users SET last_activity_at = COALESCE(last_activity_at, last_login, updated_at)");
+db.exec('UPDATE branding_settings SET show_app_mode_badges = 1 WHERE show_app_mode_badges IS NULL');
+db.exec("UPDATE branding_settings SET default_home_desktop_view = 'cards' WHERE default_home_desktop_view IS NULL");
+db.exec('UPDATE branding_settings SET default_compact_view = 0 WHERE default_compact_view IS NULL');
+db.exec(`UPDATE branding_settings SET default_language = '${DEFAULT_LANGUAGE}' WHERE default_language IS NULL`);
+db.exec("UPDATE branding_settings SET default_timezone = 'UTC' WHERE default_timezone IS NULL");
+db.exec('UPDATE branding_settings SET use_european_date_format = 0 WHERE use_european_date_format IS NULL');
+db.exec('UPDATE branding_settings SET use_24h_time_format = 0 WHERE use_24h_time_format IS NULL');
+db.exec('UPDATE branding_settings SET log_retention_days = 90 WHERE log_retention_days IS NULL');
+db.exec('UPDATE branding_settings SET show_home_hero = 1 WHERE show_home_hero IS NULL');
+db.exec('UPDATE branding_settings SET hide_home_hero_on_mobile = 0 WHERE hide_home_hero_on_mobile IS NULL');
+db.exec('UPDATE branding_settings SET hide_login_page = 0 WHERE hide_login_page IS NULL');
+db.exec('UPDATE branding_settings SET show_shared_cookie_mode = 1 WHERE show_shared_cookie_mode IS NULL');
+db.exec('UPDATE branding_settings SET show_redirect_sso_mode = 1 WHERE show_redirect_sso_mode IS NULL');
+db.exec('UPDATE branding_settings SET show_entra_app_mode = 1 WHERE show_entra_app_mode IS NULL');
+db.exec('UPDATE branding_settings SET plugins_enabled = 0 WHERE plugins_enabled IS NULL');
+db.exec("UPDATE users SET last_activity_at = COALESCE(last_login, updated_at) WHERE last_activity_at IS NULL");
 
 db.exec("UPDATE user_groups SET source = 'local' WHERE source IS NULL OR source NOT IN ('local', 'entra');");
 db.exec("CREATE INDEX IF NOT EXISTS idx_user_groups_source ON user_groups(source);");
@@ -557,8 +557,9 @@ db.prepare(`
 
 db.exec(`
   UPDATE users
-  SET app_order_updated_at = COALESCE(app_order_updated_at, updated_at)
-  WHERE app_order IS NOT NULL
+  SET app_order_updated_at = updated_at
+  WHERE app_order_updated_at IS NULL
+    AND app_order IS NOT NULL
     AND TRIM(COALESCE(app_order, '')) <> ''
 `);
 

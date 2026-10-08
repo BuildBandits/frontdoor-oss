@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import db from '../db.js';
+import { createPreferenceUpdate } from '../services/userPreferences.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { getAppTimeZone, getRequiredEnv, isDevLoginEnabled } from '../config.js';
@@ -378,16 +379,14 @@ router.post('/home-activity', authenticate, (req, res) => {
 });
 
 router.put('/me/preferences', authenticate, (req, res) => {
-  const updates = [];
-  const values = [];
+  const changes = createPreferenceUpdate();
 
   if (Object.prototype.hasOwnProperty.call(req.body, 'homeDesktopView')) {
     const { homeDesktopView } = req.body;
     if (homeDesktopView !== null && !['cards', 'compact'].includes(homeDesktopView)) {
       return res.status(400).json({ error: 'homeDesktopView must be cards, compact, or null' });
     }
-    updates.push('home_desktop_view = ?');
-    values.push(homeDesktopView);
+    changes.set('home_desktop_view', homeDesktopView);
   }
 
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredLanguage')) {
@@ -395,8 +394,7 @@ router.put('/me/preferences', authenticate, (req, res) => {
     if (preferredLanguage !== null && !isSupportedLanguage(preferredLanguage)) {
       return res.status(400).json({ error: 'preferredLanguage must be a supported language or null' });
     }
-    updates.push('preferred_language = ?');
-    values.push(preferredLanguage);
+    changes.set('preferred_language', preferredLanguage);
   }
 
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredTimeZone')) {
@@ -404,8 +402,7 @@ router.put('/me/preferences', authenticate, (req, res) => {
     if (preferredTimeZone !== null && !isSupportedTimeZone(preferredTimeZone)) {
       return res.status(400).json({ error: 'preferredTimeZone must be a supported time zone or null' });
     }
-    updates.push('preferred_timezone = ?');
-    values.push(normalizeOptionalTimeZone(preferredTimeZone));
+    changes.set('preferred_timezone', normalizeOptionalTimeZone(preferredTimeZone));
   }
 
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredColorScheme')) {
@@ -413,8 +410,7 @@ router.put('/me/preferences', authenticate, (req, res) => {
     if (preferredColorScheme !== null && !isSupportedColorScheme(preferredColorScheme)) {
       return res.status(400).json({ error: 'preferredColorScheme must be light, dark, auto, or null' });
     }
-    updates.push('preferred_color_scheme = ?');
-    values.push(preferredColorScheme);
+    changes.set('preferred_color_scheme', preferredColorScheme);
   }
 
   if (Object.prototype.hasOwnProperty.call(req.body, 'appOrder')) {
@@ -425,16 +421,12 @@ router.put('/me/preferences', authenticate, (req, res) => {
     if (Array.isArray(appOrder)) {
       const normalized = appOrder.filter((id) => typeof id === 'string' && id.trim());
       if (normalized.length > 0) {
-        updates.push('app_order = ?');
-        values.push(JSON.stringify(normalized));
-        updates.push('app_order_updated_at = datetime(\'now\')');
+        changes.set('app_order', JSON.stringify(normalized), { touch: 'app_order_updated_at' });
       } else {
-        updates.push('app_order = NULL');
-        updates.push('app_order_updated_at = NULL');
+        changes.set('app_order', null, { touch: 'app_order_updated_at' });
       }
     } else {
-      updates.push('app_order = NULL');
-      updates.push('app_order_updated_at = NULL');
+      changes.set('app_order', null, { touch: 'app_order_updated_at' });
     }
   }
 
@@ -449,12 +441,9 @@ router.put('/me/preferences', authenticate, (req, res) => {
       if (isLocalStorageMigration && normalized.length > 0) {
         console.info(`[favorites-migration] user=${req.user.id} count=${normalized.length}`);
       }
-      updates.push('favorite_apps = ?');
-      values.push(JSON.stringify(normalized));
-      updates.push('favorite_apps_updated_at = datetime(\'now\')');
+      changes.set('favorite_apps', JSON.stringify(normalized), { touch: 'favorite_apps_updated_at' });
     } else {
-      updates.push('favorite_apps = NULL');
-      updates.push('favorite_apps_updated_at = NULL');
+      changes.set('favorite_apps', null, { touch: 'favorite_apps_updated_at' });
     }
   }
 
@@ -463,20 +452,14 @@ router.put('/me/preferences', authenticate, (req, res) => {
     if (homeTourSeenAt !== null && typeof homeTourSeenAt !== 'string') {
       return res.status(400).json({ error: 'homeTourSeenAt must be a string or null' });
     }
-    updates.push('home_tour_seen_at = ?');
-    values.push(homeTourSeenAt || null);
+    changes.set('home_tour_seen_at', homeTourSeenAt || null);
   }
 
-  if (updates.length === 0) {
+  if (changes.size === 0) {
     return res.status(400).json({ error: 'No preference updates provided' });
   }
 
-  db.prepare(
-    `UPDATE users
-     SET ${updates.join(', ')},
-         updated_at = datetime('now')
-     WHERE id = ?`
-  ).run(...values, req.user.id);
+  changes.apply(db, req.user.id);
 
   const user = db.prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, last_activity_at FROM users WHERE id = ?').get(req.user.id);
 

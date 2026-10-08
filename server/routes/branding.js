@@ -16,7 +16,7 @@ router.get('/', (req, res) => {
 router.put('/', authenticate, isOwner, async (req, res) => {
   try {
     const { branding, auditDetails } = await updateBrandingSettings(req.body || {});
-    logRbacAudit(req.user.id, 'update', 'branding', 'default', auditDetails);
+    if (auditDetails) logRbacAudit(req.user.id, 'update', 'branding', 'default', auditDetails);
     res.json({ branding });
   } catch (error) {
     console.error('Branding update failed:', error.message);

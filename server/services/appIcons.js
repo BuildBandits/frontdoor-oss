@@ -81,8 +81,14 @@ export function isAppIconAsset(app) {
   return Boolean(app?.icon_file_name);
 }
 
-export async function saveAppIconAsset(appId, source, appMeta = null, { cacheDir = DEFAULT_CACHE_DIR, dbHandle = db } = {}) {
+export async function saveAppIconAsset(appId, source, appMeta = null, { cacheDir = DEFAULT_CACHE_DIR, dbHandle = db, currentFileName = null } = {}) {
   if (!appId || !source?.buffer) return null;
+
+  // The same image sent again (e.g. a form saved with its current icon) keeps the stored file.
+  if (currentFileName) {
+    const current = await fsp.readFile(iconPath(cacheDir, currentFileName)).catch(() => null);
+    if (current && current.equals(source.buffer)) return { fileName: currentFileName };
+  }
 
   const extension = extensionFromContentType(source.contentType);
   const fileName = `${appId}.${Date.now()}.${uuidv4().slice(0, 8)}.${extension}`;

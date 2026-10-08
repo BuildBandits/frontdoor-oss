@@ -301,11 +301,15 @@ export function upsertPluginRegistry(input = {}) {
     throw new Error('backendUrl is required when backend support is enabled');
   }
 
-  const enabled = input.enabled === undefined ? true : Boolean(input.enabled);
+  const stored = db.prepare('SELECT * FROM plugin_registry WHERE id = ?').get(manifest.id) || null;
+  // Values the caller leaves out keep what is stored: the API never returns the
+  // backend secret, so a client cannot send it back, and an omitted `enabled`
+  // must not re-enable a disabled plugin.
+  const enabled = input.enabled === undefined ? (stored ? stored.enabled === 1 : true) : Boolean(input.enabled);
   const backendEnabled = input.backendEnabled === undefined
     ? manifest.backend.enabled
     : Boolean(input.backendEnabled);
-  const backendSecret = String(input.backendSecret || input.backend?.secret || manifest.backend.secret || '').trim();
+  const backendSecret = String(input.backendSecret || input.backend?.secret || manifest.backend.secret || stored?.backend_secret || '').trim();
   const eventSubscriptions = normalizeList(pickList(
     input.eventSubscriptions,
     pickList(input.backend?.eventSubscriptions, manifest.backend.eventSubscriptions)
@@ -320,7 +324,6 @@ export function upsertPluginRegistry(input = {}) {
   const homepage = String(input.homepage || manifest.homepage || '').trim();
   const name = String(input.name || manifest.name || manifest.id).trim() || manifest.id;
   const id = manifest.id;
-  const approved = input.approved === undefined ? false : Boolean(input.approved);
 
   const manifestJson = JSON.stringify({
     ...manifest,
@@ -339,6 +342,37 @@ export function upsertPluginRegistry(input = {}) {
       eventSubscriptions,
     },
   });
+
+  const next = {
+    name,
+    description,
+    version,
+    source,
+    entry: entry || null,
+    manifest_json: manifestJson,
+    permissions_json: JSON.stringify(permissions),
+    roles_json: roles.length > 0 ? JSON.stringify(roles) : null,
+    backend_enabled: backendEnabled ? 1 : 0,
+    backend_url: backendUrl || null,
+    backend_secret: backendSecret || null,
+    event_subscriptions_json: JSON.stringify(eventSubscriptions),
+    enabled: enabled ? 1 : 0,
+  };
+
+  // An approval covers the code and the access the plugin asks for; it is kept
+  // only while none of that changes. Callers can still set it explicitly.
+  const reviewedColumns = ['entry', 'manifest_json', 'permissions_json', 'roles_json', 'backend_enabled', 'backend_url', 'backend_secret', 'event_subscriptions_json'];
+  const reviewChanged = !stored || reviewedColumns.some((column) => stored[column] !== next[column]);
+  const approved = input.approved === undefined ? (!reviewChanged && stored.approved === 1) : Boolean(input.approved);
+  const keepApprovalStamp = Boolean(stored && approved && stored.approved === 1 && !reviewChanged);
+
+  if (
+    stored
+    && Object.entries(next).every(([column, value]) => stored[column] === value)
+    && (approved ? 1 : 0) === stored.approved
+  ) {
+    return getPluginRegistryById(id);
+  }
 
   db.prepare(`
     INSERT INTO plugin_registry (
@@ -361,26 +395,28 @@ export function upsertPluginRegistry(input = {}) {
       backend_secret = excluded.backend_secret,
       event_subscriptions_json = excluded.event_subscriptions_json,
       approved = excluded.approved,
-      approved_by = NULL,
-      approved_at = NULL,
+      approved_by = CASE WHEN ? THEN approved_by ELSE NULL END,
+      approved_at = CASE WHEN ? THEN approved_at ELSE NULL END,
       enabled = excluded.enabled,
       updated_at = datetime('now')
   `).run(
     id,
-    name,
-    description,
-    version,
-    source,
-    entry || null,
-    manifestJson,
-    JSON.stringify(permissions),
-    roles.length > 0 ? JSON.stringify(roles) : null,
-    backendEnabled ? 1 : 0,
-    backendUrl || null,
-    backendSecret || null,
-    JSON.stringify(eventSubscriptions),
+    next.name,
+    next.description,
+    next.version,
+    next.source,
+    next.entry,
+    next.manifest_json,
+    next.permissions_json,
+    next.roles_json,
+    next.backend_enabled,
+    next.backend_url,
+    next.backend_secret,
+    next.event_subscriptions_json,
     approved ? 1 : 0,
-    enabled ? 1 : 0,
+    next.enabled,
+    keepApprovalStamp ? 1 : 0,
+    keepApprovalStamp ? 1 : 0,
   );
 
   return getPluginRegistryById(id);
@@ -399,12 +435,20 @@ export async function importPluginBundle(input = {}) {
   const moduleSource = String(input.moduleSource || packagePayload?.moduleSource || '').trim();
 
   if (moduleSource) {
-    const stored = await writeLocalPluginBundle({
-      id: manifest.id,
-      version: manifest.version,
-      moduleSource,
-    });
-    entry = stored.entry;
+    // Re-importing the same module reuses the stored bundle instead of writing a new copy.
+    const currentSource = existing?.entry && isLocalPluginEntry(existing.entry)
+      ? await fs.readFile(localEntryToFilePath(existing.entry), 'utf8').catch(() => null)
+      : null;
+    if (currentSource === moduleSource) {
+      entry = existing.entry;
+    } else {
+      const stored = await writeLocalPluginBundle({
+        id: manifest.id,
+        version: manifest.version,
+        moduleSource,
+      });
+      entry = stored.entry;
+    }
     source = packagePayload ? 'package' : 'uploaded';
   }
 
@@ -417,7 +461,6 @@ export async function importPluginBundle(input = {}) {
     manifest,
     entry,
     source,
-    approved: false,
   });
 
   if (existing?.entry && existing.entry !== entry && isLocalPluginEntry(existing.entry)) {

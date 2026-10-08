@@ -1,5 +1,6 @@
 import express from 'express';
 import db from '../db.js';
+import { createPreferenceUpdate } from '../services/userPreferences.js';
 import { logRbacAudit } from '../db.js';
 import { authenticate, isAdminViewer, isAdminEditor, ROLE_OWNER } from '../middleware/auth.js';
 import { ensureAvatarCached, serveAvatarForUser } from '../services/avatars.js';
@@ -66,8 +67,7 @@ router.get('/:id/avatar', authenticate, async (req, res) => {
 // Reset one or more personal preferences for a specific user (editor roles only).
 router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
   const { id } = req.params;
-  const updates = [];
-  const values = [];
+  const changes = createPreferenceUpdate();
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
   if (!user) {
@@ -79,8 +79,7 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
     if (homeDesktopView !== null && !['cards', 'compact'].includes(homeDesktopView)) {
       return res.status(400).json({ error: 'homeDesktopView must be cards, compact, or null' });
     }
-    updates.push('home_desktop_view = ?');
-    values.push(homeDesktopView);
+    changes.set('home_desktop_view', homeDesktopView);
   }
 
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredLanguage')) {
@@ -88,8 +87,7 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
     if (preferredLanguage !== null && !isSupportedLanguage(preferredLanguage)) {
       return res.status(400).json({ error: 'preferredLanguage must be a supported language or null' });
     }
-    updates.push('preferred_language = ?');
-    values.push(preferredLanguage);
+    changes.set('preferred_language', preferredLanguage);
   }
 
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredTimeZone')) {
@@ -97,8 +95,7 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
     if (preferredTimeZone !== null && !isSupportedTimeZone(preferredTimeZone)) {
       return res.status(400).json({ error: 'preferredTimeZone must be a supported time zone or null' });
     }
-    updates.push('preferred_timezone = ?');
-    values.push(normalizeOptionalTimeZone(preferredTimeZone));
+    changes.set('preferred_timezone', normalizeOptionalTimeZone(preferredTimeZone));
   }
 
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredColorScheme')) {
@@ -106,8 +103,7 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
     if (preferredColorScheme !== null && !isSupportedColorScheme(preferredColorScheme)) {
       return res.status(400).json({ error: 'preferredColorScheme must be light, dark, auto, or null' });
     }
-    updates.push('preferred_color_scheme = ?');
-    values.push(normalizeOptionalColorScheme(preferredColorScheme));
+    changes.set('preferred_color_scheme', normalizeOptionalColorScheme(preferredColorScheme));
   }
 
   if (Object.prototype.hasOwnProperty.call(req.body, 'appOrder')) {
@@ -118,29 +114,20 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
     if (Array.isArray(appOrder)) {
       const normalized = [...new Set(appOrder.filter((item) => typeof item === 'string' && item.trim()))];
       if (normalized.length > 0) {
-        updates.push('app_order = ?');
-        values.push(JSON.stringify(normalized));
-        updates.push('app_order_updated_at = datetime(\'now\')');
+        changes.set('app_order', JSON.stringify(normalized), { touch: 'app_order_updated_at' });
       } else {
-        updates.push('app_order = NULL');
-        updates.push('app_order_updated_at = NULL');
+        changes.set('app_order', null, { touch: 'app_order_updated_at' });
       }
     } else {
-      updates.push('app_order = NULL');
-      updates.push('app_order_updated_at = NULL');
+      changes.set('app_order', null, { touch: 'app_order_updated_at' });
     }
   }
 
-  if (updates.length === 0) {
+  if (changes.size === 0) {
     return res.status(400).json({ error: 'No preference updates provided' });
   }
 
-  db.prepare(
-    `UPDATE users
-     SET ${updates.join(', ')},
-         updated_at = datetime('now')
-     WHERE id = ?`
-  ).run(...values, id);
+  changes.apply(db, id);
 
   res.json({ ok: true });
 });

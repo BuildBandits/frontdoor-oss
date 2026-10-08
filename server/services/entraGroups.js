@@ -161,25 +161,39 @@ function upsertDiscoveredGroups(groups, seenAt) {
 
 function syncImportedMemberships(userId, groups, syncedAt) {
   const importedGroups = db.prepare(`
-    SELECT id, name, entra_group_id
+    SELECT id, name, description, entra_display_name, entra_group_id
     FROM user_groups
     WHERE source = 'entra' AND entra_group_id IS NOT NULL
   `).all();
   const importedGroupIds = importedGroups.map((group) => group.id);
   const importedByEntraId = new Map(importedGroups.map((group) => [group.entra_group_id, group]));
   const reservedNames = new Set(db.prepare('SELECT name FROM user_groups').all().map((row) => row.name));
+  // Name and description are rewritten only when Entra reports different values;
+  // entra_synced_at always records the sync.
   const importedGroupUpdate = db.prepare(`
     UPDATE user_groups
     SET name = ?, description = ?, entra_display_name = ?, entra_synced_at = ?, source = 'entra'
     WHERE id = ?
   `);
+  const importedGroupTouch = db.prepare('UPDATE user_groups SET entra_synced_at = ? WHERE id = ?');
 
-  let membershipsRemoved = 0;
+  // Apply only the membership changes: remove the imported groups the user left,
+  // add the ones they joined, and leave the others untouched.
+  const desiredGroupIds = new Set(
+    groups.map((group) => importedByEntraId.get(group.id)?.id).filter(Boolean)
+  );
+  let currentGroupIds = [];
   if (importedGroupIds.length > 0) {
     const placeholders = importedGroupIds.map(() => '?').join(', ');
-    const result = db.prepare(`DELETE FROM user_group_members WHERE user_id = ? AND group_id IN (${placeholders})`)
-      .run(userId, ...importedGroupIds);
-    membershipsRemoved = result.changes;
+    currentGroupIds = db.prepare(`SELECT group_id FROM user_group_members WHERE user_id = ? AND group_id IN (${placeholders})`)
+      .all(userId, ...importedGroupIds)
+      .map((row) => row.group_id);
+  }
+  const removeMembership = db.prepare('DELETE FROM user_group_members WHERE user_id = ? AND group_id = ?');
+  let membershipsRemoved = 0;
+  for (const groupId of currentGroupIds) {
+    if (desiredGroupIds.has(groupId)) continue;
+    membershipsRemoved += removeMembership.run(userId, groupId).changes;
   }
 
   const membershipCacheUpsert = db.prepare(`
@@ -196,13 +210,19 @@ function syncImportedMemberships(userId, groups, syncedAt) {
     const importedGroup = importedByEntraId.get(group.id);
     if (importedGroup) {
       const resolvedName = resolveUniqueEntraGroupName(group.displayName, group.id, reservedNames, importedGroup.name);
-      importedGroupUpdate.run(
-        resolvedName,
-        group.description || 'No description available on Entra',
-        group.displayName,
-        syncedAt,
-        importedGroup.id
-      );
+      const description = group.description || 'No description available on Entra';
+      if (
+        resolvedName !== importedGroup.name
+        || description !== importedGroup.description
+        || group.displayName !== importedGroup.entra_display_name
+      ) {
+        importedGroupUpdate.run(resolvedName, description, group.displayName, syncedAt, importedGroup.id);
+        importedGroup.name = resolvedName;
+        importedGroup.description = description;
+        importedGroup.entra_display_name = group.displayName;
+      } else {
+        importedGroupTouch.run(syncedAt, importedGroup.id);
+      }
       const result = localMembershipInsert.run(userId, importedGroup.id);
       membershipsAdded += result.changes;
     }
@@ -331,7 +351,14 @@ export function syncUserEntraGroups(userId, entraGroups) {
 
   const syncTransaction = db.transaction(() => {
     const discoveredGroups = upsertDiscoveredGroups(currentGroups, syncAt);
-    db.prepare('DELETE FROM entra_user_group_memberships WHERE user_id = ?').run(userId);
+    // Drop only the cached memberships Graph no longer reports; the rest are refreshed by the upsert.
+    const currentIds = currentGroups.map((group) => group.id);
+    if (currentIds.length > 0) {
+      db.prepare(`DELETE FROM entra_user_group_memberships WHERE user_id = ? AND entra_group_id NOT IN (${currentIds.map(() => '?').join(', ')})`)
+        .run(userId, ...currentIds);
+    } else {
+      db.prepare('DELETE FROM entra_user_group_memberships WHERE user_id = ?').run(userId);
+    }
     const { membershipsAdded, membershipsRemoved } = syncImportedMemberships(userId, currentGroups, syncAt);
     return { discoveredGroups, membershipsAdded, membershipsRemoved };
   });
@@ -381,17 +408,17 @@ export function listDiscoveredEntraGroups() {
 
 export function importEntraGroups(groupIds) {
   if (!isEntraGroupSyncEnabled()) {
-    return { importedGroups: 0, membershipsAdded: 0 };
+    return { importedGroups: 0, skippedGroups: 0, membershipsAdded: 0 };
   }
 
   const uniqueGroupIds = [...new Set((Array.isArray(groupIds) ? groupIds : []).filter(Boolean))];
   if (uniqueGroupIds.length === 0) {
-    return { importedGroups: 0, membershipsAdded: 0 };
+    return { importedGroups: 0, skippedGroups: 0, membershipsAdded: 0 };
   }
 
   const now = new Date().toISOString();
   const cacheLookup = db.prepare('SELECT entra_group_id, display_name, description FROM entra_group_cache WHERE entra_group_id = ?');
-  const existingGroups = db.prepare("SELECT id, name, entra_group_id FROM user_groups WHERE source = 'entra'").all();
+  const existingGroups = db.prepare("SELECT id, name, description, entra_group_id, entra_display_name FROM user_groups WHERE source = 'entra'").all();
   const reservedNames = new Set(db.prepare('SELECT name FROM user_groups').all().map((row) => row.name));
   const membershipBackfill = db.prepare(`
     INSERT OR IGNORE INTO user_group_members (user_id, group_id)
@@ -415,6 +442,7 @@ export function importEntraGroups(groupIds) {
 
   const syncTransaction = db.transaction(() => {
     let importedGroups = 0;
+    let skippedGroups = 0;
     let membershipsAdded = 0;
 
     for (const entraGroupId of uniqueGroupIds) {
@@ -425,22 +453,26 @@ export function importEntraGroups(groupIds) {
 
       const existing = existingByEntraId.get(entraGroupId) || null;
       const name = resolveUniqueEntraGroupName(cacheRow.display_name, entraGroupId, reservedNames, existing?.name || null);
+      const description = cacheRow.description || 'No description available on Entra';
 
-      importedGroupUpsert.run(
-        entraGroupId,
-        name,
-        cacheRow.description || 'No description available on Entra',
-        entraGroupId,
-        cacheRow.display_name,
-        now
-      );
-      importedGroups += 1;
+      // Already imported with the same data: nothing to rewrite.
+      if (
+        existing
+        && existing.name === name
+        && existing.description === description
+        && existing.entra_display_name === cacheRow.display_name
+      ) {
+        skippedGroups += 1;
+      } else {
+        importedGroupUpsert.run(entraGroupId, name, description, entraGroupId, cacheRow.display_name, now);
+        importedGroups += 1;
+      }
 
       const result = membershipBackfill.run(entraGroupId, entraGroupId);
       membershipsAdded += result.changes;
     }
 
-    return { importedGroups, membershipsAdded };
+    return { importedGroups, skippedGroups, membershipsAdded };
   });
 
   return syncTransaction();
@@ -458,7 +490,7 @@ function isProtectedFromAutoDeactivation(user) {
 // lock out the compose owner or the last active admin editor.
 function handleUserMissingFromEntra(user) {
   if (isProtectedFromAutoDeactivation(user)) {
-    db.prepare("UPDATE users SET entra_missing_since = COALESCE(entra_missing_since, datetime('now')) WHERE id = ?").run(user.id);
+    db.prepare("UPDATE users SET entra_missing_since = datetime('now') WHERE id = ? AND entra_missing_since IS NULL").run(user.id);
     return false;
   }
   db.prepare(`
