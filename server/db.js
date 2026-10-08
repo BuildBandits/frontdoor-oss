@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { restoreDefaultDemoApps } from './services/demoApps.js';
+import { withAuditRefs } from './services/auditDetails.js';
 import { DEFAULT_LANGUAGE } from '../shared/languages.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -596,11 +597,16 @@ if (memberResult.changes > 0) console.log(`RBAC: added ${memberResult.changes} u
 
 // NOTE: no app backfill — app permissions are assigned explicitly by admin flows or restore actions
 
-/** Log an RBAC mutation for audit trail. Never throws — failures are logged to stderr. */
+/**
+ * Log an RBAC mutation for audit trail. Never throws — failures are logged to stderr.
+ * Names of the entities involved are snapshotted into `details.refs`, so the row
+ * stays readable after those entities are renamed or deleted.
+ */
 function logRbacAudit(actorId, action, targetType, targetId, details = null) {
   try {
+    const payload = withAuditRefs(db, { action, targetType, targetId, details });
     db.prepare('INSERT INTO rbac_audit_logs (actor_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)')
-      .run(actorId, action, targetType, targetId, details ? JSON.stringify(details) : null);
+      .run(actorId, action, targetType, targetId, payload ? JSON.stringify(payload) : null);
   } catch (e) {
     console.error('RBAC audit log write failed:', e.message);
   }

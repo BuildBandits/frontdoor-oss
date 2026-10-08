@@ -3,6 +3,7 @@ import db from '../db.js';
 import { authenticate, isOwner } from '../middleware/auth.js';
 import { getAppTimeZone } from '../config.js';
 import { iconUrlForApp } from '../services/appIcons.js';
+import { collectAuditIds, lookupAuditNames } from '../services/auditDetails.js';
 
 const router = express.Router();
 const PAGE_SIZES = [50, 100, 150, 200, 250];
@@ -258,7 +259,7 @@ function loadAuditLogs(req, res) {
     FROM rbac_audit_logs a
     LEFT JOIN users u ON a.actor_id = u.id
     WHERE ${where}
-    ORDER BY a.created_at DESC
+    ORDER BY a.created_at DESC, a.id DESC
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset).map((log) => ({
     ...log,
@@ -266,8 +267,19 @@ function loadAuditLogs(req, res) {
     details: jsonOrText(log.details),
   }));
 
+  // Current names for every entity on this page; rows written before names were
+  // snapshotted (or whose snapshot is partial) fall back to these.
+  const idSets = logs.reduce((sets, log) => collectAuditIds({
+    action: log.action,
+    targetType: log.target_type,
+    targetId: log.target_id,
+    details: log.details,
+  }, sets), undefined);
+  const refs = idSets ? lookupAuditNames(db, idSets) : {};
+
   res.json({
     logs,
+    refs,
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     retentionDays,
     availablePageSizes: PAGE_SIZES,

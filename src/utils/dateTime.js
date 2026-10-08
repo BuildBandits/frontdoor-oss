@@ -52,3 +52,27 @@ export function formatDateTimeWithTimeZone(value, {
 
   return { parsed, formattedDate, formattedTime };
 }
+
+/** Locale-independent `YYYY-MM-DD, HH:MM:SS` in the given time zone (null if the value is not a date). */
+export function formatIsoDateTime(value, timeZone) {
+  const parsed = parseServerTimestamp(value);
+  if (!parsed || Number.isNaN(parsed.getTime())) return null;
+  const resolvedTimeZone = normalizeTimeZone(timeZone, DEFAULT_TIME_ZONE);
+  const options = {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  };
+  let parts;
+  try {
+    parts = new Intl.DateTimeFormat('en-US', { ...options, timeZone: resolvedTimeZone }).formatToParts(parsed);
+  } catch {
+    parts = new Intl.DateTimeFormat('en-US', { ...options, timeZone: DEFAULT_TIME_ZONE }).formatToParts(parsed);
+  }
+  const part = (type) => parts.find((item) => item.type === type)?.value;
+  return `${part('year')}-${part('month')}-${part('day')}, ${part('hour')}:${part('minute')}:${part('second')}`;
+}

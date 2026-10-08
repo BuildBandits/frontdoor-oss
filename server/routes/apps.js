@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
 import { logRbacAudit } from '../db.js';
+import { diffAuditFields } from '../services/auditDetails.js';
 import { authenticate, isAdminViewer, isAdminEditor } from '../middleware/auth.js';
 import { getRequiredEnv } from '../config.js';
 import { restoreDefaultDemoApps } from '../services/demoApps.js';
@@ -409,6 +410,33 @@ async function applyAppIconChange(appId, existingApp, { icon, iconDataUrl, iconS
   };
 }
 
+function parseStoredTags(value) {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+// Audit-friendly changes for an app update: tags as lists, and the uploaded
+// icon image as a present/updated/removed marker instead of a file name.
+function buildAppAuditChanges(before, after, changedColumns) {
+  return changedColumns.map((field) => {
+    if (field === 'tags') {
+      return { field, from: parseStoredTags(before.tags), to: parseStoredTags(after.tags) };
+    }
+    if (field === 'icon_file_name') {
+      return {
+        field: 'iconImage',
+        from: before.icon_file_name ? 'present' : 'not set',
+        to: after.icon_file_name ? 'updated' : 'removed',
+      };
+    }
+    return { field, from: before[field] ?? null, to: after[field] ?? null };
+  });
+}
+
 function buildCloneName(originalName) {
   const base = (originalName || 'App').trim() || 'App';
   let candidate = `${base} (copia)`;
@@ -593,35 +621,42 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
     });
     const normalizedTags = tags !== undefined ? normalizeTagList(tags) : undefined;
 
-    db.prepare(`
-      UPDATE apps SET
-        name = COALESCE(?, name),
-        slug = COALESCE(?, slug),
-        description = COALESCE(?, description),
-        icon = COALESCE(?, icon),
-        icon_file_name = ?,
-        target_url = COALESCE(?, target_url),
-        is_active = COALESCE(?, is_active),
-        sort_order = COALESCE(?, sort_order),
-        mode = COALESCE(?, mode),
-        sso_endpoint = COALESCE(?, sso_endpoint),
-        sso_method = COALESCE(?, sso_method),
-        long_description = COALESCE(?, long_description),
-        tags = COALESCE(?, tags),
-        updated_at = datetime('now')
-      WHERE id = ?
-    `).run(name, slug, description, iconChange.icon, iconChange.icon_file_name, target_url, is_active, sort_order, mode, normalizedSsoEndpoint, sso_method, long_description, normalizedTags !== undefined ? JSON.stringify(normalizedTags) : null, id);
-
-    const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
-    logRbacAudit(req.user.id, 'update', 'app', id, {
+    // Fields left out of the request (or sent as null) keep their current value;
+    // icon_file_name always comes from the icon change.
+    const requested = {
       name,
       slug,
-      is_active,
-      mode,
+      description,
+      long_description,
+      icon: iconChange.icon,
+      icon_file_name: iconChange.icon_file_name,
       target_url,
+      is_active: typeof is_active === 'boolean' ? Number(is_active) : is_active,
       sort_order,
-      tags: normalizedTags,
-    });
+      mode,
+      sso_endpoint: normalizedSsoEndpoint,
+      sso_method,
+      tags: normalizedTags !== undefined ? JSON.stringify(normalizedTags) : undefined,
+    };
+    const next = { ...existing };
+    for (const [column, value] of Object.entries(requested)) {
+      if (column === 'icon_file_name' || (value !== undefined && value !== null)) next[column] = value;
+    }
+
+    // Write only the columns whose value actually changes.
+    const changedColumns = diffAuditFields(existing, next, Object.keys(requested)).map((change) => change.field);
+    if (changedColumns.length > 0) {
+      db.prepare(`
+        UPDATE apps SET ${changedColumns.map((column) => `${column} = ?`).join(', ')}, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(...changedColumns.map((column) => next[column]), id);
+      logRbacAudit(req.user.id, 'update', 'app', id, {
+        name: next.name,
+        changes: buildAppAuditChanges(existing, next, changedColumns),
+      });
+    }
+
+    const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
     res.json({ app });
   } catch (error) {
     console.error('Update app failed:', error.message);

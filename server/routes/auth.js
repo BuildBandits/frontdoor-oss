@@ -278,11 +278,7 @@ router.get('/microsoft/callback', async (req, res) => {
     console.log(`User login via Microsoft [${user.id}]: ${user.email} (${user.display_name})${isNewUser ? ' [new]' : ''}`);
 
     if (['owner', 'admin', 'admin_readonly'].includes(user.role)) {
-      logRbacAudit(user.id, 'login', 'auth', user.id, {
-        role: user.role,
-        microsoftId: user.microsoft_id,
-        email: user.email,
-      });
+      logRbacAudit(user.id, 'login', 'auth', user.id, { role: user.role });
     }
 
     await ensureAvatarCached(

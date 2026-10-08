@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Added
 - **Website link in the footer**: the product name in the footer links to the Frontdoor website (frontdoor.buildbandits.com).
+- **Readable audit details**: the *Details* column of *Audit* and *Plugin audit* now describes each event in a sentence (e.g. *Added 2 members to Finance*), lists changed fields as `old → new` and shows users, groups and apps by name instead of by ID. Actions and targets get readable labels, with the raw value on hover. Each row has *Copy JSON* and *Show JSON* for the stored payload. Audit rows now keep a snapshot of the names involved (`details.refs`), so they stay readable after an entity is renamed or deleted; older rows use the current names returned by `GET /api/logs/audit` (`refs`). The column is no longer hidden on narrow screens, and dates are shown as `YYYY-MM-DD, HH:MM:SS` in the viewer's time zone (they were always formatted in Italian by the server). ([#72](https://github.com/BuildBandits/frontdoor-oss/issues/72))
 
 ### Changed
 - **Simpler footer**: a single line, *Frontdoor v1.3.x · Licensed under MIT license*, with the product name linking to the website. The commit hash and the "open source software" note are no longer shown; the commit is still recorded in backups when `COMMIT_SHA` is set at build time.
@@ -17,6 +18,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Access log dates follow the interface language**: the access log formats timestamps in the browser with the interface locale instead of using the Italian date the server returned.
 
 ### Fixed
+- **No-op saves no longer write or audit**: saving an app, a group, a user role or status, a customization form or a plugin approval without changing anything no longer rewrites the row, bumps `updated_at` (which also reloaded the app icon for everyone) or adds an audit row. App updates now write only the columns that changed, and app and group updates record a `from → to` diff of the changed fields instead of the submitted values. App transfers between groups that move nothing are not audited.
+- **Audit rows in the same second** are now listed newest first.
+- **Less personal data in sign-in audit rows**: administrator sign-ins no longer copy the email address and Microsoft ID into the audit details; the user is identified by the actor.
 - **Home tour on desktop**: the *Find the menu button* step, which points at the mobile hamburger button, was also shown on desktop where that button does not exist. It is now mobile-only, like the *Reorder the cards* step is desktop-only.
 - **Pages opened already scrolled down**: following a link from a scrolled page (for example *Open backup page* in *Customize → Maintenance*) kept the scroll position, so the new page opened halfway down. Route changes now start at the top; links to a `#section` and back/forward navigation are unchanged. The *Open backup page* button also gets dark-mode colours.
 - **Empty pagination and Refresh buttons**: the *Previous*, *Next* and *Refresh* labels used by the admin lists and plugin pages were missing from the translations, so those buttons showed only an icon.
