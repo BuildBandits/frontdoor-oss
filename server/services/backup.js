@@ -4,6 +4,7 @@ import os from 'os';
 import path from 'path';
 import zlib from 'zlib';
 import { pipeline } from 'stream/promises';
+import Database from 'better-sqlite3';
 import db from '../db.js';
 import { getAppTimeZone } from '../config.js';
 import { AVATAR_CACHE_DIR } from './avatars.js';
@@ -620,6 +621,31 @@ function buildAnalysisReport({ dbHandle, currentVersion, createdAt, app, archive
 }
 
 /**
+ * Runs fn with a read-only connection holding one read transaction, so every table
+ * comes from the same point in time and the shared connection stays free for writes
+ * while rows are streamed (WAL readers never block writers). In-memory databases
+ * cannot be reopened and are read through the given handle.
+ */
+async function withReadSnapshot(dbHandle, fn) {
+  const file = dbHandle.name;
+  if (!file || file === ':memory:' || dbHandle.memory) return fn(dbHandle);
+  const snapshot = new Database(file, { readonly: true, fileMustExist: true });
+  try {
+    snapshot.pragma('busy_timeout = 5000');
+    snapshot.exec('BEGIN');
+    // The snapshot starts with the first read.
+    snapshot.prepare('SELECT COUNT(*) FROM sqlite_master').get();
+    try {
+      return await fn(snapshot);
+    } finally {
+      snapshot.exec('COMMIT');
+    }
+  } finally {
+    snapshot.close();
+  }
+}
+
+/**
  * Writes a backup in format v2 to outputPath, streaming rows and files.
  */
 export async function createBackupFile({
@@ -637,12 +663,12 @@ export async function createBackupFile({
   const excludedTables = excludeLogs ? [...LOG_TABLES] : [];
   const createdAt = new Date().toISOString();
   const completed = [];
-  const { manifest } = await writeBackupV2({
-    dbHandle,
-    tables: listTables(dbHandle).filter((tableName) => !excludedTables.includes(tableName)),
-    schema: readSchema(dbHandle),
+  const { manifest } = await withReadSnapshot(dbHandle, (source) => writeBackupV2({
+    dbHandle: source,
+    tables: listTables(source).filter((tableName) => !excludedTables.includes(tableName)),
+    schema: readSchema(source),
     buckets: resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir, pluginAssetDir }),
-    app: collectAppMetadata(dbHandle),
+    app: collectAppMetadata(source),
     options: { excludedTables },
     createdAt,
     outputPath,
@@ -651,7 +677,7 @@ export async function createBackupFile({
       completed.push(stage);
       emitBackupProgress(onProgress, stage, Math.round((completed.length / BACKUP_PROGRESS_STAGES.length) * 100), [...completed]);
     },
-  });
+  }));
   return {
     manifest,
     summary: manifest.summary,
