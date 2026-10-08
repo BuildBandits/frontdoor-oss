@@ -5,6 +5,9 @@ import AppIcon from './AppIcon';
 import Tooltip from './Tooltip';
 import api from '../services/api';
 
+// Tags shown on a card; the rest are summarized as +N so the tag row stays one line.
+const MAX_CARD_TAGS = 3;
+
 const AppCard = forwardRef(function AppCard(
   { app, isFavorite, onToggleFavorite, showModeBadges = true, compact = false, dragHandleProps, dragging, style, tourHighlight = false, tourShowDragHandle = false, tourFavoriteRef = null, tourInfoRef = null, tourDragHandleRef = null, labels = {} },
   ref
@@ -151,7 +154,7 @@ const AppCard = forwardRef(function AppCard(
       <div
         ref={ref}
         style={style}
-        className={`group bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-100 dark:border-gray-800 hover:border-accent hover:shadow-lg hover:shadow-accent/10 transition-all duration-200 text-left w-full relative ${
+        className={`group flex h-full flex-col bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-100 dark:border-gray-800 hover:border-accent hover:shadow-lg hover:shadow-accent/10 transition-all duration-200 text-left w-full relative ${
           tourHighlight ? 'z-20 scale-[1.01]' : ''
         } ${
           dragging ? 'shadow-xl ring-2 ring-accent/30 opacity-80 z-10' : ''
@@ -229,8 +232,10 @@ const AppCard = forwardRef(function AppCard(
             )}
           </div>
         </div>
-        <button onClick={handleClick} className="w-full text-left cursor-pointer">
-          <h3 className="text-lg font-bold text-dark dark:text-gray-100 mb-1.5 group-hover:text-dark/80 dark:group-hover:text-gray-200 transition-colors">
+        {/* Fixed-height content (one-line title, two-line description, one tag row)
+            keeps every card the same height, with or without description and tags. */}
+        <button onClick={handleClick} className="w-full flex-1 text-left cursor-pointer">
+          <h3 className="text-lg font-bold text-dark dark:text-gray-100 mb-1.5 truncate group-hover:text-dark/80 dark:group-hover:text-gray-200 transition-colors" title={app.name}>
             {app.name}
           </h3>
           {description && shouldShowDescriptionTooltip ? (
@@ -238,27 +243,26 @@ const AppCard = forwardRef(function AppCard(
               content={description}
               tooltipClassName="text-left max-w-[min(36rem,calc(100vw-2rem))]"
             >
-              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2 min-h-[2lh]">
                 {description}
               </p>
             </Tooltip>
           ) : (
-            description && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
-                {description}
-              </p>
-            )
+            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2 min-h-[2lh]">
+              {description}
+            </p>
           )}
         </button>
-        {tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3">
-            {tags.map((tag, i) => (
-              <span key={i} className="text-[10px] font-semibold uppercase tracking-wider text-purple-700 dark:text-purple-200 bg-purple-100 dark:bg-purple-900/40 px-2 py-0.5 rounded-full">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="mt-3 flex h-5 items-center gap-1.5 overflow-hidden" title={tags.length > MAX_CARD_TAGS ? tags.join(', ') : undefined}>
+          {tags.slice(0, MAX_CARD_TAGS).map((tag, i) => (
+            <span key={i} className="max-w-[45%] shrink-0 truncate text-[10px] font-semibold uppercase tracking-wider text-purple-700 dark:text-purple-200 bg-purple-100 dark:bg-purple-900/40 px-2 py-0.5 rounded-full">
+              {tag}
+            </span>
+          ))}
+          {tags.length > MAX_CARD_TAGS && (
+            <span className="shrink-0 text-[10px] text-gray-400 dark:text-gray-500">+{tags.length - MAX_CARD_TAGS}</span>
+          )}
+        </div>
       </div>
 
       {showInfo && <InfoModal app={app} onClose={() => setShowInfo(false)} labels={labels} />}
