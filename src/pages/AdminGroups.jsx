@@ -33,6 +33,7 @@ export default function AdminGroups() {
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [groupSearch, setGroupSearch] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('all');
   const [activeGroupPanel, setActiveGroupPanel] = useState('members');
 
   const showToast = (message, type = 'success') => setPageNotice({ message, type });
@@ -781,10 +782,17 @@ export default function AdminGroups() {
   });
   const hasEntraSearch = entraSearch.trim().length > 0;
 
+  // The default group and every non-Entra group count as local.
+  const groupSource = (group) => (group.source === 'entra' ? 'entra' : 'local');
+  const sourceCounts = useMemo(() => groups.reduce((counts, group) => {
+    counts[groupSource(group)] += 1;
+    return counts;
+  }, { local: 0, entra: 0 }), [groups]);
   const filteredGroups = useMemo(() => {
-    if (!groupSearch.trim()) return groups;
+    const bySource = sourceFilter === 'all' ? groups : groups.filter((group) => groupSource(group) === sourceFilter);
+    if (!groupSearch.trim()) return bySource;
     const q = groupSearch.toLowerCase();
-    return groups.filter((group) => {
+    return bySource.filter((group) => {
       const searchable = [
         groupLabel(group),
         group.description || '',
@@ -794,7 +802,7 @@ export default function AdminGroups() {
       ].join(' ').toLowerCase();
       return searchable.includes(q);
     });
-  }, [groups, groupSearch]);
+  }, [groups, groupSearch, sourceFilter]);
   const groupsWithoutApps = useMemo(
     () => groups.filter((group) => Number(group.app_count || 0) === 0 && Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) === 0),
     [groups],
@@ -811,7 +819,7 @@ export default function AdminGroups() {
   const visibleGroups = showOnlyProblemGroups
     ? filteredGroups.filter((group) => Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) === 0 && (Number(group.app_count || 0) === 0 || Number(group.member_count || 0) === 0))
     : filteredGroups;
-  const hasGroupFilter = groupSearch.trim().length > 0 || showOnlyProblemGroups;
+  const hasGroupFilter = groupSearch.trim().length > 0 || showOnlyProblemGroups || sourceFilter !== 'all';
   const pagination = useMemo(() => ({
     page,
     pages: Math.max(1, Math.ceil(visibleGroups.length / pageSize)),
@@ -830,7 +838,7 @@ export default function AdminGroups() {
 
   useEffect(() => {
     setPage(1);
-  }, [groupSearch, showOnlyProblemGroups, pageSize]);
+  }, [groupSearch, showOnlyProblemGroups, pageSize, sourceFilter]);
   useEffect(() => {
     if (page > pagination.pages) {
       setPage(pagination.pages);
@@ -1007,6 +1015,18 @@ export default function AdminGroups() {
               searchShortcutLabel={ui.common.searchShortcut}
             />
           </div>
+          <DropdownSelect
+            value={sourceFilter}
+            onChange={setSourceFilter}
+            label={g.sourceFilter}
+            icon={Layers3}
+            options={[
+              { value: 'all', label: `${g.sourceAll} (${groups.length})` },
+              { value: 'local', label: `${g.sourceLocal} (${sourceCounts.local})` },
+              { value: 'entra', label: `${g.sourceEntra} (${sourceCounts.entra})` },
+            ]}
+            className="min-w-[220px]"
+          />
           <DropdownSelect
             value={pageSize}
             onChange={(next) => setPageSize(parseInt(next, 10))}

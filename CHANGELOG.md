@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- **Filter groups by source**: *Admin → Groups* has a *Source* filter (All, Local, Microsoft Entra, each with its count) that works together with the search; the *default* group counts as local. ([#95](https://github.com/BuildBandits/frontdoor-oss/issues/95))
 - **Sign-ins hidden in Audit**: administrator sign-in events are hidden by default on *Audit*, so the list shows actual changes; *Show sign-ins* brings them back and the choice is remembered in the browser. `GET /api/logs/audit` accepts `exclude_target_types` (comma-separated) so pagination counts stay correct. ([#92](https://github.com/BuildBandits/frontdoor-oss/issues/92))
 
 ### Security

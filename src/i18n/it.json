@@ -1120,7 +1120,11 @@
       "graphHints": {
         "graph_group_member_read": "Verifica il permesso applicativo Microsoft Graph GroupMember.Read.All e concedi il consenso amministratore per leggere le membership dei gruppi con token app-only."
       },
-      "pageSummary": "Pagina {page} di {pages} · {total} gruppi"
+      "pageSummary": "Pagina {page} di {pages} · {total} gruppi",
+      "sourceFilter": "Origine",
+      "sourceAll": "Tutti",
+      "sourceLocal": "Locali",
+      "sourceEntra": "Microsoft Entra"
     },
     "users": {
       "title": "Utenti",

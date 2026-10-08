@@ -1120,7 +1120,11 @@
       "graphHints": {
         "graph_group_member_read": "Check the Microsoft Graph application permission GroupMember.Read.All and grant admin consent for app-only group membership reads."
       },
-      "pageSummary": "Page {page} of {pages} · {total} groups"
+      "pageSummary": "Page {page} of {pages} · {total} groups",
+      "sourceFilter": "Source",
+      "sourceAll": "All",
+      "sourceLocal": "Local",
+      "sourceEntra": "Microsoft Entra"
     },
     "users": {
       "title": "Users",
