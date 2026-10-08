@@ -149,7 +149,7 @@ function parseCsvList(value) {
     .filter(Boolean);
 }
 
-function buildAuditWhere({ action, target_type, actorIds, from, to, retentionDays, q }) {
+function buildAuditWhere({ action, target_type, excludeTargetTypes = [], actorIds, from, to, retentionDays, q }) {
   let where = `a.created_at >= datetime('now', ?)`;
   const params = [`-${retentionDays} days`];
 
@@ -160,6 +160,10 @@ function buildAuditWhere({ action, target_type, actorIds, from, to, retentionDay
   if (target_type) {
     where += ' AND a.target_type = ?';
     params.push(target_type);
+  }
+  if (excludeTargetTypes.length > 0) {
+    where += ` AND a.target_type NOT IN (${excludeTargetTypes.map(() => '?').join(', ')})`;
+    params.push(...excludeTargetTypes);
   }
   if (Array.isArray(actorIds) && actorIds.length > 0) {
     where += ` AND a.actor_id IN (${actorIds.map(() => '?').join(', ')})`;
@@ -248,8 +252,9 @@ function loadAuditLogs(req, res) {
   const { action, target_type, actor_id, actor_ids, from, to } = req.query;
   const q = parseSearch(req.query.q);
   const parsedActorIds = parseCsvList(actor_ids || actor_id);
+  const excludeTargetTypes = parseCsvList(req.query.exclude_target_types);
 
-  const { where, params } = buildAuditWhere({ action, target_type, actorIds: parsedActorIds, from, to, retentionDays, q });
+  const { where, params } = buildAuditWhere({ action, target_type, excludeTargetTypes, actorIds: parsedActorIds, from, to, retentionDays, q });
 
   const total = db.prepare(`SELECT COUNT(*) AS count FROM rbac_audit_logs a LEFT JOIN users u ON a.actor_id = u.id WHERE ${where}`).get(...params).count;
 

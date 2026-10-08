@@ -1438,7 +1438,9 @@
           "removed": "rimossa",
           "updated": "aggiornata"
         }
-      }
+      },
+      "showSignIns": "Mostra accessi",
+      "signInsHidden": "Gli accessi degli amministratori sono nascosti: usa \"Mostra accessi\" per includerli."
     }
   },
   "errors": {

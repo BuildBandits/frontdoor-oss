@@ -1438,7 +1438,9 @@
           "removed": "removed",
           "updated": "updated"
         }
-      }
+      },
+      "showSignIns": "Show sign-ins",
+      "signInsHidden": "Administrator sign-ins are hidden; use \"Show sign-ins\" to include them."
     }
   },
   "errors": {

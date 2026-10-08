@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+- **Sign-ins hidden in Audit**: administrator sign-in events are hidden by default on *Audit*, so the list shows actual changes; *Show sign-ins* brings them back and the choice is remembered in the browser. `GET /api/logs/audit` accepts `exclude_target_types` (comma-separated) so pagination counts stay correct. ([#92](https://github.com/BuildBandits/frontdoor-oss/issues/92))
+
 ### Security
 - **Icons and media served as images only**: app icons now accept only PNG, JPEG, GIF, WEBP, BMP, AVIF, ICO or (sanitized) SVG; other files are rejected with `icon_unsupported_type`. The media library takes the served type from the stored file's extension instead of the type recorded at upload, and sends anything that is not an image as a download. ([#77](https://github.com/BuildBandits/frontdoor-oss/issues/77))
 - **Cross-site requests refused**: API requests that change data with the session cookie must come from Frontdoor itself (`Sec-Fetch-Site: same-origin`) or from an origin in `FRONTEND_URL` / `CORS_ALLOWED_ORIGINS`; others get `403 cross_site_request`. Requests authenticated with a bearer token or an API key are not affected. Backup check and restore require a binary content type (`application/octet-stream` or gzip). ([#78](https://github.com/BuildBandits/frontdoor-oss/issues/78))

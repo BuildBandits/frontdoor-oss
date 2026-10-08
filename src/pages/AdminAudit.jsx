@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AlertCircle, Filter, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Filter, LogIn, ShieldCheck } from 'lucide-react';
 import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
 import AuditDetails from '../components/AuditDetails';
@@ -13,6 +13,24 @@ import { formatIsoDateTime } from '../utils/dateTime';
 import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
 const PRIVILEGED_ROLES = new Set(['owner', 'admin', 'admin_readonly']);
+const SIGN_IN_TARGET_TYPE = 'auth';
+const SHOW_SIGN_INS_KEY = 'frontdoor.audit.showSignIns';
+
+function readShowSignIns() {
+  try {
+    return window.localStorage.getItem(SHOW_SIGN_INS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeShowSignIns(value) {
+  try {
+    window.localStorage.setItem(SHOW_SIGN_INS_KEY, value ? '1' : '0');
+  } catch {
+    // Storage unavailable: the choice lasts for this page only.
+  }
+}
 
 export default function AdminAudit() {
   const { user } = useAuthStore();
@@ -27,6 +45,9 @@ export default function AdminAudit() {
   const [retentionDays, setRetentionDays] = useState(30);
   const [pageSize, setPageSize] = useState(50);
   const [selectedActorIds, setSelectedActorIds] = useState([]);
+  // Administrator sign-ins are hidden by default (they drown out the changes);
+  // the choice is remembered per browser.
+  const [showSignIns, setShowSignIns] = useState(() => readShowSignIns());
   const [brandingLanguage, setBrandingLanguage] = useState('en');
   const [brandingTimeZone, setBrandingTimeZone] = useState('UTC');
   const timeZone = resolveAppTimeZone(user?.preferredTimeZone, brandingTimeZone);
@@ -84,6 +105,7 @@ export default function AdminAudit() {
           retention_days: retentionDays,
           q: search,
           actor_ids: selectedActorIds.length > 0 ? selectedActorIds.join(',') : undefined,
+          exclude_target_types: showSignIns ? undefined : SIGN_IN_TARGET_TYPE,
         },
       });
       setLogs(res.data.logs);
@@ -94,11 +116,18 @@ export default function AdminAudit() {
       setRefs({});
     }
     setLoading(false);
-  }, [pageSize, retentionDays, search, selectedActorIds]);
+  }, [pageSize, retentionDays, search, selectedActorIds, showSignIns]);
 
   useEffect(() => {
     setPage(1);
-  }, [search, retentionDays, pageSize, selectedActorIds]);
+  }, [search, retentionDays, pageSize, selectedActorIds, showSignIns]);
+
+  const toggleShowSignIns = () => {
+    setShowSignIns((current) => {
+      writeShowSignIns(!current);
+      return !current;
+    });
+  };
 
   useEffect(() => { loadLogs(page); }, [loadLogs, page]);
 
@@ -168,6 +197,19 @@ export default function AdminAudit() {
             ]}
             className="min-w-[140px]"
           />
+          <button
+            type="button"
+            onClick={toggleShowSignIns}
+            aria-pressed={showSignIns}
+            className={`inline-flex h-12 items-center gap-2 rounded-xl border px-3 text-sm font-medium transition-colors ${
+              showSignIns
+                ? 'border-accent bg-accent/10 text-dark dark:text-gray-100'
+                : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+            }`}
+          >
+            <LogIn className="w-4 h-4" />
+            {ui.admin.audit.showSignIns}
+          </button>
         </div>
       </div>
 
@@ -183,6 +225,7 @@ export default function AdminAudit() {
             <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-40" />
             <p className="text-lg font-medium">{ui.admin.audit.emptyTitle}</p>
             <p className="text-sm mt-1">{ui.admin.audit.emptyBody}</p>
+            {!showSignIns && <p className="text-xs mt-2">{ui.admin.audit.signInsHidden}</p>}
           </div>
         ) : (
           <>
