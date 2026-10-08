@@ -16,6 +16,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **No personal data in server logs**: sign-ins and the startup owner promotion log the user ID only. ([#78](https://github.com/BuildBandits/frontdoor-oss/issues/78))
 
 ### Fixed
+- **Backups no longer block the database**: while a backup was being exported, sign-ins, access tracking and audit writes could fail (and audit or access rows were lost) because rows were streamed over the shared database connection. The export now reads from a separate read-only connection inside one transaction, so writes continue normally and every table in the archive comes from the same point in time. ([#79](https://github.com/BuildBandits/frontdoor-oss/issues/79))
 - **Unknown API routes** return a JSON `404 not_found` instead of the web app page. ([#78](https://github.com/BuildBandits/frontdoor-oss/issues/78))
 
 ## [1.3.2] — 2026-10-08
