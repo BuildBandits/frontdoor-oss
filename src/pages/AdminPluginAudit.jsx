@@ -3,9 +3,11 @@ import { ChevronLeft, ChevronRight, AlertCircle, Filter, PlugZap, ShieldCheck } 
 import { Link } from 'react-router';
 import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
+import AuditDetails from '../components/AuditDetails';
 import ClearableSearchField from '../components/ClearableSearchField';
 import { useAuthStore } from '../stores/authStore';
-import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { describeAuditLog } from '../utils/auditFormatters';
 import { formatDateTimeWithTimeZone } from '../utils/dateTime';
 import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
@@ -16,6 +18,7 @@ export default function AdminPluginAudit() {
   const { user } = useAuthStore();
   const periodOptions = [1, 7, 14, 30, 60, 90];
   const [logs, setLogs] = useState([]);
+  const [refs, setRefs] = useState({});
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [adminUsers, setAdminUsers] = useState([]);
@@ -87,9 +90,11 @@ export default function AdminPluginAudit() {
         },
       });
       setLogs(res.data.logs);
+      setRefs(res.data.refs || {});
       setPagination(res.data.pagination);
     } catch {
       setLogs([]);
+      setRefs({});
     }
     setLoading(false);
   }, [action, pageSize, retentionDays, search, selectedActorId]);
@@ -104,7 +109,7 @@ export default function AdminPluginAudit() {
     if (!iso) return '-';
     try {
       const formatted = formatDateTimeWithTimeZone(iso, {
-        locale: 'it-IT',
+        locale: ui.common.dateLocale,
         timeZone,
         dateOptions: {
           day: '2-digit',
@@ -121,32 +126,6 @@ export default function AdminPluginAudit() {
       return `${formatted.formattedDate} ${formatted.formattedTime}`;
     } catch {
       return iso;
-    }
-  };
-
-  const formatDetails = (details) => {
-    if (!details) return '-';
-    if (typeof details === 'string') {
-      try {
-        return JSON.parse(details);
-      } catch {
-        return details;
-      }
-    }
-    return details;
-  };
-
-  const renderDetails = (details) => {
-    const normalizedDetails = formatDetails(details);
-
-    if (typeof normalizedDetails === 'string') {
-      return normalizedDetails;
-    }
-
-    try {
-      return JSON.stringify(normalizedDetails, null, 2);
-    } catch {
-      return String(normalizedDetails);
     }
   };
 
@@ -285,12 +264,12 @@ export default function AdminPluginAudit() {
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.audit.admin}</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.audit.action}</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.pluginAudit.plugin}</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hidden lg:table-cell">{ui.admin.audit.details}</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.audit.details}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {logs.map((log) => (
-                    <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <tr key={log.id} className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 align-top">
                       <td className="px-5 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{log.created_at_local || formatDate(log.created_at)}</td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
@@ -323,10 +302,8 @@ export default function AdminPluginAudit() {
                           <span className="text-[11px] text-gray-400 dark:text-gray-500">{log.details?.name || log.details?.version || ui.admin.pluginAudit.pluginFallback}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-3 hidden lg:table-cell">
-                        <pre className="max-w-[420px] whitespace-pre-wrap wrap-break-word text-[11px] text-gray-500 dark:text-gray-400 font-mono">
-                          {renderDetails(log.details)}
-                        </pre>
+                      <td className="px-5 py-3 min-w-[280px]">
+                        <AuditDetails event={describeAuditLog(log, { ui, refs })} ui={ui} />
                       </td>
                     </tr>
                   ))}
@@ -337,10 +314,7 @@ export default function AdminPluginAudit() {
             {pagination.pages > 1 && (
               <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-gray-800">
                 <p className="text-xs text-gray-400 dark:text-gray-500">
-                  {ui.admin.pluginAudit.pageSummary
-                    .replace('{page}', pagination.page)
-                    .replace('{pages}', pagination.pages)
-                    .replace('{total}', pagination.total)}
+                  {formatMessage(ui.admin.pluginAudit.pageSummary, { page: pagination.page, pages: pagination.pages, total: pagination.total })}
                 </p>
                 <div className="flex items-center gap-1">
                   <button

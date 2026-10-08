@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { AlertCircle, Filter, ShieldCheck } from 'lucide-react';
 import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
+import AuditDetails from '../components/AuditDetails';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import PaginationControls from '../components/PaginationControls';
 import { useAuthStore } from '../stores/authStore';
-import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { describeAuditLog } from '../utils/auditFormatters';
 import { formatDateTimeWithTimeZone } from '../utils/dateTime';
 import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
@@ -16,6 +18,7 @@ export default function AdminAudit() {
   const { user } = useAuthStore();
   const periodOptions = [1, 7, 14, 30, 60, 90];
   const [logs, setLogs] = useState([]);
+  const [refs, setRefs] = useState({});
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [adminUsers, setAdminUsers] = useState([]);
@@ -84,9 +87,11 @@ export default function AdminAudit() {
         },
       });
       setLogs(res.data.logs);
+      setRefs(res.data.refs || {});
       setPagination(res.data.pagination);
     } catch {
       setLogs([]);
+      setRefs({});
     }
     setLoading(false);
   }, [pageSize, retentionDays, search, selectedActorIds]);
@@ -101,7 +106,7 @@ export default function AdminAudit() {
     if (!iso) return '-';
     try {
       const formatted = formatDateTimeWithTimeZone(iso, {
-        locale: 'it-IT',
+        locale: ui.common.dateLocale,
         timeZone,
         dateOptions: {
           day: '2-digit',
@@ -118,32 +123,6 @@ export default function AdminAudit() {
       return `${formatted.formattedDate} ${formatted.formattedTime}`;
     } catch {
       return iso;
-    }
-  };
-
-  const formatDetails = (details) => {
-    if (!details) return '-';
-    if (typeof details === 'string') {
-      try {
-        return JSON.parse(details);
-      } catch {
-        return details;
-      }
-    }
-    return details;
-  };
-
-  const renderDetails = (details) => {
-    const normalizedDetails = formatDetails(details);
-
-    if (typeof normalizedDetails === 'string') {
-      return normalizedDetails;
-    }
-
-    try {
-      return JSON.stringify(normalizedDetails, null, 2);
-    } catch {
-      return String(normalizedDetails);
     }
   };
 
@@ -233,7 +212,7 @@ export default function AdminAudit() {
               page={pagination.page}
               pages={pagination.pages}
               total={pagination.total}
-              summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} eventi totali`}
+              summary={formatMessage(ui.admin.audit.pageSummary, { page: pagination.page, pages: pagination.pages, total: pagination.total })}
               previousLabel={ui.common.previous}
               nextLabel={ui.common.next}
               onPrevious={() => setPage((p) => Math.max(1, p - 1))}
@@ -248,47 +227,56 @@ export default function AdminAudit() {
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.audit.admin}</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.audit.action}</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.audit.target}</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hidden lg:table-cell">{ui.admin.audit.details}</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.audit.details}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {logs.map((log) => (
-                    <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="px-5 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{log.created_at_local || formatDate(log.created_at)}</td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <UserAvatar
-                            userId={log.actor_id}
-                            displayName={log.actor_name}
-                            email={log.actor_email}
-                            avatarColor={null}
-                            className="w-6 h-6"
-                            initialsClassName="text-[10px]"
-                          />
-                          <div className="min-w-0">
-                            <p className="text-dark dark:text-gray-100 font-medium truncate text-xs">{log.actor_name || 'Utente rimosso'}</p>
-                            <p className="text-gray-400 dark:text-gray-500 truncate text-[11px]">{log.actor_email || '-'}</p>
+                  {logs.map((log) => {
+                    const event = describeAuditLog(log, { ui, refs });
+                    return (
+                      <tr key={log.id} className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 align-top">
+                        <td className="px-5 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{log.created_at_local || formatDate(log.created_at)}</td>
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <UserAvatar
+                              userId={log.actor_id}
+                              displayName={log.actor_name}
+                              email={log.actor_email}
+                              avatarColor={null}
+                              className="w-6 h-6"
+                              initialsClassName="text-[10px]"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-dark dark:text-gray-100 font-medium truncate text-xs">{log.actor_name || ui.admin.audit.removedUser}</p>
+                              <p className="text-gray-400 dark:text-gray-500 truncate text-[11px]">{log.actor_email || '-'}</p>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                          {log.action}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-dark dark:text-gray-100">{log.target_type}</span>
-                          <span className="text-[11px] text-gray-400 dark:text-gray-500 font-mono break-all">{log.target_id || '-'}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3 hidden lg:table-cell">
-                        <pre className="max-w-[420px] whitespace-pre-wrap wrap-break-word text-[11px] text-gray-500 dark:text-gray-400 font-mono">
-                          {renderDetails(log.details)}
-                        </pre>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-5 py-3">
+                          <span
+                            className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300"
+                            title={log.action}
+                          >
+                            {event.actionLabel}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3">
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500" title={log.target_type}>{event.targetTypeLabel}</span>
+                            {event.targetName && (
+                              <span className="text-xs font-medium text-dark dark:text-gray-100 break-words">{event.targetName}</span>
+                            )}
+                            {log.target_id && (
+                              <span className="text-[11px] text-gray-400 dark:text-gray-500 font-mono break-all">{log.target_id}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 min-w-[280px]">
+                          <AuditDetails event={event} ui={ui} />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -297,7 +285,7 @@ export default function AdminAudit() {
               page={pagination.page}
               pages={pagination.pages}
               total={pagination.total}
-              summary={`${pagination.page} / ${pagination.pages} · ${pagination.total} eventi totali`}
+              summary={formatMessage(ui.admin.audit.pageSummary, { page: pagination.page, pages: pagination.pages, total: pagination.total })}
               previousLabel={ui.common.previous}
               nextLabel={ui.common.next}
               onPrevious={() => setPage((p) => Math.max(1, p - 1))}

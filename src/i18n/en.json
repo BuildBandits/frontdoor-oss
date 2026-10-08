@@ -1170,7 +1170,219 @@
       "emptyTitle": "No audit logs",
       "emptyBody": "Audit rows are written when privileged users perform admin actions",
       "removedUser": "Removed user",
-      "pageSummary": "Page {page} of {pages} · {total} total events"
+      "pageSummary": "Page {page} of {pages} · {total} total events",
+      "copyJson": "Copy JSON",
+      "copyJsonHelp": "Copy the raw details of this event as JSON",
+      "copied": "Copied",
+      "copyFailed": "Copy failed",
+      "showRaw": "Show JSON",
+      "hideRaw": "Hide JSON",
+      "emptyValue": "—",
+      "unknownEntity": "deleted item ({id})",
+      "andMore": "and {count} more",
+      "actionLabels": {
+        "create": "Created",
+        "update": "Updated",
+        "delete": "Deleted",
+        "restore": "Restored",
+        "import": "Imported",
+        "sync": "Synced",
+        "refresh": "Maintenance",
+        "login": "Sign-in",
+        "activate": "Activated",
+        "deactivate": "Deactivated",
+        "approve": "Approved",
+        "revoke": "Revoked",
+        "add_members": "Members added",
+        "remove_member": "Member removed",
+        "add_apps": "Apps granted",
+        "remove_app": "App revoked",
+        "sync_apps": "Access updated",
+        "move_apps": "Apps moved",
+        "copy_apps": "Apps copied",
+        "add_linked_groups": "Groups linked",
+        "add_linked_entra_groups": "Entra groups linked",
+        "remove_linked_group": "Group unlinked",
+        "remove_linked_entra_group": "Entra group unlinked"
+      },
+      "targetLabels": {
+        "app": "App",
+        "group": "Group",
+        "membership": "Membership",
+        "permission": "App access",
+        "role": "Role",
+        "user_status": "User",
+        "branding": "Customization",
+        "auth": "Sign-in",
+        "plugin": "Plugin"
+      },
+      "events": {
+        "fallback": "{action}: {targetType} {target}",
+        "app": {
+          "create": "Created the app {target}",
+          "update": "Updated the app {target}",
+          "delete": "Deleted the app {target}",
+          "restore": "Restored the demo apps"
+        },
+        "group": {
+          "create": "Created the group {target}",
+          "update": "Updated the group {target}",
+          "delete": "Deleted the group {target}",
+          "import": "Imported {count} groups from Microsoft Entra",
+          "sync": "Synced users and groups from Microsoft Entra",
+          "add_linked_groups": "Linked {count} groups to {target}",
+          "add_linked_entra_groups": "Linked {count} Entra groups to {target}",
+          "remove_linked_group": "Unlinked the group {item} from {target}",
+          "remove_linked_entra_group": "Unlinked the Entra group {item} from {target}",
+          "import_one": "Imported 1 group from Microsoft Entra",
+          "add_linked_groups_one": "Linked 1 group to {target}",
+          "add_linked_entra_groups_one": "Linked 1 Entra group to {target}"
+        },
+        "membership": {
+          "add_members": "Added {count} members to {target}",
+          "remove_member": "Removed {item} from {target}",
+          "add_members_one": "Added 1 member to {target}"
+        },
+        "permission": {
+          "add_apps": "Gave {target} access to {count} apps",
+          "remove_app": "Removed access to {item} from {target}",
+          "sync_apps": "Changed which groups can open {target}",
+          "move_apps": "Moved {count} apps from {target} to {item}",
+          "copy_apps": "Copied {count} apps from {target} to {item}",
+          "add_apps_one": "Gave {target} access to 1 app",
+          "move_apps_one": "Moved 1 app from {target} to {item}",
+          "copy_apps_one": "Copied 1 app from {target} to {item}"
+        },
+        "role": {
+          "update": "Changed the role of {target}"
+        },
+        "user_status": {
+          "activate": "Reactivated {target}",
+          "deactivate": "Deactivated {target}",
+          "delete": "Deleted the user {target}"
+        },
+        "auth": {
+          "login": "Signed in"
+        },
+        "branding": {
+          "update": "Updated the customization settings",
+          "refreshAvatars": "Cleared the avatar cache",
+          "refreshAppIcons": "Cleaned up the app icon cache",
+          "compactDatabase": "Compacted the database"
+        },
+        "plugin": {
+          "approve": "Approved the plugin {target}",
+          "revoke": "Revoked the approval of the plugin {target}"
+        }
+      },
+      "fields": {
+        "name": "Name",
+        "slug": "Slug",
+        "description": "Description",
+        "long_description": "Long description",
+        "target_url": "URL",
+        "is_active": "Active",
+        "sort_order": "Order",
+        "mode": "Mode",
+        "sso_endpoint": "SSO endpoint",
+        "sso_method": "SSO method",
+        "tags": "Tags",
+        "icon": "Icon",
+        "role": "Role",
+        "value": "Value",
+        "email": "Email",
+        "reason": "Reason",
+        "bulk": "Bulk action",
+        "added": "Added",
+        "removed": "Removed",
+        "addedCount": "Added",
+        "removedCount": "Removed",
+        "sourceCount": "Apps in source group",
+        "userIds": "Users",
+        "userId": "User",
+        "appIds": "Apps",
+        "appId": "App",
+        "groupIds": "Groups",
+        "childGroupIds": "Linked groups",
+        "childGroupId": "Linked group",
+        "entraGroupIds": "Entra groups",
+        "entraGroupId": "Entra group",
+        "targetGroupId": "Target group",
+        "importedGroups": "Imported groups",
+        "skippedGroups": "Skipped groups",
+        "usersSynced": "Users synced",
+        "usersConsidered": "Users checked",
+        "usersNotFound": "Users not found in Entra",
+        "usersDeactivated": "Users deactivated",
+        "discoveredGroups": "Groups discovered",
+        "errors": "Errors",
+        "removedFiles": "Files removed",
+        "removedBytes": "Bytes freed",
+        "reclaimedBytes": "Bytes reclaimed",
+        "reclaimedPages": "Pages reclaimed",
+        "scope": "Scope",
+        "version": "Version",
+        "source": "Source",
+        "approved": "Approved",
+        "restored": "Restored",
+        "created": "Created",
+        "updated": "Updated",
+        "logo": "Logo",
+        "heroTitleLine1": "Home title, line 1",
+        "heroTitleLine2": "Home title, line 2",
+        "heroSubtitle": "Home subtitle",
+        "heroTitleLine1I18n": "Home title, line 1 (translations)",
+        "heroTitleLine2I18n": "Home title, line 2 (translations)",
+        "heroSubtitleI18n": "Home subtitle (translations)",
+        "showHomeHero": "Show the Home header",
+        "hideHomeHeroOnMobile": "Hide the Home header on mobile",
+        "showAppModeBadges": "Show app mode badges",
+        "defaultHomeDesktopView": "Default Home view",
+        "defaultCompactView": "Default compact view",
+        "defaultLanguage": "Default language",
+        "defaultColorScheme": "Default theme",
+        "defaultTimeZone": "Default time zone",
+        "enableDarkModeBeta": "Dark mode (beta)",
+        "useEuropeanDateFormat": "European date format",
+        "use24hTimeFormat": "24-hour time",
+        "logRetentionDays": "Log retention (days)",
+        "hideLoginPage": "Hide the login page",
+        "showSharedCookieMode": "Shared cookie mode",
+        "showRedirectSsoMode": "Redirect SSO mode",
+        "showEntraAppMode": "Entra app mode",
+        "pluginsEnabled": "Plugins",
+        "iconImage": "Icon image"
+      },
+      "values": {
+        "role": {
+          "owner": "Owner",
+          "admin": "Admin",
+          "admin_readonly": "Admin (read-only)",
+          "user": "User"
+        },
+        "mode": {
+          "redirect": "Redirect SSO",
+          "redirect-plain": "Link",
+          "internal-link": "Internal link",
+          "shared-cookie": "Shared cookie",
+          "entra-app": "Entra app"
+        },
+        "reason": {
+          "not_found_in_entra": "Not found in Microsoft Entra"
+        },
+        "logo": {
+          "present": "present",
+          "not set": "not set",
+          "removed": "removed",
+          "updated": "updated"
+        },
+        "iconImage": {
+          "present": "present",
+          "not set": "not set",
+          "removed": "removed",
+          "updated": "updated"
+        }
+      }
     }
   }
 }
