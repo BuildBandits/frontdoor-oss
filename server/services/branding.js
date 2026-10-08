@@ -9,6 +9,7 @@ import { DEFAULT_TIME_ZONE, normalizeTimeZone } from '../../shared/timeZones.js'
 import { archiveMediaAsset } from './mediaAssets.js';
 import { applySvgSafeHeaders, isSvgContentType, sanitizeSvgBuffer } from './svgSanitize.js';
 import { UserFacingError } from './errors.js';
+import { MAX_RASTER_LOGO_BYTES, MAX_SVG_ICON_BYTES, estimateDataUrlBytes } from '../../shared/iconLimits.js';
 
 const BRANDING_ID = 'default';
 // path.resolve() normalizes a relative env value to an absolute path so
@@ -175,6 +176,17 @@ function buildBrandingAuditDetails(currentRow, nextBranding, input = {}) {
 function parseLogoDataUrl(dataUrl) {
   if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
     throw new UserFacingError('logo must be a base64 data URL', { code: 'logo_invalid_data_url' });
+  }
+
+  // Checked before decoding or parsing; SVG logos are sanitized like icons, so they get the same lower limit.
+  const isSvg = /^data:image\/svg\+xml/i.test(dataUrl);
+  const limit = isSvg ? MAX_SVG_ICON_BYTES : MAX_RASTER_LOGO_BYTES;
+  if (estimateDataUrlBytes(dataUrl) > limit) {
+    throw new UserFacingError(`logo is larger than ${Math.round(limit / 1024)} KB`, {
+      statusCode: 413,
+      code: 'logo_too_large',
+      details: { maxBytes: limit },
+    });
   }
 
   const match = dataUrl.match(/^data:(image\/(?:png|jpeg|jpg|webp|gif|svg\+xml));base64,(.+)$/i);

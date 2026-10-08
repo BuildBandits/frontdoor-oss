@@ -283,7 +283,7 @@
       "appIconCacheReloadNotice": "Current icons stay in place; only unreferenced files were removed.",
       "cacheFiles": "files",
       "cacheOrphans": "orphans",
-      "logoTooLarge": "The logo must be at most 2 MB.",
+      "logoTooLarge": "The logo is too large: images up to 2 MB, SVG up to 512 KB.",
       "assetFileHint": "PNG, JPG, WEBP, GIF or SVG. Max 2 MB.",
       "logRetentionNextCleanup": "The new log retention will apply on the next cleanup cycle."
     },
@@ -902,7 +902,8 @@
       "useExistingTag": "Use existing tag",
       "goToGroupsSearch": "Go to Groups management with prefilled search",
       "pageSummary": "Page {page} of {pages} · {total} apps",
-      "skipGroupAssignment": "Skip"
+      "skipGroupAssignment": "Skip",
+      "iconTooLarge": "The icon is too large: images up to 1 MB, SVG up to 512 KB."
     },
     "icons": {
       "pageTitle": "Media library",
@@ -1516,6 +1517,7 @@
     "group_name_too_short": "The group name must be at least 2 characters long.",
     "group_not_found": "Group not found.",
     "groups_not_found": "One or more groups were not found.",
+    "icon_too_large": "The icon is too large: images up to 1 MB, SVG up to 512 KB.",
     "icon_unsupported_type": "The icon must be a PNG, JPEG, GIF, WEBP, BMP, AVIF, ICO or SVG image.",
     "insufficient_permissions": "You do not have permission to do this.",
     "internal_server_error": "Something went wrong on the server. Try again.",
@@ -1542,6 +1544,7 @@
     "logo_empty": "The logo image is empty.",
     "logo_invalid_data_url": "The logo must be an image data URL.",
     "logo_invalid_svg": "The logo SVG is not valid.",
+    "logo_too_large": "The logo is too large: images up to 2 MB, SVG up to 512 KB.",
     "logo_unsupported_type": "The logo must be a PNG, JPEG, WEBP, GIF or SVG image.",
     "media_asset_in_use": "This file is still used by an app or by the branding settings.",
     "media_asset_not_found": "Media file not found.",

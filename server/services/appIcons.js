@@ -7,6 +7,18 @@ import { archiveMediaAsset } from './mediaAssets.js';
 import { applySvgSafeHeaders, isSvgBuffer, isSvgContentType, sanitizeSvgBuffer } from './svgSanitize.js';
 import { UserFacingError } from './errors.js';
 import { RASTER_ICON_TYPES, normalizeImageContentType } from './imageTypes.js';
+import { MAX_RASTER_ICON_BYTES, MAX_SVG_ICON_BYTES, estimateDataUrlBytes } from '../../shared/iconLimits.js';
+
+function assertIconSize(bytes, { svg }) {
+  const limit = svg ? MAX_SVG_ICON_BYTES : MAX_RASTER_ICON_BYTES;
+  if (bytes > limit) {
+    throw new UserFacingError(`icon is larger than ${Math.round(limit / 1024)} KB`, {
+      statusCode: 413,
+      code: 'icon_too_large',
+      details: { maxBytes: limit },
+    });
+  }
+}
 
 // path.resolve() normalizes a relative env value (e.g. "./data/app-icon-cache")
 // to an absolute path so res.sendFile() in serveAppIconForApp does not reject it.
@@ -158,6 +170,7 @@ export async function readAppIconAssetDataUrl(app, { cacheDir = DEFAULT_CACHE_DI
 export function parseAppIconPayload({ iconDataUrl, iconSvgText }) {
   const svgText = typeof iconSvgText === 'string' ? iconSvgText.trim() : '';
   if (/<svg[\s>]/i.test(svgText)) {
+    assertIconSize(Buffer.byteLength(svgText, 'utf8'), { svg: true });
     const sanitized = sanitizeSvgBuffer(Buffer.from(svgText, 'utf8'));
     if (!sanitized) return null;
     return {
@@ -166,9 +179,12 @@ export function parseAppIconPayload({ iconDataUrl, iconSvgText }) {
     };
   }
 
+  // Size is checked from the data URL length before decoding anything.
+  assertIconSize(estimateDataUrlBytes(iconDataUrl), { svg: false });
   const parsed = parseDataUrl(iconDataUrl);
   if (parsed?.buffer) {
     if (isSvgContentType(parsed.contentType) || isSvgBuffer(parsed.buffer)) {
+      assertIconSize(parsed.buffer.length, { svg: true });
       const sanitized = sanitizeSvgBuffer(parsed.buffer);
       if (!sanitized) return null;
       return {

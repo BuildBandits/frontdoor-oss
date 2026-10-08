@@ -10,6 +10,7 @@ import { apiErrorMessage } from '../utils/apiErrors';
 import { getSupportedTimeZoneOptions, normalizeTimeZone } from '../../shared/timeZones.js';
 import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
+import { MAX_RASTER_LOGO_BYTES, MAX_SVG_ICON_BYTES } from '../../shared/iconLimits.js';
 
 // Hero texts default to the translated Home copy (see emptyBrandingFor).
 const emptyBranding = {
@@ -334,7 +335,8 @@ export default function Customization() {
     if (!file) return;
     setBrandingLogoFileName(file.name);
 
-    if (file.size > 2 * 1024 * 1024) {
+    const isSvg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name);
+    if (file.size > (isSvg ? MAX_SVG_ICON_BYTES : MAX_RASTER_LOGO_BYTES)) {
       pushNotice('error', ui.customization.preferences.logoTooLarge);
       setBrandingLogoFileName('');
       event.target.value = '';
