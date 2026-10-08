@@ -7,11 +7,16 @@
 .env.*
 coverage
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
 *.key
 *.log
 *.pem
+data
 dist
+docs
+security
 LICENSE
-LOOP_CHANGELOG.md
 node_modules
 test
