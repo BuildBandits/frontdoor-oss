@@ -57,8 +57,10 @@ export default function Layout({ children }) {
   const showHomeNav = role !== 'user';
   const showLogoutAction = !hideLoginPage;
 
-  const handleLogout = () => {
-    logout();
+  // Wait for the server to clear the session cookie before leaving the page,
+  // otherwise the navigation can cancel the request and the session survives.
+  const handleLogout = async () => {
+    await logout();
     window.location.href = '/login';
   };
 

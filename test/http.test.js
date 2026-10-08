@@ -21,7 +21,7 @@ function createUser(role) {
   const id = `http-test-${role}`;
   db.prepare('INSERT OR REPLACE INTO users (id, email, display_name, role, is_active) VALUES (?, ?, ?, ?, 1)')
     .run(id, `${role}@http-test.local`, `HTTP ${role}`, role);
-  tokens[role] = jwt.sign({ userId: id }, process.env.JWT_SECRET, { expiresIn: '5m' });
+  tokens[role] = jwt.sign({ userId: id }, process.env.JWT_SECRET, { expiresIn: '5m', issuer: 'frontdoor' });
   return id;
 }
 

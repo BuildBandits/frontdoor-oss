@@ -22,7 +22,7 @@ let token;
 before(async () => {
   db.prepare('INSERT OR REPLACE INTO users (id, email, display_name, role, is_active) VALUES (?, ?, ?, ?, 1)')
     .run(USER_ID, 'minimal@writes.local', 'Minimal Writes', 'user');
-  token = jwt.sign({ userId: USER_ID }, process.env.JWT_SECRET, { expiresIn: '5m' });
+  token = jwt.sign({ userId: USER_ID }, process.env.JWT_SECRET, { expiresIn: '5m', issuer: 'frontdoor' });
   server = createApp().listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;

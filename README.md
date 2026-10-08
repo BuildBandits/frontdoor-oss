@@ -442,6 +442,8 @@ Apps in the catalog can pick one of three patterns to consume frontdoor authenti
 | **Redirect with shared secret** (`mode=redirect`, classic) | Satellite on a different domain, operated by the same team. | Receive the short-lived token via GET query string or POST form, verify it locally with the shared `JWT_SECRET`. |
 | **Redirect with introspection** (`mode=redirect`, A.3) | Satellite on a different domain that should NOT hold the frontdoor secret (third-party, lower-trust environment, blast-radius reduction). | Receive the short-lived token, then POST it to `/api/auth/verify-sso-token` together with its own slug as `expected_aud`. No shared secret. |
 
+An app that holds `JWT_SECRET` can verify Frontdoor tokens but could also sign them, including session tokens. Share the secret only with fully trusted apps; use introspection for the others. Frontdoor accepts as sessions only tokens signed with HS256, carrying its issuer (`JWT_ISSUER`, default `frontdoor`) and no audience.
+
 #### `POST /api/auth/verify-sso-token`
 
 Server-to-server token introspection (RFC 7662-inspired, scoped to this flow). The frontdoor verifies signature, expiration, issuer (`JWT_ISSUER` or `frontdoor`), audience match, user activation and app activation in one shot. Authorization to call the endpoint is implicit in possessing a valid token for the requested `expected_aud`; no API key needed.

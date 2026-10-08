@@ -18,7 +18,15 @@ export const authenticate = (req, res, next) => {
       return res.status(401).json({ error: 'No token provided', code: 'not_authenticated' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Session tokens only: HS256, Frontdoor issuer, and no audience (tokens with an
+    // audience are short-lived SSO tokens meant for a single app).
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+      algorithms: ['HS256'],
+      issuer: process.env.JWT_ISSUER || 'frontdoor',
+    });
+    if (decoded.aud !== undefined || !decoded.userId) {
+      return res.status(401).json({ error: 'Invalid token', code: 'invalid_token' });
+    }
 
     const user = db
       .prepare(`

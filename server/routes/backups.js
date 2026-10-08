@@ -219,8 +219,20 @@ router.get('/export-jobs/:jobId/file', authenticate, isOwner, async (req, res) =
   });
 });
 
+// Archives are uploaded as raw bytes with a binary content type. Text, form and
+// untyped bodies are refused: those are the ones a cross-site page can send
+// without a CORS preflight.
+const BACKUP_UPLOAD_TYPES = ['application/octet-stream', 'application/gzip', 'application/x-gzip'];
+
+function requireBinaryUpload(req, res, next) {
+  if (!req.is(BACKUP_UPLOAD_TYPES)) {
+    return res.status(415).json({ error: 'Backup uploads must be sent with a binary content type (application/octet-stream)', code: 'backup_upload_content_type' });
+  }
+  return next();
+}
+
 // Dry run: describe what a restore would do without changing anything.
-router.post('/verify', authenticate, isOwner, async (req, res) => {
+router.post('/verify', authenticate, isOwner, requireBinaryUpload, async (req, res) => {
   let uploadPath = null;
   try {
     uploadPath = await receiveUpload(req);
@@ -233,7 +245,7 @@ router.post('/verify', authenticate, isOwner, async (req, res) => {
   }
 });
 
-router.post('/restore', authenticate, isOwner, async (req, res) => {
+router.post('/restore', authenticate, isOwner, requireBinaryUpload, async (req, res) => {
   let uploadPath = null;
   try {
     uploadPath = await receiveUpload(req);

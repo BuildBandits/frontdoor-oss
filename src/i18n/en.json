@@ -62,7 +62,8 @@
       "sso_init_failed": "Microsoft connection failed. Try again.",
       "invalid_state": "Session expired. Try again.",
       "account_disabled": "Your Frontdoor account is disabled. Contact your administrator.",
-      "generic": "An error occurred. Try again."
+      "generic": "An error occurred. Try again.",
+      "account_conflict": "This email is already linked to another Microsoft account. Contact your administrator."
     }
   },
   "home": {
@@ -1464,12 +1465,14 @@
     "backup_passphrase_required": "This backup is encrypted: enter its passphrase.",
     "backup_passphrase_too_short": "The backup passphrase must be at least {minLength} characters long.",
     "backup_too_large": "The backup file is too large.",
+    "backup_upload_content_type": "The backup file could not be uploaded. Reload the page and try again.",
     "backup_version_unsupported": "This backup version is not supported.",
     "cannot_deactivate_self": "You cannot deactivate yourself.",
     "cannot_delete_self": "You cannot delete yourself.",
     "compose_owner_change": "The Compose owner cannot be changed from the web app.",
     "compose_owner_deactivate": "The Compose owner cannot be deactivated from the web app.",
     "compose_owner_delete": "The Compose owner cannot be deleted from the web app.",
+    "cross_site_request": "This request was refused because it did not come from Frontdoor. Reload the page and try again.",
     "default_group_delete": "The default group cannot be deleted.",
     "default_group_link": "Groups cannot be linked to the default group.",
     "default_group_rename": "The default group cannot be renamed.",
@@ -1545,6 +1548,7 @@
     "membership_not_found": "Membership not found.",
     "no_preference_updates": "No preference changes were provided.",
     "not_authenticated": "You are not signed in.",
+    "not_found": "Not found.",
     "owner_assignment_forbidden": "The owner role can only be assigned from the server configuration.",
     "permission_not_found": "Permission not found.",
     "plugin_archive_empty_archive": "The plugin archive is empty.",

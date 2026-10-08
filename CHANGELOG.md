@@ -8,6 +8,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Security
 - **Icons and media served as images only**: app icons now accept only PNG, JPEG, GIF, WEBP, BMP, AVIF, ICO or (sanitized) SVG; other files are rejected with `icon_unsupported_type`. The media library takes the served type from the stored file's extension instead of the type recorded at upload, and sends anything that is not an image as a download. ([#77](https://github.com/BuildBandits/frontdoor-oss/issues/77))
+- **Cross-site requests refused**: API requests that change data with the session cookie must come from Frontdoor itself (`Sec-Fetch-Site: same-origin`) or from an origin in `FRONTEND_URL` / `CORS_ALLOWED_ORIGINS`; others get `403 cross_site_request`. Requests authenticated with a bearer token or an API key are not affected. Backup check and restore require a binary content type (`application/octet-stream` or gzip). ([#78](https://github.com/BuildBandits/frontdoor-oss/issues/78))
+- **Stricter session tokens**: API sessions accept only HS256 tokens with the Frontdoor issuer and no audience, so short-lived SSO tokens for apps cannot be used as sessions. Existing sessions keep working. ([#78](https://github.com/BuildBandits/frontdoor-oss/issues/78))
+- **Safer account linking at sign-in**: a Microsoft sign-in is linked to an existing account by email only when that account has no Microsoft identity yet, or when its previous identity no longer exists in Microsoft Entra; otherwise the sign-in is refused with *account_conflict*. When `AZURE_TENANT_ID` is a tenant ID, tokens from other tenants are refused. ([#78](https://github.com/BuildBandits/frontdoor-oss/issues/78))
+- **Logout always clears the session**: the page waits for the server to clear the cookie before going to the login page. ([#78](https://github.com/BuildBandits/frontdoor-oss/issues/78))
+- **No personal data in server logs**: sign-ins and the startup owner promotion log the user ID only. ([#78](https://github.com/BuildBandits/frontdoor-oss/issues/78))
+
+### Fixed
+- **Unknown API routes** return a JSON `404 not_found` instead of the web app page. ([#78](https://github.com/BuildBandits/frontdoor-oss/issues/78))
 
 ## [1.3.2] — 2026-10-08
 

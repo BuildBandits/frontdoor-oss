@@ -23,7 +23,7 @@ export const useAuthStore = create((set, get) => ({
 
   logout: async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include', keepalive: true });
     } catch {
       // Continue logout even if API call fails
     }
