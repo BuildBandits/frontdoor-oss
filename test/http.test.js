@@ -93,11 +93,11 @@ test('malformed JSON body is rejected with 400', async () => {
 test('protected routes require a valid token', async () => {
   const missing = await request('/api/users');
   assert.equal(missing.status, 401);
-  assert.deepEqual(await missing.json(), { error: 'No token provided' });
+  assert.deepEqual(await missing.json(), { error: 'No token provided', code: 'not_authenticated' });
 
   const invalid = await request('/api/users', { headers: { Authorization: 'Bearer not-a-jwt' } });
   assert.equal(invalid.status, 401);
-  assert.deepEqual(await invalid.json(), { error: 'Invalid token' });
+  assert.deepEqual(await invalid.json(), { error: 'Invalid token', code: 'invalid_token' });
 
   const cookie = await request('/api/users', { headers: { Cookie: `frontdoor_token=${tokens.owner}` } });
   assert.equal(cookie.status, 200);
@@ -162,7 +162,7 @@ test('plugin routes answer 404, not 500, for malformed plugin ids', async () => 
     for (const [method, pathname] of cases) {
       const res = await request(pathname, { role: 'owner', method, headers: json, body: method === 'GET' ? undefined : '{}' });
       assert.equal(res.status, 404, `${method} ${pathname}`);
-      assert.deepEqual(await res.json(), { error: 'Plugin not found' }, `${method} ${pathname}`);
+      assert.deepEqual(await res.json(), { error: 'Plugin not found', code: 'plugin_not_found' }, `${method} ${pathname}`);
     }
   } finally {
     db.prepare("UPDATE branding_settings SET plugins_enabled = 0 WHERE id = 'default'").run();
@@ -173,7 +173,7 @@ test('SSO init reports 501 when Microsoft SSO is not configured', async () => {
   // The MSAL client is built at import time from AZURE_* env vars, which tests do not set.
   const res = await request('/api/auth/microsoft');
   assert.equal(res.status, 501);
-  assert.deepEqual(await res.json(), { error: 'Microsoft SSO not configured' });
+  assert.deepEqual(await res.json(), { error: 'Microsoft SSO not configured', code: 'sso_not_configured' });
 });
 
 test('backup verify describes an archive for owners only and changes nothing', async () => {

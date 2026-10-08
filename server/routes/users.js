@@ -71,13 +71,13 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
   if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+    return res.status(404).json({ error: 'User not found', code: 'user_not_found' });
   }
 
   if (Object.prototype.hasOwnProperty.call(req.body, 'homeDesktopView')) {
     const { homeDesktopView } = req.body;
     if (homeDesktopView !== null && !['cards', 'compact'].includes(homeDesktopView)) {
-      return res.status(400).json({ error: 'homeDesktopView must be cards, compact, or null' });
+      return res.status(400).json({ error: 'homeDesktopView must be cards, compact, or null', code: 'invalid_home_view' });
     }
     updates.push('home_desktop_view = ?');
     values.push(homeDesktopView);
@@ -86,7 +86,7 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredLanguage')) {
     const { preferredLanguage } = req.body;
     if (preferredLanguage !== null && !isSupportedLanguage(preferredLanguage)) {
-      return res.status(400).json({ error: 'preferredLanguage must be a supported language or null' });
+      return res.status(400).json({ error: 'preferredLanguage must be a supported language or null', code: 'invalid_language' });
     }
     updates.push('preferred_language = ?');
     values.push(preferredLanguage);
@@ -95,7 +95,7 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredTimeZone')) {
     const { preferredTimeZone } = req.body;
     if (preferredTimeZone !== null && !isSupportedTimeZone(preferredTimeZone)) {
-      return res.status(400).json({ error: 'preferredTimeZone must be a supported time zone or null' });
+      return res.status(400).json({ error: 'preferredTimeZone must be a supported time zone or null', code: 'invalid_time_zone' });
     }
     updates.push('preferred_timezone = ?');
     values.push(normalizeOptionalTimeZone(preferredTimeZone));
@@ -104,7 +104,7 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body, 'preferredColorScheme')) {
     const { preferredColorScheme } = req.body;
     if (preferredColorScheme !== null && !isSupportedColorScheme(preferredColorScheme)) {
-      return res.status(400).json({ error: 'preferredColorScheme must be light, dark, auto, or null' });
+      return res.status(400).json({ error: 'preferredColorScheme must be light, dark, auto, or null', code: 'invalid_color_scheme' });
     }
     updates.push('preferred_color_scheme = ?');
     values.push(normalizeOptionalColorScheme(preferredColorScheme));
@@ -113,7 +113,7 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body, 'appOrder')) {
     const { appOrder } = req.body;
     if (appOrder !== null && !Array.isArray(appOrder)) {
-      return res.status(400).json({ error: 'appOrder must be an array or null' });
+      return res.status(400).json({ error: 'appOrder must be an array or null', code: 'invalid_app_order' });
     }
     if (Array.isArray(appOrder)) {
       const normalized = [...new Set(appOrder.filter((item) => typeof item === 'string' && item.trim()))];
@@ -132,7 +132,7 @@ router.put('/:id/preferences', authenticate, isAdminEditor, (req, res) => {
   }
 
   if (updates.length === 0) {
-    return res.status(400).json({ error: 'No preference updates provided' });
+    return res.status(400).json({ error: 'No preference updates provided', code: 'no_preference_updates' });
   }
 
   db.prepare(
@@ -151,7 +151,7 @@ router.get('/:id', authenticate, isAdminViewer, (req, res) => {
     .prepare('SELECT id, email, display_name, role, avatar_color, home_desktop_view, preferred_language, preferred_timezone, preferred_color_scheme, app_order, app_order_updated_at, favorite_apps, favorite_apps_updated_at, home_tour_seen_at, is_active, entra_missing_since, last_login, last_activity_at, created_at FROM users WHERE id = ?')
     .get(req.params.id);
 
-  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (!user) return res.status(404).json({ error: 'User not found', code: 'user_not_found' });
 
   const groups = db.prepare(`
     WITH RECURSIVE effective_groups(group_id) AS (
@@ -230,24 +230,24 @@ router.put('/:id/role', authenticate, isAdminEditor, (req, res) => {
   const normalizedRole = role === 'superadmin' ? 'owner' : role;
 
   if (!['owner', 'admin', 'admin_readonly', 'user'].includes(normalizedRole)) {
-    return res.status(400).json({ error: 'role must be owner, admin, admin_readonly or user' });
+    return res.status(400).json({ error: 'role must be owner, admin, admin_readonly or user', code: 'invalid_role' });
   }
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
   if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+    return res.status(404).json({ error: 'User not found', code: 'user_not_found' });
   }
 
   if (isComposeLockedAdmin(user.email) && normalizedRole !== ROLE_OWNER) {
-    return res.status(400).json({ error: 'Compose owner cannot be changed from the webapp' });
+    return res.status(400).json({ error: 'Compose owner cannot be changed from the webapp', code: 'compose_owner_change' });
   }
 
   if (normalizedRole === ROLE_OWNER && !isComposeLockedAdmin(user.email)) {
-    return res.status(400).json({ error: 'Owner can only be assigned from compose/run' });
+    return res.status(400).json({ error: 'Owner can only be assigned from compose/run', code: 'owner_assignment_forbidden' });
   }
 
   if (isEditorRole(user.role) && !isEditorRole(normalizedRole) && remainingEditorCountExcluding(id) === 0) {
-    return res.status(400).json({ error: 'Cannot remove the last active admin editor' });
+    return res.status(400).json({ error: 'Cannot remove the last active admin editor', code: 'last_admin_editor_remove' });
   }
 
   db.prepare('UPDATE users SET role = ?, updated_at = datetime(\'now\') WHERE id = ?').run(normalizedRole, id);
@@ -261,28 +261,28 @@ router.put('/:id/active', authenticate, isAdminEditor, (req, res) => {
   const { is_active } = req.body;
 
   if (![0, 1, true, false].includes(is_active)) {
-    return res.status(400).json({ error: 'is_active must be 0, 1, true, or false' });
+    return res.status(400).json({ error: 'is_active must be 0, 1, true, or false', code: 'invalid_is_active' });
   }
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
   if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+    return res.status(404).json({ error: 'User not found', code: 'user_not_found' });
   }
 
   const activeValue = is_active ? 1 : 0;
 
   if (isComposeLockedAdmin(user.email) && !activeValue) {
-    return res.status(400).json({ error: 'Compose owner cannot be deactivated from the webapp' });
+    return res.status(400).json({ error: 'Compose owner cannot be deactivated from the webapp', code: 'compose_owner_deactivate' });
   }
 
   // Prevent deactivating yourself
   if (id === req.user.id && !is_active) {
-    return res.status(400).json({ error: 'Cannot deactivate yourself' });
+    return res.status(400).json({ error: 'Cannot deactivate yourself', code: 'cannot_deactivate_self' });
   }
 
   // Prevent deactivating the last active admin editor
   if (!activeValue && isEditorRole(user.role) && remainingEditorCountExcluding(id) === 0) {
-    return res.status(400).json({ error: 'Cannot deactivate the last active admin editor' });
+    return res.status(400).json({ error: 'Cannot deactivate the last active admin editor', code: 'last_admin_editor_deactivate' });
   }
 
   // Reactivating clears the "not found in Entra" mark; the next force sync sets it again if the user is still missing.
@@ -301,21 +301,21 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
   if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+    return res.status(404).json({ error: 'User not found', code: 'user_not_found' });
   }
 
   // Prevent deleting yourself
   if (id === req.user.id) {
-    return res.status(400).json({ error: 'Cannot delete yourself' });
+    return res.status(400).json({ error: 'Cannot delete yourself', code: 'cannot_delete_self' });
   }
 
   if (isComposeLockedAdmin(user.email)) {
-    return res.status(400).json({ error: 'Compose owner cannot be deleted from the webapp' });
+    return res.status(400).json({ error: 'Compose owner cannot be deleted from the webapp', code: 'compose_owner_delete' });
   }
 
   // Prevent deleting the last active admin editor
   if (isEditorRole(user.role) && remainingEditorCountExcluding(id) === 0) {
-    return res.status(400).json({ error: 'Cannot delete the last active admin editor' });
+    return res.status(400).json({ error: 'Cannot delete the last active admin editor', code: 'last_admin_editor_delete' });
   }
 
   const deleteAll = db.transaction(() => {

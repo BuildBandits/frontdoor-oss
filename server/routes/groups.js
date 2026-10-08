@@ -17,12 +17,13 @@ function sanitizeName(name) {
   return name.replace(/<[^>]*>/g, '').trim().slice(0, 100);
 }
 
+// Returns { error, code } for an invalid group name, or null when the name is valid.
 function validateGroupName(name) {
-  if (!name || !name.trim()) return 'name is required';
+  if (!name || !name.trim()) return { error: 'name is required', code: 'group_name_required' };
   const clean = sanitizeName(name);
-  if (clean.length < 2) return 'name must be at least 2 characters';
-  if (clean.length > 100) return 'name must be 100 characters or less';
-  if (/[<>"'&]/.test(clean)) return 'name contains invalid characters';
+  if (clean.length < 2) return { error: 'name must be at least 2 characters', code: 'group_name_too_short' };
+  if (clean.length > 100) return { error: 'name must be 100 characters or less', code: 'group_name_too_long' };
+  if (/[<>"'&]/.test(clean)) return { error: 'name contains invalid characters', code: 'group_name_invalid_characters' };
   return null;
 }
 
@@ -85,7 +86,7 @@ router.get('/entra/candidates', authenticate, isAdminViewer, (req, res) => {
 router.post('/entra/import', authenticate, isAdminEditor, (req, res) => {
   const { groupIds } = req.body;
   if (!Array.isArray(groupIds) || groupIds.length === 0) {
-    return res.status(400).json({ error: 'groupIds must be a non-empty array' });
+    return res.status(400).json({ error: 'groupIds must be a non-empty array', code: 'group_ids_required' });
   }
 
   try {
@@ -126,22 +127,22 @@ router.post('/entra/force-sync', authenticate, isAdminEditor, async (req, res) =
 router.post('/bulk-delete', authenticate, isAdminEditor, (req, res) => {
   const { groupIds } = req.body;
   if (!Array.isArray(groupIds) || groupIds.length === 0) {
-    return res.status(400).json({ error: 'groupIds must be a non-empty array' });
+    return res.status(400).json({ error: 'groupIds must be a non-empty array', code: 'group_ids_required' });
   }
 
   if (groupIds.includes(DEFAULT_GROUP_ID)) {
-    return res.status(400).json({ error: 'Cannot delete the default group' });
+    return res.status(400).json({ error: 'Cannot delete the default group', code: 'default_group_delete' });
   }
 
   const uniqueGroupIds = [...new Set(groupIds.filter(Boolean))];
   if (uniqueGroupIds.length === 0) {
-    return res.status(400).json({ error: 'groupIds must contain at least one valid group id' });
+    return res.status(400).json({ error: 'groupIds must contain at least one valid group id', code: 'group_ids_required' });
   }
   const placeholders = uniqueGroupIds.map(() => '?').join(', ');
   const groups = db.prepare(`SELECT id, name FROM user_groups WHERE id IN (${placeholders})`).all(...uniqueGroupIds);
 
   if (groups.length !== uniqueGroupIds.length) {
-    return res.status(404).json({ error: 'One or more groups were not found' });
+    return res.status(404).json({ error: 'One or more groups were not found', code: 'groups_not_found' });
   }
 
   const deletedGroups = groups.map((group) => ({
@@ -170,7 +171,7 @@ router.post('/bulk-delete', authenticate, isAdminEditor, (req, res) => {
 // Get single group with members and apps (viewer roles only)
 router.get('/:id', authenticate, isAdminViewer, (req, res) => {
   const group = db.prepare('SELECT * FROM user_groups WHERE id = ?').get(req.params.id);
-  if (!group) return res.status(404).json({ error: 'Group not found' });
+  if (!group) return res.status(404).json({ error: 'Group not found', code: 'group_not_found' });
 
   const members = db.prepare(`
     SELECT u.id, u.email, u.display_name, u.role, u.avatar_color, u.last_login
@@ -206,13 +207,13 @@ router.get('/:id', authenticate, isAdminViewer, (req, res) => {
 router.post('/', authenticate, isAdminEditor, (req, res) => {
   const { name, description } = req.body;
   const nameError = validateGroupName(name);
-  if (nameError) return res.status(400).json({ error: nameError });
+  if (nameError) return res.status(400).json(nameError);
 
   const cleanName = sanitizeName(name);
   const cleanDesc = description ? description.replace(/<[^>]*>/g, '').trim().slice(0, 500) : '';
 
   const existing = db.prepare('SELECT id FROM user_groups WHERE name = ?').get(cleanName);
-  if (existing) return res.status(409).json({ error: 'A group with this name already exists' });
+  if (existing) return res.status(409).json({ error: 'A group with this name already exists', code: 'group_name_taken' });
 
   const id = uuidv4();
   db.prepare('INSERT INTO user_groups (id, name, description) VALUES (?, ?, ?)').run(id, cleanName, cleanDesc);
@@ -225,28 +226,28 @@ router.post('/', authenticate, isAdminEditor, (req, res) => {
 // Update group (editor roles only, cannot rename "default")
 router.put('/:id', authenticate, isAdminEditor, (req, res) => {
   const group = db.prepare('SELECT * FROM user_groups WHERE id = ?').get(req.params.id);
-  if (!group) return res.status(404).json({ error: 'Group not found' });
+  if (!group) return res.status(404).json({ error: 'Group not found', code: 'group_not_found' });
   if (group.source === 'entra') {
-    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally' });
+    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally', code: 'entra_group_read_only' });
   }
 
   const { name, description } = req.body;
 
   if (name) {
     const nameError = validateGroupName(name);
-    if (nameError) return res.status(400).json({ error: nameError });
+    if (nameError) return res.status(400).json(nameError);
   }
 
   const cleanName = name ? sanitizeName(name) : null;
   const cleanDesc = description !== undefined ? description.replace(/<[^>]*>/g, '').trim().slice(0, 500) : null;
 
   if (group.id === DEFAULT_GROUP_ID && cleanName && cleanName !== 'default') {
-    return res.status(400).json({ error: 'Cannot rename the default group' });
+    return res.status(400).json({ error: 'Cannot rename the default group', code: 'default_group_rename' });
   }
 
   if (cleanName) {
     const conflict = db.prepare('SELECT id FROM user_groups WHERE name = ? AND id != ?').get(cleanName, req.params.id);
-    if (conflict) return res.status(409).json({ error: 'A group with this name already exists' });
+    if (conflict) return res.status(409).json({ error: 'A group with this name already exists', code: 'group_name_taken' });
   }
 
   db.prepare('UPDATE user_groups SET name = COALESCE(?, name), description = COALESCE(?, description) WHERE id = ?')
@@ -260,11 +261,11 @@ router.put('/:id', authenticate, isAdminEditor, (req, res) => {
 // Delete group (editor roles only, cannot delete "default")
 router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   if (req.params.id === DEFAULT_GROUP_ID) {
-    return res.status(400).json({ error: 'Cannot delete the default group' });
+    return res.status(400).json({ error: 'Cannot delete the default group', code: 'default_group_delete' });
   }
 
   const group = db.prepare('SELECT * FROM user_groups WHERE id = ?').get(req.params.id);
-  if (!group) return res.status(404).json({ error: 'Group not found' });
+  if (!group) return res.status(404).json({ error: 'Group not found', code: 'group_not_found' });
 
   const deleteAll = db.transaction(() => {
     db.prepare('DELETE FROM user_group_members WHERE group_id = ?').run(req.params.id);
@@ -282,37 +283,37 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
 // Link child groups to a parent group
 router.post('/:id/groups', authenticate, isAdminEditor, (req, res) => {
   const parentGroup = db.prepare('SELECT id, name, source FROM user_groups WHERE id = ?').get(req.params.id);
-  if (!parentGroup) return res.status(404).json({ error: 'Group not found' });
+  if (!parentGroup) return res.status(404).json({ error: 'Group not found', code: 'group_not_found' });
   if (parentGroup.source === 'entra') {
-    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally' });
+    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally', code: 'entra_group_read_only' });
   }
   if (parentGroup.id === DEFAULT_GROUP_ID) {
-    return res.status(400).json({ error: 'Cannot link groups to the default group' });
+    return res.status(400).json({ error: 'Cannot link groups to the default group', code: 'default_group_link' });
   }
 
   const { groupIds } = req.body;
   if (!Array.isArray(groupIds) || groupIds.length === 0) {
-    return res.status(400).json({ error: 'groupIds must be a non-empty array' });
+    return res.status(400).json({ error: 'groupIds must be a non-empty array', code: 'group_ids_required' });
   }
 
   const uniqueGroupIds = [...new Set(groupIds.filter(Boolean))];
   if (uniqueGroupIds.length === 0) {
-    return res.status(400).json({ error: 'groupIds must contain at least one valid group id' });
+    return res.status(400).json({ error: 'groupIds must contain at least one valid group id', code: 'group_ids_required' });
   }
   if (uniqueGroupIds.includes(parentGroup.id) || uniqueGroupIds.includes(DEFAULT_GROUP_ID)) {
-    return res.status(400).json({ error: 'Cannot link the selected group' });
+    return res.status(400).json({ error: 'Cannot link the selected group', code: 'group_link_invalid' });
   }
 
   const placeholders = uniqueGroupIds.map(() => '?').join(', ');
   const childGroups = db.prepare(`SELECT id, name, source FROM user_groups WHERE id IN (${placeholders})`).all(...uniqueGroupIds);
   if (childGroups.length !== uniqueGroupIds.length) {
-    return res.status(404).json({ error: 'One or more groups were not found' });
+    return res.status(404).json({ error: 'One or more groups were not found', code: 'groups_not_found' });
   }
 
   for (const childGroup of childGroups) {
     const descendantIds = getDescendantGroupIds(childGroup.id);
     if (descendantIds.includes(parentGroup.id)) {
-      return res.status(400).json({ error: 'Cannot create a circular group link' });
+      return res.status(400).json({ error: 'Cannot create a circular group link', code: 'group_link_circular' });
     }
     if (childGroup.source === 'entra' && childGroup.entra_group_id) {
       const alreadyLinkedAsEntra = db.prepare(`
@@ -321,7 +322,7 @@ router.post('/:id/groups', authenticate, isAdminEditor, (req, res) => {
         WHERE parent_group_id = ? AND entra_group_id = ?
       `).get(parentGroup.id, childGroup.entra_group_id);
       if (alreadyLinkedAsEntra) {
-        return res.status(409).json({ error: 'This Entra group is already linked to the container' });
+        return res.status(409).json({ error: 'This Entra group is already linked to the container', code: 'entra_group_already_linked' });
       }
     }
   }
@@ -346,28 +347,28 @@ router.post('/:id/groups', authenticate, isAdminEditor, (req, res) => {
 // Link Entra groups directly to a parent group without importing them
 router.post('/:id/entra-groups', authenticate, isAdminEditor, (req, res) => {
   const parentGroup = db.prepare('SELECT id, source FROM user_groups WHERE id = ?').get(req.params.id);
-  if (!parentGroup) return res.status(404).json({ error: 'Group not found' });
+  if (!parentGroup) return res.status(404).json({ error: 'Group not found', code: 'group_not_found' });
   if (parentGroup.source === 'entra') {
-    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally' });
+    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally', code: 'entra_group_read_only' });
   }
   if (parentGroup.id === DEFAULT_GROUP_ID) {
-    return res.status(400).json({ error: 'Cannot link groups to the default group' });
+    return res.status(400).json({ error: 'Cannot link groups to the default group', code: 'default_group_link' });
   }
 
   const { entraGroupIds } = req.body;
   if (!Array.isArray(entraGroupIds) || entraGroupIds.length === 0) {
-    return res.status(400).json({ error: 'entraGroupIds must be a non-empty array' });
+    return res.status(400).json({ error: 'entraGroupIds must be a non-empty array', code: 'entra_group_ids_required' });
   }
 
   const uniqueEntraGroupIds = [...new Set(entraGroupIds.filter(Boolean))];
   if (uniqueEntraGroupIds.length === 0) {
-    return res.status(400).json({ error: 'entraGroupIds must contain at least one valid group id' });
+    return res.status(400).json({ error: 'entraGroupIds must contain at least one valid group id', code: 'entra_group_ids_required' });
   }
 
   const placeholders = uniqueEntraGroupIds.map(() => '?').join(', ');
   const discoveredGroups = db.prepare(`SELECT entra_group_id FROM entra_group_cache WHERE entra_group_id IN (${placeholders})`).all(...uniqueEntraGroupIds);
   if (discoveredGroups.length !== uniqueEntraGroupIds.length) {
-    return res.status(404).json({ error: 'One or more Entra groups were not found' });
+    return res.status(404).json({ error: 'One or more Entra groups were not found', code: 'entra_groups_not_found' });
   }
 
   for (const entraGroupId of uniqueEntraGroupIds) {
@@ -378,7 +379,7 @@ router.post('/:id/entra-groups', authenticate, isAdminEditor, (req, res) => {
       WHERE gm.parent_group_id = ? AND ug.entra_group_id = ?
     `).get(parentGroup.id, entraGroupId);
     if (alreadyLinkedAsLocal) {
-      return res.status(409).json({ error: 'This Entra group is already linked to the container' });
+      return res.status(409).json({ error: 'This Entra group is already linked to the container', code: 'entra_group_already_linked' });
     }
   }
 
@@ -402,9 +403,9 @@ router.post('/:id/entra-groups', authenticate, isAdminEditor, (req, res) => {
 // Remove a linked child group
 router.delete('/:id/groups/:childGroupId', authenticate, isAdminEditor, (req, res) => {
   const parentGroup = db.prepare('SELECT id, source FROM user_groups WHERE id = ?').get(req.params.id);
-  if (!parentGroup) return res.status(404).json({ error: 'Group not found' });
+  if (!parentGroup) return res.status(404).json({ error: 'Group not found', code: 'group_not_found' });
   if (parentGroup.source === 'entra') {
-    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally' });
+    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally', code: 'entra_group_read_only' });
   }
 
   const result = db.prepare(`
@@ -412,16 +413,16 @@ router.delete('/:id/groups/:childGroupId', authenticate, isAdminEditor, (req, re
     WHERE parent_group_id = ? AND child_group_id = ?
   `).run(req.params.id, req.params.childGroupId);
 
-  if (result.changes === 0) return res.status(404).json({ error: 'Linked group not found' });
+  if (result.changes === 0) return res.status(404).json({ error: 'Linked group not found', code: 'linked_group_not_found' });
   logRbacAudit(req.user.id, 'remove_linked_group', 'group', req.params.id, { childGroupId: req.params.childGroupId });
   res.json({ removed: true });
 });
 
 router.delete('/:id/entra-groups/:entraGroupId', authenticate, isAdminEditor, (req, res) => {
   const parentGroup = db.prepare('SELECT id, source FROM user_groups WHERE id = ?').get(req.params.id);
-  if (!parentGroup) return res.status(404).json({ error: 'Group not found' });
+  if (!parentGroup) return res.status(404).json({ error: 'Group not found', code: 'group_not_found' });
   if (parentGroup.source === 'entra') {
-    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally' });
+    return res.status(400).json({ error: 'Entra-synced groups cannot be edited locally', code: 'entra_group_read_only' });
   }
 
   const result = db.prepare(`
@@ -429,7 +430,7 @@ router.delete('/:id/entra-groups/:entraGroupId', authenticate, isAdminEditor, (r
     WHERE parent_group_id = ? AND entra_group_id = ?
   `).run(req.params.id, req.params.entraGroupId);
 
-  if (result.changes === 0) return res.status(404).json({ error: 'Linked Entra group not found' });
+  if (result.changes === 0) return res.status(404).json({ error: 'Linked Entra group not found', code: 'linked_entra_group_not_found' });
   logRbacAudit(req.user.id, 'remove_linked_entra_group', 'group', req.params.id, { entraGroupId: req.params.entraGroupId });
   res.json({ removed: true });
 });
@@ -439,10 +440,10 @@ router.delete('/:id/entra-groups/:entraGroupId', authenticate, isAdminEditor, (r
 // Add members to group (by userIds only)
 router.post('/:id/members', authenticate, isAdminEditor, (req, res) => {
   const group = db.prepare('SELECT id FROM user_groups WHERE id = ?').get(req.params.id);
-  if (!group) return res.status(404).json({ error: 'Group not found' });
+  if (!group) return res.status(404).json({ error: 'Group not found', code: 'group_not_found' });
   const fullGroup = db.prepare('SELECT source FROM user_groups WHERE id = ?').get(req.params.id);
   if (fullGroup?.source === 'entra') {
-    return res.status(400).json({ error: 'Entra-synced group memberships are managed in Microsoft Entra' });
+    return res.status(400).json({ error: 'Entra-synced group memberships are managed in Microsoft Entra', code: 'entra_membership_managed' });
   }
 
   const { userIds, emails } = req.body;
@@ -450,11 +451,11 @@ router.post('/:id/members', authenticate, isAdminEditor, (req, res) => {
   const hasEmails = Array.isArray(emails) && emails.length > 0;
 
   if (hasEmails) {
-    return res.status(400).json({ error: 'Email invitations are no longer supported' });
+    return res.status(400).json({ error: 'Email invitations are no longer supported', code: 'email_invitations_unsupported' });
   }
 
   if (!hasUserIds) {
-    return res.status(400).json({ error: 'userIds must be a non-empty array' });
+    return res.status(400).json({ error: 'userIds must be a non-empty array', code: 'user_ids_required' });
   }
 
   // Collect all user IDs to add
@@ -465,7 +466,7 @@ router.post('/:id/members', authenticate, isAdminEditor, (req, res) => {
     const checkUser = db.prepare('SELECT id FROM users WHERE id = ?');
     const invalid = userIds.filter(uid => !checkUser.get(uid));
     if (invalid.length > 0) {
-      return res.status(400).json({ error: `Users not found: ${invalid.join(', ')}` });
+      return res.status(400).json({ error: `Users not found: ${invalid.join(', ')}`, code: 'users_not_found', details: { count: invalid.length } });
     }
     resolvedUserIds.push(...userIds);
   }
@@ -488,16 +489,16 @@ router.post('/:id/members', authenticate, isAdminEditor, (req, res) => {
 // Remove member from group
 router.delete('/:id/members/:userId', authenticate, isAdminEditor, (req, res) => {
   const group = db.prepare('SELECT id FROM user_groups WHERE id = ?').get(req.params.id);
-  if (!group) return res.status(404).json({ error: 'Group not found' });
+  if (!group) return res.status(404).json({ error: 'Group not found', code: 'group_not_found' });
   const fullGroup = db.prepare('SELECT source FROM user_groups WHERE id = ?').get(req.params.id);
   if (fullGroup?.source === 'entra') {
-    return res.status(400).json({ error: 'Entra-synced group memberships are managed in Microsoft Entra' });
+    return res.status(400).json({ error: 'Entra-synced group memberships are managed in Microsoft Entra', code: 'entra_membership_managed' });
   }
 
   const result = db.prepare('DELETE FROM user_group_members WHERE group_id = ? AND user_id = ?')
     .run(req.params.id, req.params.userId);
 
-  if (result.changes === 0) return res.status(404).json({ error: 'Membership not found' });
+  if (result.changes === 0) return res.status(404).json({ error: 'Membership not found', code: 'membership_not_found' });
   logRbacAudit(req.user.id, 'remove_member', 'membership', req.params.id, { userId: req.params.userId });
   res.json({ removed: true });
 });
@@ -507,18 +508,18 @@ router.delete('/:id/members/:userId', authenticate, isAdminEditor, (req, res) =>
 // Assign apps to group
 router.post('/:id/apps', authenticate, isAdminEditor, (req, res) => {
   const group = db.prepare('SELECT id FROM user_groups WHERE id = ?').get(req.params.id);
-  if (!group) return res.status(404).json({ error: 'Group not found' });
+  if (!group) return res.status(404).json({ error: 'Group not found', code: 'group_not_found' });
 
   const { appIds } = req.body;
   if (!Array.isArray(appIds) || appIds.length === 0) {
-    return res.status(400).json({ error: 'appIds must be a non-empty array' });
+    return res.status(400).json({ error: 'appIds must be a non-empty array', code: 'app_ids_required' });
   }
 
   // Validate all app IDs exist before inserting
   const checkApp = db.prepare('SELECT id FROM apps WHERE id = ?');
   const invalid = appIds.filter(aid => !checkApp.get(aid));
   if (invalid.length > 0) {
-    return res.status(400).json({ error: `Apps not found: ${invalid.join(', ')}` });
+    return res.status(400).json({ error: `Apps not found: ${invalid.join(', ')}`, code: 'apps_not_found', details: { count: invalid.length } });
   }
 
   const insert = db.prepare('INSERT OR IGNORE INTO app_permissions (app_id, group_id) VALUES (?, ?)');
@@ -539,12 +540,12 @@ router.post('/:id/apps', authenticate, isAdminEditor, (req, res) => {
 // Remove app from group
 router.delete('/:id/apps/:appId', authenticate, isAdminEditor, (req, res) => {
   const group = db.prepare('SELECT id FROM user_groups WHERE id = ?').get(req.params.id);
-  if (!group) return res.status(404).json({ error: 'Group not found' });
+  if (!group) return res.status(404).json({ error: 'Group not found', code: 'group_not_found' });
 
   const result = db.prepare('DELETE FROM app_permissions WHERE group_id = ? AND app_id = ?')
     .run(req.params.id, req.params.appId);
 
-  if (result.changes === 0) return res.status(404).json({ error: 'Permission not found' });
+  if (result.changes === 0) return res.status(404).json({ error: 'Permission not found', code: 'permission_not_found' });
   logRbacAudit(req.user.id, 'remove_app', 'permission', req.params.id, { appId: req.params.appId });
   res.json({ removed: true });
 });
@@ -552,21 +553,21 @@ router.delete('/:id/apps/:appId', authenticate, isAdminEditor, (req, res) => {
 // Copy or move all app permissions from one group to another
 router.post('/:id/apps/transfer', authenticate, isAdminEditor, (req, res) => {
   const sourceGroup = db.prepare('SELECT id, name, source FROM user_groups WHERE id = ?').get(req.params.id);
-  if (!sourceGroup) return res.status(404).json({ error: 'Source group not found' });
+  if (!sourceGroup) return res.status(404).json({ error: 'Source group not found', code: 'source_group_not_found' });
 
   const { targetGroupId, mode } = req.body;
   if (typeof targetGroupId !== 'string' || !targetGroupId.trim()) {
-    return res.status(400).json({ error: 'targetGroupId is required' });
+    return res.status(400).json({ error: 'targetGroupId is required', code: 'target_group_required' });
   }
   if (!['copy', 'move'].includes(mode)) {
-    return res.status(400).json({ error: 'mode must be copy or move' });
+    return res.status(400).json({ error: 'mode must be copy or move', code: 'invalid_transfer_mode' });
   }
   if (targetGroupId === sourceGroup.id) {
-    return res.status(400).json({ error: 'Source and target groups must be different' });
+    return res.status(400).json({ error: 'Source and target groups must be different', code: 'transfer_same_group' });
   }
 
   const targetGroup = db.prepare('SELECT id, name, source FROM user_groups WHERE id = ?').get(targetGroupId);
-  if (!targetGroup) return res.status(404).json({ error: 'Target group not found' });
+  if (!targetGroup) return res.status(404).json({ error: 'Target group not found', code: 'target_group_not_found' });
 
   const result = transferGroupApps({
     dbHandle: db,

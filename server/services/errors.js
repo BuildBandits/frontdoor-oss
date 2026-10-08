@@ -13,6 +13,12 @@ export class UserFacingError extends Error {
   }
 }
 
+// "failed_to_update_branding" -> "Failed to update branding"
+function humanizeCode(code) {
+  const text = String(code || 'internal_server_error').replace(/_/g, ' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function respondWithError(res, error, fallback = { status: 500, code: 'internal_server_error' }) {
   if (error?.expose && error.statusCode) {
     const body = { error: error.message };
@@ -21,5 +27,6 @@ export function respondWithError(res, error, fallback = { status: 500, code: 'in
     if (error.details) body.details = error.details;
     return res.status(error.statusCode).json(body);
   }
-  return res.status(fallback.status || 500).json({ error: fallback.code || 'internal_server_error' });
+  const code = fallback.code || 'internal_server_error';
+  return res.status(fallback.status || 500).json({ error: fallback.message || humanizeCode(code), code });
 }

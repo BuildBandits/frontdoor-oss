@@ -51,6 +51,14 @@ function isBlockedExternalHostname(hostname) {
   return isPrivateIpLiteral(hostname) || hostname.startsWith('127.') || hostname.startsWith('169.254.');
 }
 
+// Stable codes for the messages returned by validateTargetUrl (the UI translates the codes).
+export const TARGET_URL_ERROR_CODES = {
+  'target_url must use http or https': 'target_url_protocol',
+  'internal-link target_url must use a private IP address': 'target_url_private_ip_required',
+  'target_url cannot point to private networks': 'target_url_private_network',
+  'target_url must be a valid URL': 'target_url_invalid',
+};
+
 export function validateTargetUrl(targetUrl, mode = 'redirect-plain') {
   try {
     const parsed = new URL(targetUrl);

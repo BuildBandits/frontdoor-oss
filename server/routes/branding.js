@@ -34,7 +34,7 @@ router.post('/avatars/refresh', authenticate, isOwner, async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Avatar cache refresh failed:', error.message);
-    res.status(500).json({ error: 'Failed to refresh avatar cache' });
+    res.status(500).json({ error: 'Failed to refresh avatar cache', code: 'failed_to_refresh_avatar_cache' });
   }
 });
 
@@ -53,7 +53,7 @@ router.get('/cache', authenticate, isOwner, async (req, res) => {
     });
   } catch (error) {
     console.error('Cache stats load failed:', error.message);
-    res.status(500).json({ error: 'Failed to load cache stats' });
+    res.status(500).json({ error: 'Failed to load cache stats', code: 'failed_to_load_cache_stats' });
   }
 });
 
@@ -68,7 +68,7 @@ router.post('/app-icons/cleanup', authenticate, isOwner, async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('App icon cache cleanup failed:', error.message);
-    res.status(500).json({ error: 'Failed to clean app icon cache' });
+    res.status(500).json({ error: 'Failed to clean app icon cache', code: 'failed_to_clean_icon_cache' });
   }
 });
 
@@ -83,7 +83,7 @@ router.post('/database/compact', authenticate, isOwner, async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Database compaction failed:', error.message);
-    res.status(500).json({ error: 'Failed to compact database storage' });
+    res.status(500).json({ error: 'Failed to compact database storage', code: 'failed_to_compact_database' });
   }
 });
 

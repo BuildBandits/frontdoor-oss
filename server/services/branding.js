@@ -174,18 +174,18 @@ function buildBrandingAuditDetails(currentRow, nextBranding, input = {}) {
 
 function parseLogoDataUrl(dataUrl) {
   if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
-    throw new UserFacingError('logo must be a base64 data URL');
+    throw new UserFacingError('logo must be a base64 data URL', { code: 'logo_invalid_data_url' });
   }
 
   const match = dataUrl.match(/^data:(image\/(?:png|jpeg|jpg|webp|gif|svg\+xml));base64,(.+)$/i);
   if (!match) {
-    throw new UserFacingError('logo must be a PNG, JPEG, WEBP, GIF, or SVG image');
+    throw new UserFacingError('logo must be a PNG, JPEG, WEBP, GIF, or SVG image', { code: 'logo_unsupported_type' });
   }
 
   const contentType = match[1].toLowerCase().replace('jpg', 'jpeg');
   const buffer = Buffer.from(match[2], 'base64');
   if (!buffer.length) {
-    throw new UserFacingError('logo image is empty');
+    throw new UserFacingError('logo image is empty', { code: 'logo_empty' });
   }
 
   return { contentType, buffer };
@@ -204,7 +204,7 @@ async function saveLogo(dataUrl, { dbHandle = db } = {}) {
   if (isSvgContentType(contentType)) {
     const sanitized = sanitizeSvgBuffer(buffer);
     if (!sanitized) {
-      throw new UserFacingError('logo SVG is not valid');
+      throw new UserFacingError('logo SVG is not valid', { code: 'logo_invalid_svg' });
     }
     buffer = sanitized;
   }
