@@ -208,3 +208,17 @@ test('audit dates use a compact YYYY-MM-DD, HH:MM:SS format in the viewer time z
   assert.equal(formatIsoDateTime('2026-01-05 00:00:00', 'UTC'), '2026-01-05, 00:00:00');
   assert.equal(formatIsoDateTime('not a date', 'UTC'), null);
 });
+
+test('the audit API can leave out sign-in events and still counts correctly', async () => {
+  db.prepare('INSERT INTO rbac_audit_logs (actor_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)')
+    .run(OWNER_ID, 'login', 'auth', OWNER_ID, JSON.stringify({ role: 'owner' }));
+  db.prepare('INSERT INTO rbac_audit_logs (actor_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)')
+    .run(OWNER_ID, 'update', 'group', GROUP_ID, JSON.stringify({ name: 'Finance' }));
+
+  const all = await (await request('/api/logs/audit')).json();
+  assert.equal(all.pagination.total, 2);
+
+  const withoutSignIns = await (await request('/api/logs/audit?exclude_target_types=auth')).json();
+  assert.equal(withoutSignIns.pagination.total, 1);
+  assert.deepEqual(withoutSignIns.logs.map((log) => log.action), ['update']);
+});
