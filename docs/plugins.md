@@ -1,6 +1,8 @@
 # Frontdoor Plugin Host
 
-Frontdoor can load plugins at runtime through a lightweight host.
+> **Status:** the plugin platform is locked off in the current releases: plugin routes answer `404` and the server keeps the plugin setting off. The work required before unlocking it is tracked in [#90](https://github.com/BuildBandits/frontdoor-oss/issues/90). This document describes the design.
+
+Frontdoor can load plugins at runtime through a lightweight host. Plugins run in the page origin, so only reviewed and owner-approved code should ever be enabled.
 
 ## Loader inputs
 
@@ -22,7 +24,7 @@ Set one or more URLs before building or deploying:
   "version": "1.0.0",
   "description": "Adds a ticket creation action, route and surface",
   "entry": "https://cdn.example.com/ticket-plugin/index.js",
-  "permissions": ["actions", "routes"],
+  "permissions": ["actions.write", "routes.write"],
   "roles": ["owner", "admin"],
   "backend": {
     "enabled": true,

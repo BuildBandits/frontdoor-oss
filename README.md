@@ -60,7 +60,7 @@ See [FEATURES.md](FEATURES.md) for the full capability map. Highlights:
 - Plain link mode (simple external redirect)
 - Bulk app upsert API (for CI/automation)
 - Demo apps are optional and can be restored from the admin panel or with `npm run db:seed`
-- Home hero text, company logo, homepage/login behavior, and app visibility toggles can be customized from the **Personalizza** admin page
+- Home hero text, company logo, homepage/login behavior, and app visibility toggles can be customized from the **Customize** admin page
 
 ## Quick Start (Node.js)
 
@@ -147,6 +147,7 @@ The image stores every writable path on the `/data` volume by default (`DATABASE
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DEV_LOGIN` | Enable local dev login without Azure SSO (ignored in production) | `false` |
+| `NODE_ENV` | `production` disables Dev Login and enables secure cookies | - (`production` in Docker) |
 | `PORT` | Express server port | `3001` |
 | `DATABASE_PATH` | SQLite file path | `./frontdoor.db` |
 | `AVATAR_CACHE_DIR` | Disk cache for user avatars and metadata | `./data/avatar-cache` |
@@ -157,18 +158,24 @@ The image stores every writable path on the `/data` volume by default (`DATABASE
 | `AVATAR_CACHE_TTL_DAYS` | Refresh interval for cached Microsoft 365 / Gravatar avatars | `14` |
 | `AVATAR_CACHE_MISS_TTL_DAYS` | Retry interval when no avatar was found | `30` |
 | `BASE_DOMAIN` | Base domain (no protocol) | `frontdoor.local` |
-| `FRONTEND_URL` | Frontend URL with protocol (see `.env.example.*`) | - |
+| `FRONTEND_URL` | Frontend URL with protocol (see `.env.example.*`); also trusted as origin for requests that change data | `https://frontdoor.local` |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated allowlist of origins that can call Frontdoor with `credentials: 'include'` for shared-cookie or session-check pages | - |
+| `TIMEZONE` (or `TZ`) | Server time zone used for log timestamps; the tenant default for the UI is set in *Customize* | `UTC` |
 | `AZURE_CLIENT_ID` | Azure AD App Registration Client ID | - |
 | `AZURE_CLIENT_SECRET` | Azure AD Client Secret | - |
 | `AZURE_TENANT_ID` | Azure AD Tenant ID | - |
-| `AZURE_REDIRECT_URI` | SSO callback redirect URI | - |
+| `AZURE_REDIRECT_URI` | SSO callback redirect URI | `https://frontdoor.local/api/auth/microsoft/callback` |
 | `JWT_SECRET` | JWT signing secret | - |
 | `ENTRA_GROUP_SYNC` | Discover Entra group memberships at login and enable admin import/force-sync flows | `false` (`true` in `docker-compose.yml`) |
 | `ENTRA_TENANT_REFRESH_MINUTES` | Minimum minutes between two refreshes of the tenant-wide Entra group catalog triggered by sign-ins (force sync always refreshes it; `0` refreshes at every sign-in) | `360` |
 | `JWT_EXPIRES_IN` | JWT token duration | `7d` |
+| `JWT_ISSUER` | Issuer of the session and SSO tokens (satellites verifying tokens must use the same value) | `frontdoor` |
 | `ADMIN_EMAILS` | Comma-separated owner emails (auto-promoted) | - |
 | `ADMIN_API_KEY` | API key for bulk endpoints | - |
+| `AUTH_RATE_LIMIT_MAX` / `AUTH_RATE_LIMIT_WINDOW_MS` | Rate limit for the Microsoft sign-in endpoints, per IP | `5000` / 15 min |
+| `RBAC_RATE_LIMIT_MAX` / `RBAC_RATE_LIMIT_WINDOW_MS` | Rate limit for group and user changes, per IP | `500` / 15 min |
+| `API_RATE_LIMIT_MAX` / `API_RATE_LIMIT_WINDOW_MS` | Rate limit for the rest of the API, per IP | `6000` / 15 min |
+| `COMMIT_SHA` | Commit recorded in backups (Docker build argument) | - |
 
 #### Production checklist
 
@@ -189,7 +196,7 @@ Recommended but optional:
 - `ADMIN_EMAILS`
 - `ADMIN_API_KEY`
 - `JWT_EXPIRES_IN`
-- Tenant default time zone from `Personalizza` if you want something other than UTC
+- Tenant default time zone from *Customize* if you want something other than UTC
 
 If one of the required values is missing or malformed, the container now fails fast at startup with a clear log entry instead of surfacing a runtime auth error later.
 
@@ -213,8 +220,8 @@ Then the page can ask Frontdoor whether the current browser session is already a
     });
 
     if (response.ok) {
-      const user = await response.json();
-      console.log('Signed in as:', user.email || user.display_name);
+      const { user } = await response.json();
+      console.log('Signed in as:', user.email || user.displayName);
       return;
     }
 
@@ -233,24 +240,24 @@ The important part is `credentials: 'include'`: it tells the browser to send the
 
 Frontdoor supports four role values:
 
-- `owner` - full access, including Log, Audit, and Personalizza
-- `admin` - full admin access except Log and Personalizza
+- `owner` - full access, including Logs, Audit, Customize and backups
+- `admin` - full admin access except Logs, Audit and Customize
 - `admin_readonly` - can view admin pages but cannot modify data
 - `user` - standard app-catalog user
 
 Users listed in `ADMIN_EMAILS` are auto-promoted to `owner` and remain protected from web UI changes while they stay in the compose/run list.
 
-Only `owner` can access Log, Audit, and Personalizza. `admin` and `admin_readonly` can access Gestione App, Gruppi, and Utenti; the latter is read-only.
+Only `owner` can access Logs, Audit and Customize. `admin` and `admin_readonly` can access Apps, Groups and Users; the latter is read-only.
 
-#### Criteri di conservazione
+#### Avatars and log retention
 
 Frontdoor keeps user avatars on disk inside `AVATAR_CACHE_DIR`. In Docker the recommended target is the shared `/data` volume so cached images survive container restarts.
 
-- Microsoft 365 photos are fetched from Microsoft Graph when users sign in, and can also be prewarmed with the dedicated utility or refreshed from `Personalizza`.
+- Microsoft 365 photos are fetched from Microsoft Graph when users sign in, and can also be prewarmed with the dedicated utility or refreshed from *Customize*.
 - If Microsoft does not expose a photo, Frontdoor falls back to Gravatar and then to the text avatar.
 - Cached avatars are refreshed only after the TTL expires, so the UI does not hit Graph on every page load.
-- The **Personalizza** page includes a maintenance action to refresh the avatar cache when Microsoft 365 profile photos change.
-- The same **Personalizza** page also includes a log retention selector from 0 to 90 days.
+- The **Customize** page includes a maintenance action to refresh the avatar cache when Microsoft 365 profile photos change.
+- The same **Customize** page also includes a log retention selector from 0 to 90 days.
 - `0` means logless: at the next scheduled cleanup cycle Frontdoor purges both access logs and audit logs from the database.
 - The purge is not immediate when you save the setting, so an admin can still revert the change before the next cleanup runs.
 - The default retention stays at 90 days.
@@ -263,27 +270,28 @@ npm run avatars:prewarm
 
 In Docker, run it as the app user so the cached files keep the right owner: `docker compose exec -u frontdoor frontdoor npm run avatars:prewarm`.
 
-If you want the utility or the `Personalizza` refresh action to fetch Microsoft 365 photos for existing users, grant the app the Microsoft Graph application permission `ProfilePhoto.Read.All` and admin consent.
+If you want the utility or the *Customize* refresh action to fetch Microsoft 365 photos for existing users, grant the app the Microsoft Graph application permission `ProfilePhoto.Read.All` and admin consent.
 
 #### Home branding
 
-The home hero text, optional company logo, homepage/login behavior, and app badge visibility are managed from the **Personalizza** page in the admin panel.
+The home hero text, optional company logo, homepage/login behavior, and app badge visibility are managed from the **Customize** page in the admin panel.
 
 - The text fields update the hero copy shown on the home page.
 - The logo is uploaded to `BRANDING_ASSET_DIR` and served back from the app.
 - If no logo is configured, the home page keeps the current text-only layout.
-- The `Mostra banner hero in Home` option hides the big landing banner.
-- The `Home compatta di default` option defines the tenant-wide compact/default home view, but users can still override it locally in their browser.
-- The `Vai subito alla Login SSO` option skips the login page and redirects directly to Microsoft sign-in.
-- The `Mostra badge ext / SSO sulle app` option controls whether app cards show mode badges.
-- The `Mostra Shared Cookie`, `Mostra Redirect SSO`, and `Mostra Entra App` options hide those app-mode buttons in the admin app editor.
-- The `Criteri di conservazione` section lets an owner invalidate the cached avatars and tune log retention so Microsoft/Gravatar changes and retention policy updates are picked up on the next cycle.
+- *Show hero banner on Home* hides or shows the big landing banner.
+- The default Home view (cards or compact, also separately for mobile) is tenant-wide; users can still choose their own from the profile menu.
+- *Go straight to SSO login* skips the login page and redirects directly to Microsoft sign-in.
+- *Show ext / SSO badges on apps* controls whether app cards show mode badges.
+- *Show Shared Cookie*, *Show Redirect SSO* and *Show Entra App* hide those app-mode buttons in the admin app editor.
+- The *Maintenance* section lets an owner clear cached avatars, clean up unused icons, compact the database and tune log retention.
 
 #### Audit and retention
 
-- Log and Audit timestamps are stored in UTC and rendered using the app/tenant/user time zone settings, while the database continues to store UTC values.
-- Audit includes an owner-only admin filter so you can narrow the view to a single privileged account.
-- Frontdoor automatically purges `access_logs` and `rbac_audit_logs` entries older than 90 days at startup and then once per day.
+- Log and Audit timestamps are stored in UTC and shown in the viewer's time zone (Audit uses `YYYY-MM-DD, HH:MM:SS`).
+- Audit describes each event in a sentence, with names instead of IDs and changed fields as `old → new`; the raw JSON can be copied or expanded. Administrator sign-ins are hidden by default (*Show sign-ins*).
+- Audit includes an admin filter so you can narrow the view to a single privileged account.
+- Frontdoor purges `access_logs` and `rbac_audit_logs` entries older than the configured retention (0 to 90 days, default 90) at startup and then once per day.
 
 #### App icons
 
@@ -293,7 +301,7 @@ App icons can be entered as:
 - pasted images copied from your computer or browser
 - pasted SVG markup
 
-Uploaded or pasted icon assets are stored on disk inside `APP_ICON_CACHE_DIR` and served by Frontdoor with a long-lived cache. The public URL is versioned by `updated_at`, so browsers refresh the icon only after an admin saves a change.
+Icons are limited to 1 MB (SVG 512 KB); PNG, JPEG and WebP images are shrunk in the browser to at most 256 px before upload. Uploaded or pasted icon assets are stored on disk inside `APP_ICON_CACHE_DIR` and served by Frontdoor with a long-lived cache. The public URL is versioned by `updated_at`, so browsers refresh the icon only after an admin saves a change.
 
 When you create a new app in the admin panel, you can choose one or more Frontdoor groups to grant visibility immediately. If you do not select any group, the app is created without permissions.
 
@@ -309,20 +317,22 @@ Frontdoor startup configuration:
   BRANDING_ASSET_DIR=/data/branding
   BASE_DOMAIN=contoso.com
   FRONTEND_URL=https://frontdoor.contoso.com
+  CORS_ALLOWED_ORIGINS=[empty]
+  TIMEZONE=Europe/Rome
+  DEV_LOGIN=disabled
   AZURE_CLIENT_ID=[set]
   AZURE_CLIENT_SECRET=[set]
   AZURE_TENANT_ID=[set]
   AZURE_REDIRECT_URI=https://frontdoor.contoso.com/api/auth/microsoft/callback
   JWT_SECRET=[set]
   ADMIN_EMAILS=1 owner configured
-  ENTRA_GROUP_SYNC=true
 ```
 
 Warnings are emitted for defaults or weak-but-valid settings, for example:
 
 - `BASE_DOMAIN is not set, defaulting to frontdoor.local`
 - `JWT_SECRET is shorter than 32 characters; use a longer random secret in production`
-If `ENTRA_GROUP_SYNC=true`, Frontdoor discovers Microsoft Entra groups at login (a tenant-wide refresh of the group catalog via `/groups`, followed by a per-user membership fetch via `/users/{id}/transitiveMemberOf`), stores them in a discovery cache, and lets admins import only the groups they actually want to use in Frontdoor. Both calls are made with an **app-only** Microsoft Graph token, so the user's login token is never asked for any group-read scope — the login consent screen stays on the minimal `openid / profile / email / User.Read` delegated set. The admin Force Sync flow uses the same app-only path to refresh the tenant-wide group catalog plus every user's memberships in one shot.
+If `ENTRA_GROUP_SYNC=true`, Frontdoor discovers Microsoft Entra groups at login (a per-user membership fetch via `/users/{id}/transitiveMemberOf`, plus a tenant-wide refresh of the group catalog via `/groups` at most once every `ENTRA_TENANT_REFRESH_MINUTES`), stores them in a discovery cache, and lets admins import only the groups they actually want to use in Frontdoor. Both calls are made with an **app-only** Microsoft Graph token, so the user's login token is never asked for any group-read scope — the login consent screen stays on the minimal `openid / profile / email / User.Read` delegated set. The admin Force Sync flow uses the same app-only path to refresh the tenant-wide group catalog plus every user's memberships in one shot.
 
 Because of the app-only calls, your app registration must have the Microsoft Graph **application** permissions listed in Step 4 (`User.Read.All`, `GroupMember.Read.All`, optionally `Group.Read.All`), all with admin consent. The first time you enable `ENTRA_GROUP_SYNC=true`, add the permissions in Azure, grant consent, then trigger a fresh login or Force Sync to populate the cache.
 
@@ -343,7 +353,7 @@ Frontdoor uses Microsoft Entra ID for SSO authentication via the OAuth 2.0 Autho
    - *Multitenant* — users from any Azure AD organization
 4. **Redirect URI:** Select **Web** and enter:
    - Production: `https://your-domain.com/api/auth/microsoft/callback`
-   - Local dev: `http://frontdoor.local:3001/api/auth/microsoft/callback`
+   - Local dev: `http://localhost:3001/api/auth/microsoft/callback` (as in `.env.example.node`)
 5. Click **Register**
 
 #### Step 2: Note the identifiers
@@ -395,45 +405,83 @@ AZURE_REDIRECT_URI=https://your-domain.com/api/auth/microsoft/callback
 
 ## API
 
+Every error response is JSON with a human-readable `error` and a stable snake_case `code`. Requests that change data with the session cookie must come from Frontdoor itself or from an origin in `CORS_ALLOWED_ORIGINS`. *Session* means the `frontdoor_token` cookie or the same token as `Authorization: Bearer`; *Admin viewer* is `owner`, `admin` or `admin_readonly`; *Admin editor* is `owner` or `admin`.
+
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/api/health` | No | Health check |
-| GET | `/api/auth/microsoft` | No | Initiate SSO flow |
-| GET | `/api/auth/microsoft/callback` | No | SSO callback |
-| GET | `/api/auth/me` | Bearer | Current user profile |
-| POST | `/api/auth/verify-sso-token` | None (token+aud in body) | SSO token introspection for satellite apps |
-| POST | `/api/auth/logout` | No | Logout (clear cookie) |
-| GET | `/api/branding` | Bearer | Read home branding settings |
-| PUT | `/api/branding` | Owner | Update home branding settings |
-| GET | `/api/branding/logo` | No | Serve optional company logo |
-| GET | `/api/apps` | Bearer | List active apps (RBAC filtered) |
-| GET | `/api/apps/all` | Admin viewer | List all apps (including inactive) |
-| GET | `/api/apps/:id/icon` | Bearer | Serve a custom app icon asset |
+| GET | `/api/auth/microsoft` | No | Start the Microsoft sign-in (PKCE; optional `?redirect=<app slug>`) |
+| GET | `/api/auth/microsoft/callback` | No | Microsoft sign-in callback |
+| GET | `/api/auth/me` | Session | Current user and preferences |
+| PUT | `/api/auth/me/preferences` | Session | Update own preferences (Home view, language, time zone, theme, app order, favourites, tour) |
+| POST | `/api/auth/home-activity` | Session | Record Home activity (throttled) |
+| POST | `/api/auth/logout` | No | Sign out (clears the cookie) |
+| GET | `/api/auth/dev-status` | No | Whether Dev Login is available |
+| POST | `/api/auth/dev-login` | No | Dev Login (development only, never in production) |
+| POST | `/api/auth/verify-sso-token` | None (token + aud in body) | SSO token introspection for satellite apps |
+| GET | `/api/branding` | No | Branding and tenant defaults |
+| PUT | `/api/branding` | Owner | Update branding and tenant defaults |
+| GET | `/api/branding/logo` | No | Company logo |
+| GET | `/api/branding/cache` | Owner | Avatar, icon cache and database size |
+| POST | `/api/branding/avatars/refresh` | Owner | Clear the avatar cache |
+| POST | `/api/branding/app-icons/cleanup` | Owner | Remove unused app icon files |
+| POST | `/api/branding/database/compact` | Owner | Compact the database (`VACUUM`) |
+| GET | `/api/apps` | Session | Apps visible to the current user |
+| GET | `/api/apps/all` | Admin viewer | All apps, including inactive ones |
+| GET | `/api/apps/:id/icon` | No | App icon |
+| GET | `/api/apps/:slug/sso-redirect` | Session | Open an app (redirect or SSO POST, access logged) |
+| GET | `/api/apps/:slug/entra-redirect` | Session | Open an Entra app through MyApps (access logged) |
+| POST | `/api/apps/:slug/track-access` | Session | Record an access to an app opened directly |
 | POST | `/api/apps` | Admin editor | Create app |
-| POST | `/api/apps/restore-defaults` | Admin editor | Restore the default demo apps |
-| PUT | `/api/apps/:id` | Admin editor | Update app |
+| POST | `/api/apps/:id/clone` | Admin editor | Prepare a copy of an app (nothing is saved) |
+| PUT | `/api/apps/:id` | Admin editor | Update app (only changed fields are written) |
+| POST | `/api/apps/:id/groups` | Admin editor | Set the groups that can open an app |
 | DELETE | `/api/apps/:id` | Admin editor | Delete app |
-| GET | `/api/apps/bulk` | API Key | Bulk export apps (full metadata) |
-| POST | `/api/apps/bulk` | API Key | Bulk upsert apps |
+| POST | `/api/apps/restore-defaults` | Admin editor | Restore the demo apps |
+| GET | `/api/apps/bulk` | API key | Bulk export apps (full metadata) |
+| POST | `/api/apps/bulk` | API key | Bulk upsert apps by slug |
 | GET | `/api/users` | Admin viewer | List users |
-| PUT | `/api/users/:id/role` | Admin editor | Change user role |
-| PUT | `/api/users/:id/active` | Admin editor | Activate/deactivate user |
+| GET | `/api/users/:id` | Admin viewer | User detail (groups, visible apps) |
+| GET | `/api/users/:id/avatar` | Session | User avatar |
+| PUT | `/api/users/:id/preferences` | Admin editor | Update or reset a user's preferences |
+| PUT | `/api/users/:id/role` | Admin editor | Change role |
+| PUT | `/api/users/:id/active` | Admin editor | Activate or deactivate |
 | DELETE | `/api/users/:id` | Admin editor | Delete user |
 | GET | `/api/groups` | Admin viewer | List groups |
-| GET | `/api/groups/entra/candidates` | Admin viewer | List discovered Entra groups available for import |
-| POST | `/api/groups/entra/import` | Admin editor | Import selected discovered Entra groups |
-| POST | `/api/groups/entra/force-sync` | Admin editor | Force sync Entra memberships for all linked users |
-| POST | `/api/groups/bulk-delete` | Admin editor | Delete multiple groups at once |
+| GET | `/api/groups/:id` | Admin viewer | Group detail (members, apps, links) |
 | POST | `/api/groups` | Admin editor | Create group |
 | PUT | `/api/groups/:id` | Admin editor | Update group |
 | DELETE | `/api/groups/:id` | Admin editor | Delete group |
+| POST | `/api/groups/bulk-delete` | Admin editor | Delete several groups |
 | POST | `/api/groups/:id/members` | Admin editor | Add members |
 | DELETE | `/api/groups/:id/members/:userId` | Admin editor | Remove member |
-| POST | `/api/groups/:id/apps` | Admin editor | Assign apps |
-| DELETE | `/api/groups/:id/apps/:appId` | Admin editor | Remove app |
+| POST | `/api/groups/:id/apps` | Admin editor | Give a group access to apps |
+| DELETE | `/api/groups/:id/apps/:appId` | Admin editor | Remove an app from a group |
+| POST | `/api/groups/:id/apps/transfer` | Admin editor | Copy or move all apps to another group |
+| POST | `/api/groups/:id/groups` | Admin editor | Link child groups |
+| DELETE | `/api/groups/:id/groups/:childGroupId` | Admin editor | Unlink a child group |
+| POST | `/api/groups/:id/entra-groups` | Admin editor | Link Entra groups |
+| DELETE | `/api/groups/:id/entra-groups/:entraGroupId` | Admin editor | Unlink an Entra group |
+| GET | `/api/groups/entra/candidates` | Admin viewer | Discovered Entra groups available for import |
+| POST | `/api/groups/entra/import` | Admin editor | Import discovered Entra groups |
+| POST | `/api/groups/entra/force-sync` | Admin editor | Sync Entra memberships for all linked users |
+| GET | `/api/media-assets` | Admin viewer | Media library (icons and logos) |
+| GET | `/api/media-assets/:id` | Admin viewer | Media asset detail |
+| GET | `/api/media-assets/:id/file` | Admin viewer | Media asset file (images only) |
+| DELETE | `/api/media-assets/:id` | Admin editor | Delete an unused media asset |
 | GET | `/api/logs` | Owner | Access logs (paginated) |
-| GET | `/api/logs/top-apps` | Owner | Top apps analytics |
-| GET | `/api/logs/audit` | Owner | Audit logs (paginated) |
+| GET | `/api/logs/top-apps` | Owner | Most opened apps |
+| POST | `/api/logs/clear-access` | Owner | Clear the access log now |
+| GET | `/api/logs/audit` | Owner | Audit log (paginated; `exclude_target_types=auth` hides sign-ins). Alias: `/api/logs/rbac-audit` |
+| GET | `/api/backups/export` | Owner | Download a backup |
+| POST | `/api/backups/export-jobs` | Owner | Start a backup in the background |
+| GET | `/api/backups/export-jobs/:jobId/events` | Owner | Backup progress (server-sent events) |
+| GET | `/api/backups/export-jobs/:jobId/file` | Owner | Download the finished backup |
+| GET | `/api/backups/database` | Owner | Raw database copy (`.db`) |
+| POST | `/api/backups/verify` | Owner | Check a backup without changing anything (binary upload) |
+| POST | `/api/backups/restore` | Owner | Restore a backup (binary upload) |
+
+The plugin endpoints (`/api/plugins/*`) answer `404` while the plugin platform is locked off.
 
 ### Auth integration patterns for satellite apps
 
@@ -510,7 +558,7 @@ Schema changes are applied automatically at startup. Table rebuilds run inside a
 
 ## Upgrading an existing installation
 
-1. **Back up.** In **Personalizza (Customize) → Maintenance**, download a backup (a `.tar.gz` file with database rows and schema, app icons, logo, avatars and plugin files, plus the Frontdoor version and commit that produced it). Backups are written and read as streams, so their size is limited by disk space rather than memory; `.json.gz` files from earlier versions can still be checked and restored. Tick *Leave out access and audit logs* for a smaller file, and set a passphrase to encrypt it; keep the passphrase safe, it cannot be recovered. With the container stopped (`docker compose stop`), also copy the SQLite file from the volume, e.g. `docker cp <container>:/data/frontdoor.db ./frontdoor.db.bak`, including `frontdoor.db-wal` if present.
+1. **Back up.** In **Customize → Maintenance**, download a backup (a `.tar.gz` file with database rows and schema, app icons, logo, avatars and plugin files, plus the Frontdoor version and commit that produced it). Backups are written and read as streams, so their size is limited by disk space rather than memory; `.json.gz` files from earlier versions can still be checked and restored. Tick *Leave out access and audit logs* for a smaller file, and set a passphrase to encrypt it; keep the passphrase safe, it cannot be recovered. With the container stopped (`docker compose stop`), also copy the SQLite file from the volume, e.g. `docker cp <container>:/data/frontdoor.db ./frontdoor.db.bak`, including `frontdoor.db-wal` if present.
    For an exact copy of the database file you can also use *Download database file (.db)* under *Advanced options* on the same page, which works while Frontdoor is running. Encrypted files (`.enc`) can be decrypted with `FRONTDOOR_BACKUP_PASSPHRASE=... npm run backup:decrypt -- <file.enc>`.
 2. **Rehearse (recommended).** From a checkout of the new version, run `npm run backup:rehearse -- <backup or .db file>` (set `FRONTDOOR_BACKUP_PASSPHRASE` for `.enc` files). It rebuilds the source database in a temporary folder, runs the new version's migrations and prints schema changes, row counts and integrity checks; it exits with a non-zero code if rows would be lost or the database is damaged. Backups made before 1.3.1 carry no schema, so for those it rehearses a restore into the new schema instead. You can also start the new image locally against a copy of the database and check the `[startup]` log lines.
 3. **Upgrade.** Pull or build the new image and start it on the same `/data` volume. Migrations run on startup.

@@ -17,7 +17,7 @@ We currently support only the latest minor release on `main`. There are no LTS b
 
 Send a private report to:
 
-`<security@TBD>` *(this address will be set when the project is migrated to its permanent home; until then, contact a maintainer directly via GitHub)*
+Use GitHub's private vulnerability reporting: on the repository page open **Security → Report a vulnerability**. If that option is not available, contact a maintainer directly through GitHub and ask for a private channel.
 
 Include in your report:
 
