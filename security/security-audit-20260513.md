@@ -262,3 +262,17 @@ aa4ddd6 security: remove user email from server logs
 - Audit originale basato su analisi statica al commit `4504d55`. Remediation applicata su `worktree-silly-jumping-aurora`, branchato successivamente.
 - Verifica empirica delle 3 mitigations principali (SVG sanitize, CSP, JWT placeholder block) eseguita via curl + server live + dev-login.
 - I 9 finding ancora aperti sono tutti MEDIUM/LOW/INFO e non bloccano la produzione single-instance corrente. Vanno pianificati in iterazioni successive.
+
+---
+
+## AGGIORNAMENTO 2026-10
+
+Revisione del repository di ottobre 2026 (issue #77, #78, #89, #90):
+
+- **Riferimenti ai file:** CSP, header di sicurezza, rate limit e mount delle route sono passati da `server/index.js` a `server/app.js` (`createApp()`); i riferimenti a `server/index.js` qui sopra valgono per il commit dell'audit originale.
+- **Nota SSRF:** `validateTargetUrl` valida gli URL delle app, ma `target_url` non viene mai richiesto lato server. Le chiamate in uscita reali sono Microsoft Graph, Gravatar (host fissi) e le webhook dei plugin; queste ultime sono tracciate in #90 (piattaforma plugin bloccata).
+- **Upload:** icone e media sono accettati e serviti solo come immagini (#77).
+- **Richieste cross-site:** le richieste che modificano dati con il cookie di sessione devono arrivare da Frontdoor o da un'origine in `CORS_ALLOWED_ORIGINS` (`Sec-Fetch-Site` / `Origin`); restore e verifica dei backup richiedono un content type binario (`application/octet-stream` o gzip) (#78). Questo supera la motivazione "le mutazioni richiedono POST" usata per accettare `SameSite=Lax`, che non vale tra sottodomini dello stesso sito.
+- **Token di sessione:** verificati con `HS256` e issuer, e rifiutati se hanno un'audience (token SSO per le app). Chi possiede `JWT_SECRET` può comunque firmare sessioni valide: va condiviso solo con app satellite pienamente fidate (modalità shared-cookie e redirect classico); le altre usano `POST /api/auth/verify-sso-token` (#78).
+- **Login:** collegamento per email solo per account senza identità Microsoft o con identità non più presente in Entra; controllo del tenant del token; nessuna email o nome nei log (#78). PKCE e legame dello `state` al browser in #89.
+- **Endpoint pubblici:** l'elenco va esteso con `/api/plugins/runtime` e `/api/plugins/files/*` quando la piattaforma plugin verrà sbloccata (#90).

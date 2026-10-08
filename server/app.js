@@ -52,6 +52,24 @@ export function createApp() {
     console.log(`Frontdoor CORS allowlist loaded: ${allowedOrigins.join(', ')}`);
   }
 
+  // Requests that change data with the session cookie must come from Frontdoor
+  // itself or from an allowlisted origin. The cookie is SameSite=Lax on the parent
+  // domain, so sibling subdomains would otherwise count as same-site.
+  const trustedOrigins = new Set(allowedOrigins);
+  try {
+    if (process.env.FRONTEND_URL) trustedOrigins.add(new URL(process.env.FRONTEND_URL).origin);
+  } catch {
+    // An invalid FRONTEND_URL is reported by the startup checks.
+  }
+  app.use('/api', (req, res, next) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || !req.cookies?.frontdoor_token) return next();
+    const fetchSite = req.get('sec-fetch-site');
+    if (fetchSite === 'same-origin' || fetchSite === 'none') return next();
+    const origin = req.get('origin');
+    if (origin ? trustedOrigins.has(origin) : !fetchSite) return next();
+    return res.status(403).json({ error: 'Cross-site request refused', code: 'cross_site_request' });
+  });
+
   // Keep a slightly larger body limit because branding/image uploads are sent as data URLs.
   app.use(express.json({ limit: '5mb' }));
   // Express 5 leaves req.body undefined when no parser ran (e.g. a POST without a
@@ -123,6 +141,11 @@ export function createApp() {
   app.use('/api/users', usersRoutes);
   app.use('/api/groups', groupsRoutes);
   app.use('/api/logs', logsRoutes);
+
+  // Unknown API routes get a JSON 404 instead of the SPA page.
+  app.use('/api', (req, res) => {
+    res.status(404).json({ error: 'Not found', code: 'not_found' });
+  });
 
   // Serve frontend (production)
   const distPath = path.join(__dirname, '..', 'dist');

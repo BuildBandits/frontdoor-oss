@@ -277,6 +277,22 @@ export async function fetchEntraGroupsForUserId(graphUserId, accessToken) {
   return normalizeGraphGroups(groups);
 }
 
+/**
+ * True only when Microsoft Graph reports that the directory object no longer exists
+ * (404 Request_ResourceNotFound). Uses the same endpoint and permission as force sync.
+ * Any other outcome, including errors, returns false.
+ */
+export async function isEntraUserDeleted(graphUserId, { acquireToken = acquireGraphAppToken } = {}) {
+  if (!graphUserId) return false;
+  try {
+    const accessToken = await acquireToken();
+    await fetchGraphPage(`${GRAPH_BASE_URL}/users/${encodeURIComponent(graphUserId)}/transitiveMemberOf/microsoft.graph.group?$select=id&$top=1`, accessToken);
+    return false;
+  } catch (error) {
+    return error?.status === 404 && error?.graphCode === 'Request_ResourceNotFound';
+  }
+}
+
 export async function discoverEntraGroupsForUser(graphUserId) {
   if (!isEntraGroupSyncEnabled()) return [];
   if (!graphUserId) return [];

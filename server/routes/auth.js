@@ -8,7 +8,7 @@ import { createPreferenceUpdate } from '../services/userPreferences.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { getAppTimeZone, getRequiredEnv, isDevLoginEnabled } from '../config.js';
-import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, refreshGroupCacheFromTenant, syncUserEntraGroups } from '../services/entraGroups.js';
+import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, isEntraUserDeleted, refreshGroupCacheFromTenant, syncUserEntraGroups } from '../services/entraGroups.js';
 import { ensureAvatarCached } from '../services/avatars.js';
 import { verifySsoTokenChain } from '../services/verifySsoToken.js';
 import { dispatchPluginEvent } from '../services/plugins.js';
@@ -39,6 +39,7 @@ const msalClient = process.env.AZURE_CLIENT_ID
 // enforced at validation time (10 min) and old rows are swept opportunistically
 // on each new state insert.
 const AUTH_STATE_TTL_MINUTES = 10;
+const TENANT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const insertAuthState = db.prepare('INSERT INTO auth_pending_states (state) VALUES (?)');
 const cleanupAuthStates = db.prepare(
   `DELETE FROM auth_pending_states WHERE datetime(created_at) < datetime('now', '-${AUTH_STATE_TTL_MINUTES} minutes')`
@@ -189,6 +190,15 @@ router.get('/microsoft/callback', async (req, res) => {
       redirectUri: process.env.AZURE_REDIRECT_URI,
     });
 
+    // The authority is tenant-specific; when the tenant is configured by ID, also
+    // check the token's tenant so a misconfigured multi-tenant app cannot sign in outsiders.
+    const expectedTenantId = String(process.env.AZURE_TENANT_ID || '').trim().toLowerCase();
+    const tokenTenantId = String(tokenResponse.idTokenClaims?.tid || tokenResponse.tenantId || '').toLowerCase();
+    if (TENANT_ID_RE.test(expectedTenantId) && tokenTenantId && tokenTenantId !== expectedTenantId) {
+      console.warn('Login refused: token issued for another tenant');
+      return res.redirect(`${frontendUrl}/login?error=sso_denied`);
+    }
+
     // Fetch user profile from Microsoft Graph
     const graphResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
       headers: { Authorization: `Bearer ${tokenResponse.accessToken}` },
@@ -225,7 +235,14 @@ router.get('/microsoft/callback', async (req, res) => {
     let isNewUser = false;
 
     if (!user) {
-      user = db.prepare('SELECT * FROM users WHERE email = ? AND is_active = 1').get(email);
+      // Link by email only accounts that are not tied to another Microsoft identity
+      // yet (pre-registered users), or whose previous identity no longer exists in Entra.
+      const byEmail = db.prepare('SELECT * FROM users WHERE email = ? AND is_active = 1').get(email);
+      if (byEmail?.microsoft_id && byEmail.microsoft_id !== microsoftId && !(await isEntraUserDeleted(byEmail.microsoft_id))) {
+        console.warn(`Login refused: account [${byEmail.id}] is linked to another Microsoft identity`);
+        return res.redirect(`${frontendUrl}/login?error=account_conflict`);
+      }
+      user = byEmail;
     }
 
     // A deactivated account (by an admin, or because it was missing from Entra)
@@ -276,7 +293,7 @@ router.get('/microsoft/callback', async (req, res) => {
       }
     }
 
-    console.log(`User login via Microsoft [${user.id}]: ${user.email} (${user.display_name})${isNewUser ? ' [new]' : ''}`);
+    console.log(`User login via Microsoft [${user.id}]${isNewUser ? ' [new]' : ''}`);
 
     if (['owner', 'admin', 'admin_readonly'].includes(user.role)) {
       logRbacAudit(user.id, 'login', 'auth', user.id, { role: user.role });
@@ -562,7 +579,7 @@ router.post('/dev-login', (req, res) => {
     source: 'auth.dev-login',
   });
 
-  console.log(`User login via dev login [${user.id}]: ${user.email} (${user.display_name}) (${role})`);
+  console.log(`User login via dev login [${user.id}] (${role})`);
   res.json({ user: serializeCurrentUser(user) });
 });
 

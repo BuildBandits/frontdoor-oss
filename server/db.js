@@ -583,8 +583,8 @@ if (!db.prepare('SELECT 1 FROM apps LIMIT 1').get()) {
 // Ensure default admins (from env var, comma-separated)
 const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean);
 for (const email of adminEmails) {
-  const result = db.prepare("UPDATE users SET role = 'owner', updated_at = datetime('now') WHERE email = ? AND role != 'owner'").run(email);
-  if (result.changes > 0) console.log(`[startup][roles] promoted compose-managed owner: ${email}`);
+  const promoted = db.prepare("UPDATE users SET role = 'owner', updated_at = datetime('now') WHERE email = ? AND role != 'owner' RETURNING id").get(email);
+  if (promoted) console.log(`[startup][roles] promoted compose-managed owner [${promoted.id}]`);
 }
 
 // Backfill: add users to "default" only if they are not in ANY group yet

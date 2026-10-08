@@ -35,7 +35,7 @@ function auditRows(where = '1 = 1', ...params) {
 before(async () => {
   db.prepare('INSERT OR REPLACE INTO users (id, email, display_name, role, is_active) VALUES (?, ?, ?, ?, 1)')
     .run(OWNER_ID, 'owner@audit-test.local', 'Audit Owner', 'owner');
-  token = jwt.sign({ userId: OWNER_ID }, process.env.JWT_SECRET, { expiresIn: '5m' });
+  token = jwt.sign({ userId: OWNER_ID }, process.env.JWT_SECRET, { expiresIn: '5m', issuer: 'frontdoor' });
   server = createApp().listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;

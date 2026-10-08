@@ -62,7 +62,8 @@
       "sso_init_failed": "Errore di connessione con Microsoft. Riprova.",
       "invalid_state": "Sessione scaduta. Riprova.",
       "account_disabled": "Il tuo account Frontdoor è disattivato. Contatta l'amministratore.",
-      "generic": "Si è verificato un errore. Riprova."
+      "generic": "Si è verificato un errore. Riprova.",
+      "account_conflict": "Questa email è già collegata a un altro account Microsoft. Contatta l'amministratore."
     }
   },
   "home": {
@@ -1464,12 +1465,14 @@
     "backup_passphrase_required": "Questo backup è cifrato: inserisci la passphrase.",
     "backup_passphrase_too_short": "La passphrase del backup deve contenere almeno {minLength} caratteri.",
     "backup_too_large": "Il file di backup è troppo grande.",
+    "backup_upload_content_type": "Impossibile caricare il file di backup. Ricarica la pagina e riprova.",
     "backup_version_unsupported": "Questa versione del backup non è supportata.",
     "cannot_deactivate_self": "Non puoi disattivare te stesso.",
     "cannot_delete_self": "Non puoi eliminare te stesso.",
     "compose_owner_change": "L'owner di Compose non può essere modificato dalla web app.",
     "compose_owner_deactivate": "L'owner di Compose non può essere disattivato dalla web app.",
     "compose_owner_delete": "L'owner di Compose non può essere eliminato dalla web app.",
+    "cross_site_request": "Richiesta rifiutata perché non proviene da Frontdoor. Ricarica la pagina e riprova.",
     "default_group_delete": "Il gruppo predefinito non può essere eliminato.",
     "default_group_link": "Non è possibile collegare gruppi al gruppo predefinito.",
     "default_group_rename": "Il gruppo predefinito non può essere rinominato.",
@@ -1545,6 +1548,7 @@
     "membership_not_found": "Membership non trovata.",
     "no_preference_updates": "Nessuna modifica delle preferenze fornita.",
     "not_authenticated": "Non hai effettuato l'accesso.",
+    "not_found": "Non trovato.",
     "owner_assignment_forbidden": "Il ruolo owner può essere assegnato solo dalla configurazione del server.",
     "permission_not_found": "Permesso non trovato.",
     "plugin_archive_empty_archive": "L'archivio del plugin è vuoto.",
