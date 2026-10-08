@@ -9,7 +9,7 @@ import PaginationControls from '../components/PaginationControls';
 import { useAuthStore } from '../stores/authStore';
 import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { describeAuditLog } from '../utils/auditFormatters';
-import { formatDateTimeWithTimeZone } from '../utils/dateTime';
+import { formatIsoDateTime } from '../utils/dateTime';
 import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
 const PRIVILEGED_ROLES = new Set(['owner', 'admin', 'admin_readonly']);
@@ -102,29 +102,7 @@ export default function AdminAudit() {
 
   useEffect(() => { loadLogs(page); }, [loadLogs, page]);
 
-  const formatDate = (iso) => {
-    if (!iso) return '-';
-    try {
-      const formatted = formatDateTimeWithTimeZone(iso, {
-        locale: ui.common.dateLocale,
-        timeZone,
-        dateOptions: {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        },
-        timeOptions: {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        },
-      });
-      if (!formatted) return iso;
-      return `${formatted.formattedDate} ${formatted.formattedTime}`;
-    } catch {
-      return iso;
-    }
-  };
+  const formatDate = (iso) => formatIsoDateTime(iso, timeZone) || iso || '-';
 
   return (
     <div>
@@ -235,7 +213,7 @@ export default function AdminAudit() {
                     const event = describeAuditLog(log, { ui, refs });
                     return (
                       <tr key={log.id} className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 align-top">
-                        <td className="px-5 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{log.created_at_local || formatDate(log.created_at)}</td>
+                        <td className="px-5 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDate(log.created_at)}</td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
                             <UserAvatar

@@ -201,3 +201,10 @@ test('describeAuditLog reads legacy role rows and unknown events', () => {
   assert.equal(unknown.text, 'plain text');
   assert.equal(unknown.raw, 'plain text');
 });
+
+test('audit dates use a compact YYYY-MM-DD, HH:MM:SS format in the viewer time zone', async () => {
+  const { formatIsoDateTime } = await import('../src/utils/dateTime.js');
+  assert.equal(formatIsoDateTime('2026-10-08 08:54:35', 'Europe/Rome'), '2026-10-08, 10:54:35');
+  assert.equal(formatIsoDateTime('2026-01-05 00:00:00', 'UTC'), '2026-01-05, 00:00:00');
+  assert.equal(formatIsoDateTime('not a date', 'UTC'), null);
+});
