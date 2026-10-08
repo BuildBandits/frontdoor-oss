@@ -5,6 +5,8 @@ import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { archiveMediaAsset } from './mediaAssets.js';
 import { applySvgSafeHeaders, isSvgBuffer, isSvgContentType, sanitizeSvgBuffer } from './svgSanitize.js';
+import { UserFacingError } from './errors.js';
+import { RASTER_ICON_TYPES, normalizeImageContentType } from './imageTypes.js';
 
 // path.resolve() normalizes a relative env value (e.g. "./data/app-icon-cache")
 // to an absolute path so res.sendFile() in serveAppIconForApp does not reject it.
@@ -31,6 +33,7 @@ function extensionFromContentType(contentType) {
   if (normalized.includes('jpeg') || normalized.includes('jpg')) return 'jpg';
   if (normalized.includes('bmp')) return 'bmp';
   if (normalized.includes('avif')) return 'avif';
+  if (normalized.includes('icon')) return 'ico';
   return 'png';
 }
 
@@ -51,6 +54,8 @@ function contentTypeFromExtension(extension) {
       return 'image/bmp';
     case 'avif':
       return 'image/avif';
+    case 'ico':
+      return 'image/x-icon';
     default:
       return 'application/octet-stream';
   }
@@ -171,9 +176,13 @@ export function parseAppIconPayload({ iconDataUrl, iconSvgText }) {
         contentType: 'image/svg+xml',
       };
     }
+    const contentType = normalizeImageContentType(parsed.contentType);
+    if (!RASTER_ICON_TYPES.has(contentType)) {
+      throw new UserFacingError('icon must be a PNG, JPEG, GIF, WEBP, BMP, AVIF, ICO or SVG image', { code: 'icon_unsupported_type' });
+    }
     return {
       buffer: parsed.buffer,
-      contentType: parsed.contentType,
+      contentType,
     };
   }
 

@@ -5,6 +5,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { applySvgSafeHeaders, isSvgBuffer, isSvgContentType, sanitizeSvgBuffer } from './svgSanitize.js';
+import { RASTER_ICON_TYPES, normalizeImageContentType } from './imageTypes.js';
 
 // path.resolve() ensures the configured dir is absolute even when the env var
 // uses a relative form like "./data/branding" — required by res.sendFile().
@@ -20,6 +21,7 @@ function extensionFromContentType(contentType) {
   if (normalized.includes('jpeg') || normalized.includes('jpg')) return 'jpg';
   if (normalized.includes('bmp')) return 'bmp';
   if (normalized.includes('avif')) return 'avif';
+  if (normalized.includes('icon')) return 'ico';
   return 'bin';
 }
 
@@ -40,6 +42,8 @@ function contentTypeFromExtension(extension) {
       return 'image/bmp';
     case 'avif':
       return 'image/avif';
+    case 'ico':
+      return 'image/x-icon';
     default:
       return 'application/octet-stream';
   }
@@ -110,9 +114,11 @@ export function parseMediaAssetPayload({ dataUrl, svgText }) {
         contentType: 'image/svg+xml',
       };
     }
+    const contentType = normalizeImageContentType(parsed.contentType);
+    if (!RASTER_ICON_TYPES.has(contentType)) return null;
     return {
       buffer: parsed.buffer,
-      contentType: parsed.contentType,
+      contentType,
     };
   }
 
@@ -503,11 +509,17 @@ export async function serveMediaAsset(asset, res, {
   }
 
   res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-  const contentType = asset.content_type || contentTypeFromFilename(asset.stored_file_name);
+  // The type comes from the stored file's extension (always set by Frontdoor),
+  // never from the recorded upload type; anything that is not an image is a download.
+  const contentType = contentTypeFromFilename(asset.stored_file_name);
   if (isSvgContentType(contentType)) {
     applySvgSafeHeaders(res, asset.stored_file_name);
-  } else {
+  } else if (contentType.startsWith('image/')) {
     res.setHeader('Content-Type', contentType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+  } else {
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${path.basename(asset.stored_file_name).replace(/"/g, '')}"`);
   }
   res.sendFile(absolutePath);
 }

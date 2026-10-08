@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Security
+- **Icons and media served as images only**: app icons now accept only PNG, JPEG, GIF, WEBP, BMP, AVIF, ICO or (sanitized) SVG; other files are rejected with `icon_unsupported_type`. The media library takes the served type from the stored file's extension instead of the type recorded at upload, and sends anything that is not an image as a download. ([#77](https://github.com/BuildBandits/frontdoor-oss/issues/77))
+
 ## [1.3.2] — 2026-10-08
 
 Readable audit trail (events described in a sentence, names instead of IDs, changed fields as old → new, copyable raw JSON, compact dates), interface text and API errors fully translated with stable error codes, and fewer database writes: saves that change nothing are skipped and the Microsoft Entra sync applies only membership changes.
