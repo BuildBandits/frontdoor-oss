@@ -17,6 +17,7 @@ import { normalizeEntraApplicationId } from '../../shared/entra.js';
 import { normalizeAppSlug, suggestAppSlug } from '../../shared/appSlug.js';
 import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
+import { MAX_RASTER_ICON_BYTES, MAX_SVG_ICON_BYTES } from '../../shared/iconLimits.js';
 
 const emptyApp = { name: '', slug: '', description: '', long_description: '', icon: '📦', target_url: '', sort_order: 0, mode: 'redirect-plain', sso_endpoint: '', sso_method: 'GET', tags: [] };
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
@@ -401,6 +402,11 @@ export default function Admin() {
 
   const applyIconAssetFile = (file) => {
     if (!file) return;
+    const isSvg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name);
+    if (file.size > (isSvg ? MAX_SVG_ICON_BYTES : MAX_RASTER_ICON_BYTES)) {
+      pushNotice('error', a.iconTooLarge);
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = String(reader.result || '');
@@ -434,6 +440,11 @@ export default function Admin() {
     const pastedText = event.clipboardData?.getData('text/plain') || '';
     if (/<svg[\s>]/i.test(pastedText)) {
       const svg = pastedText.trim();
+      if (new Blob([svg]).size > MAX_SVG_ICON_BYTES) {
+        pushNotice('error', a.iconTooLarge);
+        event.preventDefault();
+        return;
+      }
       setIconMode('asset');
       setIconSvgText(svg);
       setIconAssetDataUrl(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);

@@ -57,3 +57,29 @@ test('media assets are served with a type derived from the stored file, never th
   assert.equal(other.headers['content-type'], 'application/octet-stream');
   assert.match(other.headers['content-disposition'], /^attachment; filename="icon-b\.bin"$/);
 });
+
+test('icons over the size limit are refused before decoding or parsing', async () => {
+  const { MAX_RASTER_ICON_BYTES, MAX_SVG_ICON_BYTES, estimateDataUrlBytes } = await import('../shared/iconLimits.js');
+  const tooLarge = (error) => error.code === 'icon_too_large' && error.statusCode === 413;
+
+  const bigPng = `data:image/png;base64,${'A'.repeat(Math.ceil((MAX_RASTER_ICON_BYTES * 4) / 3) + 8)}`;
+  assert.ok(estimateDataUrlBytes(bigPng) > MAX_RASTER_ICON_BYTES);
+  assert.throws(() => parseAppIconPayload({ iconDataUrl: bigPng }), tooLarge);
+
+  const bigSvg = `<svg xmlns="http://www.w3.org/2000/svg">${'<g/>'.repeat(MAX_SVG_ICON_BYTES / 4)}</svg>`;
+  assert.throws(() => parseAppIconPayload({ iconSvgText: bigSvg }), tooLarge);
+  // An SVG data URL between the SVG and raster limits is still refused as SVG.
+  assert.throws(() => parseAppIconPayload({ iconDataUrl: dataUrl('image/svg+xml', bigSvg) }), tooLarge);
+
+  assert.equal(parseAppIconPayload({ iconDataUrl: dataUrl('image/png', 'x'.repeat(200 * 1024)) }).contentType, 'image/png');
+});
+
+test('branding logos over the size limit are refused', async () => {
+  const { updateBrandingSettings } = await import('../server/services/branding.js');
+  const { MAX_SVG_ICON_BYTES } = await import('../shared/iconLimits.js');
+  const bigSvg = `<svg xmlns="http://www.w3.org/2000/svg">${'<g/>'.repeat(MAX_SVG_ICON_BYTES / 4)}</svg>`;
+  await assert.rejects(
+    updateBrandingSettings({ logoDataUrl: dataUrl('image/svg+xml', bigSvg) }),
+    (error) => error.code === 'logo_too_large' && error.statusCode === 413,
+  );
+});

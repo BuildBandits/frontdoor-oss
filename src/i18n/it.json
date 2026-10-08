@@ -283,7 +283,7 @@
       "appIconCacheReloadNotice": "Le icone correnti restano al loro posto; sono stati rimossi solo i file non referenziati.",
       "cacheFiles": "file",
       "cacheOrphans": "orfani",
-      "logoTooLarge": "Il logo deve essere al massimo 2 MB.",
+      "logoTooLarge": "Il logo è troppo grande: immagini fino a 2 MB, SVG fino a 512 KB.",
       "assetFileHint": "PNG, JPG, WEBP, GIF o SVG. Max 2 MB.",
       "logRetentionNextCleanup": "La nuova conservazione dei log si applicherà al prossimo ciclo di pulizia."
     },
@@ -902,7 +902,8 @@
       "useExistingTag": "Usa etichetta esistente",
       "goToGroupsSearch": "Vai a Gestione Gruppi con ricerca precompilata",
       "pageSummary": "Pagina {page} di {pages} · {total} app",
-      "skipGroupAssignment": "Salta"
+      "skipGroupAssignment": "Salta",
+      "iconTooLarge": "L'icona è troppo grande: immagini fino a 1 MB, SVG fino a 512 KB."
     },
     "icons": {
       "pageTitle": "Libreria media",
@@ -1516,6 +1517,7 @@
     "group_name_too_short": "Il nome del gruppo deve contenere almeno 2 caratteri.",
     "group_not_found": "Gruppo non trovato.",
     "groups_not_found": "Uno o più gruppi non sono stati trovati.",
+    "icon_too_large": "L'icona è troppo grande: immagini fino a 1 MB, SVG fino a 512 KB.",
     "icon_unsupported_type": "L'icona deve essere un'immagine PNG, JPEG, GIF, WEBP, BMP, AVIF, ICO o SVG.",
     "insufficient_permissions": "Non hai i permessi per eseguire questa operazione.",
     "internal_server_error": "Si è verificato un errore sul server. Riprova.",
@@ -1542,6 +1544,7 @@
     "logo_empty": "L'immagine del logo è vuota.",
     "logo_invalid_data_url": "Il logo deve essere un'immagine in formato data URL.",
     "logo_invalid_svg": "Il file SVG del logo non è valido.",
+    "logo_too_large": "Il logo è troppo grande: immagini fino a 2 MB, SVG fino a 512 KB.",
     "logo_unsupported_type": "Il logo deve essere un'immagine PNG, JPEG, WEBP, GIF o SVG.",
     "media_asset_in_use": "Questo file è ancora usato da un'app o dalle impostazioni di branding.",
     "media_asset_not_found": "File multimediale non trovato.",
