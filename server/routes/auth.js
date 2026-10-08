@@ -2,7 +2,8 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
-import { ConfidentialClientApplication } from '@azure/msal-node';
+import crypto from 'node:crypto';
+import { ConfidentialClientApplication, CryptoProvider } from '@azure/msal-node';
 import db from '../db.js';
 import { createPreferenceUpdate } from '../services/userPreferences.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
@@ -40,14 +41,27 @@ const msalClient = process.env.AZURE_CLIENT_ID
 // on each new state insert.
 const AUTH_STATE_TTL_MINUTES = 10;
 const TENANT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const insertAuthState = db.prepare('INSERT INTO auth_pending_states (state) VALUES (?)');
+const insertAuthState = db.prepare('INSERT INTO auth_pending_states (state, code_verifier, browser_nonce_hash) VALUES (?, ?, ?)');
 const cleanupAuthStates = db.prepare(
   `DELETE FROM auth_pending_states WHERE datetime(created_at) < datetime('now', '-${AUTH_STATE_TTL_MINUTES} minutes')`
 );
 const consumeAuthState = db.prepare(
   `DELETE FROM auth_pending_states
-   WHERE state = ? AND datetime(created_at) > datetime('now', '-${AUTH_STATE_TTL_MINUTES} minutes')`
+   WHERE state = ? AND datetime(created_at) > datetime('now', '-${AUTH_STATE_TTL_MINUTES} minutes')
+   RETURNING code_verifier, browser_nonce_hash`
 );
+const pkceCrypto = new CryptoProvider();
+
+// Ties a pending sign-in to the browser that started it: the callback must present
+// the same nonce cookie, so a callback URL opened in another browser is refused.
+const AUTH_NONCE_COOKIE = 'frontdoor_auth_nonce';
+const AUTH_NONCE_COOKIE_OPTS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  path: '/api/auth/microsoft',
+};
+const hashNonce = (nonce) => crypto.createHash('sha256').update(String(nonce)).digest('hex');
 
 const parseStoredAppOrder = (value) => {
   if (!value) return null;
@@ -127,8 +141,11 @@ router.get('/microsoft', async (req, res) => {
 
   try {
     const state = uuidv4();
+    const { verifier, challenge } = await pkceCrypto.generatePkceCodes();
+    const nonce = crypto.randomBytes(32).toString('base64url');
     cleanupAuthStates.run();
-    insertAuthState.run(state);
+    insertAuthState.run(state, verifier, hashNonce(nonce));
+    res.cookie(AUTH_NONCE_COOKIE, nonce, { ...AUTH_NONCE_COOKIE_OPTS, maxAge: AUTH_STATE_TTL_MINUTES * 60 * 1000 });
 
     // Cookie binding strategy:
     // - if a valid `?redirect=<slug>` was provided → write `<slug>.<state>` so
@@ -151,6 +168,8 @@ router.get('/microsoft', async (req, res) => {
       scopes: authScopes,
       redirectUri: process.env.AZURE_REDIRECT_URI,
       state,
+      codeChallenge: challenge,
+      codeChallengeMethod: 'S256',
     });
 
     res.redirect(authUrl);
@@ -177,7 +196,12 @@ router.get('/microsoft/callback', async (req, res) => {
     return res.redirect(`${frontendUrl}/login?error=sso_denied`);
   }
 
-  if (!state || consumeAuthState.run(state).changes === 0) {
+  const pending = state ? consumeAuthState.get(state) : null;
+  const nonceCookie = req.cookies?.[AUTH_NONCE_COOKIE];
+  if (nonceCookie) res.clearCookie(AUTH_NONCE_COOKIE, AUTH_NONCE_COOKIE_OPTS);
+  // Pending states created before PKCE was added carry no nonce or verifier; they
+  // expire within AUTH_STATE_TTL_MINUTES and are still accepted until then.
+  if (!pending || (pending.browser_nonce_hash && (!nonceCookie || hashNonce(nonceCookie) !== pending.browser_nonce_hash))) {
     return res.redirect(`${frontendUrl}/login?error=invalid_state`);
   }
 
@@ -188,6 +212,7 @@ router.get('/microsoft/callback', async (req, res) => {
       code,
       scopes: authScopes,
       redirectUri: process.env.AZURE_REDIRECT_URI,
+      ...(pending.code_verifier ? { codeVerifier: pending.code_verifier } : {}),
     });
 
     // The authority is tenant-specific; when the tenant is configured by ID, also

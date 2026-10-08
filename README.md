@@ -384,7 +384,7 @@ AZURE_REDIRECT_URI=https://your-domain.com/api/auth/microsoft/callback
 
 #### Security Notes
 
-- The OAuth flow uses PKCE and state parameters for CSRF protection
+- The OAuth flow uses PKCE (S256) and a single-use `state` stored server-side and bound to the browser that started the sign-in (short-lived httpOnly `frontdoor_auth_nonce` cookie); the code verifier never leaves the server
 - Tokens from Microsoft are validated by the MSAL library (signature verification against Azure's public keys)
 - The JWT token issued by Frontdoor is stored only in an httpOnly cookie (not accessible to JavaScript)
 - User profile data passed to the frontend does not include the token
@@ -498,7 +498,7 @@ SQLite with 15 tables:
 | `group_entra_group_memberships` | Entra groups linked to a Frontdoor group |
 | `branding_settings` | Customization settings (hero texts per language, logo, Home and login behaviour, feature toggles) |
 | `media_assets` | Index of uploaded app icons and branding logos stored on disk |
-| `auth_pending_states` | Short-lived OAuth `state` values for in-flight SSO logins |
+| `auth_pending_states` | Short-lived OAuth `state` values for in-flight SSO logins, with the PKCE verifier and a hash of the browser nonce |
 | `plugin_registry` | Plugin manifests and approvals (plugin system currently locked off) |
 
 On first startup with an empty DB, example apps are seeded automatically.
