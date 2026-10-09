@@ -1,20 +1,15 @@
 import { useCallback, useState, useEffect, useEffectEvent, useRef, useMemo } from 'react';
-import { Plus, Pencil, Trash2, X, Save, Copy, Users, ChevronDown, ChevronUp, Check, Filter, Settings, Tag } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { useBranding } from '../stores/brandingStore';
-import TagInput from '../components/TagInput';
 import AppIcon from '../components/AppIcon';
 import PageNotice from '../components/PageNotice';
 import TopToastNotice from '../components/TopToastNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useConfirmDialog } from '../hooks/useConfirmDialog';
-import Modal from '../components/Modal';
-import ClearableSearchField from '../components/ClearableSearchField';
-import DropdownSelect from '../components/DropdownSelect';
-import PaginationControls from '../components/PaginationControls';
-import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
 import { normalizeEntraApplicationId } from '../../shared/entra.js';
 import { normalizeAppSlug, suggestAppSlug } from '../../shared/appSlug.js';
@@ -22,10 +17,12 @@ import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
 import { MAX_RASTER_ICON_BYTES, MAX_SVG_ICON_BYTES, estimateDataUrlBytes } from '../../shared/iconLimits.js';
 import { MAX_ICON_SOURCE_BYTES, downscaleIconDataUrl, isResizableIconType } from '../utils/iconImages';
+import { DEFAULT_GROUP_ID, UNLABELED_TAG_FILTER, emptyApp } from './apps/constants';
+import AppsFilterBar from './apps/AppsFilterBar';
+import AppsTable from './apps/AppsTable';
+import AppFormModal from './apps/AppFormModal';
+import GroupAssignmentModal from './apps/GroupAssignmentModal';
 
-const emptyApp = { name: '', slug: '', description: '', long_description: '', icon: '📦', target_url: '', sort_order: 0, mode: 'redirect-plain', sso_endpoint: '', sso_method: 'GET', tags: [] };
-const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
-const UNLABELED_TAG_FILTER = '__frontdoor_unlabeled__';
 
 export default function Admin() {
   const { user } = useAuthStore();
@@ -955,902 +952,120 @@ export default function Admin() {
         </div>
       )}
 
-      <div className="mb-6 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
-          <div className="flex flex-wrap items-center gap-3">
-          <div className="flex-[1.1] min-w-[180px]">
-            <ClearableSearchField
-              value={appSearch}
-              onChange={setAppSearch}
-              placeholder={ui.admin.apps.searchPlaceholder}
-              clearLabel={ui.common.clearSearch}
-              searchShortcutTarget="primary"
-              searchShortcutLabel={ui.common.searchShortcut}
-            />
-          </div>
-          <div className="relative" ref={modeFilterRef}>
-            <button
-              type="button"
-              onClick={() => setModeFilterOpen((prev) => !prev)}
-            className={`relative inline-flex h-12 items-center w-full ${filterButtonMinWidth} pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-left text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900`}
-            >
-              <Settings className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-              <span className="flex min-w-0 flex-1 items-center gap-1">
-                <span className="shrink-0 text-gray-400 dark:text-gray-500">{a.modeFilterShort}:</span>
-                <span className="truncate">{currentModeFilterOption.label}</span>
-              </span>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-            </button>
+      <AppsFilterBar
+        appSearch={appSearch}
+        setAppSearch={setAppSearch}
+        ui={ui}
+        modeFilterRef={modeFilterRef}
+        setModeFilterOpen={setModeFilterOpen}
+        filterButtonMinWidth={filterButtonMinWidth}
+        a={a}
+        currentModeFilterOption={currentModeFilterOption}
+        modeFilterOpen={modeFilterOpen}
+        visibleModeFilterOptions={visibleModeFilterOptions}
+        appModeFilter={appModeFilter}
+        setAppModeFilter={setAppModeFilter}
+        tagFilterRef={tagFilterRef}
+        setTagFilterOpen={setTagFilterOpen}
+        hasTagFilters={hasTagFilters}
+        tagFilterOpen={tagFilterOpen}
+        selectedTagFilters={selectedTagFilters}
+        tagFilterSearch={tagFilterSearch}
+        setTagFilterSearch={setTagFilterSearch}
+        tagFilterSearchRef={tagFilterSearchRef}
+        handleTagFilterSearchKeyDown={handleTagFilterSearchKeyDown}
+        setSelectedTagFilters={setSelectedTagFilters}
+        tagFilterItemRefs={tagFilterItemRefs}
+        handleTagFilterItemKeyDown={handleTagFilterItemKeyDown}
+        toggleTagFilter={toggleTagFilter}
+        t={t}
+        filteredTags={filteredTags}
+        pageSize={pageSize}
+        setPageSize={setPageSize}
+        filteredApps={filteredApps}
+        apps={apps}
+      />
 
-            {modeFilterOpen && (
-              <div className="absolute right-0 z-20 mt-2 w-full overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
-                <div className="py-1">
-                  {visibleModeFilterOptions.map((opt) => {
-                    const selected = appModeFilter === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => {
-                          setAppModeFilter(opt.value);
-                          setModeFilterOpen(false);
-                        }}
-                        className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                          selected ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                        }`}
-                      >
-                        <span className="flex-1">{opt.label}</span>
-                        {selected && <Check className="h-4 w-4 text-dark dark:text-gray-100" aria-hidden="true" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="relative" ref={tagFilterRef}>
-            <button
-              type="button"
-              onClick={() => setTagFilterOpen((prev) => !prev)}
-              className={`relative inline-flex h-12 items-center w-full ${filterButtonMinWidth} pl-10 pr-10 border rounded-xl text-sm text-left transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900 ${
-                hasTagFilters
-                  ? 'border-violet-300 bg-violet-50 text-violet-900 dark:border-violet-700 dark:bg-violet-950/45 dark:text-violet-100'
-                  : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300'
-              }`}
-              aria-haspopup="menu"
-              aria-expanded={tagFilterOpen}
-            >
-              <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-              <span
-                className="relative flex min-w-0 flex-1 items-center gap-1 overflow-hidden pr-12 whitespace-nowrap"
-                style={{
-                  WebkitMaskImage: 'linear-gradient(to right, #000 0, #000 calc(100% - 3rem), transparent 100%)',
-                  maskImage: 'linear-gradient(to right, #000 0, #000 calc(100% - 3rem), transparent 100%)',
-                }}
-              >
-                <span className="shrink-0 text-gray-400 dark:text-gray-500">{a.tagFilterLabel}:</span>
-                <span className="min-w-0">
-                  {selectedTagFilters.length === 0
-                    ? a.tagFilterAll
-                    : a.tagFilterSelected.replace('{count}', String(selectedTagFilters.length))}
-                </span>
-              </span>
-              <span className="absolute right-10 top-1/2 -translate-y-1/2 inline-flex min-w-6 items-center justify-center rounded-full bg-white/80 dark:bg-gray-900/80 px-2 py-0.5 text-[11px] font-semibold text-gray-500 dark:text-gray-300">
-                {selectedTagFilters.length}
-              </span>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-            </button>
-
-            {tagFilterOpen && (
-              <div className="absolute right-0 z-20 mt-2 w-full overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
-                <div className="border-b border-gray-100 dark:border-gray-800 px-3 py-3">
-                  <ClearableSearchField
-                    value={tagFilterSearch}
-                    onChange={setTagFilterSearch}
-                    placeholder={a.tagFilterSearchPlaceholder}
-                    clearLabel={ui.common.clearSearch}
-                    inputClassName="text-sm"
-                    autoFocus
-                    inputRef={tagFilterSearchRef}
-                    onKeyDown={handleTagFilterSearchKeyDown}
-                  />
-                </div>
-                <div className="max-h-72 overflow-auto py-1">
-                  {hasTagFilters && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTagFilters([])}
-                      ref={(node) => { tagFilterItemRefs.current[0] = node; }}
-                      onKeyDown={(event) => handleTagFilterItemKeyDown(event, 0)}
-                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors text-violet-700 dark:text-violet-200 hover:bg-violet-50 dark:hover:bg-violet-950/30"
-                    >
-                      <span className="flex h-4 w-4 items-center justify-center rounded-sm border border-violet-300 bg-violet-100 text-violet-700 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-100" aria-hidden="true">
-                        <Check className="h-3 w-3" />
-                      </span>
-                      <span className="flex-1 font-semibold">{a.clearTagFilters}</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedTagFilters([])}
-                    ref={(node) => { tagFilterItemRefs.current[hasTagFilters ? 1 : 0] = node; }}
-                    onKeyDown={(event) => handleTagFilterItemKeyDown(event, hasTagFilters ? 1 : 0)}
-                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                      !hasTagFilters
-                        ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    <span
-                      className={`flex h-4 w-4 items-center justify-center rounded border ${
-                        !hasTagFilters ? 'border-dark bg-dark text-white' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-transparent'
-                      }`}
-                      aria-hidden="true"
-                    >
-                      <Check className="h-3 w-3" />
-                    </span>
-                    <span className="flex-1">{a.tagFilterAll}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleTagFilter(UNLABELED_TAG_FILTER)}
-                    ref={(node) => { tagFilterItemRefs.current[hasTagFilters ? 2 : 1] = node; }}
-                    onKeyDown={(event) => handleTagFilterItemKeyDown(event, hasTagFilters ? 2 : 1)}
-                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                      selectedTagFilters.includes(UNLABELED_TAG_FILTER)
-                        ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    <span
-                      className={`flex h-4 w-4 items-center justify-center rounded border ${
-                        selectedTagFilters.includes(UNLABELED_TAG_FILTER)
-                          ? 'border-dark bg-dark text-white'
-                          : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-transparent'
-                      }`}
-                      aria-hidden="true"
-                    >
-                      <Check className="h-3 w-3" />
-                    </span>
-                    <span className="flex-1">{a.appsWithoutTags}</span>
-                  </button>
-                  <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
-                  {filteredTags.length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-gray-400 dark:text-gray-500">
-                      {a.noTagFilterMatches}
-                    </div>
-                  ) : filteredTags.map((tag, tagIndex) => {
-                    const selected = selectedTagFilters.includes(tag);
-                    const index = (hasTagFilters ? 3 : 2) + tagIndex;
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => toggleTagFilter(tag)}
-                        ref={(node) => { tagFilterItemRefs.current[index] = node; }}
-                        onKeyDown={(event) => handleTagFilterItemKeyDown(event, index)}
-                        className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                          selected
-                            ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100'
-                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                        }`}
-                      >
-                        <span
-                          className={`flex h-4 w-4 items-center justify-center rounded border ${
-                            selected ? 'border-dark bg-dark text-white' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-transparent'
-                          }`}
-                          aria-hidden="true"
-                        >
-                          <Check className="h-3 w-3" />
-                        </span>
-                        <span className="flex-1 truncate">{tag}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-          <DropdownSelect
-            value={pageSize}
-            onChange={(next) => setPageSize(parseInt(next, 10))}
-            label={ui.admin.logs.rows}
-            icon={Filter}
-            options={[
-              { value: 25, label: '25' },
-              { value: 50, label: '50' },
-              { value: 100, label: '100' },
-              { value: 150, label: '150' },
-            ]}
-            className="min-w-[150px]"
-          />
-          <div className="text-xs text-gray-400 dark:text-gray-500">
-            {filteredApps.length} {ui.nav.apps.toLowerCase()} {t.of} {apps.length}
-          </div>
-        </div>
-      </div>
-
-      {/* App table */}
-      {loading ? (
-        <div className="animate-pulse space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-16 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800" />
-          ))}
-        </div>
-      ) : (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-          <PaginationControls
-            page={pagination.page}
-            pages={pagination.pages}
-            total={pagination.total}
-            summary={formatMessage(a.pageSummary, pagination)}
-            previousLabel={ui.common.previous}
-            nextLabel={ui.common.next}
-            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
-            onNext={() => setPage((current) => Math.min(pagination.pages, current + 1))}
-            variant="attached-top"
-            className="mt-0 bg-white dark:bg-gray-900"
-          />
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100 dark:border-gray-800">
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                    <button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark dark:hover:text-white">
-                    <span>{ui.nav.apps}</span> {sortIndicator('name')}
-                    </button>
-                  </th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                    <button type="button" onClick={() => toggleSort('slug')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark dark:hover:text-white">
-                      <span>{a.sortBySlug}</span> {sortIndicator('slug')}
-                    </button>
-                  </th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                    <button type="button" onClick={() => toggleSort('target_url')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark dark:hover:text-white">
-                      <span>{a.sortByTargetUrl}</span> {sortIndicator('target_url')}
-                    </button>
-                  </th>
-                  <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    <button type="button" onClick={() => toggleSort('mode')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark dark:hover:text-white">
-                    <span>{ui.admin.common.appMode}</span> {sortIndicator('mode')}
-                    </button>
-                  </th>
-                  <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                    <button type="button" onClick={() => toggleSort('is_active')} className="inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark dark:hover:text-white">
-                    <span>{ui.admin.common.active}</span> {sortIndicator('is_active')}
-                    </button>
-                  </th>
-                <th className="text-center px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{t.actions}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedApps.map((app) => (
-                <tr key={app.id} className="border-b border-gray-100 dark:border-gray-800 transition-colors hover:bg-gray-50/90 dark:hover:bg-gray-800/55">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <AppIcon app={app} className="w-8 h-8" textClassName="text-2xl" />
-                      <span className="font-semibold text-dark dark:text-gray-100">{app.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 font-mono">{app.slug}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 truncate max-w-[200px]">{app.target_url}</td>
-                  <td className="px-6 py-4 text-center whitespace-nowrap">
-                    <span className={`inline-flex items-center text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ${
-                      app.mode === 'redirect' ? 'bg-blue-100 text-blue-700'
-                        : app.mode === 'internal-link' ? 'bg-emerald-100 text-emerald-700'
-                        : app.mode === 'shared-cookie' ? 'bg-accent/10 text-accent-dark'
-                        : app.mode === 'entra-app' ? 'bg-violet-100 text-violet-700'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
-                    }`}>
-                      {app.mode === 'redirect' ? t.redirectSso : app.mode === 'internal-link' ? t.internalLink : app.mode === 'shared-cookie' ? t.sharedCookie : app.mode === 'entra-app' ? t.entraApp : t.link}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <button
-                      onClick={() => handleToggle(app)}
-                      disabled={!canEdit}
-                      className={`w-10 h-6 rounded-full transition-colors relative inline-flex items-center ${
-                        app.is_active ? 'bg-accent dark:bg-accent-dark' : 'bg-gray-200 dark:bg-gray-700'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      <span
-                        className={`absolute w-4 h-4 rounded-full shadow transition-transform ${
-                          app.is_active
-                            ? 'translate-x-5 bg-white'
-                            : 'translate-x-1 bg-white dark:bg-gray-400'
-                        }`}
-                      />
-                    </button>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        onClick={() => jumpToGroupsForApp(app)}
-                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        title={a.goToGroupsSearch}
-                      >
-                        <Users className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => openEdit(app)}
-                        disabled={!canEdit}
-                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => duplicateApp(app)}
-                        disabled={!canEdit || cloning}
-                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        title={cloning ? a.duplicating : a.duplicate}
-                        aria-label={cloning ? a.duplicating : a.duplicate}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(app)}
-                        disabled={!canEdit}
-                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <PaginationControls
-            page={pagination.page}
-            pages={pagination.pages}
-            total={pagination.total}
-            summary={formatMessage(a.pageSummary, pagination)}
-            previousLabel={ui.common.previous}
-            nextLabel={ui.common.next}
-            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
-            onNext={() => setPage((current) => Math.min(pagination.pages, current + 1))}
-            variant="attached-bottom"
-            className="mt-0 bg-white dark:bg-gray-900"
-          />
-        </div>
-      )}
+      <AppsTable
+        loading={loading}
+        pagination={pagination}
+        a={a}
+        ui={ui}
+        setPage={setPage}
+        toggleSort={toggleSort}
+        sortIndicator={sortIndicator}
+        t={t}
+        paginatedApps={paginatedApps}
+        handleToggle={handleToggle}
+        canEdit={canEdit}
+        jumpToGroupsForApp={jumpToGroupsForApp}
+        openEdit={openEdit}
+        duplicateApp={duplicateApp}
+        cloning={cloning}
+        handleDelete={handleDelete}
+      />
 
       <PluginSurface surface={PLUGIN_SURFACES.ADMIN_PAGE_BOTTOM} variant="stack" className="mt-6" />
 
       {/* Modal */}
-      {editing !== null && (
-        <Modal onClose={close} closeOnEscape={false} closeOnBackdrop={false} labelledBy="apps-dialog-1-title" panelClassName="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-6xl shadow-xl my-auto" overlayClassName="fixed inset-0 bg-black/40 flex items-start justify-center z-50 px-4 py-6 overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 id="apps-dialog-1-title" className="text-xl font-bold text-dark dark:text-gray-100">
-                {editing === 'new' ? ui.admin.apps.newApp : ui.admin.apps.editApp}
-              </h2>
-              <button type="button" onClick={close} aria-label={ui.common.closeDialog} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <AppFormModal
+        editing={editing}
+        close={close}
+        apps={apps}
+        ui={ui}
+        a={a}
+        setIconMode={setIconMode}
+        setIconAssetDataUrl={setIconAssetDataUrl}
+        setIconAssetPreview={setIconAssetPreview}
+        setIconSvgText={setIconSvgText}
+        setRemoveIconAsset={setRemoveIconAsset}
+        iconMode={iconMode}
+        form={form}
+        setForm={setForm}
+        handleIconPaste={handleIconPaste}
+        applyIconAssetFile={applyIconAssetFile}
+        iconFileInputRef={iconFileInputRef}
+        iconAssetPreview={iconAssetPreview}
+        handleIconFileChange={handleIconFileChange}
+        iconSvgText={iconSvgText}
+        slugAutoFillRef={slugAutoFillRef}
+        includeDefaultGroup={includeDefaultGroup}
+        setIncludeDefaultGroup={setIncludeDefaultGroup}
+        visibleModeOptions={visibleModeOptions}
+        handleModeChange={handleModeChange}
+        currentModeOption={currentModeOption}
+        allTags={allTags}
+        t={t}
+        handleSaveAndAssignGroups={handleSaveAndAssignGroups}
+        saving={saving}
+        openClone={openClone}
+        cloning={cloning}
+        canEdit={canEdit}
+        handleSave={handleSave}
+      />
 
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-950/50 p-4 space-y-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.icon}</label>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
-                      {a.iconHelp}
-                    </p>
-                  </div>
-                  <div className="flex items-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIconMode('emoji');
-                        setIconAssetDataUrl('');
-                        setIconAssetPreview('');
-                        setIconSvgText('');
-                        setRemoveIconAsset(Boolean(editing && editing !== 'new' && editing.iconUrl));
-                      }}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                        iconMode === 'emoji' ? 'bg-dark text-white' : 'text-gray-500 dark:text-gray-400 hover:text-dark dark:hover:text-white'
-                      }`}
-                    >
-                      {a.useEmoji}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIconMode('asset')}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                        iconMode === 'asset' ? 'bg-dark text-white' : 'text-gray-500 dark:text-gray-400 hover:text-dark dark:hover:text-white'
-                      }`}
-                    >
-                      {a.useImage}
-                    </button>
-                  </div>
-                </div>
-
-                {iconMode === 'emoji' ? (
-                  <div className="grid gap-4 sm:grid-cols-[auto_1fr] items-center">
-                    <div className="w-16 h-16 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center justify-center">
-                      <AppIcon app={{ icon: form.icon }} className="w-10 h-10" textClassName="text-3xl" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.emojiOrSymbol}</label>
-                      <input
-                        type="text"
-                        value={form.icon}
-                        onChange={(e) => setForm({ ...form, icon: e.target.value })}
-                        placeholder="📦"
-                        className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid gap-4 lg:grid-cols-[180px_1fr] items-start">
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onPaste={handleIconPaste}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        const file = e.dataTransfer?.files?.[0];
-                        if (file) applyIconAssetFile(file);
-                      }}
-                      onClick={() => iconFileInputRef.current?.click()}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          iconFileInputRef.current?.click();
-                        }
-                      }}
-                      className="rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-4 text-center cursor-pointer hover:border-accent transition-colors outline-hidden min-h-[180px] flex flex-col items-center justify-center gap-3"
-                    >
-                      <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center overflow-hidden">
-                        {iconAssetPreview ? (
-                          <img src={iconAssetPreview} alt={a.uploadedIconPreview} className="w-full h-full object-contain" />
-                        ) : (
-                          <AppIcon app={{ icon: form.icon }} className="w-10 h-10" textClassName="text-3xl" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-dark dark:text-gray-100">{a.iconUploadCta}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">{a.iconUploadHint}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <input
-                        ref={iconFileInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml"
-                        onChange={handleIconFileChange}
-                        className="hidden"
-                      />
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.pasteSvgLabel}</label>
-                        <textarea
-                          value={iconSvgText}
-                          onChange={(e) => {
-                            const svg = e.target.value;
-                            setIconSvgText(svg);
-                            setIconAssetPreview(/<svg[\s>]/i.test(svg)
-                              ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.trim())}`
-                              : '');
-                            setIconAssetDataUrl('');
-                            setRemoveIconAsset(false);
-                          }}
-                          placeholder={a.svgPlaceholder}
-                          rows={4}
-                          className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500 resize-y"
-                        />
-                      </div>
-
-                      {iconAssetPreview && (
-                        <div className="flex items-center justify-between gap-3 text-xs text-gray-400 dark:text-gray-500">
-                          <span>{a.uploadedIconPreview}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIconAssetDataUrl('');
-                              setIconAssetPreview('');
-                              setIconSvgText('');
-                              setRemoveIconAsset(true);
-                            }}
-                            className="text-red-600 hover:text-red-700 font-semibold"
-                          >
-                            {a.removeImage}
-                          </button>
-                        </div>
-                      )}
-                      <p className="text-xs text-gray-400 dark:text-gray-500">
-                        {a.iconPasteHint}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.nameLabel}</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder={a.nameExample}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.slugLabel}</label>
-                <input
-                  type="text"
-                  value={form.slug}
-                  maxLength={63}
-                  onChange={(e) => {
-                    slugAutoFillRef.current = true;
-                    setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') });
-                  }}
-                  placeholder={a.slugExample}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
-                />
-                <p className="mt-1 flex items-center justify-between gap-3 text-xs text-gray-400 dark:text-gray-500">
-                  <span>{a.slugHelp}</span>
-                  <span className="shrink-0 font-mono">
-                    {form.slug.length}/63
-                  </span>
-                </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  {a.slugLimitHelp}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.descriptionLabel}</label>
-                <input
-                  type="text"
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder={a.descriptionPlaceholder}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.targetUrlLabel}</label>
-                <input
-                  type="url"
-                  value={form.target_url}
-                  onChange={(e) => setForm({ ...form, target_url: e.target.value })}
-                  placeholder={a.targetUrlExample}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
-                />
-                {form.mode === 'internal-link' && (
-                  <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
-                    {a.internalLinkHelp}
-                  </p>
-                )}
-              </div>
-
-                {editing === 'new' && (
-                  <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-950/50 p-4">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={includeDefaultGroup}
-                        onChange={(e) => setIncludeDefaultGroup(e.target.checked)}
-                        className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
-                      />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium text-dark dark:text-gray-100">{a.addToDefaultGroup}</span>
-                          <span className="text-[10px] bg-accent/20 text-dark dark:text-gray-100 px-1.5 py-0.5 rounded-sm font-medium">
-                            {ui.common.defaultRecommended}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                          {a.defaultGroupIncludedHelp}
-                        </p>
-                      </div>
-                    </label>
-                  </div>
-                )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.connection}</label>
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                  {visibleModeOptions.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => handleModeChange(opt.value)}
-                      className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-                        form.mode === opt.value ? opt.active : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                {currentModeOption && !visibleModeOptions.some((opt) => opt.value === form.mode) && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                    {a.currentMode}: <span className="font-semibold text-gray-500 dark:text-gray-400">{currentModeOption.label}</span>. {a.currentModeHelp}
-                  </p>
-                )}
-              </div>
-
-              {form.mode === 'entra-app' && (
-                <div className="p-3 bg-violet-50 dark:bg-violet-950/40 rounded-xl border border-violet-100 dark:border-violet-900/50">
-                    <label className="block text-sm font-medium text-violet-700 dark:text-violet-300 mb-1">{ui.admin.apps.entraApplicationId}</label>
-                  <input
-                    type="text"
-                    value={form.sso_endpoint}
-                    onChange={(e) => setForm({ ...form, sso_endpoint: e.target.value })}
-                    onBlur={(e) => {
-                      const normalized = normalizeEntraApplicationId(e.target.value);
-                      if (normalized !== e.target.value) {
-                        setForm((prev) => ({ ...prev, sso_endpoint: normalized }));
-                      }
-                    }}
-                    placeholder={ui.admin.apps.enterApplicationId}
-                    className="w-full px-3 py-2 border border-violet-200 dark:border-violet-800 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-violet-400 dark:focus-visible:ring-violet-600"
-                  />
-                  <p className="text-xs text-violet-500 dark:text-violet-400 mt-1">
-                    {ui.admin.apps.applicationIdHelp}
-                  </p>
-                </div>
-              )}
-
-              {form.mode === 'redirect' && (
-                <div className="grid grid-cols-[1fr_auto] gap-4 p-3 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-100 dark:border-blue-900/50">
-                    <div>
-                    <label className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">{a.ssoEndpointLabel}</label>
-                    <input
-                      type="text"
-                      value={form.sso_endpoint}
-                      onChange={(e) => setForm({ ...form, sso_endpoint: e.target.value })}
-                      placeholder="/sso"
-                      className="w-full px-3 py-2 border border-blue-200 dark:border-blue-800 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-blue-600"
-                    />
-                    </div>
-                    <div>
-                    <label className="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">{a.ssoMethodLabel}</label>
-                    <select
-                      value={form.sso_method}
-                      onChange={(e) => setForm({ ...form, sso_method: e.target.value })}
-                      className="w-full px-3 py-2 border border-blue-200 dark:border-blue-800 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-blue-600"
-                    >
-                      <option value="GET">GET</option>
-                      <option value="POST">POST</option>
-                    </select>
-                    {form.sso_method === 'GET' && (
-                      <p className="mt-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-md p-2 leading-relaxed">
-                        ⚠️ {a.ssoMethodGetWarning}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-                <div>
-                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.tagsLabel}</label>
-                  <TagInput
-                    value={form.tags}
-                    onChange={(tags) => setForm({ ...form, tags })}
-                    suggestions={allTags}
-                    placeholder={a.tagsPlaceholder}
-                    suggestionsLabel={a.tagSuggestionsTitle}
-                    availableTagsLabel={a.availableTagsTitle}
-                    useSuggestionLabel={a.useExistingTag}
-                  />
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{ui.admin.apps.enterToAddTags}</p>
-                </div>
-
-                <div>
-                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.sortOrderLabel}</label>
-                  <input
-                    type="number"
-                    value={form.sort_order}
-                    onChange={(e) => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{a.longDescriptionLabel}</label>
-                <textarea
-                  value={form.long_description}
-                  onChange={(e) => setForm({ ...form, long_description: e.target.value })}
-                  placeholder={a.longDescriptionPlaceholder}
-                  rows={4}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 font-mono text-xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-gray-500 resize-y"
-                />
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{a.longDescriptionHelp}</p>
-              </div>
-            </div>
-
-              <div className="flex flex-col gap-3 mt-6 pt-6 border-t border-gray-100 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-end">
-                {editing !== 'new' && (
-                  <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-2">
-                    <button
-                      type="button"
-                      onClick={handleSaveAndAssignGroups}
-                      disabled={saving || !form.name || !form.slug || !form.target_url}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-dark dark:text-white bg-accent hover:bg-accent/80 dark:bg-accent-dark dark:hover:bg-accent-dark/90 shadow-xs shadow-accent/20 dark:shadow-black/30 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <Users className="w-4 h-4" />
-                      {saving ? a.saving : a.saveAndAssignGroups}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={openClone}
-                      disabled={cloning || !canEdit}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-violet-700 hover:text-violet-800 hover:bg-violet-50 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <Copy className="w-4 h-4" />
-                      {cloning ? a.duplicating : a.duplicate}
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={close}
-                    className="px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
-                  >
-                    {ui.common.cancel}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={saving || !form.name || !form.slug || !form.target_url}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Save className="w-4 h-4" />
-                    {saving ? a.saving : a.save}
-                  </button>
-                </div>
-            </div>
-        </Modal>
-      )}
-
-      {pendingGroupAssignApp && (
-        <Modal onClose={closeGroupAssignmentModal} closeOnEscape={false} closeOnBackdrop={false} labelledBy="apps-dialog-2-title" panelClassName="relative w-full max-w-3xl max-h-[88vh] overflow-y-auto rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-100 dark:border-gray-800" overlayClassName="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/40 px-4 py-4">
-            <button
-              type="button"
-              onClick={() => {
-                if (hasPendingGroupAssignmentChanges) {
-                  openConfirm({
-                    title: t.closeWithoutSavingTitle,
-                    message: t.closeWithoutSavingGroupsMessage,
-                    confirmLabel: t.close,
-                    onConfirm: async () => closeGroupAssignmentModal(),
-                  });
-                  return;
-                }
-                closeGroupAssignmentModal();
-              }}
-              className="absolute top-4 right-4 p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              aria-label={a.closeGroupSelection}
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div className="p-6 sm:p-8">
-              <div className="mb-6">
-                <h2 id="apps-dialog-2-title" className="text-2xl font-extrabold text-dark dark:text-gray-100">{a.addToGroupsTitle}</h2>
-                <p className="text-gray-500 dark:text-gray-400 mt-1">
-                  {a.addToGroupsHelp}
-                </p>
-                {pendingGroupAssignApp?.defaultIncluded ? (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                    {a.defaultGroupAlreadyCreated}
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                    {a.defaultGroupMissingHelp}
-                  </p>
-                )}
-              </div>
-
-              <div className="mb-4">
-                <ClearableSearchField
-                  value={groupAssignSearch}
-                  onChange={setGroupAssignSearch}
-                  placeholder={ui.admin.apps.searchGroupsPlaceholder}
-                  clearLabel={ui.common.clearSearch}
-                  autoFocus
-                  searchShortcutTarget="primary"
-                  searchShortcutLabel={ui.common.searchShortcut}
-                />
-                <div className="mt-2 text-xs text-gray-400 dark:text-gray-500 flex items-center justify-between gap-3">
-                  <span>{groupAssignSelection.length} {a.selectedGroupSummary}</span>
-                  <span>{filteredGroups.length} {t.groups}</span>
-                </div>
-                {hasGroupAssignSearch && (
-                  <div className="mt-2 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={selectVisibleGroups}
-                      disabled={filteredGroups.length === 0}
-                      className="text-xs font-medium text-accent-dark hover:underline disabled:opacity-40 disabled:no-underline"
-                    >
-                      {a.selectAllFiltered}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {groupsLoading ? (
-                <div className="animate-pulse grid gap-2 sm:grid-cols-2">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="h-16 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800" />
-                  ))}
-                </div>
-              ) : filteredGroups.length === 0 ? (
-                <div className="text-sm text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-900 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-3 py-4">
-                  {ui.admin.apps.noGroupsFound}
-                </div>
-              ) : (
-                <div className="grid gap-2 sm:grid-cols-2 max-h-[48vh] overflow-y-auto pr-1">
-                  {filteredGroups.map((group) => {
-                    const selected = groupAssignSelection.includes(group.id);
-                    const groupSourceLabel = group.source === 'entra' ? ui.admin.groups.entraBadge : ui.admin.groups.localBadge;
-                    return (
-                      <label
-                        key={group.id}
-                        className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${
-                          selected ? 'border-accent bg-accent/5' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() => toggleGroupAssignment(group.id)}
-                          className="mt-1 rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium text-dark dark:text-gray-100 truncate">{groupLabel(group)}</span>
-                            <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded-sm font-medium">
-                              {groupSourceLabel}
-                            </span>
-                            {group.id === DEFAULT_GROUP_ID && (
-                              <span className="text-[10px] bg-accent/30 text-dark dark:text-gray-100 px-1.5 py-0.5 rounded-sm font-medium">
-                                {ui.admin.groups.defaultBadge}
-                              </span>
-                            )}
-                          </div>
-                          {group.description && (
-                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">{group.description}</p>
-                          )}
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3 mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
-                <button
-                  type="button"
-                  onClick={closeGroupAssignmentModal}
-                  className="px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
-                >
-                  {a.skipGroupAssignment}
-                </button>
-                <button
-                  type="button"
-                  onClick={saveGroupAssignment}
-                  disabled={assigningGroups || (!hasPendingGroupAssignmentChanges && !groupAssignAllowNoChanges)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Save className="w-4 h-4" />
-                  {assigningGroups ? t.saving : ui.admin.apps.addSelectedGroups}
-                </button>
-              </div>
-            </div>
-        </Modal>
-      )}
+      <GroupAssignmentModal
+        pendingGroupAssignApp={pendingGroupAssignApp}
+        closeGroupAssignmentModal={closeGroupAssignmentModal}
+        apps={apps}
+        hasPendingGroupAssignmentChanges={hasPendingGroupAssignmentChanges}
+        openConfirm={openConfirm}
+        t={t}
+        a={a}
+        groupAssignSearch={groupAssignSearch}
+        setGroupAssignSearch={setGroupAssignSearch}
+        ui={ui}
+        groupAssignSelection={groupAssignSelection}
+        filteredGroups={filteredGroups}
+        hasGroupAssignSearch={hasGroupAssignSearch}
+        selectVisibleGroups={selectVisibleGroups}
+        groupsLoading={groupsLoading}
+        toggleGroupAssignment={toggleGroupAssignment}
+        groupLabel={groupLabel}
+        saveGroupAssignment={saveGroupAssignment}
+        assigningGroups={assigningGroups}
+        groupAssignAllowNoChanges={groupAssignAllowNoChanges}
+      />
 
       <ConfirmDialog {...confirmDialogProps} ui={ui} />
     </div>
