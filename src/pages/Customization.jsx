@@ -415,6 +415,17 @@ export default function Customization() {
     return brandingDirty || heroI18nDirty || logoDirty;
   }, [branding, initialBranding, brandingLogoDataUrl, removeBrandingLogo]);
 
+  // Leaving or reloading the page with unsaved changes asks the browser to confirm.
+  useEffect(() => {
+    if (!isDirty) return undefined;
+    const onBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [isDirty]);
+
   const scrollToSection = useCallback((ref) => {
     if (!ref.current) return;
     const offset = window.innerWidth >= 1280 ? 112 : 96;

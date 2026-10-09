@@ -1,8 +1,9 @@
-import { forwardRef, useState } from 'react';
+import { forwardRef, useId, useState } from 'react';
 import { Info, X, Lock, Star, GripVertical } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import AppIcon from './AppIcon';
 import Tooltip from './Tooltip';
+import Modal from './Modal';
 import api from '../services/api';
 
 // Tags shown on a card; the rest are summarized as +N so the tag row stays one line.
@@ -107,7 +108,7 @@ const AppCard = forwardRef(function AppCard(
               </span>
             )}
             {showModeBadges && isEntraApp && (
-              <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-sm">{getLabel('entraBadgeShort')}</span>
+              <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-sm dark:bg-violet-950/40 dark:text-violet-300">{getLabel('entraBadgeShort')}</span>
             )}
             {showModeBadges && isExternal && (
               <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-sm">{getLabel('externalBadgeShort')}</span>
@@ -222,7 +223,7 @@ const AppCard = forwardRef(function AppCard(
               </span>
             )}
             {showModeBadges && isEntraApp && (
-              <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-sm">{getLabel('entraBadgeShort')}</span>
+              <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-sm dark:bg-violet-950/40 dark:text-violet-300">{getLabel('entraBadgeShort')}</span>
             )}
             {showModeBadges && isExternal && (
               <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-sm">{getLabel('externalBadgeShort')}</span>
@@ -270,25 +271,40 @@ const AppCard = forwardRef(function AppCard(
   );
 });
 
+// Links that open a new tab never get access to this window.
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'A' && node.getAttribute('target')) {
+    node.setAttribute('rel', 'noopener noreferrer');
+  }
+});
+
+// Long descriptions are rich text: give lists, paragraphs and headings their spacing
+// explicitly (Tailwind's preflight resets them and no typography plugin is used).
+const LONG_DESCRIPTION_CLASSES = 'max-w-none text-sm leading-6 text-gray-600 dark:text-gray-300 [&_p]:my-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_a]:text-accent-dark [&_a]:underline [&_h1]:mt-3 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:mt-3 [&_h2]:text-base [&_h2]:font-bold [&_h3]:mt-2 [&_h3]:text-sm [&_h3]:font-semibold [&_strong]:font-semibold [&_code]:rounded [&_code]:bg-gray-100 dark:[&_code]:bg-gray-800 [&_code]:px-1 [&_img]:rounded-lg [&_img]:max-w-full';
+
 function InfoModal({ app, onClose, labels = {} }) {
+  const titleId = useId();
   const sanitizedLongDescription = DOMPurify.sanitize(app.long_description || '', {
     ADD_ATTR: ['target', 'rel'],
   });
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-lg shadow-xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <Modal
+      onClose={onClose}
+      labelledBy={titleId}
+      panelClassName="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-lg shadow-xl max-h-[80vh] overflow-y-auto"
+    >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <AppIcon app={app} className="w-10 h-10" textClassName="text-3xl" />
-            <h2 className="text-xl font-bold text-dark dark:text-gray-100">{app.name}</h2>
+            <h2 id={titleId} className="text-xl font-bold text-dark dark:text-gray-100">{app.name}</h2>
           </div>
           <button onClick={onClose} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" aria-label={labels.closeDialog}>
             <X className="w-5 h-5" />
           </button>
         </div>
         <div
-          className="prose prose-sm max-w-none text-gray-600 dark:text-gray-300 [&_a]:text-accent-dark [&_a]:underline [&_h1]:text-lg [&_h2]:text-base [&_h3]:text-sm [&_img]:rounded-lg [&_img]:max-w-full"
+          className={LONG_DESCRIPTION_CLASSES}
           dangerouslySetInnerHTML={{ __html: sanitizedLongDescription }}
         />
         <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
@@ -299,8 +315,7 @@ function InfoModal({ app, onClose, labels = {} }) {
             {typeof labels.openAppNamed === 'function' ? labels.openAppNamed(app.name) : app.name}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

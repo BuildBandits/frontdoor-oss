@@ -390,7 +390,7 @@ export default function AdminIcons() {
           {visibleAssets.map((asset) => (
             <article key={asset.id} className="overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs">
               <div className="aspect-4/3 bg-linear-to-br from-gray-50 via-white to-gray-100 p-4">
-                <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 bg-white/70 p-4">
+                <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 bg-white/70 p-4 dark:bg-gray-900/70">
                   <AssetPreview asset={asset} missingLabel={ui.admin.icons.missingFile} />
                 </div>
               </div>
@@ -408,7 +408,7 @@ export default function AdminIcons() {
                       {asset.kind === 'app-icon' ? ui.admin.icons.kindAppIcon : ui.admin.icons.kindBrandingLogo}
                     </span>
                     {asset.hasOrphanMembers && (
-                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/60">
                         {ui.admin.icons.containsOrphans}
                       </span>
                     )}
@@ -454,7 +454,7 @@ export default function AdminIcons() {
                       ))}
                     </div>
                     {asset.duplicateCount > 1 && (
-                      <div className="mt-3 rounded-xl border border-accent/20 bg-white/70 px-3 py-2">
+                      <div className="mt-3 rounded-xl border border-accent/20 bg-white/70 px-3 py-2 dark:bg-gray-900/70">
                         <button
                           type="button"
                           onClick={() => toggleAssetDetails(asset.id)}
@@ -479,7 +479,7 @@ export default function AdminIcons() {
                                 </div>
                                 <div className="flex shrink-0 flex-col items-end gap-1 text-right">
                                   {member.fileExists === false ? (
-                                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-1 font-semibold text-amber-700">
+                                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-1 font-semibold text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/60">
                                       {ui.admin.icons.orphanBadge}
                                     </span>
                                   ) : (

@@ -125,7 +125,7 @@ export default function Login() {
 
           {/* Error message */}
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm text-center">
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm text-center dark:bg-red-950/30 dark:text-red-300 dark:border-red-900/60">
               {ui.login.errors[error] || ui.login.errors.generic}
             </div>
           )}
@@ -146,7 +146,7 @@ export default function Login() {
           )}
 
           {devLogin && (
-            <div className="mt-6 p-4 bg-amber-50 border border-amber-300 rounded-xl">
+            <div className="mt-6 p-4 bg-amber-50 border border-amber-300 rounded-xl dark:bg-amber-950/30">
               <p className="text-amber-800 text-xs font-semibold uppercase tracking-wide mb-3">{ui.login.devLoginTitle}</p>
               <div className="flex gap-2 mb-3">
                 {['owner', 'admin', 'admin_readonly', 'user'].map((r) => (

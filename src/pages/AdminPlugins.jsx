@@ -17,6 +17,7 @@ import {
 import { Link } from 'react-router';
 import api from '../services/api';
 import Tooltip from '../components/Tooltip';
+import Modal from '../components/Modal';
 import { useAuthStore } from '../stores/authStore';
 import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
@@ -1068,15 +1069,14 @@ export default function AdminPlugins() {
       )}
 
       {reviewState && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/70 p-4">
-          <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl">
+        <Modal onClose={closeReviewWizard} closeOnBackdrop={false} labelledBy="plugins-dialog-1-title" panelClassName="w-full max-w-5xl overflow-hidden rounded-3xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl" overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/70 p-4">
             <div className="flex items-start justify-between gap-4 border-b border-gray-100 dark:border-gray-800 px-6 py-5">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 dark:border-violet-900/60 bg-violet-50 dark:bg-violet-950/30 px-3 py-1 text-xs font-semibold text-violet-700 dark:text-violet-300">
                   <ShieldCheck className="h-3.5 w-3.5" />
                   {t.validationWizard}
                 </div>
-                <h2 className="mt-3 text-2xl font-extrabold text-dark dark:text-gray-100">{reviewState.title}</h2>
+                <h2 id="plugins-dialog-1-title" className="mt-3 text-2xl font-extrabold text-dark dark:text-gray-100">{reviewState.title}</h2>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t.reviewPackageIntro}</p>
               </div>
               <button
@@ -1217,8 +1217,7 @@ export default function AdminPlugins() {
                 </pre>
               </div>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {snapshot.loadErrors.length > 0 && (

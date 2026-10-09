@@ -7,6 +7,7 @@ import UserAvatar from '../components/UserAvatar';
 import AppIcon from '../components/AppIcon';
 import TopToastNotice from '../components/TopToastNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Modal from '../components/Modal';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import Tooltip from '../components/Tooltip';
@@ -424,7 +425,7 @@ export default function AdminUsers() {
               event.stopPropagation();
               onReset();
             }}
-            className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 transition-colors hover:bg-amber-100"
+            className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 transition-colors hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/60"
             aria-label={resetLabel}
           >
             <AlertTriangle className="h-3 w-3" />
@@ -733,7 +734,7 @@ export default function AdminUsers() {
                           <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-sm font-medium">{u.composeBadge}</span>
                         )}
                         {!user.last_login && (
-                          <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-sm font-medium flex items-center gap-0.5">
+                          <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-sm font-medium flex items-center gap-0.5 dark:bg-purple-900/40">
                             <Clock className="w-3 h-3" />{t.noLogin}
                           </span>
                         )}
@@ -1007,7 +1008,7 @@ export default function AdminUsers() {
                                     {u.importedBadge}
                                   </span>
                                 ) : (
-                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm font-medium">
+                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm font-medium dark:bg-amber-950/40 dark:text-amber-300">
                                     {u.detectedBadge}
                                   </span>
                                 )}
@@ -1106,16 +1107,15 @@ export default function AdminUsers() {
       />
 
       {showVisibleApps && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setShowVisibleApps(false)}>
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <Modal onClose={() => setShowVisibleApps(false)} closeOnEscape={false} labelledBy="users-dialog-1-title" panelClassName="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto" overlayClassName="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-bold text-dark dark:text-gray-100">{t.visibleApps}</h2>
+                <h2 id="users-dialog-1-title" className="text-lg font-bold text-dark dark:text-gray-100">{t.visibleApps}</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   {visibleAppsQuery ? `${filteredVisibleApps.length} / ${visibleApps.length}` : visibleApps.length} {t.appVisibleCount}
                 </p>
               </div>
-              <button onClick={() => setShowVisibleApps(false)} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+              <button type="button" onClick={() => setShowVisibleApps(false)} aria-label={ui.common.closeDialog} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1168,8 +1168,7 @@ export default function AdminUsers() {
                 ))}
               </div>
             )}
-          </div>
-        </div>
+        </Modal>
       )}
 
       <ConfirmDialog

@@ -87,7 +87,8 @@ function AppRoutes() {
   const pluginRuntimeApi = usePluginRuntimeApi();
   const pluginsEnabled = pluginRuntimeApi?.pluginsEnabled === true;
   const { isAuthenticated, user, updateUser } = useAuthStore();
-  const ui = getUiStrings(normalizeLanguage('en'));
+  // The user's own language when known (the tenant default arrives later with branding).
+  const ui = getUiStrings(normalizeLanguage(user?.preferredLanguage));
   useColorScheme(user?.preferredColorScheme);
   useDocumentLanguage(user?.preferredLanguage);
 
