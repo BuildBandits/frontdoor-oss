@@ -126,6 +126,7 @@ The `/admin/customization` page covers:
 - Filter by kind (app-icon / branding-logo) and orphan status; search by app, filename, or ID.
 - Inline preview, **copy asset link**, **copy SVG markup**.
 - Referential-integrity guarded deletion — assets still in use cannot be removed.
+- **Large icons** — app icons over 200 KB are listed at the top; **Optimize icons** shrinks the PNG, JPEG and WebP ones to at most 256 px in the browser and saves them on their apps (audited). The same list appears in the startup log.
 
 ## Backup & Restore 🛡️
 

@@ -100,13 +100,17 @@ function readPngSize(buffer) {
   return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
 }
 
+export const LARGE_ICON_THRESHOLD_BYTES = 200 * 1024;
+// Largest side of icons shrunk in the browser (see src/utils/iconImages.js).
+const OPTIMIZED_ICON_DIMENSION = 256;
+
 /**
  * Icons currently used by apps that are larger than the threshold, biggest first.
  * Large icons cost memory in every browser that shows Home (each one is decoded
  * at full size), so they are reported at startup.
  */
-export async function findLargeAppIcons({ thresholdBytes = 200 * 1024, cacheDir = DEFAULT_CACHE_DIR, dbHandle = db } = {}) {
-  const apps = dbHandle.prepare('SELECT name, icon_file_name FROM apps WHERE icon_file_name IS NOT NULL').all();
+export async function findLargeAppIcons({ thresholdBytes = LARGE_ICON_THRESHOLD_BYTES, cacheDir = DEFAULT_CACHE_DIR, dbHandle = db } = {}) {
+  const apps = dbHandle.prepare('SELECT id, name, icon_file_name FROM apps WHERE icon_file_name IS NOT NULL').all();
   const large = [];
   for (const app of apps) {
     const filePath = iconPath(cacheDir, app.icon_file_name);
@@ -118,7 +122,12 @@ export async function findLargeAppIcons({ thresholdBytes = 200 * 1024, cacheDir 
       await handle.read(head, 0, head.length, 0).catch(() => {});
       await handle.close();
     }
-    large.push({ name: app.name, bytes: stats.size, size: readPngSize(head) });
+    const size = readPngSize(head);
+    // Raster icons bigger than the 256 px the app form produces can be shrunk;
+    // SVG, GIF and ICO icons (or ones already that small) cannot gain anything.
+    const resizable = /\.(png|jpe?g|webp)$/i.test(app.icon_file_name);
+    const optimizable = resizable && (!size || Math.max(size.width, size.height) > OPTIMIZED_ICON_DIMENSION);
+    large.push({ id: app.id, name: app.name, bytes: stats.size, size, optimizable });
   }
   return large.sort((a, b) => b.bytes - a.bytes);
 }
