@@ -268,7 +268,7 @@ export default function AdminAudit() {
                               initialsClassName="text-[10px]"
                             />
                             <div className="min-w-0">
-                              <p className="text-dark dark:text-gray-100 font-medium truncate text-xs">{log.actor_name || ui.admin.audit.removedUser}</p>
+                              <p className="text-dark dark:text-gray-100 font-medium truncate text-xs">{log.actor_name || ui.admin.audit.actorLabels?.[log.actor_id] || ui.admin.audit.removedUser}</p>
                               <p className="text-gray-400 dark:text-gray-500 truncate text-[11px]">{log.actor_email || '-'}</p>
                             </div>
                           </div>

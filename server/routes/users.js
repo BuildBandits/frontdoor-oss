@@ -140,21 +140,17 @@ router.get('/:id', authenticate, isAdminViewer, (req, res) => {
 
   if (!user) return res.status(404).json({ error: 'User not found', code: 'user_not_found' });
 
-  const groups = db.prepare(`
-    WITH RECURSIVE effective_groups(group_id) AS (
-      SELECT group_id
-      FROM user_group_members
-      WHERE user_id = ?
-      UNION
-      SELECT gm.parent_group_id
-      FROM group_group_memberships gm
-      JOIN effective_groups eg ON eg.group_id = gm.child_group_id
-    )
-    SELECT DISTINCT g.id, g.name, g.description, g.source, g.entra_display_name
-    FROM user_groups g
-    JOIN effective_groups eg ON g.id = eg.group_id
-    ORDER BY g.name
-  `).all(req.params.id);
+  // Same resolution as the access check, so the groups listed explain the visible apps
+  // (direct memberships, linked groups and groups reached through Entra links).
+  const effectiveGroupIds = getAccessibleGroupIdsForUser(req.params.id);
+  const groups = effectiveGroupIds.length > 0
+    ? db.prepare(`
+      SELECT id, name, description, source, entra_display_name
+      FROM user_groups
+      WHERE id IN (${effectiveGroupIds.map(() => '?').join(', ')})
+      ORDER BY name
+    `).all(...effectiveGroupIds)
+    : [];
 
   const entraGroups = db.prepare(`
     SELECT

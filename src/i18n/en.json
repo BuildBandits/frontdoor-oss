@@ -1449,7 +1449,11 @@
         }
       },
       "showSignIns": "Show sign-ins",
-      "signInsHidden": "Administrator sign-ins are hidden; use \"Show sign-ins\" to include them."
+      "signInsHidden": "Administrator sign-ins are hidden; use \"Show sign-ins\" to include them.",
+      "actorLabels": {
+        "api-key": "API key (bulk import)",
+        "system": "System"
+      }
     }
   },
   "errors": {
@@ -1518,6 +1522,7 @@
     "generic": "Something went wrong. Try again.",
     "graph_credentials_missing": "Microsoft Graph app credentials are not configured.",
     "graph_token_failed": "Could not get a Microsoft Graph token.",
+    "group_description_invalid": "The group description must be text.",
     "group_ids_required": "Select at least one group.",
     "group_link_circular": "Cannot create a circular group link.",
     "group_link_invalid": "The selected group cannot be linked.",
