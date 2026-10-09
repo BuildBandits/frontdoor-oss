@@ -353,10 +353,20 @@ export default function Home() {
       return currentTourStep?.targetRef?.current ? [currentTourStep.targetRef.current] : [];
     };
 
+    // Only a real change re-renders: the DOM observer below would otherwise loop.
+    const applyRects = (next) => {
+      setSpotlightRects((current) => (
+        current.length === next.length
+          && current.every((rect, index) => ['top', 'left', 'width', 'height'].every((key) => rect[key] === next[index][key]))
+          ? current
+          : next
+      ));
+    };
+
     const updateSpotlight = () => {
       const targets = getTargetElements();
       if (!targets.length) {
-        setSpotlightRects([]);
+        applyRects([]);
         return;
       }
       const rects = targets.map((target) => {
@@ -372,7 +382,7 @@ export default function Home() {
       });
 
       if (rects.length === 1) {
-        setSpotlightRects(rects);
+        applyRects(rects);
         return;
       }
 
@@ -388,7 +398,7 @@ export default function Home() {
         bottom: rects[0].bottom,
       });
 
-      setSpotlightRects([{
+      applyRects([{
         top: combinedRect.top,
         left: combinedRect.left,
         right: combinedRect.right,
@@ -398,20 +408,28 @@ export default function Home() {
       }]);
     };
 
-    const raf = window.requestAnimationFrame(() => {
-      if (currentTourStep?.key === 'menu' && !isMobileViewport) {
-        window.requestAnimationFrame(updateSpotlight);
-        return;
-      }
-      updateSpotlight();
-    });
-    window.addEventListener('resize', updateSpotlight);
-    window.addEventListener('scroll', updateSpotlight, true);
+    // Measure on the next frame, and again whenever elements are added or removed:
+    // the target can appear late (the account menu opens through Layout, which may
+    // render after a heavy Home), and measuring only once left it under the overlay.
+    let frame = 0;
+    const scheduleUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        updateSpotlight();
+      });
+    };
+    scheduleUpdate();
+    const observer = new MutationObserver(scheduleUpdate);
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('resize', scheduleUpdate);
+    window.addEventListener('scroll', scheduleUpdate, true);
 
     return () => {
-      window.cancelAnimationFrame(raf);
-      window.removeEventListener('resize', updateSpotlight);
-      window.removeEventListener('scroll', updateSpotlight, true);
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener('resize', scheduleUpdate);
+      window.removeEventListener('scroll', scheduleUpdate, true);
     };
   }, [currentTourStep, isMobileViewport, tourOpen]);
 

@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Fixed
+- **Tour highlights the personal menu**: on desktop, step 6 of the Home tour sometimes left the opened personal menu under the dark overlay, because the highlight was measured before the menu had rendered (more likely on a busy Home). The highlight is now measured again whenever elements appear or disappear while the tour is open.
+
 ## [1.4.0] — 2026-10-09
 
 Security hardening before the repository goes public (PKCE and browser-bound Microsoft sign-in, cross-site requests refused, stricter session tokens, images-only media, a hardened plugin platform), tools for oversized app icons (startup report and *Optimize icons* in the media library), a lighter and steadier frontend (branding loaded once, only the active language downloaded, no English flash on load, accessible dialogs) and many fixes from a full repository review.
