@@ -1,7 +1,7 @@
 import { X, Save } from 'lucide-react';
 import Modal from '../../components/Modal';
 import ClearableSearchField from '../../components/ClearableSearchField';
-import { DEFAULT_GROUP_ID } from './constants';
+import { DEFAULT_GROUP_ID } from '../../../shared/groups.js';
 
 export default function GroupAssignmentModal({
   pendingGroupAssignApp,
