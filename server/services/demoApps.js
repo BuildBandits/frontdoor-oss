@@ -51,14 +51,20 @@ export function restoreDefaultDemoApps(database, defaultGroupId) {
     VALUES (?, ?)
   `);
 
-  const existingBySlug = database.prepare('SELECT id FROM apps WHERE slug = ?');
+  const existingBySlug = database.prepare('SELECT id, target_url FROM apps WHERE slug = ?');
 
   const tx = database.transaction(() => {
     let created = 0;
     let updated = 0;
+    let skipped = 0;
 
     DEFAULT_DEMO_APPS.forEach((app, sortOrder) => {
       const existing = existingBySlug.get(app.slug);
+      // An app with a demo slug but another target is a real app: leave it alone.
+      if (existing && existing.target_url !== app.target_url) {
+        skipped += 1;
+        return;
+      }
       const appId = existing?.id || uuidv4();
 
       upsertApp.run(
@@ -84,6 +90,7 @@ export function restoreDefaultDemoApps(database, defaultGroupId) {
     return {
       created,
       updated,
+      skipped,
       total: DEFAULT_DEMO_APPS.length,
     };
   });

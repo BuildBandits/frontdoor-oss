@@ -241,7 +241,13 @@ router.put('/:id', authenticate, isAdminEditor, (req, res) => {
   }
 
   const cleanName = name ? sanitizeName(name) : null;
-  const cleanDesc = description !== undefined ? description.replace(/<[^>]*>/g, '').trim().slice(0, 500) : null;
+  if (description !== undefined && description !== null && typeof description !== 'string') {
+    return res.status(400).json({ error: 'description must be a string', code: 'group_description_invalid' });
+  }
+  // null clears the description; undefined leaves it unchanged.
+  const cleanDesc = description === null
+    ? ''
+    : (description !== undefined ? description.replace(/<[^>]*>/g, '').trim().slice(0, 500) : null);
 
   if (group.id === DEFAULT_GROUP_ID && cleanName && cleanName !== 'default') {
     return res.status(400).json({ error: 'Cannot rename the default group', code: 'default_group_rename' });
@@ -314,7 +320,7 @@ router.post('/:id/groups', authenticate, isAdminEditor, (req, res) => {
   }
 
   const placeholders = uniqueGroupIds.map(() => '?').join(', ');
-  const childGroups = db.prepare(`SELECT id, name, source FROM user_groups WHERE id IN (${placeholders})`).all(...uniqueGroupIds);
+  const childGroups = db.prepare(`SELECT id, name, source, entra_group_id FROM user_groups WHERE id IN (${placeholders})`).all(...uniqueGroupIds);
   if (childGroups.length !== uniqueGroupIds.length) {
     return res.status(404).json({ error: 'One or more groups were not found', code: 'groups_not_found' });
   }

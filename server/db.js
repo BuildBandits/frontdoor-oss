@@ -208,11 +208,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_group_entra_group_memberships_entra ON group_entra_group_memberships(entra_group_id);
   CREATE INDEX IF NOT EXISTS idx_access_logs_app ON access_logs(app_id);
   CREATE INDEX IF NOT EXISTS idx_access_logs_user ON access_logs(user_id);
+  CREATE INDEX IF NOT EXISTS idx_access_logs_created ON access_logs(created_at);
   CREATE INDEX IF NOT EXISTS idx_media_assets_kind ON media_assets(kind);
   CREATE INDEX IF NOT EXISTS idx_media_assets_source_ref ON media_assets(source_ref);
   CREATE INDEX IF NOT EXISTS idx_media_assets_created_at ON media_assets(created_at);
   CREATE INDEX IF NOT EXISTS idx_rbac_audit_actor ON rbac_audit_logs(actor_id);
   CREATE INDEX IF NOT EXISTS idx_rbac_audit_target ON rbac_audit_logs(target_type, target_id);
+  CREATE INDEX IF NOT EXISTS idx_rbac_audit_created ON rbac_audit_logs(created_at);
   CREATE INDEX IF NOT EXISTS idx_entra_group_cache_last_seen ON entra_group_cache(last_seen_at);
   CREATE INDEX IF NOT EXISTS idx_entra_user_group_memberships_group ON entra_user_group_memberships(entra_group_id);
   CREATE INDEX IF NOT EXISTS idx_plugin_registry_enabled ON plugin_registry(enabled);
@@ -472,6 +474,7 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
       ALTER TABLE rbac_audit_logs_new RENAME TO rbac_audit_logs;
       CREATE INDEX IF NOT EXISTS idx_rbac_audit_actor ON rbac_audit_logs(actor_id);
       CREATE INDEX IF NOT EXISTS idx_rbac_audit_target ON rbac_audit_logs(target_type, target_id);
+      CREATE INDEX IF NOT EXISTS idx_rbac_audit_created ON rbac_audit_logs(created_at);
     `);
   }
 }
@@ -578,8 +581,9 @@ const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
 db.prepare(`INSERT OR IGNORE INTO user_groups (id, name, description) VALUES (?, 'default', 'Default group: new users are added here')`)
   .run(DEFAULT_GROUP_ID);
 
-// Seed demo apps on the very first startup when the catalog is still empty.
-if (!db.prepare('SELECT 1 FROM apps LIMIT 1').get()) {
+// Seed demo apps only on a brand-new installation (no apps and no users yet), so an
+// admin who deleted every app does not get the demo apps back on the next restart.
+if (!db.prepare('SELECT 1 FROM apps LIMIT 1').get() && !db.prepare('SELECT 1 FROM users LIMIT 1').get()) {
   const result = restoreDefaultDemoApps(db, DEFAULT_GROUP_ID);
   console.log(`Seeded ${result.total} demo apps (${result.created} created, ${result.updated} refreshed).`);
 }
