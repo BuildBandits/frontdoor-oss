@@ -15,7 +15,7 @@ import usersRoutes from './routes/users.js';
 import groupsRoutes from './routes/groups.js';
 import logsRoutes from './routes/logs.js';
 import { isPluginSystemEnabled } from './services/branding.js';
-import { PLUGIN_ASSET_DIR } from './services/plugins.js';
+import { PLUGIN_ASSET_DIR, isServablePluginEntry } from './services/plugins.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -126,8 +126,9 @@ export function createApp() {
   });
 
   // API routes
+  // Only the entry files of enabled, approved plugins are served (to anyone).
   app.use('/api/plugins/files', (req, res, next) => {
-    if (!isPluginSystemEnabled()) {
+    if (!isPluginSystemEnabled() || !isServablePluginEntry(`/api/plugins/files${req.path}`)) {
       return res.status(404).end();
     }
     return express.static(PLUGIN_ASSET_DIR, { dotfiles: 'deny' })(req, res, next);

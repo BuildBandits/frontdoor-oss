@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, isAdminViewer, isAdminEditor, isOwner } from '../middleware/auth.js';
 import { isPluginSystemEnabled } from '../services/branding.js';
+import { logRbacAudit } from '../db.js';
 import {
   buildRuntimePluginPayload,
   approvePluginRegistry,
@@ -14,6 +15,21 @@ import {
 } from '../services/plugins.js';
 
 const router = express.Router();
+
+// Approval changes only through the owner-only approve/revoke endpoints.
+function withoutApproval(body) {
+  const { approved: _approved, approvedBy: _approvedBy, approvedAt: _approvedAt, ...input } = body || {};
+  return input;
+}
+
+function auditPluginChange(req, action, plugin) {
+  if (!plugin) return;
+  logRbacAudit(req.user.id, action, 'plugin', plugin.id, {
+    name: plugin.name,
+    version: plugin.version,
+    source: plugin.source,
+  });
+}
 
 router.get('/runtime', (_req, res) => {
   if (!isPluginSystemEnabled()) {
@@ -44,7 +60,8 @@ router.get('/:id', authenticate, isAdminViewer, (req, res) => {
 
 router.post('/', authenticate, isAdminEditor, (req, res) => {
   try {
-    const plugin = upsertPluginRegistry(req.body || {});
+    const plugin = upsertPluginRegistry(withoutApproval(req.body));
+    auditPluginChange(req, 'create', plugin);
     return res.status(201).json({ plugin });
   } catch (error) {
     return res.status(400).json({
@@ -56,7 +73,8 @@ router.post('/', authenticate, isAdminEditor, (req, res) => {
 
 router.post('/import', authenticate, isAdminEditor, async (req, res) => {
   try {
-    const plugin = await importPluginBundle(req.body || {});
+    const plugin = await importPluginBundle(withoutApproval(req.body));
+    auditPluginChange(req, 'import', plugin);
     return res.status(201).json({ plugin });
   } catch (error) {
     return res.status(400).json({
@@ -69,9 +87,10 @@ router.post('/import', authenticate, isAdminEditor, async (req, res) => {
 router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
   try {
     const plugin = await importPluginBundle({
-      ...req.body,
+      ...withoutApproval(req.body),
       id: req.params.id,
     });
+    auditPluginChange(req, 'update', plugin);
     return res.json({ plugin });
   } catch (error) {
     return res.status(400).json({
@@ -82,10 +101,12 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
 });
 
 router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
+  const existing = getPluginRegistryById(req.params.id);
   const removed = deletePluginRegistry(req.params.id);
   if (!removed) {
     return res.status(404).json({ error: 'Plugin not found', code: 'plugin_not_found' });
   }
+  auditPluginChange(req, 'delete', existing);
   return res.json({ deleted: true });
 });
 

@@ -4,6 +4,7 @@ import db, { logRbacAudit } from '../db.js';
 import { v4 as uuidv4 } from 'uuid';
 import { extractPluginPackageZip } from '../../shared/packageZip.js';
 import { isPluginSystemEnabled } from './branding.js';
+import { isPublicDestination } from './networkGuard.js';
 const PLUGIN_ASSET_DIR = path.resolve(process.env.PLUGIN_ASSET_DIR || path.join(process.cwd(), 'data', 'plugins'));
 
 function safeJsonParse(value, fallback) {
@@ -584,10 +585,18 @@ export async function dispatchPluginEvent(eventName, payload = {}, context = {})
 
     summary.attempted += 1;
 
+    // Resolved at delivery time: a host that resolves to a private address is refused.
+    if (!(await isPublicDestination(row.backend_url))) {
+      summary.failed += 1;
+      summary.errors.push({ pluginId: row.id, message: 'Backend webhook destination is not allowed' });
+      continue;
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
     try {
       const response = await fetch(row.backend_url, {
+        redirect: 'manual',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -613,6 +622,7 @@ export async function dispatchPluginEvent(eventName, payload = {}, context = {})
         signal: controller.signal,
       });
 
+      // Redirects are not followed: a 3xx counts as a failed delivery.
       if (!response.ok) {
         summary.failed += 1;
         summary.errors.push({
@@ -641,11 +651,20 @@ export function buildRuntimePluginPayload() {
   if (!isPluginSystemEnabled()) {
     return [];
   }
-  return getRuntimePlugins().map((plugin) => ({
-    manifest: plugin.manifest,
-    source: plugin.source,
-    entry: plugin.entry,
-  }));
+  // The runtime manifest is public: it never carries backend (webhook) details.
+  return getRuntimePlugins().map((plugin) => {
+    const { backend: _backend, ...manifest } = plugin.manifest || {};
+    return {
+      manifest,
+      source: plugin.source,
+      entry: plugin.entry,
+    };
+  });
+}
+
+/** True when a /api/plugins/files/... path is the entry of an enabled, approved plugin. */
+export function isServablePluginEntry(entryPath) {
+  return Boolean(db.prepare('SELECT 1 FROM plugin_registry WHERE entry = ? AND enabled = 1 AND approved = 1').get(entryPath));
 }
 
 export { PLUGIN_ASSET_DIR };

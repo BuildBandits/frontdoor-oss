@@ -1,6 +1,7 @@
 import test, { beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
+import dnsPromises from 'node:dns/promises';
 import db from '../server/db.js';
 import {
   approvePluginRegistry,
@@ -14,7 +15,9 @@ beforeEach(() => {
   db.prepare("UPDATE branding_settings SET plugins_enabled = 0 WHERE id = 'default'").run();
 });
 
-test('pending plugins stay out of runtime and backend delivery until approved', async () => {
+test('pending plugins stay out of runtime and backend delivery until approved', async (t) => {
+  // Webhook hosts are resolved before delivery; keep the test offline with a public address.
+  t.mock.method(dnsPromises, 'lookup', async () => [{ address: '93.184.216.34', family: 4 }]);
   const originalFetch = global.fetch;
   let fetchCalls = 0;
   global.fetch = async () => {
