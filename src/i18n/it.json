@@ -1337,7 +1337,11 @@
         },
         "plugin": {
           "approve": "Ha approvato il plugin {target}",
-          "revoke": "Ha revocato l'approvazione del plugin {target}"
+          "revoke": "Ha revocato l'approvazione del plugin {target}",
+          "create": "Ha aggiunto il plugin {target}",
+          "import": "Ha importato il plugin {target}",
+          "update": "Ha modificato il plugin {target}",
+          "delete": "Ha eliminato il plugin {target}"
         }
       },
       "fields": {

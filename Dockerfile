@@ -13,6 +13,14 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+# Optional plugin loader settings baked into the frontend at build time
+# (see docs/plugins.md; the plugin platform is currently locked off).
+ARG VITE_FRONTDOOR_PLUGIN_MANIFESTS=
+ARG VITE_FRONTDOOR_PLUGIN_MODULES=
+ARG VITE_FRONTDOOR_ENABLE_SAMPLE_PLUGIN=
+ENV VITE_FRONTDOOR_PLUGIN_MANIFESTS=${VITE_FRONTDOOR_PLUGIN_MANIFESTS} \
+    VITE_FRONTDOOR_PLUGIN_MODULES=${VITE_FRONTDOOR_PLUGIN_MODULES} \
+    VITE_FRONTDOOR_ENABLE_SAMPLE_PLUGIN=${VITE_FRONTDOOR_ENABLE_SAMPLE_PLUGIN}
 RUN npm run build \
     && npm prune --omit=dev \
     && npm cache clean --force
