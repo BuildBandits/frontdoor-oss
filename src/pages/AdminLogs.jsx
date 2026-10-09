@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Activity, BarChart3, Users, AppWindow, AlertCircle, Filter } from 'lucide-react';
 import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
@@ -8,6 +8,7 @@ import DropdownSelect from '../components/DropdownSelect';
 import PaginationControls from '../components/PaginationControls';
 import useDebouncedValue from '../hooks/useDebouncedValue';
 import { useAuthStore } from '../stores/authStore';
+import { useLatestRequest } from '../hooks/useLatestRequest';
 import { useBrandingLanguage, useBrandingTimeZone } from '../stores/brandingStore';
 import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { formatDateTimeWithTimeZone } from '../utils/dateTime';
@@ -35,10 +36,9 @@ export default function AdminLogs() {
   const debouncedSearch = useDebouncedValue(search);
   // Only the latest request may update the list (an older, slower answer would
   // otherwise overwrite newer results).
-  const logsRequestRef = useRef(0);
+  const { begin: beginLogsRequest } = useLatestRequest();
   const loadLogs = useCallback(async (p = 1) => {
-    const requestId = logsRequestRef.current + 1;
-    logsRequestRef.current = requestId;
+    const isLatest = beginLogsRequest();
     setLoading(true);
     try {
       const res = await api.get('/logs', {
@@ -49,17 +49,17 @@ export default function AdminLogs() {
           q: debouncedSearch,
         },
       });
-      if (requestId !== logsRequestRef.current) return;
+      if (!isLatest()) return;
       setLogs(res.data.logs);
       setPagination(res.data.pagination);
       setStats(res.data.stats);
       setLoadFailed(false);
     } catch {
-      if (requestId !== logsRequestRef.current) return;
+      if (!isLatest()) return;
       setLoadFailed(true);
     }
     setLoading(false);
-  }, [pageSize, retentionDays, debouncedSearch]);
+  }, [beginLogsRequest, pageSize, retentionDays, debouncedSearch]);
 
   const loadTopApps = useCallback(async () => {
     try {

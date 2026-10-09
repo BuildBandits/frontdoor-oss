@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, ExternalLink, Filter, Image, RefreshCw, Tag, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import api from '../services/api';
@@ -6,6 +6,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import Tooltip from '../components/Tooltip';
 import { useAuthStore } from '../stores/authStore';
+import { useLatestRequest } from '../hooks/useLatestRequest';
 import { useBrandingLanguage, useBrandingTimeZone } from '../stores/brandingStore';
 import useDebouncedValue from '../hooks/useDebouncedValue';
 import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
@@ -83,11 +84,9 @@ export default function AdminIcons() {
 
   const debouncedSearch = useDebouncedValue(search);
   // Only the latest request may update the list.
-  const assetsRequestRef = useRef(0);
+  const { begin: beginAssetsRequest } = useLatestRequest();
   const loadAssets = useCallback(async (requestedPage = 1) => {
-    const requestId = assetsRequestRef.current + 1;
-    assetsRequestRef.current = requestId;
-    const isLatest = () => requestId === assetsRequestRef.current;
+    const isLatest = beginAssetsRequest();
     setLoading(true);
     try {
       const res = await api.get('/media-assets', {
@@ -129,7 +128,7 @@ export default function AdminIcons() {
     } finally {
       if (isLatest()) setLoading(false);
     }
-  }, [kindFilter, pageSize, debouncedSearch, ui.admin.icons.loadFailed]);
+  }, [beginAssetsRequest, kindFilter, pageSize, debouncedSearch, ui.admin.icons.loadFailed]);
 
   useEffect(() => {
     loadAssets(page);

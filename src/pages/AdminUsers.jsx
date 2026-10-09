@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, Wand2, Filter } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
+import { useLatestRequest } from '../hooks/useLatestRequest';
 import { useBranding } from '../stores/brandingStore';
 import UserAvatar from '../components/UserAvatar';
 import AppIcon from '../components/AppIcon';
@@ -129,23 +130,22 @@ export default function AdminUsers() {
 
   // Only the latest detail request may update the panel, so a slower answer for a
   // user that is no longer expanded cannot appear (and be acted on) under another one.
-  const detailRequestRef = useRef(0);
+  const detailRequest = useLatestRequest();
   const loadUserDetail = async (userId) => {
-    const requestId = detailRequestRef.current + 1;
-    detailRequestRef.current = requestId;
+    const isLatest = detailRequest.begin();
     setDetailLoading(true);
     try {
       const res = await api.get(`/users/${userId}`);
-      if (requestId === detailRequestRef.current) setUserDetail(res.data && typeof res.data === 'object' ? res.data : null);
+      if (isLatest()) setUserDetail(res.data && typeof res.data === 'object' ? res.data : null);
     } catch {
-      if (requestId === detailRequestRef.current) showToast(t.errorLoadingUserDetail, 'error');
+      if (isLatest()) showToast(t.errorLoadingUserDetail, 'error');
     }
-    if (requestId === detailRequestRef.current) setDetailLoading(false);
+    if (isLatest()) setDetailLoading(false);
   };
 
   const toggleExpand = async (userId) => {
     if (expandedUser === userId) {
-      detailRequestRef.current += 1;
+      detailRequest.cancel();
       setExpandedUser(null);
       setUserDetail(null);
       setShowVisibleApps(false);

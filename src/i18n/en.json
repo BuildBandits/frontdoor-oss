@@ -1241,6 +1241,7 @@
       "details": "Details",
       "emptyTitle": "No audit logs",
       "emptyBody": "Audit rows are written when privileged users perform admin actions",
+      "loadFailed": "The audit log could not be loaded.",
       "removedUser": "Removed user",
       "pageSummary": "Page {page} of {pages} · {total} total events",
       "copyJson": "Copy JSON",
