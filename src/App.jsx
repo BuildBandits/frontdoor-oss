@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useSyncExternalStore } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router';
 import { useAuthStore } from './stores/authStore';
 import { useBrandingStore } from './stores/brandingStore';
@@ -6,7 +6,7 @@ import { loginPathFor } from './utils/returnPath';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
 import api from './services/api';
-import { getUiStrings } from './i18n';
+import { getLoadedLanguagesVersion, getUiStrings, isLanguageLoaded, subscribeToLanguages } from './i18n';
 import { useColorScheme } from './hooks/useColorScheme';
 import { useDocumentLanguage } from './hooks/useDocumentLanguage';
 import PluginHostProvider, { usePluginRuntimeApi } from './pluginHost/PluginHostProvider';
@@ -90,12 +90,15 @@ function AppRoutes() {
   const { isAuthenticated, user, updateUser } = useAuthStore();
   useColorScheme(user?.preferredColorScheme);
   const { effective: language } = useDocumentLanguage(user?.preferredLanguage);
+  // Re-render the whole app when a dictionary finishes loading.
+  useSyncExternalStore(subscribeToLanguages, getLoadedLanguagesVersion);
   const ui = getUiStrings(language);
   // Known from the user's own choice, the branding cached in this browser or the
   // server's answer. Only the very first visit has to wait for branding.
   const languageKnown = useBrandingStore((state) => (
     Boolean(state.branding) || state.loaded || state.failed
   )) || Boolean(user?.preferredLanguage);
+  const languageReady = languageKnown && isLanguageLoaded(language);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return undefined;
@@ -132,7 +135,7 @@ function AppRoutes() {
   ];
 
   // No fallback English texts that switch language a moment later (#119).
-  if (!languageKnown) {
+  if (!languageReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] dark:bg-gray-950" role="status" aria-busy="true">
         <span className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-dark dark:border-gray-700 dark:border-t-gray-200" />

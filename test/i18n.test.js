@@ -1,8 +1,23 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getUiStrings } from '../src/i18n/index.js';
+import { getUiStrings, isLanguageLoaded, loadLanguage } from '../src/i18n/index.js';
 import { analyzeI18n, formatI18nReport } from '../scripts/check-i18n.mjs';
+
+describe('i18n loading', () => {
+  it('loads a dictionary only when asked, and falls back to a loaded one meanwhile', async () => {
+    // This file loads nothing at import time, so the first test sees no dictionary.
+    assert.equal(isLanguageLoaded('en'), false);
+    assert.throws(() => getUiStrings('en'), /No UI language loaded/);
+    await loadLanguage('en');
+    assert.equal(isLanguageLoaded('it'), false);
+    // Italian is requested and starts loading; English stands in until it arrives.
+    assert.equal(getUiStrings('it'), getUiStrings('en'));
+    await loadLanguage('it');
+    assert.equal(isLanguageLoaded('it'), true);
+    assert.notEqual(getUiStrings('it'), getUiStrings('en'));
+  });
+});
 
 describe('i18n dictionaries', () => {
   it('have no duplicate keys', () => {

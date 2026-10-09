@@ -121,7 +121,7 @@ export default function Customization() {
   const maintenanceSectionRef = useRef(null);
   const pluginsSectionRef = useRef(null);
   const brandingLogoInputRef = useRef(null);
-  const ui = useMemo(() => getUiStrings(uiLanguage), [uiLanguage]);
+  const ui = getUiStrings(uiLanguage);
   const languageOptions = useMemo(() => getSupportedLanguageOptions(ui), [ui]);
   const timeZoneOptions = useMemo(() => getSupportedTimeZoneOptions(), []);
   const selectClassName = 'flex-none w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 focus:border-accent focus:ring-accent lg:w-[288px] shrink-0 disabled:opacity-70';
