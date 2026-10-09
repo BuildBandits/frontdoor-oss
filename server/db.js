@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { restoreDefaultDemoApps } from './services/demoApps.js';
 import { withAuditRefs } from './services/auditDetails.js';
 import { DEFAULT_LANGUAGE } from '../shared/languages.js';
+import { DEFAULT_GROUP_ID } from '../shared/groups.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'frontdoor.db');
@@ -575,7 +576,6 @@ ensureColumn('auth_pending_states', 'code_verifier', 'code_verifier TEXT');
 ensureColumn('auth_pending_states', 'browser_nonce_hash', 'browser_nonce_hash TEXT');
 
 // --- RBAC Bootstrap: "default" group + backfill ---
-const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
 
 // Ensure "default" group exists
 db.prepare(`INSERT OR IGNORE INTO user_groups (id, name, description) VALUES (?, 'default', 'Default group: new users are added here')`)

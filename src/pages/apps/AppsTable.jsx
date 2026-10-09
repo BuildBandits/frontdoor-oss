@@ -99,6 +99,10 @@ export default function AppsTable({
                   </td>
                   <td className="px-6 py-4 text-center">
                     <button
+                      type="button"
+                      role="switch"
+                      aria-checked={Boolean(app.is_active)}
+                      aria-label={`${t.active}: ${app.name}`}
                       onClick={() => handleToggle(app)}
                       disabled={!canEdit}
                       className={`w-10 h-6 rounded-full transition-colors relative inline-flex items-center ${
@@ -120,12 +124,15 @@ export default function AppsTable({
                         onClick={() => jumpToGroupsForApp(app)}
                         className="p-2 text-gray-400 dark:text-gray-500 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         title={a.goToGroupsSearch}
+                        aria-label={a.goToGroupsSearch}
                       >
                         <Users className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => openEdit(app)}
                         disabled={!canEdit}
+                        title={a.editApp}
+                        aria-label={`${a.editApp}: ${app.name}`}
                         className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Pencil className="w-4 h-4" />
@@ -142,6 +149,8 @@ export default function AppsTable({
                       <button
                         onClick={() => handleDelete(app)}
                         disabled={!canEdit}
+                        title={a.deleteTitle}
+                        aria-label={`${a.deleteTitle}: ${app.name}`}
                         className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Trash2 className="w-4 h-4" />
