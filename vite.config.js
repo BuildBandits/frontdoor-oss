@@ -24,7 +24,7 @@ export default defineConfig({
             { name: 'vendor-react', test: /[\\/]node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/, priority: 40 },
             { name: 'vendor-icons', test: /[\\/]node_modules[\\/]lucide-react[\\/]/, priority: 30 },
             { name: 'vendor-dnd', test: /[\\/]node_modules[\\/]@dnd-kit[\\/]/, priority: 20 },
-            { name: 'vendor-shared', test: /[\\/]node_modules[\\/](dompurify|axios|zustand|clsx|uuid)[\\/]/, priority: 10 },
+            { name: 'vendor-shared', test: /[\\/]node_modules[\\/](dompurify|axios|zustand|uuid)[\\/]/, priority: 10 },
           ],
         },
       },

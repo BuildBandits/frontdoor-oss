@@ -24,6 +24,16 @@ for (const entry of fs.readdirSync(os.tmpdir(), { withFileTypes: true })) {
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), PREFIX));
 
+// Settings from the developer's shell or .env must not change test results:
+// tests that need one of these set it themselves.
+for (const name of [
+  'ADMIN_EMAILS', 'ADMIN_API_KEY', 'DEV_LOGIN', 'ENTRA_GROUP_SYNC', 'ENTRA_TENANT_REFRESH_MINUTES',
+  'JWT_SECRET', 'JWT_ISSUER', 'JWT_EXPIRES_IN', 'CORS_ALLOWED_ORIGINS', 'FRONTEND_URL', 'BASE_DOMAIN',
+  'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TENANT_ID', 'AZURE_REDIRECT_URI', 'TIMEZONE', 'TZ',
+]) {
+  delete process.env[name];
+}
+
 const defaults = {
   DATABASE_PATH: path.join(root, 'frontdoor.db'),
   APP_ICON_CACHE_DIR: path.join(root, 'app-icon-cache'),
