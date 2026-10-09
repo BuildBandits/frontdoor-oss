@@ -7,7 +7,8 @@ import ClearableSearchField from '../components/ClearableSearchField';
 import Tooltip from '../components/Tooltip';
 import { useAuthStore } from '../stores/authStore';
 import useDebouncedValue from '../hooks/useDebouncedValue';
-import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { blobToDataUrl, downscaleIconDataUrl, isResizableIconType } from '../utils/iconImages';
 import { formatDateTimeWithTimeZone } from '../utils/dateTime';
 import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
@@ -55,6 +56,9 @@ export default function AdminIcons() {
   const [summary, setSummary] = useState({ total: 0, appIcon: 0, brandingLogo: 0, orphanAssets: 0 });
   const [notice, setNotice] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const [largeIcons, setLargeIcons] = useState([]);
+  const [optimizeProgress, setOptimizeProgress] = useState(null);
+  const canEditApps = user?.role !== 'admin_readonly';
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [expandedAssetIds, setExpandedAssetIds] = useState([]);
 
@@ -219,7 +223,72 @@ export default function AdminIcons() {
     setConfirmDialog(null);
   };
 
+  const loadLargeIcons = useCallback(async () => {
+    try {
+      const res = await api.get('/media-assets/large-icons');
+      setLargeIcons(Array.isArray(res.data?.icons) ? res.data.icons : []);
+    } catch {
+      setLargeIcons([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadLargeIcons();
+  }, [loadLargeIcons]);
+
+  // Shrinks every large PNG, JPEG or WebP icon in this browser (as the app form does)
+  // and saves it through the normal app update, so each change is audited.
+  const optimizableIcons = largeIcons.filter((icon) => icon.optimizable);
+  const optimizeIcons = async () => {
+    const icons = [...optimizableIcons];
+    const counts = { optimized: 0, skipped: 0, failed: 0 };
+    setOptimizeProgress({ done: 0, total: icons.length });
+    for (const [index, icon] of icons.entries()) {
+      try {
+        const response = await fetch(`/api/apps/${encodeURIComponent(icon.id)}/icon`, { credentials: 'include' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        if (!isResizableIconType(blob.type)) {
+          counts.skipped += 1;
+        } else {
+          const original = await blobToDataUrl(blob);
+          const shrunk = await downscaleIconDataUrl(original, blob.type);
+          if (shrunk === original) {
+            counts.skipped += 1;
+          } else {
+            await api.put(`/apps/${encodeURIComponent(icon.id)}`, { iconDataUrl: shrunk });
+            counts.optimized += 1;
+          }
+        }
+      } catch {
+        counts.failed += 1;
+      }
+      setOptimizeProgress({ done: index + 1, total: icons.length });
+    }
+    setOptimizeProgress(null);
+    // Reload first: loading the library clears the notice.
+    await Promise.all([loadLargeIcons(), loadAssets(page)]);
+    setNotice({
+      type: counts.failed > 0 ? 'error' : 'success',
+      message: formatMessage(ui.admin.icons.optimizeDone, counts),
+    });
+  };
+
+  const askOptimizeIcons = () => {
+    setConfirmDialog({
+      title: ui.admin.icons.optimizeConfirmTitle,
+      message: formatMessage(ui.admin.icons.optimizeConfirmMessage, { count: optimizableIcons.length }),
+      confirmLabel: ui.admin.icons.optimizeAction,
+      action: 'optimize',
+    });
+  };
+
   const runConfirm = async () => {
+    if (confirmDialog?.action === 'optimize') {
+      setConfirmDialog(null);
+      await optimizeIcons();
+      return;
+    }
     if (!confirmDialog?.assetId) return;
     setConfirmBusy(true);
     try {
@@ -293,10 +362,43 @@ export default function AdminIcons() {
       {notice && (
         <div className={`mb-6 rounded-2xl border px-4 py-3 text-sm font-medium ${
           notice.type === 'error'
-            ? 'border-red-200 bg-red-50 text-red-700'
+            ? 'border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300'
             : 'border-accent/30 bg-accent/10 text-dark dark:text-gray-100'
         }`}>
           {notice.message}
+        </div>
+      )}
+
+      {largeIcons.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 px-4 py-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                {formatMessage(ui.admin.icons.largeIconsTitle, { count: largeIcons.length })}
+              </p>
+              <p className="mt-1 text-sm text-amber-800 dark:text-amber-200/80">{ui.admin.icons.largeIconsHelp}</p>
+              <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-amber-800 dark:text-amber-200/80">
+                {largeIcons.slice(0, 6).map((icon) => (
+                  <li key={icon.id}>
+                    {icon.name}: {formatSize(icon.bytes)}{icon.size ? `, ${icon.size.width}×${icon.size.height} px` : ''}
+                  </li>
+                ))}
+                {largeIcons.length > 6 && <li>{formatMessage(ui.admin.audit.andMore, { count: largeIcons.length - 6 })}</li>}
+              </ul>
+            </div>
+            {canEditApps && optimizableIcons.length > 0 && (
+              <button
+                type="button"
+                onClick={askOptimizeIcons}
+                disabled={Boolean(optimizeProgress)}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-60"
+              >
+                {optimizeProgress
+                  ? formatMessage(ui.admin.icons.optimizeProgress, optimizeProgress)
+                  : ui.admin.icons.optimizeAction}
+              </button>
+            )}
+          </div>
         </div>
       )}
 

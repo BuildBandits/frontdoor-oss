@@ -99,5 +99,5 @@ test('large app icons in use are found for the startup report, with PNG dimensio
   db.prepare("INSERT INTO apps (id, name, slug, target_url, icon_file_name) VALUES ('icon-small', 'Small Icon App', 'small-icon-app', 'https://small.example.com', 'small.png')").run();
 
   const large = await findLargeAppIcons({ cacheDir: dir });
-  assert.deepEqual(large, [{ name: 'Big Icon App', bytes: 300 * 1024, size: { width: 3000, height: 2000 } }]);
+  assert.deepEqual(large, [{ id: 'icon-big', name: 'Big Icon App', bytes: 300 * 1024, size: { width: 3000, height: 2000 }, optimizable: true }]);
 });

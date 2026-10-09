@@ -466,6 +466,7 @@ Every error response is JSON with a human-readable `error` and a stable snake_ca
 | POST | `/api/groups/entra/import` | Admin editor | Import discovered Entra groups |
 | POST | `/api/groups/entra/force-sync` | Admin editor | Sync Entra memberships for all linked users |
 | GET | `/api/media-assets` | Admin viewer | Media library (icons and logos) |
+| GET | `/api/media-assets/large-icons` | Admin viewer | App icons larger than 200 KB, with pixel size and whether they can be optimized |
 | GET | `/api/media-assets/:id` | Admin viewer | Media asset detail |
 | GET | `/api/media-assets/:id/file` | Admin viewer | Media asset file (images only) |
 | DELETE | `/api/media-assets/:id` | Admin editor | Delete an unused media asset |

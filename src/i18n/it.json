@@ -957,7 +957,14 @@
       "refreshed": "Indice aggiornato",
       "paginationSummary": "Pagina {page} di {pages} · {total} asset totali",
       "previousPage": "Precedente",
-      "nextPage": "Successiva"
+      "nextPage": "Successiva",
+      "largeIconsTitle": "{count} icone di app superano i 200 KB",
+      "largeIconsHelp": "Le icone grandi appesantiscono la Home: ogni icona viene decodificata a dimensione piena anche se è mostrata piccola. L’ottimizzazione riduce le icone PNG, JPEG e WebP a massimo 256 px; le icone SVG, GIF e ICO restano invariate.",
+      "optimizeAction": "Ottimizza icone",
+      "optimizeProgress": "Ottimizzazione {done}/{total}…",
+      "optimizeConfirmTitle": "Ottimizzare le icone grandi?",
+      "optimizeConfirmMessage": "{count} icone verranno ridotte a massimo 256 px in questo browser e salvate sulle rispettive app. Ogni modifica viene registrata nell’audit.",
+      "optimizeDone": "Icone ottimizzate: {optimized}. Lasciate invariate: {skipped}. Non riuscite: {failed}."
     },
     "groups": {
       "title": "Gruppi",
@@ -1506,6 +1513,7 @@
     "entra_group_read_only": "I gruppi sincronizzati con Entra non possono essere modificati localmente.",
     "entra_groups_not_found": "Uno o più gruppi Entra non sono stati trovati.",
     "entra_membership_managed": "Le membership dei gruppi sincronizzati con Entra si gestiscono in Microsoft Entra.",
+    "failed_to_check_icons": "Impossibile controllare la dimensione delle icone.",
     "failed_to_clean_icon_cache": "Impossibile pulire la cache delle icone delle app.",
     "failed_to_compact_database": "Impossibile compattare lo spazio del database.",
     "failed_to_create_app": "Impossibile creare l'app.",

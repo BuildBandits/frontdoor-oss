@@ -957,7 +957,14 @@
       "refreshed": "Index refreshed",
       "paginationSummary": "Page {page} of {pages} · {total} assets total",
       "previousPage": "Previous",
-      "nextPage": "Next"
+      "nextPage": "Next",
+      "largeIconsTitle": "{count} app icons are larger than 200 KB",
+      "largeIconsHelp": "Large icons slow down Home: every icon is decoded at full size even though it is shown small. Optimizing shrinks PNG, JPEG and WebP icons to at most 256 px; SVG, GIF and ICO icons are left as they are.",
+      "optimizeAction": "Optimize icons",
+      "optimizeProgress": "Optimizing {done}/{total}…",
+      "optimizeConfirmTitle": "Optimize the large icons?",
+      "optimizeConfirmMessage": "{count} icons will be shrunk to at most 256 px in this browser and saved on their apps. Each change is recorded in the audit log.",
+      "optimizeDone": "Icons optimized: {optimized}. Left as they are: {skipped}. Failed: {failed}."
     },
     "groups": {
       "title": "Groups",
@@ -1506,6 +1513,7 @@
     "entra_group_read_only": "Entra-synced groups cannot be edited locally.",
     "entra_groups_not_found": "One or more Entra groups were not found.",
     "entra_membership_managed": "Memberships of Entra-synced groups are managed in Microsoft Entra.",
+    "failed_to_check_icons": "The icon sizes could not be checked.",
     "failed_to_clean_icon_cache": "Could not clean the app icon cache.",
     "failed_to_compact_database": "Could not compact the database storage.",
     "failed_to_create_app": "Could not create the app.",

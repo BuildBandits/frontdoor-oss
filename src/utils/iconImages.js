@@ -37,3 +37,12 @@ export async function downscaleIconDataUrl(dataUrl, type) {
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL(type === 'image/jpeg' ? 'image/jpeg' : 'image/png', 0.92);
 }
+
+export function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('icon could not be read'));
+    reader.readAsDataURL(blob);
+  });
+}

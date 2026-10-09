@@ -5,7 +5,7 @@ import { purgeLogsOlderThan } from './routes/logs.js';
 import { getStartupConfig, validateStartupEnv } from './config.js';
 import { getBrandingSettings } from './services/branding.js';
 import { backfillMediaLibrary } from './services/mediaAssets.js';
-import { findLargeAppIcons } from './services/appIcons.js';
+import { findLargeAppIcons, LARGE_ICON_THRESHOLD_BYTES } from './services/appIcons.js';
 
 const PORT = process.env.PORT || 3001;
 
@@ -60,8 +60,6 @@ function logDatabaseBackedSettings() {
   }
 }
 
-const LARGE_ICON_THRESHOLD_BYTES = 200 * 1024;
-
 async function logLargeAppIcons() {
   try {
     const large = await findLargeAppIcons({ thresholdBytes: LARGE_ICON_THRESHOLD_BYTES });
@@ -69,7 +67,7 @@ async function logLargeAppIcons() {
       console.log(`[startup][icons] all app icons are under ${LARGE_ICON_THRESHOLD_BYTES / 1024} KB`);
       return;
     }
-    console.warn(`[startup][icons] ${large.length} app icon(s) larger than ${LARGE_ICON_THRESHOLD_BYTES / 1024} KB; upload them again from the app form to shrink them:`);
+    console.warn(`[startup][icons] ${large.length} app icon(s) larger than ${LARGE_ICON_THRESHOLD_BYTES / 1024} KB; shrink them with Optimize icons in Admin > Media library:`);
     for (const icon of large.slice(0, 20)) {
       const size = icon.size ? `, ${icon.size.width}x${icon.size.height} px` : '';
       console.warn(`  ${icon.name}: ${(icon.bytes / 1024).toFixed(0)} KB${size}`);
