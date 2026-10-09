@@ -83,3 +83,21 @@ test('branding logos over the size limit are refused', async () => {
     (error) => error.code === 'logo_too_large' && error.statusCode === 413,
   );
 });
+
+test('large app icons in use are found for the startup report, with PNG dimensions', async () => {
+  const { findLargeAppIcons } = await import('../server/services/appIcons.js');
+  const { default: db } = await import('../server/db.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'frontdoor-large-icons-'));
+  // PNG header with IHDR 3000x2000, padded to 300 KB.
+  const png = Buffer.alloc(300 * 1024);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]).copy(png, 0);
+  png.writeUInt32BE(3000, 16);
+  png.writeUInt32BE(2000, 20);
+  fs.writeFileSync(path.join(dir, 'big.png'), png);
+  fs.writeFileSync(path.join(dir, 'small.png'), Buffer.alloc(10 * 1024));
+  db.prepare("INSERT INTO apps (id, name, slug, target_url, icon_file_name) VALUES ('icon-big', 'Big Icon App', 'big-icon-app', 'https://big.example.com', 'big.png')").run();
+  db.prepare("INSERT INTO apps (id, name, slug, target_url, icon_file_name) VALUES ('icon-small', 'Small Icon App', 'small-icon-app', 'https://small.example.com', 'small.png')").run();
+
+  const large = await findLargeAppIcons({ cacheDir: dir });
+  assert.deepEqual(large, [{ name: 'Big Icon App', bytes: 300 * 1024, size: { width: 3000, height: 2000 } }]);
+});
