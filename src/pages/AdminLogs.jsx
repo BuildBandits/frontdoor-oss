@@ -8,9 +8,10 @@ import DropdownSelect from '../components/DropdownSelect';
 import PaginationControls from '../components/PaginationControls';
 import useDebouncedValue from '../hooks/useDebouncedValue';
 import { useAuthStore } from '../stores/authStore';
-import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { useBrandingLanguage, useBrandingTimeZone } from '../stores/brandingStore';
+import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { formatDateTimeWithTimeZone } from '../utils/dateTime';
-import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
+import { resolveAppTimeZone } from '../../shared/timeZones.js';
 
 export default function AdminLogs() {
   const { user } = useAuthStore();
@@ -25,29 +26,9 @@ export default function AdminLogs() {
   const [search, setSearch] = useState('');
   const [retentionDays, setRetentionDays] = useState(30);
   const [pageSize, setPageSize] = useState(50);
-  const [brandingLanguage, setBrandingLanguage] = useState('en');
-  const [brandingTimeZone, setBrandingTimeZone] = useState('UTC');
+  const brandingLanguage = useBrandingLanguage();
+  const brandingTimeZone = useBrandingTimeZone();
   const timeZone = resolveAppTimeZone(user?.preferredTimeZone, brandingTimeZone);
-
-  useEffect(() => {
-    let cancelled = false;
-    api.get('/branding')
-      .then((res) => {
-        if (!cancelled) {
-          setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
-          setBrandingTimeZone(normalizeTimeZone(res.data?.branding?.defaultTimeZone, 'UTC'));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setBrandingLanguage('en');
-          setBrandingTimeZone('UTC');
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
 

@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
-import api from '../services/api';
+import { useEffect } from 'react';
+import { useBranding } from '../stores/brandingStore';
 import {
-  DEFAULT_COLOR_SCHEME,
   normalizeColorScheme,
   resolveAppColorScheme,
 } from '../../shared/colorSchemes.js';
@@ -26,29 +25,7 @@ function isDarkScheme(effective) {
 }
 
 export function useColorScheme(preferredColorScheme) {
-  const [brandingScheme, setBrandingScheme] = useState(DEFAULT_COLOR_SCHEME);
-
-  useEffect(() => {
-    let cancelled = false;
-    api.get('/branding')
-      .then((res) => {
-        if (cancelled) return;
-        setBrandingScheme(normalizeColorScheme(res.data?.branding?.defaultColorScheme));
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setBrandingScheme(DEFAULT_COLOR_SCHEME);
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    const onBrandingUpdated = (event) => {
-      setBrandingScheme(normalizeColorScheme(event.detail?.defaultColorScheme));
-    };
-    window.addEventListener('frontdoor:branding-updated', onBrandingUpdated);
-    return () => window.removeEventListener('frontdoor:branding-updated', onBrandingUpdated);
-  }, []);
+  const brandingScheme = normalizeColorScheme(useBranding()?.defaultColorScheme);
 
   const effective = resolveAppColorScheme(preferredColorScheme, brandingScheme);
 

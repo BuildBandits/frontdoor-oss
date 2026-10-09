@@ -19,7 +19,8 @@ import api from '../services/api';
 import Tooltip from '../components/Tooltip';
 import Modal from '../components/Modal';
 import { useAuthStore } from '../stores/authStore';
-import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { useBrandingLanguage } from '../stores/brandingStore';
+import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
 import { usePluginRegistry } from '../pluginHost/registry';
 import { moduleExample } from '../pluginHost/pluginDocsContent';
@@ -100,7 +101,7 @@ export default function AdminPlugins() {
   const isOwner = user?.role === 'owner';
   // Read-only admins can browse plugins but not install, edit, test or delete them.
   const canEdit = user?.role !== 'admin_readonly';
-  const [brandingLanguage, setBrandingLanguage] = useState('en');
+  const brandingLanguage = useBrandingLanguage();
   const snapshot = usePluginRegistry();
   const [serverPlugins, setServerPlugins] = useState([]);
   const [serverError, setServerError] = useState('');
@@ -114,19 +115,6 @@ export default function AdminPlugins() {
   const totalRoutes = plugins.reduce((sum, plugin) => sum + (plugin.routes?.length || 0), 0);
   const readyCount = plugins.filter((plugin) => plugin.status === 'ready').length;
   const errorCount = plugins.filter((plugin) => plugin.status === 'error').length;
-  useEffect(() => {
-    let cancelled = false;
-    api.get('/branding')
-      .then((res) => {
-        if (!cancelled) setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
-      })
-      .catch(() => {
-        if (!cancelled) setBrandingLanguage('en');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
   const t = ui.admin.plugins;

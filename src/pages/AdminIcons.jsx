@@ -6,11 +6,12 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import Tooltip from '../components/Tooltip';
 import { useAuthStore } from '../stores/authStore';
+import { useBrandingLanguage, useBrandingTimeZone } from '../stores/brandingStore';
 import useDebouncedValue from '../hooks/useDebouncedValue';
-import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { blobToDataUrl, downscaleIconDataUrl, isResizableIconType } from '../utils/iconImages';
 import { formatDateTimeWithTimeZone } from '../utils/dateTime';
-import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
+import { resolveAppTimeZone } from '../../shared/timeZones.js';
 
 const KIND_ORDER = ['app-icon', 'branding-logo'];
 
@@ -43,8 +44,8 @@ function AssetPreview({ asset, missingLabel }) {
 export default function AdminIcons() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
-  const [brandingLanguage, setBrandingLanguage] = useState('en');
-  const [brandingTimeZone, setBrandingTimeZone] = useState('UTC');
+  const brandingLanguage = useBrandingLanguage();
+  const brandingTimeZone = useBrandingTimeZone();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [assets, setAssets] = useState([]);
@@ -61,26 +62,6 @@ export default function AdminIcons() {
   const canEditApps = user?.role !== 'admin_readonly';
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [expandedAssetIds, setExpandedAssetIds] = useState([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    api.get('/branding')
-      .then((res) => {
-        if (!cancelled) {
-          setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
-          setBrandingTimeZone(normalizeTimeZone(res.data?.branding?.defaultTimeZone, 'UTC'));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setBrandingLanguage('en');
-          setBrandingTimeZone('UTC');
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
   const timeZone = resolveAppTimeZone(user?.preferredTimeZone, brandingTimeZone);

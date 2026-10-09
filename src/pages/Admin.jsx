@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, X, Save, Copy, Users, ChevronDown, ChevronUp, Che
 import { useNavigate, useSearchParams } from 'react-router';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
+import { useBranding } from '../stores/brandingStore';
 import TagInput from '../components/TagInput';
 import AppIcon from '../components/AppIcon';
 import PageNotice from '../components/PageNotice';
@@ -31,7 +32,7 @@ export default function Admin() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [apps, setApps] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [branding, setBranding] = useState(null);
+  const branding = useBranding();
   const [editing, setEditing] = useState(null); // null = closed, 'new' = creating, or app object
   const [form, setForm] = useState(emptyApp);
   const [loading, setLoading] = useState(true);
@@ -72,7 +73,7 @@ export default function Admin() {
   const tagFilterSearchRef = useRef(null);
   const tagFilterItemRefs = useRef([]);
   const canEdit = user?.role !== 'admin_readonly';
-  const [brandingLanguage, setBrandingLanguage] = useState('en');
+  const brandingLanguage = normalizeLanguage(branding?.defaultLanguage);
   const filterButtonMinWidth = 'min-w-[260px]';
 
   useEffect(() => {
@@ -150,18 +151,6 @@ export default function Admin() {
     });
   };
 
-  const loadBranding = () => {
-    api.get('/branding')
-      .then((res) => {
-        setBranding(res.data.branding || null);
-        setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
-      })
-      .catch(() => {
-        setBranding(null);
-        setBrandingLanguage('en');
-      });
-  };
-
   const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
   const ui = getUiStrings(language);
   const t = ui.admin.common;
@@ -171,7 +160,6 @@ export default function Admin() {
   const loadInitialData = useEffectEvent(() => {
     loadApps();
     loadGroups();
-    loadBranding();
   });
   useEffect(() => {
     loadInitialData();

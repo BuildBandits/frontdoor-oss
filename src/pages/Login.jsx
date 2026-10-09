@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useAuthStore } from '../stores/authStore';
+import { useBranding, useBrandingStore } from '../stores/brandingStore';
 import BrandMark from '../components/BrandMark';
 import AppFooter from '../components/AppFooter';
 import api from '../services/api';
@@ -11,8 +12,12 @@ export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { isAuthenticated, loginWithToken } = useAuthStore();
-  const [branding, setBranding] = useState(null);
-  const [brandingLoading, setBrandingLoading] = useState(true);
+  const branding = useBranding();
+  // The automatic sign-in for a hidden login page waits for the server's answer,
+  // never only the copy of branding cached in this browser.
+  const brandingLoaded = useBrandingStore((state) => state.loaded);
+  const brandingLoading = useBrandingStore((state) => !state.loaded && !state.failed);
+  const hideLoginPage = brandingLoaded && branding?.hideLoginPage === true;
   const [devLogin, setDevLogin] = useState(false);
   const [devRole, setDevRole] = useState('owner');
   const [devLoading, setDevLoading] = useState(false);
@@ -31,10 +36,6 @@ export default function Login() {
   };
 
   useEffect(() => {
-    api.get('/branding')
-      .then((res) => setBranding(res.data.branding || null))
-      .catch(() => setBranding(null))
-      .finally(() => setBrandingLoading(false));
     api.get('/auth/dev-status')
       .then((res) => setDevLogin(res.data.devLogin === true))
       .catch(() => setDevLogin(false));
@@ -75,12 +76,12 @@ export default function Login() {
       return;
     }
 
-    if (!brandingLoading && branding?.hideLoginPage && !error && !ssoOk) {
+    if (hideLoginPage && !error && !ssoOk) {
       window.location.href = validRedirect
         ? `/api/auth/microsoft?redirect=${encodeURIComponent(validRedirect)}`
         : '/api/auth/microsoft';
     }
-  }, [searchParams, error, isAuthenticated, loginWithToken, navigate, branding, brandingLoading, validRedirect]);
+  }, [searchParams, error, isAuthenticated, loginWithToken, navigate, hideLoginPage, validRedirect]);
 
   const handleSSOLogin = () => {
     window.location.href = validRedirect
@@ -130,7 +131,7 @@ export default function Login() {
             </div>
           )}
 
-          {!branding?.hideLoginPage && (
+          {!hideLoginPage && (
             <button
               onClick={handleSSOLogin}
               className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-dark text-white rounded-xl font-semibold text-lg hover:bg-gray-800 transition-colors cursor-pointer"
