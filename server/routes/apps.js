@@ -585,8 +585,15 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
 
     const nextMode = mode !== undefined ? mode : existing.mode;
 
-    if (target_url !== undefined) {
-      const urlError = validateTargetUrl(target_url, nextMode);
+    if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
+      return res.status(400).json({ error: 'name, slug, and target_url are required', code: 'app_required_fields' });
+    }
+
+    // The URL is checked against the resulting mode also when only the mode changes
+    // (e.g. a private-network internal link switched to an external mode).
+    const urlToValidate = target_url !== undefined ? target_url : (nextMode !== existing.mode ? existing.target_url : undefined);
+    if (urlToValidate !== undefined) {
+      const urlError = validateTargetUrl(urlToValidate, nextMode);
       if (urlError) return res.status(400).json({ error: urlError, code: TARGET_URL_ERROR_CODES[urlError] || 'target_url_invalid' });
     }
 
@@ -748,6 +755,9 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
 });
 
 // Shared API-key guard for bulk endpoints (CLI/automation/server-to-server sync)
+// Actor recorded in the audit log for changes made through the bulk API key.
+const BULK_API_ACTOR = 'api-key';
+
 function requireBulkApiKey(req, res) {
   const expected = process.env.ADMIN_API_KEY;
   if (!expected) {
@@ -796,10 +806,22 @@ router.post('/bulk', (req, res) => {
   }
 
   const results = [];
+  // Audit rows for the apps actually created or updated, written after the import.
+  const auditEntries = [];
   const upsert = db.transaction(() => {
     for (const app of appList) {
       if (!app.slug || !app.name || !app.target_url) {
         results.push({ slug: app.slug, status: 'skipped', reason: 'missing slug, name, or target_url' });
+        continue;
+      }
+
+      const slugError = validateAppSlug(app.slug);
+      if (slugError) {
+        results.push({ slug: app.slug, status: 'skipped', reason: slugError });
+        continue;
+      }
+      if (app.tags !== undefined && app.tags !== null && !Array.isArray(app.tags)) {
+        results.push({ slug: app.slug, status: 'skipped', reason: 'tags must be an array' });
         continue;
       }
 
@@ -867,6 +889,19 @@ router.post('/bulk', (req, res) => {
           WHERE id = ?
         `).run(...changedColumns.map((column) => requested[column]), existing.id);
         results.push({ slug: app.slug, status: 'updated' });
+        auditEntries.push({
+          action: 'update',
+          id: existing.id,
+          details: {
+            name: requested.name || existing.name,
+            source: 'bulk',
+            changes: changedColumns.map((field) => ({
+              field,
+              from: field === 'tags' ? parseTags(existing.tags) : existing[field] ?? null,
+              to: field === 'tags' ? parseTags(requested.tags) : requested[field],
+            })),
+          },
+        });
       } else {
         const id = uuidv4();
         const normalizedGroupIds = Array.isArray(app.groupIds)
@@ -896,11 +931,16 @@ router.post('/bulk', (req, res) => {
           insertPermission.run(id, groupId);
         }
         results.push({ slug: app.slug, status: 'created' });
+        auditEntries.push({ action: 'create', id, details: { name: app.name, slug: app.slug, source: 'bulk', groupIds: normalizedGroupIds } });
       }
     }
   });
 
   upsert();
+  // Bulk changes are made with the API key, not by a user.
+  for (const entry of auditEntries) {
+    logRbacAudit(BULK_API_ACTOR, entry.action, 'app', entry.id, entry.details);
+  }
   res.json({ results });
 });
 

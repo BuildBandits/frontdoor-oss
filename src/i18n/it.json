@@ -1449,7 +1449,11 @@
         }
       },
       "showSignIns": "Mostra accessi",
-      "signInsHidden": "Gli accessi degli amministratori sono nascosti: usa \"Mostra accessi\" per includerli."
+      "signInsHidden": "Gli accessi degli amministratori sono nascosti: usa \"Mostra accessi\" per includerli.",
+      "actorLabels": {
+        "api-key": "Chiave API (import massivo)",
+        "system": "Sistema"
+      }
     }
   },
   "errors": {
@@ -1518,6 +1522,7 @@
     "generic": "Si è verificato un errore. Riprova.",
     "graph_credentials_missing": "Le credenziali dell'app Microsoft Graph non sono configurate.",
     "graph_token_failed": "Impossibile ottenere un token Microsoft Graph.",
+    "group_description_invalid": "La descrizione del gruppo deve essere un testo.",
     "group_ids_required": "Seleziona almeno un gruppo.",
     "group_link_circular": "Impossibile creare un collegamento circolare tra gruppi.",
     "group_link_invalid": "Il gruppo selezionato non può essere collegato.",
