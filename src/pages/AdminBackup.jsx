@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, ChevronDown, Database, Download, SearchCheck, Upload } from 'lucide-react';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import TopToastNotice from '../components/TopToastNotice';
 import { useAuthStore } from '../stores/authStore';
 import { useBrandingLanguage } from '../stores/brandingStore';
@@ -53,7 +54,7 @@ export default function AdminBackup() {
   const [restorePassphrase, setRestorePassphrase] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState(null);
+  const { open: openConfirm, dialogProps: confirmDialogProps } = useConfirmDialog();
   const downloadProgressResetTimer = useRef(null);
 
   const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
@@ -311,13 +312,14 @@ export default function AdminBackup() {
 
         const payload = await response.json().catch(() => ({}));
         if (response.status === 409 && payload.code === 'backup_from_newer_version') {
-          setConfirmDialog({
+          openConfirm({
             title: copy.restoreNewerTitle,
             message: copy.restoreNewerMessage
               .replace('{source}', payload.details?.sourceVersion || '?')
               .replace('{current}', payload.details?.currentVersion || '?'),
             confirmLabel: copy.restoreAction,
             onConfirm: async () => runRestore({ allowNewer: true }),
+            closeFirst: true,
           });
           return;
         }
@@ -345,11 +347,13 @@ export default function AdminBackup() {
       }
     };
 
-    setConfirmDialog({
+    openConfirm({
       title: copy.restoreConfirmTitle,
       message: copy.restoreConfirmMessage,
       confirmLabel: copy.restoreAction,
       onConfirm: async () => runRestore(),
+      // The restore shows its own progress on the page.
+      closeFirst: true,
     });
   };
 
@@ -369,24 +373,7 @@ export default function AdminBackup() {
         positionClassName="top-4 sm:top-6"
       />
 
-      {confirmDialog && (
-        <ConfirmDialog
-          open
-          title={confirmDialog.title}
-          message={confirmDialog.message}
-          confirmLabel={confirmDialog.confirmLabel}
-          cancelLabel={ui.common.cancel}
-          closeLabel={ui.common.closeDialog}
-          busyLabel={ui.common.saving}
-          busy={restoreBusy}
-          onConfirm={async () => {
-            const run = confirmDialog.onConfirm;
-            setConfirmDialog(null);
-            await run?.();
-          }}
-          onCancel={() => setConfirmDialog(null)}
-        />
-      )}
+      <ConfirmDialog {...confirmDialogProps} ui={ui} />
 
       <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
         <section className="flex h-full flex-col rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-xs">

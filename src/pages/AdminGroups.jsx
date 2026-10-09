@@ -10,6 +10,7 @@ import AppIcon from '../components/AppIcon';
 import PageNotice from '../components/PageNotice';
 import TopToastNotice from '../components/TopToastNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import Modal from '../components/Modal';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
@@ -33,28 +34,12 @@ export default function AdminGroups() {
   const groupRowRefs = useRef(new Map());
 
   const [pageNotice, setPageNotice] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState(null);
-  const [confirmBusy, setConfirmBusy] = useState(false);
+  const { dialog: confirmDialog, open: openConfirm, dialogProps: confirmDialogProps } = useConfirmDialog();
   const [groupSearch, setGroupSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [activeGroupPanel, setActiveGroupPanel] = useState('members');
 
   const showToast = (message, type = 'success') => setPageNotice({ message, type });
-  const openConfirm = useCallback((dialog) => setConfirmDialog(dialog), []);
-  const closeConfirm = () => {
-    if (confirmBusy) return;
-    setConfirmDialog(null);
-  };
-  const runConfirm = async () => {
-    if (!confirmDialog?.onConfirm) return;
-    setConfirmBusy(true);
-    try {
-      await confirmDialog.onConfirm();
-    } finally {
-      setConfirmBusy(false);
-      setConfirmDialog(null);
-    }
-  };
 
   // Create group modal
   const [showCreate, setShowCreate] = useState(false);
@@ -1928,18 +1913,7 @@ export default function AdminGroups() {
         </Modal>
       )}
 
-      <ConfirmDialog
-        open={Boolean(confirmDialog)}
-        title={confirmDialog?.title || ''}
-        message={confirmDialog?.message || ''}
-        confirmLabel={confirmDialog?.confirmLabel || ui.common.confirm}
-        cancelLabel={confirmDialog?.cancelLabel || ui.common.cancel}
-        closeLabel={ui.common.closeDialog}
-        busyLabel={ui.common.pleaseWait}
-        busy={confirmBusy}
-        onConfirm={runConfirm}
-        onCancel={closeConfirm}
-      />
+      <ConfirmDialog {...confirmDialogProps} ui={ui} />
     </div>
   );
 }

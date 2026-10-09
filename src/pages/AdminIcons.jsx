@@ -3,6 +3,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, ExternalLink, 
 import { useNavigate } from 'react-router';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import Tooltip from '../components/Tooltip';
 import { useAuthStore } from '../stores/authStore';
@@ -11,7 +12,7 @@ import { useBrandingLanguage, useBrandingTimeZone } from '../stores/brandingStor
 import useDebouncedValue from '../hooks/useDebouncedValue';
 import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { blobToDataUrl, downscaleIconDataUrl, isResizableIconType } from '../utils/iconImages';
-import { formatDateTimeWithTimeZone } from '../utils/dateTime';
+import { formatLocalDateTime } from '../utils/dateTime';
 import { resolveAppTimeZone } from '../../shared/timeZones.js';
 
 const KIND_ORDER = ['app-icon', 'branding-logo'];
@@ -57,11 +58,10 @@ export default function AdminIcons() {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: 25 });
   const [summary, setSummary] = useState({ total: 0, appIcon: 0, brandingLogo: 0, orphanAssets: 0 });
   const [notice, setNotice] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState(null);
+  const { open: openConfirm, dialogProps: confirmDialogProps } = useConfirmDialog();
   const [largeIcons, setLargeIcons] = useState([]);
   const [optimizeProgress, setOptimizeProgress] = useState(null);
   const canEditApps = user?.role !== 'admin_readonly';
-  const [confirmBusy, setConfirmBusy] = useState(false);
   const [expandedAssetIds, setExpandedAssetIds] = useState([]);
 
   const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
@@ -190,17 +190,26 @@ export default function AdminIcons() {
       setNotice({ type: 'error', message: ui.admin.icons.deleteBlockedTooltip });
       return;
     }
-    setConfirmDialog({
+    openConfirm({
       title: ui.admin.icons.deleteTitle,
       message: ui.admin.icons.deleteConfirm.replace('{name}', asset.original_name || asset.stored_file_name),
       confirmLabel: ui.admin.icons.deleteAsset,
-      assetId: asset.id,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/media-assets/${asset.id}`);
+          // After the reload, which clears the notice.
+          await loadAssets(page);
+          setNotice({ type: 'success', message: ui.admin.icons.deleteSuccess });
+        } catch (error) {
+          setNotice({
+            type: 'error',
+            message: error.response?.status === 409
+              ? ui.admin.icons.deleteBlockedTooltip
+              : ui.admin.icons.deleteFailed,
+          });
+        }
+      },
     });
-  };
-
-  const closeConfirm = () => {
-    if (confirmBusy) return;
-    setConfirmDialog(null);
   };
 
   const loadLargeIcons = useCallback(async () => {
@@ -255,37 +264,14 @@ export default function AdminIcons() {
   };
 
   const askOptimizeIcons = () => {
-    setConfirmDialog({
+    openConfirm({
       title: ui.admin.icons.optimizeConfirmTitle,
       message: formatMessage(ui.admin.icons.optimizeConfirmMessage, { count: optimizableIcons.length }),
       confirmLabel: ui.admin.icons.optimizeAction,
-      action: 'optimize',
+      onConfirm: optimizeIcons,
+      // The optimization shows its own progress on the button.
+      closeFirst: true,
     });
-  };
-
-  const runConfirm = async () => {
-    if (confirmDialog?.action === 'optimize') {
-      setConfirmDialog(null);
-      await optimizeIcons();
-      return;
-    }
-    if (!confirmDialog?.assetId) return;
-    setConfirmBusy(true);
-    try {
-      await api.delete(`/media-assets/${confirmDialog.assetId}`);
-      setNotice({ type: 'success', message: ui.admin.icons.deleteSuccess });
-      setConfirmDialog(null);
-      await loadAssets(page);
-    } catch (error) {
-      setNotice({
-        type: 'error',
-        message: error.response?.status === 409
-          ? ui.admin.icons.deleteBlockedTooltip
-          : ui.admin.icons.deleteFailed,
-      });
-    } finally {
-      setConfirmBusy(false);
-    }
   };
 
   const refresh = async () => {
@@ -300,28 +286,7 @@ export default function AdminIcons() {
     }
   };
 
-  const formatDate = (iso) => {
-    if (!iso) return '-';
-    try {
-      const formatted = formatDateTimeWithTimeZone(iso, {
-        locale: ui.common.dateLocale,
-        timeZone,
-        dateOptions: {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        },
-        timeOptions: {
-          hour: '2-digit',
-          minute: '2-digit',
-        },
-      });
-      if (!formatted) return iso;
-      return `${formatted.formattedDate} ${formatted.formattedTime}`;
-    } catch {
-      return iso;
-    }
-  };
+  const formatDate = (iso) => (iso ? formatLocalDateTime(iso, { locale: ui.common.dateLocale, timeZone }) || iso : '-');
 
   const formatSize = (bytes) => {
     if (!Number.isFinite(bytes)) return '-';
@@ -663,18 +628,7 @@ export default function AdminIcons() {
         </div>
       )}
 
-      <ConfirmDialog
-        open={Boolean(confirmDialog)}
-        title={confirmDialog?.title || ui.common.confirm}
-        message={confirmDialog?.message || ''}
-        confirmLabel={confirmDialog?.confirmLabel || ui.common.confirm}
-        cancelLabel={ui.common.cancel}
-        closeLabel={ui.common.closeDialog}
-        busyLabel={ui.common.pleaseWait}
-        busy={confirmBusy}
-        onConfirm={runConfirm}
-        onCancel={closeConfirm}
-      />
+      <ConfirmDialog {...confirmDialogProps} ui={ui} />
     </div>
   );
 }

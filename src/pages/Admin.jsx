@@ -9,6 +9,7 @@ import AppIcon from '../components/AppIcon';
 import PageNotice from '../components/PageNotice';
 import TopToastNotice from '../components/TopToastNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import Modal from '../components/Modal';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
@@ -63,8 +64,7 @@ export default function Admin() {
   const [pageSize, setPageSize] = useState(25);
   const [pageNotice, setPageNotice] = useState(null);
   const [appSaveNotice, setAppSaveNotice] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState(null);
-  const [confirmBusy, setConfirmBusy] = useState(false);
+  const { dialog: confirmDialog, open: openConfirm, dialogProps: confirmDialogProps } = useConfirmDialog();
   const [cloning, setCloning] = useState(false);
   const iconFileInputRef = useRef(null);
   const slugAutoFillRef = useRef(false);
@@ -109,21 +109,6 @@ export default function Admin() {
       ? crypto.randomUUID()
       : String(Date.now());
     setAppSaveNotice({ id: noticeId, type, message });
-  };
-  const openConfirm = (dialog) => setConfirmDialog(dialog);
-  const closeConfirm = () => {
-    if (confirmBusy) return;
-    setConfirmDialog(null);
-  };
-  const runConfirm = async () => {
-    if (!confirmDialog?.onConfirm) return;
-    setConfirmBusy(true);
-    try {
-      await confirmDialog.onConfirm();
-    } finally {
-      setConfirmBusy(false);
-      setConfirmDialog(null);
-    }
   };
   const hasPendingGroupAssignmentChanges = groupAssignSelection.length !== groupAssignInitialSelection.length
     || groupAssignSelection.some((groupId) => !groupAssignInitialSelection.includes(groupId));
@@ -378,7 +363,7 @@ export default function Admin() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [editing, appModalDirty, confirmDialog, t]);
+  }, [editing, appModalDirty, confirmDialog, openConfirm, t]);
 
   useEffect(() => {
     if (!pendingGroupAssignApp || confirmDialog) return undefined;
@@ -398,7 +383,7 @@ export default function Admin() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [pendingGroupAssignApp, hasPendingGroupAssignmentChanges, confirmDialog, t]);
+  }, [pendingGroupAssignApp, hasPendingGroupAssignmentChanges, confirmDialog, openConfirm, t]);
 
   const applyIconAssetFile = (file) => {
     if (!file) return;
@@ -1867,18 +1852,7 @@ export default function Admin() {
         </Modal>
       )}
 
-      <ConfirmDialog
-        open={Boolean(confirmDialog)}
-        title={confirmDialog?.title || ''}
-        message={confirmDialog?.message || ''}
-        confirmLabel={confirmDialog?.confirmLabel || ui.common.confirm}
-        cancelLabel={confirmDialog?.cancelLabel || ui.common.cancel}
-        closeLabel={ui.common.closeDialog}
-        busyLabel={ui.common.pleaseWait}
-        busy={confirmBusy}
-        onConfirm={runConfirm}
-        onCancel={closeConfirm}
-      />
+      <ConfirmDialog {...confirmDialogProps} ui={ui} />
     </div>
   );
 }

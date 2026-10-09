@@ -11,7 +11,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useLatestRequest } from '../hooks/useLatestRequest';
 import { useBrandingLanguage, useBrandingTimeZone } from '../stores/brandingStore';
 import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
-import { formatDateTimeWithTimeZone } from '../utils/dateTime';
+import { formatLocalDateTime } from '../utils/dateTime';
 import { resolveAppTimeZone } from '../../shared/timeZones.js';
 
 export default function AdminLogs() {
@@ -77,27 +77,7 @@ export default function AdminLogs() {
   useEffect(() => { loadLogs(page); }, [loadLogs, page]);
   useEffect(() => { loadTopApps(); }, [loadTopApps]);
 
-  const formatDate = (iso) => {
-    if (!iso) return '-';
-    try {
-      const formatted = formatDateTimeWithTimeZone(iso, {
-        locale: ui.common.dateLocale,
-        timeZone,
-        dateOptions: {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        },
-        timeOptions: {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        },
-      });
-      if (!formatted) return iso;
-      return `${formatted.formattedDate} ${formatted.formattedTime}`;
-    } catch { return iso; }
-  };
+  const formatDate = (iso) => (iso ? formatLocalDateTime(iso, { locale: ui.common.dateLocale, timeZone, seconds: true }) || iso : '-');
 
   return (
     <div>
