@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import { useBrandingLanguage } from '../stores/brandingStore';
 import { getUiStrings, resolveAppLanguage } from '../i18n';
 
 const normalizeTag = (tag) => tag.trim().toLowerCase();
@@ -31,7 +32,8 @@ export default function TagInput({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightedSuggestionIndex, setHighlightedSuggestionIndex] = useState(-1);
   const inputRef = useRef(null);
-  const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, 'en'));
+  const brandingLanguage = useBrandingLanguage();
+  const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
   const resolvedPlaceholder = placeholder || ui.admin.apps.tagsPlaceholder;
   const resolvedSuggestionsLabel = suggestionsLabel || ui.admin.apps.tagSuggestionsTitle;
   const resolvedAvailableTagsLabel = availableTagsLabel || ui.admin.apps.availableTagsTitle;

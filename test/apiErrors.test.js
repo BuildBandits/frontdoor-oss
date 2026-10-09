@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { formatMessage, getUiStrings } from '../src/i18n/index.js';
+import { formatMessage, getUiStrings, loadLanguage } from '../src/i18n/index.js';
 import { apiErrorMessage } from '../src/utils/apiErrors.js';
 import { analyzePluginPackage } from '../src/pluginHost/packageUtils.js';
 import { extractPluginPackageZip } from '../shared/packageZip.js';
 import { APP_SLUG_ERROR_CODES } from '../shared/appSlug.js';
 import { TARGET_URL_ERROR_CODES } from '../shared/targetUrl.js';
 import { respondWithError } from '../server/services/errors.js';
+
+await Promise.all([loadLanguage('en'), loadLanguage('it')]);
 
 function listSourceFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

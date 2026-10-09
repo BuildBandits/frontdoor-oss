@@ -8,7 +8,8 @@ const { default: db, logRbacAudit } = await import('../server/db.js');
 const { createApp } = await import('../server/app.js');
 const { collectAuditIds, diffAuditFields, lookupAuditNames } = await import('../server/services/auditDetails.js');
 const { describeAuditLog } = await import('../src/utils/auditFormatters.js');
-const { getUiStrings } = await import('../src/i18n/index.js');
+const { getUiStrings, loadLanguage } = await import('../src/i18n/index.js');
+await Promise.all([loadLanguage('en'), loadLanguage('it')]);
 
 const OWNER_ID = 'audit-test-owner';
 const APP_ID = 'audit-test-app';

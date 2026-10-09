@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
+import { useBrandingLanguage } from '../stores/brandingStore';
 import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 
 const AVATAR_CACHE_VERSION_KEY = 'frontdoor_avatar_cache_version';
@@ -31,7 +32,8 @@ export default function UserAvatar({
   initialsClassName = 'text-xs',
 }) {
   const preferredLanguage = useAuthStore((state) => state.user?.preferredLanguage);
-  const ui = getUiStrings(resolveAppLanguage(preferredLanguage, 'en'));
+  const brandingLanguage = useBrandingLanguage();
+  const ui = getUiStrings(resolveAppLanguage(preferredLanguage, brandingLanguage));
   const [loadFailed, setLoadFailed] = useState(false);
   const [cacheVersion, setCacheVersion] = useState(getAvatarCacheVersion());
   const avatarSrc = userId ? `/api/users/${encodeURIComponent(userId)}/avatar?v=${encodeURIComponent(cacheVersion)}` : null;

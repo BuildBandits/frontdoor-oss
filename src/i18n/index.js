@@ -1,5 +1,3 @@
-import en from './en.json' with { type: 'json' };
-import it from './it.json' with { type: 'json' };
 import {
   DEFAULT_LANGUAGE,
   SUPPORTED_LANGUAGES,
@@ -8,10 +6,48 @@ import {
 
 export { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE };
 
-const DICTIONARIES = {
-  en,
-  it,
+// Dictionaries are loaded on demand, so a page only downloads the language it shows
+// (each one is a separate chunk of about 90 kB).
+const DICTIONARY_LOADERS = {
+  en: () => import('./en.json', { with: { type: 'json' } }),
+  it: () => import('./it.json', { with: { type: 'json' } }),
 };
+
+const dictionaries = new Map();
+const pendingLoads = new Map();
+const listeners = new Set();
+let loadedVersion = 0;
+
+/** Loads a language's dictionary (once); resolves when getUiStrings can return it. */
+export function loadLanguage(language) {
+  const normalized = normalizeLanguage(language);
+  if (dictionaries.has(normalized)) return Promise.resolve();
+  if (!pendingLoads.has(normalized)) {
+    const load = DICTIONARY_LOADERS[normalized]()
+      .then((module) => {
+        dictionaries.set(normalized, module.default);
+        loadedVersion += 1;
+        listeners.forEach((listener) => listener());
+      })
+      .finally(() => pendingLoads.delete(normalized));
+    pendingLoads.set(normalized, load);
+  }
+  return pendingLoads.get(normalized);
+}
+
+export function isLanguageLoaded(language) {
+  return dictionaries.has(normalizeLanguage(language));
+}
+
+/** For useSyncExternalStore: re-render when a dictionary finishes loading. */
+export function subscribeToLanguages(listener) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function getLoadedLanguagesVersion() {
+  return loadedVersion;
+}
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -52,10 +88,23 @@ export function getSupportedLanguageOptions(ui) {
 // render and pass the result (or values derived from it) to hook dependency lists.
 const uiStringsCache = new Map();
 
+/**
+ * UI strings for a language. When its dictionary is not loaded yet, loading starts
+ * and the strings of a loaded language are returned meanwhile (the app renders only
+ * after the first dictionary is loaded and re-renders when the next one arrives).
+ */
 export function getUiStrings(language) {
   const normalized = normalizeLanguage(language);
+  if (!dictionaries.has(normalized)) {
+    void loadLanguage(normalized).catch(() => {});
+    const fallback = dictionaries.has(DEFAULT_LANGUAGE) ? DEFAULT_LANGUAGE : dictionaries.keys().next().value;
+    if (!fallback) throw new Error('No UI language loaded yet: await loadLanguage() first');
+    return getUiStrings(fallback);
+  }
   if (!uiStringsCache.has(normalized)) {
-    uiStringsCache.set(normalized, deepMerge(en, DICTIONARIES[normalized] || {}));
+    // English fills any key a translation lacks, when it is loaded.
+    const base = dictionaries.get(DEFAULT_LANGUAGE) || {};
+    uiStringsCache.set(normalized, deepMerge(base, dictionaries.get(normalized)));
   }
   return uiStringsCache.get(normalized);
 }
