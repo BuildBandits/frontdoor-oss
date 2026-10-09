@@ -94,6 +94,35 @@ export function iconUrlForApp(app, { cacheDir = DEFAULT_CACHE_DIR } = {}) {
   return `/api/apps/${encodeURIComponent(app.id)}/icon${version}`;
 }
 
+// PNG stores width and height at fixed offsets of the IHDR chunk.
+function readPngSize(buffer) {
+  if (buffer.length < 24 || buffer.toString('ascii', 1, 4) !== 'PNG') return null;
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
+
+/**
+ * Icons currently used by apps that are larger than the threshold, biggest first.
+ * Large icons cost memory in every browser that shows Home (each one is decoded
+ * at full size), so they are reported at startup.
+ */
+export async function findLargeAppIcons({ thresholdBytes = 200 * 1024, cacheDir = DEFAULT_CACHE_DIR, dbHandle = db } = {}) {
+  const apps = dbHandle.prepare('SELECT name, icon_file_name FROM apps WHERE icon_file_name IS NOT NULL').all();
+  const large = [];
+  for (const app of apps) {
+    const filePath = iconPath(cacheDir, app.icon_file_name);
+    const stats = await fsp.stat(filePath).catch(() => null);
+    if (!stats || stats.size <= thresholdBytes) continue;
+    const head = Buffer.alloc(32);
+    const handle = await fsp.open(filePath, 'r').catch(() => null);
+    if (handle) {
+      await handle.read(head, 0, head.length, 0).catch(() => {});
+      await handle.close();
+    }
+    large.push({ name: app.name, bytes: stats.size, size: readPngSize(head) });
+  }
+  return large.sort((a, b) => b.bytes - a.bytes);
+}
+
 export function isAppIconAsset(app) {
   return Boolean(app?.icon_file_name);
 }
