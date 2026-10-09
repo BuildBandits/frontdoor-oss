@@ -180,8 +180,10 @@ export default function AdminBackup() {
           }
         });
 
+        // CONNECTING means the browser is reconnecting on its own after a network blip;
+        // CLOSED means the stream failed for good (e.g. an HTTP error), so stop waiting.
         source.addEventListener('error', () => {
-          if (source.readyState === EventSource.CLOSED) {
+          if (source.readyState === EventSource.CONNECTING) {
             return;
           }
           finalize();

@@ -3,6 +3,22 @@ import api from '../services/api';
 
 const STORAGE_KEY = 'frontdoor_user';
 
+// A missing or corrupted cached profile must not break the whole app.
+function readStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+  } catch {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Storage unavailable.
+    }
+    return null;
+  }
+}
+
+const storedUser = readStoredUser();
+
 function serializeUser(user) {
   if (!user) return null;
   return { ...user };
@@ -10,8 +26,8 @@ function serializeUser(user) {
 
 export const useAuthStore = create((set, get) => ({
   // Only user profile data in localStorage (non-sensitive). Token lives only in httpOnly cookie.
-  user: JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'),
-  isAuthenticated: !!localStorage.getItem(STORAGE_KEY),
+  user: storedUser,
+  isAuthenticated: Boolean(storedUser),
 
   loginWithToken: (_token, user) => {
     // Token is already set as httpOnly cookie by the server callback.

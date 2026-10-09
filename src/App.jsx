@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router';
+import { Routes, Route, Navigate, useLocation } from 'react-router';
 import { useAuthStore } from './stores/authStore';
+import { loginPathFor } from './utils/returnPath';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
 import api from './services/api';
@@ -37,7 +38,8 @@ function ProtectedRoute({
   allowedRoles = null,
 }) {
   const { isAuthenticated, user } = useAuthStore();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  if (!isAuthenticated) return <Navigate to={loginPathFor(location)} replace />;
   if (ownerOnly && user?.role !== 'owner') return <Navigate to="/" replace />;
   if (adminOnly && !ADMIN_VIEWER_ROLES.includes(user?.role)) return <Navigate to="/" replace />;
   if (adminEditorOnly && !ADMIN_EDITOR_ROLES.includes(user?.role)) return <Navigate to="/" replace />;

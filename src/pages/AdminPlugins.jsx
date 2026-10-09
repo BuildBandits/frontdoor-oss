@@ -97,6 +97,8 @@ async function readArrayBufferFile(file) {
 export default function AdminPlugins() {
   const { user } = useAuthStore();
   const isOwner = user?.role === 'owner';
+  // Read-only admins can browse plugins but not install, edit, test or delete them.
+  const canEdit = user?.role !== 'admin_readonly';
   const [brandingLanguage, setBrandingLanguage] = useState('en');
   const snapshot = usePluginRegistry();
   const [serverPlugins, setServerPlugins] = useState([]);
@@ -642,6 +644,10 @@ export default function AdminPlugins() {
           </p>
 
           <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
+            {!canEdit && (
+              <p className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950/40 px-3 py-2 text-sm text-gray-600 dark:text-gray-300">{ui.admin.apps.readOnly}</p>
+            )}
+            <fieldset disabled={!canEdit} className="m-0 min-w-0 space-y-4 border-0 p-0">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block">
                 <span className="mb-1.5 block text-sm font-semibold text-dark dark:text-gray-100">{t.pluginIdLabel}</span>
@@ -901,6 +907,7 @@ export default function AdminPlugins() {
                 {t.reset}
               </button>
             </div>
+            </fieldset>
           </form>
         </section>
       </div>
@@ -986,7 +993,8 @@ export default function AdminPlugins() {
                   <button
                   type="button"
                   onClick={() => openForEdit(plugin)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                  disabled={!canEdit}
+                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <PencilLine className="h-4 w-4" />
                   {t.edit}
@@ -1017,7 +1025,7 @@ export default function AdminPlugins() {
                   <button
                     type="button"
                     onClick={() => void handleTestBackend(plugin)}
-                    disabled={!plugin.backendEnabled || plugin.status !== 'approved' || busyId === `${plugin.id}:test`}
+                    disabled={!canEdit || !plugin.backendEnabled || plugin.status !== 'approved' || busyId === `${plugin.id}:test`}
                     aria-label={t.testBackend}
                     className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -1028,7 +1036,7 @@ export default function AdminPlugins() {
                 <button
                   type="button"
                   onClick={() => void handleDelete(plugin)}
-                  disabled={busyId === plugin.id}
+                  disabled={!canEdit || busyId === plugin.id}
                   className="inline-flex items-center gap-2 rounded-xl border border-red-200 dark:border-red-900/60 px-3 py-2 text-sm font-semibold text-red-700 dark:text-red-300 transition-colors hover:bg-red-50 dark:hover:bg-red-950/30 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Trash2 className="h-4 w-4" />

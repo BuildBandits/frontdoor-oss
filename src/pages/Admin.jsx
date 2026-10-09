@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useRef, useMemo } from 'react';
+import { useCallback, useState, useEffect, useEffectEvent, useRef, useMemo } from 'react';
 import { Plus, Pencil, Trash2, X, Save, Copy, Users, ChevronDown, ChevronUp, Check, Filter, Settings, Tag } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import api from '../services/api';
@@ -127,10 +127,16 @@ export default function Admin() {
     || groupAssignSelection.some((groupId) => !groupAssignInitialSelection.includes(groupId));
 
   const loadApps = () => {
-    api.get('/apps/all').then((res) => {
-      setApps(res.data.apps);
-      setLoading(false);
-    });
+    api.get('/apps/all')
+      .then((res) => {
+        setApps(res.data.apps);
+      })
+      .catch(() => {
+        pushNotice('error', ui.admin.apps.loadFailed);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   const loadGroups = () => {
@@ -160,10 +166,14 @@ export default function Admin() {
   const t = ui.admin.common;
   const a = ui.admin.apps;
 
-  useEffect(() => {
+  // Initial load only; the loaders read the current UI strings when they run.
+  const loadInitialData = useEffectEvent(() => {
     loadApps();
     loadGroups();
     loadBranding();
+  });
+  useEffect(() => {
+    loadInitialData();
   }, []);
 
   const openNew = () => {

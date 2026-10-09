@@ -147,24 +147,32 @@ export default function AdminUsers() {
     };
   }, []);
 
+  // Only the latest detail request may update the panel, so a slower answer for a
+  // user that is no longer expanded cannot appear (and be acted on) under another one.
+  const detailRequestRef = useRef(0);
   const loadUserDetail = async (userId) => {
+    const requestId = detailRequestRef.current + 1;
+    detailRequestRef.current = requestId;
     setDetailLoading(true);
     try {
       const res = await api.get(`/users/${userId}`);
-      setUserDetail(res.data && typeof res.data === 'object' ? res.data : null);
+      if (requestId === detailRequestRef.current) setUserDetail(res.data && typeof res.data === 'object' ? res.data : null);
     } catch {
-      showToast(t.errorLoadingUserDetail, 'error');
+      if (requestId === detailRequestRef.current) showToast(t.errorLoadingUserDetail, 'error');
     }
-    setDetailLoading(false);
+    if (requestId === detailRequestRef.current) setDetailLoading(false);
   };
 
   const toggleExpand = async (userId) => {
     if (expandedUser === userId) {
+      detailRequestRef.current += 1;
       setExpandedUser(null);
       setUserDetail(null);
       setShowVisibleApps(false);
+      setDetailLoading(false);
     } else {
       setExpandedUser(userId);
+      setUserDetail(null);
       setShowVisibleApps(false);
       await loadUserDetail(userId);
     }
