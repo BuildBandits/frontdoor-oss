@@ -249,24 +249,32 @@ export default function AdminGroups() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [activeModal, activeModalDirty, confirmDialog, closeCurrentModal, t]);
 
+  // Only the latest detail request may update the panel: a slower answer for a
+  // group that is no longer expanded must not show up (and be acted on) under another one.
+  const detailRequestRef = useRef(0);
   const loadGroupDetail = async (groupId) => {
+    const requestId = detailRequestRef.current + 1;
+    detailRequestRef.current = requestId;
     setDetailLoading(true);
     try {
       const res = await api.get(`/groups/${groupId}`);
-      setGroupDetail(res.data);
+      if (requestId === detailRequestRef.current) setGroupDetail(res.data);
     } catch {
-      showToast(t.errorLoadingGroupDetails, 'error');
+      if (requestId === detailRequestRef.current) showToast(t.errorLoadingGroupDetails, 'error');
     }
-    setDetailLoading(false);
+    if (requestId === detailRequestRef.current) setDetailLoading(false);
   };
 
   const toggleExpand = async (groupId) => {
     if (expandedGroup === groupId) {
+      detailRequestRef.current += 1;
       setExpandedGroup(null);
       setGroupDetail(null);
       setEditingGroup(null);
+      setDetailLoading(false);
     } else {
       setExpandedGroup(groupId);
+      setGroupDetail(null);
       setActiveGroupPanel('members');
       setEditingGroup(null);
       await loadGroupDetail(groupId);

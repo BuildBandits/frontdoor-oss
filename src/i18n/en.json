@@ -35,7 +35,8 @@
     "refresh": "Refresh",
     "userAvatar": "User avatar",
     "userAvatarNamed": "{name} avatar",
-    "twoSentences": "{first}. {second}"
+    "twoSentences": "{first}. {second}",
+    "retry": "Try again"
   },
   "nav": {
     "home": "Home",
@@ -148,7 +149,9 @@
       "browserDocsPrimary": "Recommended for your browser",
       "browserDocsSecondary": "Another useful guide"
     },
-    "appCountOne": "{count} app"
+    "appCountOne": "{count} app",
+    "appsLoadFailedTitle": "Apps could not be loaded",
+    "appsLoadFailedBody": "Check your connection and try again."
   },
   "layout": {
     "personalHomeView": "Personal Home view",
@@ -903,7 +906,8 @@
       "goToGroupsSearch": "Go to Groups management with prefilled search",
       "pageSummary": "Page {page} of {pages} · {total} apps",
       "skipGroupAssignment": "Skip",
-      "iconTooLarge": "The icon is too large: images up to 1 MB, SVG up to 512 KB."
+      "iconTooLarge": "The icon is too large: images up to 1 MB, SVG up to 512 KB.",
+      "loadFailed": "The app list could not be loaded."
     },
     "icons": {
       "pageTitle": "Media library",
@@ -1213,7 +1217,8 @@
       "accessSummary": "accesses",
       "usersSummary": "users",
       "pageSummary": "Page {page} of {pages} · {total} total logs",
-      "ipAddress": "IP"
+      "ipAddress": "IP",
+      "loadFailed": "The access log could not be loaded."
     },
     "audit": {
       "title": "Audit",

@@ -5,6 +5,7 @@ import BrandMark from '../components/BrandMark';
 import AppFooter from '../components/AppFooter';
 import api from '../services/api';
 import { getUiStrings, normalizeLanguage } from '../i18n';
+import { rememberReturnPath, takeReturnPath } from '../utils/returnPath';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -40,13 +41,16 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
+    // Page the user was trying to open before signing in (kept across the Microsoft round trip).
+    rememberReturnPath(searchParams.get('next'));
+
     // If already authenticated, continue through the server-side app launcher.
     // For mode=redirect apps, the backend reads target_url and emits the SSO POST.
     if (isAuthenticated) {
       if (validRedirect) {
         window.location.href = `/api/apps/${validRedirect}/sso-redirect`;
       } else {
-        navigate('/', { replace: true });
+        navigate(takeReturnPath(), { replace: true });
       }
       return;
     }
@@ -63,7 +67,7 @@ export default function Login() {
         if (validRedirect) {
           window.location.href = `/api/apps/${validRedirect}/sso-redirect`;
         } else {
-          navigate('/', { replace: true });
+          navigate(takeReturnPath(), { replace: true });
         }
       }).catch(() => {
         // /api/auth/me failed — cookie may not have been set correctly, stay on login page
@@ -89,7 +93,7 @@ export default function Login() {
     try {
       const res = await api.post('/auth/dev-login', { role: devRole });
       loginWithToken(null, res.data.user);
-      navigate('/', { replace: true });
+      navigate(takeReturnPath(), { replace: true });
     } catch {
       setDevLoading(false);
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Activity, BarChart3, Users, AppWindow, AlertCircle, Filter } from 'lucide-react';
 import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
@@ -6,6 +6,7 @@ import AppIcon from '../components/AppIcon';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import PaginationControls from '../components/PaginationControls';
+import useDebouncedValue from '../hooks/useDebouncedValue';
 import { useAuthStore } from '../stores/authStore';
 import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { formatDateTimeWithTimeZone } from '../utils/dateTime';
@@ -19,6 +20,7 @@ export default function AdminLogs() {
   const [stats, setStats] = useState(null);
   const [topApps, setTopApps] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [retentionDays, setRetentionDays] = useState(30);
@@ -49,7 +51,13 @@ export default function AdminLogs() {
 
   const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
 
+  const debouncedSearch = useDebouncedValue(search);
+  // Only the latest request may update the list (an older, slower answer would
+  // otherwise overwrite newer results).
+  const logsRequestRef = useRef(0);
   const loadLogs = useCallback(async (p = 1) => {
+    const requestId = logsRequestRef.current + 1;
+    logsRequestRef.current = requestId;
     setLoading(true);
     try {
       const res = await api.get('/logs', {
@@ -57,17 +65,20 @@ export default function AdminLogs() {
           page: p,
           limit: pageSize,
           retention_days: retentionDays,
-          q: search,
+          q: debouncedSearch,
         },
       });
+      if (requestId !== logsRequestRef.current) return;
       setLogs(res.data.logs);
       setPagination(res.data.pagination);
       setStats(res.data.stats);
+      setLoadFailed(false);
     } catch {
-      // silently fail
+      if (requestId !== logsRequestRef.current) return;
+      setLoadFailed(true);
     }
     setLoading(false);
-  }, [pageSize, retentionDays, search]);
+  }, [pageSize, retentionDays, debouncedSearch]);
 
   const loadTopApps = useCallback(async () => {
     try {
@@ -80,9 +91,9 @@ export default function AdminLogs() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, retentionDays, pageSize]);
+  }, [debouncedSearch, retentionDays, pageSize]);
 
-  useEffect(() => { loadLogs(page); }, [loadLogs, page, search, retentionDays, pageSize]);
+  useEffect(() => { loadLogs(page); }, [loadLogs, page]);
   useEffect(() => { loadTopApps(); }, [loadTopApps]);
 
   const formatDate = (iso) => {
@@ -234,6 +245,18 @@ export default function AdminLogs() {
             {[...Array(8)].map((_, i) => (
               <div key={i} className="h-10 bg-gray-50 dark:bg-gray-900 rounded-lg" />
             ))}
+          </div>
+        ) : loadFailed ? (
+          <div className="text-center py-16 text-gray-500 dark:text-gray-400" role="alert">
+            <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-40" />
+            <p className="text-lg font-medium">{ui.admin.logs.loadFailed}</p>
+            <button
+              type="button"
+              onClick={() => loadLogs(page)}
+              className="mt-4 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-semibold text-dark dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              {ui.common.retry}
+            </button>
           </div>
         ) : logs.length === 0 ? (
           <div className="text-center py-16 text-gray-400 dark:text-gray-500">

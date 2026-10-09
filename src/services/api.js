@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { loginPathFor } from '../utils/returnPath';
 
 const api = axios.create({
   baseURL: '/api',
@@ -11,7 +12,10 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('frontdoor_user');
-      window.location.href = '/login';
+      // Come back to the current page after signing in again.
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = loginPathFor(window.location);
+      }
     }
     return Promise.reject(error);
   }

@@ -35,7 +35,8 @@
     "refresh": "Aggiorna",
     "userAvatar": "Avatar utente",
     "userAvatarNamed": "Avatar di {name}",
-    "twoSentences": "{first}. {second}"
+    "twoSentences": "{first}. {second}",
+    "retry": "Riprova"
   },
   "nav": {
     "home": "Home",
@@ -148,7 +149,9 @@
       "browserDocsPrimary": "Consigliata per il tuo browser",
       "browserDocsSecondary": "Altra guida utile"
     },
-    "appCountOne": "{count} app"
+    "appCountOne": "{count} app",
+    "appsLoadFailedTitle": "Impossibile caricare le app",
+    "appsLoadFailedBody": "Controlla la connessione e riprova."
   },
   "layout": {
     "personalHomeView": "Vista Home personale",
@@ -903,7 +906,8 @@
       "goToGroupsSearch": "Vai a Gestione Gruppi con ricerca precompilata",
       "pageSummary": "Pagina {page} di {pages} · {total} app",
       "skipGroupAssignment": "Salta",
-      "iconTooLarge": "L'icona è troppo grande: immagini fino a 1 MB, SVG fino a 512 KB."
+      "iconTooLarge": "L'icona è troppo grande: immagini fino a 1 MB, SVG fino a 512 KB.",
+      "loadFailed": "Impossibile caricare l’elenco delle app."
     },
     "icons": {
       "pageTitle": "Libreria media",
@@ -1213,7 +1217,8 @@
       "accessSummary": "accessi",
       "usersSummary": "utenti",
       "pageSummary": "Pagina {page} di {pages} · {total} log totali",
-      "ipAddress": "IP"
+      "ipAddress": "IP",
+      "loadFailed": "Impossibile caricare il registro degli accessi."
     },
     "audit": {
       "title": "Audit",

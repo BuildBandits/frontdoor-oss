@@ -70,6 +70,7 @@ export default function Home() {
   const [search, setSearch] = useState('');
   const [selectedTags, setSelectedTags] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [appsLoadFailed, setAppsLoadFailed] = useState(false);
   const [refreshingApps, setRefreshingApps] = useState(false);
   const [brandingLoading, setBrandingLoading] = useState(true);
 
@@ -146,8 +147,11 @@ export default function Home() {
     try {
       const res = await api.get('/apps');
       setApps(res.data.apps);
+      setAppsLoadFailed(false);
     } catch {
-      // Keep the current list if a manual refresh fails.
+      // A failed manual refresh keeps the current list; a failed first load is
+      // reported instead of looking like an empty catalog.
+      if (!silent) setAppsLoadFailed(true);
     } finally {
       if (silent) {
         setRefreshingApps(false);
@@ -964,7 +968,19 @@ export default function Home() {
             ))}
           </div>
         )
-          ) : filtered.length === 0 ? (
+          ) : appsLoadFailed && apps.length === 0 ? (
+        <div className="text-center py-20 text-gray-500 dark:text-gray-400" role="alert">
+          <p className="text-xl font-semibold mb-2">{ui.home.appsLoadFailedTitle}</p>
+          <p>{ui.home.appsLoadFailedBody}</p>
+          <button
+            type="button"
+            onClick={() => { void loadApps(); }}
+            className="mt-5 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-semibold text-dark dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            {ui.common.retry}
+          </button>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-20 text-gray-400 dark:text-gray-500">
           <p className="text-xl font-semibold mb-2">
             {showFavorites ? ui.home.favoritesEmptyTitle : ui.home.appsEmptyTitle}
