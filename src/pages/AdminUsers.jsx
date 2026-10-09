@@ -9,6 +9,7 @@ import UserAvatar from '../components/UserAvatar';
 import AppIcon from '../components/AppIcon';
 import TopToastNotice from '../components/TopToastNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import Modal from '../components/Modal';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
@@ -17,7 +18,7 @@ import PaginationControls from '../components/PaginationControls';
 import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
 import { normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
-import { formatDateTimeWithTimeZone } from '../utils/dateTime';
+import { formatLocalDateTime } from '../utils/dateTime';
 import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
 export default function AdminUsers() {
@@ -33,8 +34,7 @@ export default function AdminUsers() {
   const [userDetail, setUserDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [pageNotice, setPageNotice] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState(null);
-  const [confirmBusy, setConfirmBusy] = useState(false);
+  const { open: openConfirm, dialogProps: confirmDialogProps } = useConfirmDialog();
   const [showVisibleApps, setShowVisibleApps] = useState(false);
   const [visibleAppsSearch, setVisibleAppsSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -83,21 +83,6 @@ export default function AdminUsers() {
   }, [expandedUser, detailLoading, userDetail]);
 
   const showToast = useCallback((message, type = 'success') => setPageNotice({ message, type }), []);
-  const openConfirm = (dialog) => setConfirmDialog(dialog);
-  const closeConfirm = () => {
-    if (confirmBusy) return;
-    setConfirmDialog(null);
-  };
-  const runConfirm = async () => {
-    if (!confirmDialog?.onConfirm) return;
-    setConfirmBusy(true);
-    try {
-      await confirmDialog.onConfirm();
-    } finally {
-      setConfirmBusy(false);
-      setConfirmDialog(null);
-    }
-  };
 
   const ui = getUiStrings(resolveAppLanguage(currentUser?.preferredLanguage, brandingLanguage));
   const t = ui.admin.common;
@@ -312,48 +297,9 @@ export default function AdminUsers() {
     if (mode === 'entra-app') return 'bg-violet-100 text-violet-700';
     return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300';
   };
-  const formatDate = (iso) => {
-    if (!iso) return t.noLogin;
-    try {
-      const formatted = formatDateTimeWithTimeZone(iso, {
-        locale: ui.common.dateLocale,
-        timeZone,
-        dateOptions: {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        },
-        timeOptions: {
-          hour: '2-digit',
-          minute: '2-digit',
-        },
-      });
-      if (!formatted) return iso;
-      return `${formatted.formattedDate} ${formatted.formattedTime}`;
-    } catch {
-      return iso;
-    }
-  };
+  const formatDate = (iso) => (iso ? formatLocalDateTime(iso, { locale: ui.common.dateLocale, timeZone }) || iso : t.noLogin);
 
-  const formatDateTimeCompact = (iso) => {
-    if (!iso) return ui.common.default;
-    const formatted = formatDateTimeWithTimeZone(iso, {
-      locale: ui.common.dateLocale,
-      timeZone,
-      dateOptions: {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      },
-      timeOptions: {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      },
-    });
-    if (!formatted) return iso;
-    return `${formatted.formattedDate} ${formatted.formattedTime}`;
-  };
+  const formatDateTimeCompact = (iso) => (iso ? formatLocalDateTime(iso, { locale: ui.common.dateLocale, timeZone, numeric: true }) || iso : ui.common.default);
 
   function parseStoredJsonArray(value) {
     if (!value) return [];
@@ -1150,18 +1096,7 @@ export default function AdminUsers() {
         </Modal>
       )}
 
-      <ConfirmDialog
-        open={Boolean(confirmDialog)}
-        title={confirmDialog?.title || ''}
-        message={confirmDialog?.message || ''}
-        confirmLabel={confirmDialog?.confirmLabel || t.confirm}
-        cancelLabel={confirmDialog?.cancelLabel || ui.common.cancel}
-        closeLabel={ui.common.closeDialog}
-        busyLabel={ui.common.pleaseWait}
-        busy={confirmBusy}
-        onConfirm={runConfirm}
-        onCancel={closeConfirm}
-      />
+      <ConfirmDialog {...confirmDialogProps} ui={ui} />
     </div>
   );
 }

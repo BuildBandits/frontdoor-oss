@@ -3,6 +3,7 @@ import { BookOpen, ChevronRight, Database, Eye, HardDrive, Home, Image, LogIn, P
 import { Link as RouterLink, useLocation } from 'react-router';
 import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import TopToastNotice from '../components/TopToastNotice';
 import { useAuthStore } from '../stores/authStore';
 import { useBrandingStore } from '../stores/brandingStore';
@@ -104,8 +105,7 @@ export default function Customization() {
   const [removeBrandingLogo, setRemoveBrandingLogo] = useState(false);
   const [pageNotice, setPageNotice] = useState(null);
   const [saveNotice, setSaveNotice] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState(null);
-  const [confirmBusy, setConfirmBusy] = useState(false);
+  const { open: openConfirm, dialogProps: confirmDialogProps } = useConfirmDialog();
   const [avatarRefreshing, setAvatarRefreshing] = useState(false);
   const [iconCacheCleaning, setIconCacheCleaning] = useState(false);
   const [accessLogPurging, setAccessLogPurging] = useState(false);
@@ -143,21 +143,6 @@ export default function Customization() {
     setSaveNotice({ type, message });
   };
 
-  const openConfirm = (dialog) => setConfirmDialog(dialog);
-  const closeConfirm = () => {
-    if (confirmBusy) return;
-    setConfirmDialog(null);
-  };
-  const runConfirm = async () => {
-    if (!confirmDialog?.onConfirm) return;
-    setConfirmBusy(true);
-    try {
-      await confirmDialog.onConfirm();
-    } finally {
-      setConfirmBusy(false);
-      setConfirmDialog(null);
-    }
-  };
 
   const formatBytes = (bytes) => {
     if (!Number.isFinite(bytes)) return '-';
@@ -1477,18 +1462,7 @@ export default function Customization() {
 
       <PluginSurface surface={PLUGIN_SURFACES.CUSTOMIZATION_PAGE_BOTTOM} variant="stack" className="mt-8" />
 
-      <ConfirmDialog
-        open={Boolean(confirmDialog)}
-        title={confirmDialog?.title || ''}
-        message={confirmDialog?.message || ''}
-        confirmLabel={confirmDialog?.confirmLabel || ui.common.confirm}
-        cancelLabel={confirmDialog?.cancelLabel || ui.common.cancel}
-        closeLabel={ui.common.closeDialog}
-        busyLabel={ui.common.pleaseWait}
-        busy={confirmBusy}
-        onConfirm={runConfirm}
-        onCancel={closeConfirm}
-      />
+      <ConfirmDialog {...confirmDialogProps} ui={ui} />
     </div>
   );
 }

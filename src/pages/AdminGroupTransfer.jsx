@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useBrandingLanguage } from '../stores/brandingStore';
 import PageNotice from '../components/PageNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import { getUiStrings, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
@@ -26,8 +27,7 @@ export default function AdminGroupTransfer() {
   const [mode, setMode] = useState('copy');
   const [saving, setSaving] = useState(false);
   const [pageNotice, setPageNotice] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState(null);
-  const [confirmBusy, setConfirmBusy] = useState(false);
+  const { open: openConfirm, dialogProps: confirmDialogProps } = useConfirmDialog();
 
   const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
   const ui = getUiStrings(language);
@@ -118,17 +118,17 @@ export default function AdminGroupTransfer() {
   const actionIcon = mode === 'move' ? MoveRight : Copy;
   const ActionIcon = actionIcon;
 
-  const openConfirm = () => {
+  const askTransfer = () => {
     if (!hasValidSelection) return;
-    setConfirmDialog({
+    openConfirm({
       title: mode === 'move' ? g.moveConfirmTitle : g.copyConfirmTitle,
       message: (mode === 'move' ? g.moveConfirmMessage : g.copyConfirmMessage)
         .replace('{count}', String(transferCount))
         .replace('{source}', groupLabel(sourceGroup))
         .replace('{target}', groupLabel(targetGroup)),
       confirmLabel: actionLabel,
+      onCancel: () => setSaving(false),
       onConfirm: async () => {
-        setConfirmBusy(true);
         try {
           const res = await api.post(`/groups/${sourceGroupId}/apps/transfer`, {
             targetGroupId,
@@ -153,8 +153,6 @@ export default function AdminGroupTransfer() {
             message: apiErrorMessage(error, ui, g.transferFailed),
           });
         } finally {
-          setConfirmBusy(false);
-          setConfirmDialog(null);
           setSaving(false);
         }
       },
@@ -172,7 +170,7 @@ export default function AdminGroupTransfer() {
       return;
     }
     setSaving(true);
-    openConfirm();
+    askTransfer();
   };
 
   const previewApps = sourceApps.slice(0, 12);
@@ -396,22 +394,7 @@ export default function AdminGroupTransfer() {
         </div>
       </div>
 
-      <ConfirmDialog
-        open={Boolean(confirmDialog)}
-        title={confirmDialog?.title}
-        message={confirmDialog?.message}
-        confirmLabel={confirmDialog?.confirmLabel}
-        cancelLabel={ui.common.cancel}
-        closeLabel={ui.common.closeDialog}
-        busyLabel={ui.common.saving}
-        busy={confirmBusy}
-        onConfirm={confirmDialog?.onConfirm}
-        onCancel={() => {
-          if (confirmBusy) return;
-          setConfirmDialog(null);
-          setSaving(false);
-        }}
-      />
+      <ConfirmDialog {...confirmDialogProps} ui={ui} busyLabel={ui.common.saving} />
     </div>
   );
 }

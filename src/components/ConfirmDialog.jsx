@@ -13,11 +13,20 @@ export default function ConfirmDialog({
   busy = false,
   onConfirm,
   onCancel,
+  // UI strings for the labels a page does not set (confirm, cancel, close, please wait).
+  ui,
 }) {
   const titleId = useId();
   const messageId = useId();
 
   if (!open) return null;
+
+  const labels = {
+    confirm: confirmLabel || ui?.common?.confirm,
+    cancel: cancelLabel || ui?.common?.cancel,
+    close: closeLabel || ui?.common?.closeDialog,
+    busy: busyLabel || ui?.common?.pleaseWait,
+  };
 
   const cancel = () => {
     if (!busy) onCancel();
@@ -42,7 +51,7 @@ export default function ConfirmDialog({
           type="button"
           onClick={cancel}
           className="rounded-lg p-2 text-gray-400 dark:text-gray-500 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white"
-          aria-label={closeLabel}
+          aria-label={labels.close}
           disabled={busy}
         >
           <X className="h-4 w-4" />
@@ -58,7 +67,7 @@ export default function ConfirmDialog({
           disabled={busy}
           className="rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-dark dark:hover:text-white disabled:opacity-50"
         >
-          {cancelLabel}
+          {labels.cancel}
         </button>
         <button
           type="button"
@@ -66,7 +75,7 @@ export default function ConfirmDialog({
           disabled={busy}
           className="inline-flex items-center gap-2 rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {busy ? busyLabel : confirmLabel}
+          {busy ? labels.busy : labels.confirm}
         </button>
       </div>
     </Modal>

@@ -53,6 +53,31 @@ export function formatDateTimeWithTimeZone(value, {
   return { parsed, formattedDate, formattedTime };
 }
 
+/**
+ * Localized date and time in the given time zone, such as `09 Oct 2026 14:05`
+ * (`seconds` adds the seconds; `numeric` uses `09/10/2026 14:05`). Null if the value is not a date.
+ */
+export function formatLocalDateTime(value, { locale, timeZone, seconds = false, numeric = false } = {}) {
+  let formatted;
+  try {
+    formatted = formatDateTimeWithTimeZone(value, {
+      locale,
+      timeZone,
+      dateOptions: { day: '2-digit', month: numeric ? '2-digit' : 'short', year: 'numeric' },
+      timeOptions: {
+        hour: '2-digit',
+        minute: '2-digit',
+        ...(seconds ? { second: '2-digit' } : {}),
+        ...(numeric ? { hour12: false } : {}),
+      },
+    });
+  } catch {
+    return null;
+  }
+  if (!formatted) return null;
+  return `${formatted.formattedDate} ${formatted.formattedTime}`;
+}
+
 /** Locale-independent `YYYY-MM-DD, HH:MM:SS` in the given time zone (null if the value is not a date). */
 export function formatIsoDateTime(value, timeZone) {
   const parsed = parseServerTimestamp(value);
