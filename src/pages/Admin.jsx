@@ -8,6 +8,7 @@ import AppIcon from '../components/AppIcon';
 import PageNotice from '../components/PageNotice';
 import TopToastNotice from '../components/TopToastNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Modal from '../components/Modal';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import PaginationControls from '../components/PaginationControls';
@@ -1343,13 +1344,12 @@ export default function Admin() {
 
       {/* Modal */}
       {editing !== null && (
-        <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 px-4 py-6 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-6xl shadow-xl my-auto">
+        <Modal onClose={close} closeOnEscape={false} closeOnBackdrop={false} labelledBy="apps-dialog-1-title" panelClassName="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-6xl shadow-xl my-auto" overlayClassName="fixed inset-0 bg-black/40 flex items-start justify-center z-50 px-4 py-6 overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-dark dark:text-gray-100">
+              <h2 id="apps-dialog-1-title" className="text-xl font-bold text-dark dark:text-gray-100">
                 {editing === 'new' ? ui.admin.apps.newApp : ui.admin.apps.editApp}
               </h2>
-              <button onClick={close} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+              <button type="button" onClick={close} aria-label={ui.common.closeDialog} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1737,13 +1737,11 @@ export default function Admin() {
                   </button>
                 </div>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {pendingGroupAssignApp && (
-        <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/40 px-4 py-4">
-          <div className="relative w-full max-w-3xl max-h-[88vh] overflow-y-auto rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-100 dark:border-gray-800">
+        <Modal onClose={closeGroupAssignmentModal} closeOnEscape={false} closeOnBackdrop={false} labelledBy="apps-dialog-2-title" panelClassName="relative w-full max-w-3xl max-h-[88vh] overflow-y-auto rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-100 dark:border-gray-800" overlayClassName="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/40 px-4 py-4">
             <button
               type="button"
               onClick={() => {
@@ -1766,7 +1764,7 @@ export default function Admin() {
 
             <div className="p-6 sm:p-8">
               <div className="mb-6">
-                <h2 className="text-2xl font-extrabold text-dark dark:text-gray-100">{a.addToGroupsTitle}</h2>
+                <h2 id="apps-dialog-2-title" className="text-2xl font-extrabold text-dark dark:text-gray-100">{a.addToGroupsTitle}</h2>
                 <p className="text-gray-500 dark:text-gray-400 mt-1">
                   {a.addToGroupsHelp}
                 </p>
@@ -1878,8 +1876,7 @@ export default function Admin() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       <ConfirmDialog

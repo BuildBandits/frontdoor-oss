@@ -303,7 +303,7 @@ export default function AdminGroupTransfer() {
               <ArrowRightLeft className="mt-0.5 h-4 w-4 shrink-0 text-accent-dark" />
               <p>{g.transferAppsActionHelp}</p>
             </div>
-            <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+            <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900/60">
               <p className="font-semibold">{g.transferAppsCautionTitle}</p>
               <p className="mt-1 text-sm leading-6">{g.transferAppsCautionHelp}</p>
             </div>

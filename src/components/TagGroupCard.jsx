@@ -13,7 +13,7 @@ export default function TagGroupCard({ tag, count, isOpen, onToggle, ui }) {
     >
       <div className="flex items-center justify-between">
         <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
+          <span className="text-xs font-semibold uppercase tracking-wider text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full dark:bg-purple-900/40 dark:text-purple-200">
             {tag}
           </span>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">

@@ -8,6 +8,7 @@ import AppIcon from '../components/AppIcon';
 import PageNotice from '../components/PageNotice';
 import TopToastNotice from '../components/TopToastNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Modal from '../components/Modal';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import PaginationControls from '../components/PaginationControls';
@@ -37,7 +38,7 @@ export default function AdminGroups() {
   const [activeGroupPanel, setActiveGroupPanel] = useState('members');
 
   const showToast = (message, type = 'success') => setPageNotice({ message, type });
-  const openConfirm = (dialog) => setConfirmDialog(dialog);
+  const openConfirm = useCallback((dialog) => setConfirmDialog(dialog), []);
   const closeConfirm = () => {
     if (confirmBusy) return;
     setConfirmDialog(null);
@@ -227,27 +228,32 @@ export default function AdminGroups() {
     return false;
   })();
 
+  // Escape, the backdrop and the X all close through here, so unsaved changes always ask first.
+  const requestCloseActiveModal = useCallback(() => {
+    if (activeModalDirty) {
+      openConfirm({
+        title: t.closeWithoutSavingTitle,
+        message: t.closeWithoutSavingMessage,
+        confirmLabel: t.close,
+        onConfirm: async () => {
+          closeCurrentModal();
+        },
+      });
+      return;
+    }
+    closeCurrentModal();
+  }, [activeModalDirty, closeCurrentModal, openConfirm, t]);
+
   useEffect(() => {
     if (!activeModal || confirmDialog) return undefined;
     const onKeyDown = (event) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
-      if (activeModalDirty) {
-        openConfirm({
-          title: t.closeWithoutSavingTitle,
-          message: t.closeWithoutSavingMessage,
-          confirmLabel: t.close,
-          onConfirm: async () => {
-            closeCurrentModal();
-          },
-        });
-        return;
-      }
-      closeCurrentModal();
+      requestCloseActiveModal();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeModal, activeModalDirty, confirmDialog, closeCurrentModal, t]);
+  }, [activeModal, confirmDialog, requestCloseActiveModal]);
 
   // Only the latest detail request may update the panel: a slower answer for a
   // group that is no longer expanded must not show up (and be acted on) under another one.
@@ -863,7 +869,7 @@ export default function AdminGroups() {
 
         <div className="flex items-center gap-3 max-sm:flex-col max-sm:items-stretch">
           {selectedCount > 0 && (
-            <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-sm max-sm:w-full">
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-sm max-sm:w-full dark:bg-red-950/30 dark:border-red-900/60">
               <span className="font-medium text-red-700">
                 {selectedCount} {t.selected}
                 <span className="ml-2 text-red-500 font-normal">
@@ -1469,10 +1475,10 @@ export default function AdminGroups() {
                                         <div>
                                           <span className="text-sm text-dark dark:text-gray-100">{m.display_name || m.email}</span>
                                           {m.role === 'owner' && (
-                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-sm font-medium">{g.ownerBadge}</span>
+                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-sm font-medium dark:bg-rose-950/40 dark:text-rose-300">{g.ownerBadge}</span>
                                           )}
                                           {m.role === 'admin' && (
-                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none gap-1 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm font-medium">
+                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none gap-1 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm font-medium dark:bg-amber-950/40 dark:text-amber-300">
                                               <Shield className="w-3 h-3" />
                                               {g.adminBadge}
                                             </span>
@@ -1484,7 +1490,7 @@ export default function AdminGroups() {
                                             </span>
                                           )}
                                           {!m.last_login && (
-                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none gap-0.5 text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-sm font-medium">
+                                            <span className="ml-1.5 inline-flex items-center align-middle leading-none gap-0.5 text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-sm font-medium dark:bg-purple-900/40">
                                               <Clock className="w-3 h-3" />{t.noLogin}
                                             </span>
                                           )}
@@ -1574,11 +1580,10 @@ export default function AdminGroups() {
 
       {/* Create group modal */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setShowCreate(false)}>
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <Modal onClose={requestCloseActiveModal} closeOnEscape={false} labelledBy="groups-dialog-1-title" panelClassName="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-xl" overlayClassName="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-dark dark:text-gray-100">{g.newLocalGroup}</h2>
-              <button onClick={() => setShowCreate(false)} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+              <h2 id="groups-dialog-1-title" className="text-xl font-bold text-dark dark:text-gray-100">{g.newLocalGroup}</h2>
+              <button type="button" onClick={requestCloseActiveModal} aria-label={ui.common.closeDialog} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1620,22 +1625,20 @@ export default function AdminGroups() {
                 {saving ? ui.common.saving : g.create}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Import Entra group modal */}
       {showEntraImport && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setShowEntraImport(false)}>
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-2xl shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <Modal onClose={requestCloseActiveModal} closeOnEscape={false} labelledBy="groups-dialog-2-title" panelClassName="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-2xl shadow-xl" overlayClassName="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-xl font-bold text-dark dark:text-gray-100">{g.newEntraGroup}</h2>
+                <h2 id="groups-dialog-2-title" className="text-xl font-bold text-dark dark:text-gray-100">{g.newEntraGroup}</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   {t.entraHelp}
                 </p>
               </div>
-              <button onClick={() => setShowEntraImport(false)} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+              <button type="button" onClick={requestCloseActiveModal} aria-label={ui.common.closeDialog} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1700,7 +1703,7 @@ export default function AdminGroups() {
                             {group.is_imported ? (
                               <span className="text-[10px] bg-accent/10 text-accent-dark px-1.5 py-0.5 rounded-sm font-medium">{g.alreadyImported}</span>
                             ) : (
-                              <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm font-medium">{g.onlyEntraDetected}</span>
+                              <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm font-medium dark:bg-amber-950/40 dark:text-amber-300">{g.onlyEntraDetected}</span>
                             )}
                           </div>
                           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">{group.entra_group_id}</p>
@@ -1731,17 +1734,15 @@ export default function AdminGroups() {
                   {importingEntra ? g.importing : g.importSelected}
                 </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Add members modal */}
       {showAddMembers && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setShowAddMembers(false)}>
-      <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <Modal onClose={requestCloseActiveModal} closeOnEscape={false} labelledBy="groups-dialog-3-title" panelClassName="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-xl" overlayClassName="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.addMembersTitle}</h2>
-              <button onClick={() => setShowAddMembers(false)} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+              <h2 id="groups-dialog-3-title" className="text-lg font-bold text-dark dark:text-gray-100">{g.addMembersTitle}</h2>
+              <button type="button" onClick={requestCloseActiveModal} aria-label={ui.common.closeDialog} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1779,20 +1780,18 @@ export default function AdminGroups() {
                 ))
               )}
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Add linked groups modal */}
       {showAddGroups && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={closeCurrentModal}>
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <Modal onClose={requestCloseActiveModal} closeOnEscape={false} labelledBy="groups-dialog-4-title" panelClassName="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-xl" overlayClassName="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.addLinkedGroupsTitle}</h2>
+                <h2 id="groups-dialog-4-title" className="text-lg font-bold text-dark dark:text-gray-100">{g.addLinkedGroupsTitle}</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{g.linkedGroupsHelp}</p>
               </div>
-              <button onClick={closeCurrentModal} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+              <button type="button" onClick={requestCloseActiveModal} aria-label={ui.common.closeDialog} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1900,17 +1899,15 @@ export default function AdminGroups() {
                 {g.addLinkedGroupsConfirm}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Add apps modal */}
       {showAddApps && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setShowAddApps(false)}>
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <Modal onClose={requestCloseActiveModal} closeOnEscape={false} labelledBy="groups-dialog-5-title" panelClassName="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-xl" overlayClassName="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-dark dark:text-gray-100">{g.addAppTitle}</h2>
-              <button onClick={() => setShowAddApps(false)} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+              <h2 id="groups-dialog-5-title" className="text-lg font-bold text-dark dark:text-gray-100">{g.addAppTitle}</h2>
+              <button type="button" onClick={requestCloseActiveModal} aria-label={ui.common.closeDialog} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1940,8 +1937,7 @@ export default function AdminGroups() {
                 ))
               )}
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       <ConfirmDialog

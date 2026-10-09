@@ -528,13 +528,13 @@ export default function Layout({ children }) {
                         {favoriteAppsCount != null && (
                           favoriteAppsSavedLabel ? (
                             <Tooltip content={ui.layout.savedFavoritesOn.replace('{date}', favoriteAppsSavedLabel)}>
-                              <div className="inline-flex shrink-0 self-center items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+                              <div className="inline-flex shrink-0 self-center items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900/60">
                                 <Star className="h-3.5 w-3.5 text-amber-500 fill-current" />
                                 <span>{favoriteAppsCount}</span>
                               </div>
                             </Tooltip>
                           ) : (
-                            <div className="inline-flex shrink-0 self-center items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+                            <div className="inline-flex shrink-0 self-center items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900/60">
                               <Star className="h-3.5 w-3.5 text-amber-500 fill-current" />
                               <span>{favoriteAppsCount}</span>
                             </div>
@@ -700,7 +700,7 @@ export default function Layout({ children }) {
                             </button>
                           </div>
                           {appOrderSavedLabel && (
-                            <p className="mx-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                            <p className="mx-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900/60">
                               {ui.layout.savedOrderOn.replace('{date}', appOrderSavedLabel)}
                             </p>
                           )}
@@ -825,7 +825,7 @@ export default function Layout({ children }) {
               </div>
 
               <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 space-y-3">
-                <div className="flex items-center justify-between gap-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/70 px-3 py-3">
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/70 px-3 py-3 dark:bg-gray-800/60">
                   <div className="flex items-center gap-3 min-w-0">
                     <UserAvatar
                       userId={user?.id}
