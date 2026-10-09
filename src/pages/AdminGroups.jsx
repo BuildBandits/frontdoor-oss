@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { Eye, Plus, Shield, Trash2, X, Save, Users, ChevronDown, ChevronRight, AppWindow, Pencil, Clock, RefreshCw, Layers3, ArrowRightLeft, Filter } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
+import { useLatestRequest } from '../hooks/useLatestRequest';
 import { useBrandingLanguage } from '../stores/brandingStore';
 import UserAvatar from '../components/UserAvatar';
 import AppIcon from '../components/AppIcon';
@@ -245,23 +246,22 @@ export default function AdminGroups() {
 
   // Only the latest detail request may update the panel: a slower answer for a
   // group that is no longer expanded must not show up (and be acted on) under another one.
-  const detailRequestRef = useRef(0);
+  const detailRequest = useLatestRequest();
   const loadGroupDetail = async (groupId) => {
-    const requestId = detailRequestRef.current + 1;
-    detailRequestRef.current = requestId;
+    const isLatest = detailRequest.begin();
     setDetailLoading(true);
     try {
       const res = await api.get(`/groups/${groupId}`);
-      if (requestId === detailRequestRef.current) setGroupDetail(res.data);
+      if (isLatest()) setGroupDetail(res.data);
     } catch {
-      if (requestId === detailRequestRef.current) showToast(t.errorLoadingGroupDetails, 'error');
+      if (isLatest()) showToast(t.errorLoadingGroupDetails, 'error');
     }
-    if (requestId === detailRequestRef.current) setDetailLoading(false);
+    if (isLatest()) setDetailLoading(false);
   };
 
   const toggleExpand = async (groupId) => {
     if (expandedGroup === groupId) {
-      detailRequestRef.current += 1;
+      detailRequest.cancel();
       setExpandedGroup(null);
       setGroupDetail(null);
       setEditingGroup(null);

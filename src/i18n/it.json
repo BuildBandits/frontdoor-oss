@@ -1241,6 +1241,7 @@
       "details": "Dettagli",
       "emptyTitle": "Nessun log audit",
       "emptyBody": "Le righe audit vengono scritte quando gli utenti privilegiati eseguono azioni amministrative",
+      "loadFailed": "Impossibile caricare il registro di audit.",
       "removedUser": "Utente rimosso",
       "pageSummary": "Pagina {page} di {pages} · {total} eventi totali",
       "copyJson": "Copia JSON",

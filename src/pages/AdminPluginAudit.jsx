@@ -6,6 +6,8 @@ import UserAvatar from '../components/UserAvatar';
 import AuditDetails from '../components/AuditDetails';
 import ClearableSearchField from '../components/ClearableSearchField';
 import { useAuthStore } from '../stores/authStore';
+import useDebouncedValue from '../hooks/useDebouncedValue';
+import { useLatestRequest } from '../hooks/useLatestRequest';
 import { useBrandingLanguage, useBrandingTimeZone } from '../stores/brandingStore';
 import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { describeAuditLog } from '../utils/auditFormatters';
@@ -22,6 +24,7 @@ export default function AdminPluginAudit() {
   const [refs, setRefs] = useState({});
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [adminUsers, setAdminUsers] = useState([]);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -56,7 +59,10 @@ export default function AdminPluginAudit() {
     };
   }, []);
 
+  const debouncedSearch = useDebouncedValue(search);
+  const { begin: beginLogsRequest } = useLatestRequest();
   const loadLogs = useCallback(async (p = 1) => {
+    const isLatest = beginLogsRequest();
     setLoading(true);
     try {
       const res = await api.get('/logs/audit', {
@@ -64,25 +70,27 @@ export default function AdminPluginAudit() {
           page: p,
           limit: pageSize,
           retention_days: retentionDays,
-          q: search,
+          q: debouncedSearch,
           target_type: 'plugin',
           action: action || undefined,
           actor_id: selectedActorId || undefined,
         },
       });
+      if (!isLatest()) return;
       setLogs(res.data.logs);
       setRefs(res.data.refs || {});
       setPagination(res.data.pagination);
+      setLoadFailed(false);
     } catch {
-      setLogs([]);
-      setRefs({});
+      if (!isLatest()) return;
+      setLoadFailed(true);
     }
     setLoading(false);
-  }, [action, pageSize, retentionDays, search, selectedActorId]);
+  }, [beginLogsRequest, action, pageSize, retentionDays, debouncedSearch, selectedActorId]);
 
   useEffect(() => {
     setPage(1);
-  }, [action, search, retentionDays, pageSize, selectedActorId]);
+  }, [action, debouncedSearch, retentionDays, pageSize, selectedActorId]);
 
   useEffect(() => { loadLogs(page); }, [loadLogs, page]);
 
@@ -206,6 +214,18 @@ export default function AdminPluginAudit() {
             {[...Array(8)].map((_, i) => (
               <div key={i} className="h-10 bg-gray-50 dark:bg-gray-900 rounded-lg" />
             ))}
+          </div>
+        ) : loadFailed ? (
+          <div className="text-center py-16 text-gray-500 dark:text-gray-400" role="alert">
+            <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-40" />
+            <p className="text-lg font-medium">{ui.admin.audit.loadFailed}</p>
+            <button
+              type="button"
+              onClick={() => loadLogs(page)}
+              className="mt-4 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-semibold text-dark dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              {ui.common.retry}
+            </button>
           </div>
         ) : logs.length === 0 ? (
           <div className="text-center py-16 text-gray-400 dark:text-gray-500">
