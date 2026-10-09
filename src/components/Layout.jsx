@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { ArrowUp, Activity, BookOpen, ChevronDown, Home, LogOut, Menu, Monitor, Moon, Palette, RotateCcw, Settings, Sparkles, Star, Sun, Users, UserCog, X, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
-import { DEFAULT_COLOR_SCHEME, normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
+import { useBranding } from '../stores/brandingStore';
+import { normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
 import BrandMark from './BrandMark';
 import AppFooter from './AppFooter';
 import UserAvatar from './UserAvatar';
 import Tooltip from './Tooltip';
-import api from '../services/api';
 import { formatMessage, getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { getSupportedTimeZoneOptions, normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 import PluginSurface from '../pluginHost/PluginSurface';
@@ -43,13 +43,14 @@ export default function Layout({ children }) {
   const [timeZoneSaving, setTimeZoneSaving] = useState(false);
   const [colorSchemeSaving, setColorSchemeSaving] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [defaultHomeDesktopView, setDefaultHomeDesktopView] = useState('cards');
-  const [brandingLanguage, setBrandingLanguage] = useState('en');
-  const [brandingTimeZone, setBrandingTimeZone] = useState('UTC');
-  const [brandingColorScheme, setBrandingColorScheme] = useState(DEFAULT_COLOR_SCHEME);
-  const [useEuropeanDateFormat, setUseEuropeanDateFormat] = useState(false);
-  const [use24hTimeFormat, setUse24hTimeFormat] = useState(false);
-  const [hideLoginPage, setHideLoginPage] = useState(false);
+  const branding = useBranding();
+  const defaultHomeDesktopView = branding?.defaultHomeDesktopView === 'compact' ? 'compact' : 'cards';
+  const brandingLanguage = normalizeLanguage(branding?.defaultLanguage);
+  const brandingTimeZone = normalizeTimeZone(branding?.defaultTimeZone, 'UTC');
+  const brandingColorScheme = normalizeColorScheme(branding?.defaultColorScheme);
+  const useEuropeanDateFormat = branding?.useEuropeanDateFormat === true;
+  const use24hTimeFormat = branding?.use24hTimeFormat === true;
+  const hideLoginPage = branding?.hideLoginPage === true;
   const accountMenuRef = useRef(null);
   const role = user?.role;
   const canUseAdminPages = ['owner', 'admin', 'admin_readonly'].includes(role);
@@ -139,50 +140,6 @@ export default function Layout({ children }) {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    api.get('/branding')
-      .then((res) => {
-        if (!cancelled) {
-          setDefaultHomeDesktopView(res.data?.branding?.defaultHomeDesktopView === 'compact' ? 'compact' : 'cards');
-          setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
-          setBrandingTimeZone(normalizeTimeZone(res.data?.branding?.defaultTimeZone, 'UTC'));
-          setBrandingColorScheme(normalizeColorScheme(res.data?.branding?.defaultColorScheme));
-          setUseEuropeanDateFormat(res.data?.branding?.useEuropeanDateFormat === true);
-          setUse24hTimeFormat(res.data?.branding?.use24hTimeFormat === true);
-          setHideLoginPage(res.data?.branding?.hideLoginPage === true);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDefaultHomeDesktopView('cards');
-          setBrandingLanguage('en');
-          setBrandingTimeZone('UTC');
-          setBrandingColorScheme(DEFAULT_COLOR_SCHEME);
-          setUseEuropeanDateFormat(false);
-          setUse24hTimeFormat(false);
-          setHideLoginPage(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const onBrandingUpdated = (event) => {
-      setDefaultHomeDesktopView(event.detail?.defaultHomeDesktopView === 'compact' ? 'compact' : 'cards');
-      setBrandingLanguage(normalizeLanguage(event.detail?.defaultLanguage));
-      setBrandingTimeZone(normalizeTimeZone(event.detail?.defaultTimeZone, 'UTC'));
-      setBrandingColorScheme(normalizeColorScheme(event.detail?.defaultColorScheme));
-      setUseEuropeanDateFormat(event.detail?.useEuropeanDateFormat === true);
-      setUse24hTimeFormat(event.detail?.use24hTimeFormat === true);
-      setHideLoginPage(event.detail?.hideLoginPage === true);
-    };
-    window.addEventListener('frontdoor:branding-updated', onBrandingUpdated);
-    return () => window.removeEventListener('frontdoor:branding-updated', onBrandingUpdated);
   }, []);
 
   useEffect(() => {

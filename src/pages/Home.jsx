@@ -22,6 +22,7 @@ import TagGroupCard from '../components/TagGroupCard';
 import ClearableSearchField from '../components/ClearableSearchField';
 import Tooltip from '../components/Tooltip';
 import { useAuthStore } from '../stores/authStore';
+import { useBranding, useBrandingStore } from '../stores/brandingStore';
 import { getUiStrings, resolveAppLanguage } from '../i18n';
 import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
@@ -66,13 +67,14 @@ export default function Home() {
     markHomeTourSeen,
   } = useAuthStore();
   const [apps, setApps] = useState([]);
-  const [branding, setBranding] = useState(null);
+  const branding = useBranding();
   const [search, setSearch] = useState('');
   const [selectedTags, setSelectedTags] = useState([]);
   const [loading, setLoading] = useState(true);
   const [appsLoadFailed, setAppsLoadFailed] = useState(false);
   const [refreshingApps, setRefreshingApps] = useState(false);
-  const [brandingLoading, setBrandingLoading] = useState(true);
+  // Settled once branding is known (cached or loaded) or its request failed.
+  const brandingLoading = useBrandingStore((state) => !state.branding && !state.loaded && !state.failed);
 
   // Persisted preferences
   const [favorites, setFavorites] = useState(() => readJson(LS_FAVORITES, []));
@@ -171,23 +173,6 @@ export default function Home() {
     void api.post('/auth/home-activity').catch(() => {});
     return undefined;
   }, [userId]);
-
-  useEffect(() => {
-    api.get('/branding')
-      .then((res) => setBranding(res.data.branding))
-      .catch(() => setBranding(null))
-      .finally(() => setBrandingLoading(false));
-  }, []);
-
-  useEffect(() => {
-    const onBrandingUpdated = (event) => {
-      if (event.detail) {
-        setBranding(event.detail);
-      }
-    };
-    window.addEventListener('frontdoor:branding-updated', onBrandingUpdated);
-    return () => window.removeEventListener('frontdoor:branding-updated', onBrandingUpdated);
-  }, []);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 767px)');

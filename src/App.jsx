@@ -1,11 +1,12 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router';
 import { useAuthStore } from './stores/authStore';
+import { useBrandingStore } from './stores/brandingStore';
 import { loginPathFor } from './utils/returnPath';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
 import api from './services/api';
-import { getUiStrings, normalizeLanguage } from './i18n';
+import { getUiStrings } from './i18n';
 import { useColorScheme } from './hooks/useColorScheme';
 import { useDocumentLanguage } from './hooks/useDocumentLanguage';
 import PluginHostProvider, { usePluginRuntimeApi } from './pluginHost/PluginHostProvider';
@@ -87,10 +88,14 @@ function AppRoutes() {
   const pluginRuntimeApi = usePluginRuntimeApi();
   const pluginsEnabled = pluginRuntimeApi?.pluginsEnabled === true;
   const { isAuthenticated, user, updateUser } = useAuthStore();
-  // The user's own language when known (the tenant default arrives later with branding).
-  const ui = getUiStrings(normalizeLanguage(user?.preferredLanguage));
   useColorScheme(user?.preferredColorScheme);
-  useDocumentLanguage(user?.preferredLanguage);
+  const { effective: language } = useDocumentLanguage(user?.preferredLanguage);
+  const ui = getUiStrings(language);
+  // Known from the user's own choice, the branding cached in this browser or the
+  // server's answer. Only the very first visit has to wait for branding.
+  const languageKnown = useBrandingStore((state) => (
+    Boolean(state.branding) || state.loaded || state.failed
+  )) || Boolean(user?.preferredLanguage);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return undefined;
@@ -125,6 +130,15 @@ function AppRoutes() {
     { path: '/admin/backup', element: <AdminBackup />, access: PLUGIN_ACCESS.OWNER, layout: 'app' },
     { path: '/admin/plugins', element: <AdminPlugins />, access: PLUGIN_ACCESS.ADMIN, layout: 'app' },
   ];
+
+  // No fallback English texts that switch language a moment later (#119).
+  if (!languageKnown) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] dark:bg-gray-950" role="status" aria-busy="true">
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-dark dark:border-gray-700 dark:border-t-gray-200" />
+      </div>
+    );
+  }
 
   return (
     <Suspense fallback={<div className="p-8 text-sm text-gray-500 dark:text-gray-400">{ui.common.loading}</div>}>

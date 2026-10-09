@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { Eye, Plus, Shield, Trash2, X, Save, Users, ChevronDown, ChevronRight, AppWindow, Pencil, Clock, RefreshCw, Layers3, ArrowRightLeft, Filter } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
+import { useBrandingLanguage } from '../stores/brandingStore';
 import UserAvatar from '../components/UserAvatar';
 import AppIcon from '../components/AppIcon';
 import PageNotice from '../components/PageNotice';
@@ -12,7 +13,7 @@ import Modal from '../components/Modal';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import PaginationControls from '../components/PaginationControls';
-import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
 
 const DEFAULT_GROUP_ID = '00000000-0000-0000-0000-000000000001';
@@ -93,7 +94,7 @@ export default function AdminGroups() {
   const [selectedEntraGroups, setSelectedEntraGroups] = useState([]);
   const [importingEntra, setImportingEntra] = useState(false);
   const [forceSyncing, setForceSyncing] = useState(false);
-  const [brandingLanguage, setBrandingLanguage] = useState('en');
+  const brandingLanguage = useBrandingLanguage();
   const canEdit = user?.role !== 'admin_readonly';
   const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
   const t = ui.admin.common;
@@ -131,19 +132,6 @@ export default function AdminGroups() {
   }, [t, ui]);
 
   useEffect(() => { loadGroups(); }, [loadGroups]);
-  useEffect(() => {
-    let cancelled = false;
-    api.get('/branding')
-      .then((res) => {
-        if (!cancelled) setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
-      })
-      .catch(() => {
-        if (!cancelled) setBrandingLanguage('en');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
   // Effect events: run the latest handlers without re-running the route-state effects.
   const openIncomingGroup = useEffectEvent((groupId) => openGroupAndScroll(groupId, true));
   const openIncomingEntraImport = useEffectEvent((groupIds, search) => openEntraImport(groupIds, search));

@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowRightLeft, Copy, MoveRight, RefreshCw } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
+import { useBrandingLanguage } from '../stores/brandingStore';
 import PageNotice from '../components/PageNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
-import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { getUiStrings, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
 
 function groupLabel(group) {
@@ -15,7 +16,7 @@ function groupLabel(group) {
 export default function AdminGroupTransfer() {
   const { user } = useAuthStore();
   const [groups, setGroups] = useState([]);
-  const [brandingLanguage, setBrandingLanguage] = useState('en');
+  const brandingLanguage = useBrandingLanguage();
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [groupSearch, setGroupSearch] = useState('');
   const [sourceGroupId, setSourceGroupId] = useState('');
@@ -31,20 +32,6 @@ export default function AdminGroupTransfer() {
   const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
   const ui = getUiStrings(language);
   const g = ui.admin.groups;
-
-  useEffect(() => {
-    let cancelled = false;
-    api.get('/branding')
-      .then((res) => {
-        if (!cancelled) setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
-      })
-      .catch(() => {
-        if (!cancelled) setBrandingLanguage('en');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.preferredLanguage]);
 
   useEffect(() => {
     let cancelled = false;

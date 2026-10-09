@@ -5,6 +5,7 @@ import api from '../services/api';
 import ConfirmDialog from '../components/ConfirmDialog';
 import TopToastNotice from '../components/TopToastNotice';
 import { useAuthStore } from '../stores/authStore';
+import { useBrandingStore } from '../stores/brandingStore';
 import { formatMessage, getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
 import { getSupportedTimeZoneOptions, normalizeTimeZone } from '../../shared/timeZones.js';
@@ -95,6 +96,7 @@ export default function Customization() {
   const [uiLanguage, setUiLanguage] = useState('en');
   const [heroLang, setHeroLang] = useState('en');
   const [brandingLoading, setBrandingLoading] = useState(true);
+  const setSharedBranding = useBrandingStore((state) => state.setBranding);
   const [brandingSaving, setBrandingSaving] = useState(false);
   const [brandingLogoDataUrl, setBrandingLogoDataUrl] = useState('');
   const [brandingLogoPreview, setBrandingLogoPreview] = useState(null);
@@ -168,6 +170,7 @@ export default function Customization() {
     setBrandingLoading(true);
     api.get('/branding')
       .then((res) => {
+        if (res.data.branding) setSharedBranding(res.data.branding);
         const next = seedHeroMaps(res.data.branding || emptyBrandingFor(user?.preferredLanguage));
         setBranding(next);
         setInitialBranding(next);
@@ -393,7 +396,8 @@ export default function Customization() {
       setBrandingLogoDataUrl('');
       setBrandingLogoFileName('');
       setRemoveBrandingLogo(false);
-      window.dispatchEvent(new CustomEvent('frontdoor:branding-updated', { detail: next }));
+      // Every page (language, color scheme, Home, plugins) follows the saved settings.
+      if (res.data.branding) setSharedBranding(res.data.branding);
       pushSaveNotice(
         'success',
         retentionChanged

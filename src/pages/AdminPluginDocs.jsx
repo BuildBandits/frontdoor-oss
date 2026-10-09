@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
 import { BookOpen, Boxes, Code2, ExternalLink, FileJson, PlugZap, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { Link } from 'react-router';
-import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
-import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { useBrandingLanguage } from '../stores/brandingStore';
+import { getUiStrings, resolveAppLanguage } from '../i18n';
 import {
   manifestExample,
   packageExample,
@@ -14,21 +13,7 @@ import {
 export default function AdminPluginDocs() {
   const { user } = useAuthStore();
   const isOwner = user?.role === 'owner';
-  const [brandingLanguage, setBrandingLanguage] = useState('en');
-
-  useEffect(() => {
-    let cancelled = false;
-    api.get('/branding')
-      .then((res) => {
-        if (!cancelled) setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
-      })
-      .catch(() => {
-        if (!cancelled) setBrandingLanguage('en');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const brandingLanguage = useBrandingLanguage();
 
   const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
   const t = ui.admin.pluginDocs;

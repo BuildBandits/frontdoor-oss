@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
-import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
+import { useBranding, useBrandingStore } from '../stores/brandingStore';
 import { getUiStrings, resolveAppLanguage } from '../i18n';
 import { bootstrapPlugins } from './bootstrap';
 import { clearPluginRegistry } from './registry';
@@ -14,54 +14,30 @@ export function usePluginRuntimeApi() {
 
 export default function PluginHostProvider({ children }) {
   const navigate = useNavigate();
-  const brandingRef = useRef(null);
-  const [pluginsEnabled, setPluginsEnabled] = useState(false);
+  const branding = useBranding();
+  // Only the server's answer enables plugins, never the copy cached in the browser.
+  const brandingLoaded = useBrandingStore((state) => state.loaded);
+  const pluginsEnabled = brandingLoaded && branding?.pluginsEnabled === true;
 
+  // Plugins can listen for branding changes.
   useEffect(() => {
-    let cancelled = false;
-
-    api.get('/branding')
-      .then((res) => {
-        if (!cancelled) {
-          brandingRef.current = res.data?.branding || null;
-          setPluginsEnabled(brandingRef.current?.pluginsEnabled === true);
-          window.dispatchEvent(new CustomEvent('frontdoor:plugin-branding-updated', {
-            detail: brandingRef.current,
-          }));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          brandingRef.current = null;
-          setPluginsEnabled(false);
-        }
-      });
-
-    const onBrandingUpdated = (event) => {
-      brandingRef.current = event.detail || null;
-      setPluginsEnabled(brandingRef.current?.pluginsEnabled === true);
-    };
-
-    window.addEventListener('frontdoor:branding-updated', onBrandingUpdated);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('frontdoor:branding-updated', onBrandingUpdated);
-    };
-  }, []);
+    if (!branding) return;
+    window.dispatchEvent(new CustomEvent('frontdoor:plugin-branding-updated', { detail: branding }));
+  }, [branding]);
 
   const runtimeApi = useMemo(() => ({
     apiVersion: 1,
     pluginsEnabled,
     getCurrentUser: () => useAuthStore.getState().user || null,
-    getBranding: () => brandingRef.current,
+    getBranding: () => useBrandingStore.getState().branding,
     getLanguage: () => resolveAppLanguage(
       useAuthStore.getState().user?.preferredLanguage,
-      brandingRef.current?.defaultLanguage
+      useBrandingStore.getState().branding?.defaultLanguage
     ),
     getUiStrings: () => getUiStrings(
       resolveAppLanguage(
         useAuthStore.getState().user?.preferredLanguage,
-        brandingRef.current?.defaultLanguage
+        useBrandingStore.getState().branding?.defaultLanguage
       )
     ),
     navigate: (to, options = {}) => navigate(to, options),

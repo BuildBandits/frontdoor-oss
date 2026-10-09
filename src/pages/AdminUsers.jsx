@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, Wand2, Filter } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
+import { useBranding } from '../stores/brandingStore';
 import UserAvatar from '../components/UserAvatar';
 import AppIcon from '../components/AppIcon';
 import TopToastNotice from '../components/TopToastNotice';
@@ -14,7 +15,7 @@ import Tooltip from '../components/Tooltip';
 import PaginationControls from '../components/PaginationControls';
 import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
-import { DEFAULT_COLOR_SCHEME, normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
+import { normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
 import { formatDateTimeWithTimeZone } from '../utils/dateTime';
 import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
@@ -36,10 +37,11 @@ export default function AdminUsers() {
   const [showVisibleApps, setShowVisibleApps] = useState(false);
   const [visibleAppsSearch, setVisibleAppsSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [brandingLanguage, setBrandingLanguage] = useState('en');
-  const [brandingTimeZone, setBrandingTimeZone] = useState('UTC');
-  const [defaultHomeDesktopView, setDefaultHomeDesktopView] = useState('cards');
-  const [defaultColorScheme, setDefaultColorScheme] = useState(DEFAULT_COLOR_SCHEME);
+  const branding = useBranding();
+  const brandingLanguage = normalizeLanguage(branding?.defaultLanguage);
+  const brandingTimeZone = normalizeTimeZone(branding?.defaultTimeZone, 'UTC');
+  const defaultHomeDesktopView = branding?.defaultHomeDesktopView === 'compact' ? 'compact' : 'cards';
+  const defaultColorScheme = normalizeColorScheme(branding?.defaultColorScheme);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const detailInfoRef = useRef(null);
@@ -124,29 +126,6 @@ export default function AdminUsers() {
   useEffect(() => {
     setPage(1);
   }, [search, filterRole, filterActive, filterPersonalization, pageSize]);
-  useEffect(() => {
-    let cancelled = false;
-    api.get('/branding')
-      .then((res) => {
-        if (!cancelled) {
-          setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
-          setBrandingTimeZone(normalizeTimeZone(res.data?.branding?.defaultTimeZone, 'UTC'));
-          setDefaultHomeDesktopView(res.data?.branding?.defaultHomeDesktopView === 'compact' ? 'compact' : 'cards');
-          setDefaultColorScheme(normalizeColorScheme(res.data?.branding?.defaultColorScheme));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setBrandingLanguage('en');
-          setBrandingTimeZone('UTC');
-          setDefaultHomeDesktopView('cards');
-          setDefaultColorScheme(DEFAULT_COLOR_SCHEME);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Only the latest detail request may update the panel, so a slower answer for a
   // user that is no longer expanded cannot appear (and be acted on) under another one.

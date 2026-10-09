@@ -7,10 +7,11 @@ import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import PaginationControls from '../components/PaginationControls';
 import { useAuthStore } from '../stores/authStore';
-import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
+import { useBrandingLanguage, useBrandingTimeZone } from '../stores/brandingStore';
+import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { describeAuditLog } from '../utils/auditFormatters';
 import { formatIsoDateTime } from '../utils/dateTime';
-import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
+import { resolveAppTimeZone } from '../../shared/timeZones.js';
 
 const PRIVILEGED_ROLES = new Set(['owner', 'admin', 'admin_readonly']);
 const SIGN_IN_TARGET_TYPE = 'auth';
@@ -48,29 +49,9 @@ export default function AdminAudit() {
   // Administrator sign-ins are hidden by default (they drown out the changes);
   // the choice is remembered per browser.
   const [showSignIns, setShowSignIns] = useState(() => readShowSignIns());
-  const [brandingLanguage, setBrandingLanguage] = useState('en');
-  const [brandingTimeZone, setBrandingTimeZone] = useState('UTC');
+  const brandingLanguage = useBrandingLanguage();
+  const brandingTimeZone = useBrandingTimeZone();
   const timeZone = resolveAppTimeZone(user?.preferredTimeZone, brandingTimeZone);
-
-  useEffect(() => {
-    let cancelled = false;
-    api.get('/branding')
-      .then((res) => {
-        if (!cancelled) {
-          setBrandingLanguage(normalizeLanguage(res.data?.branding?.defaultLanguage));
-          setBrandingTimeZone(normalizeTimeZone(res.data?.branding?.defaultTimeZone, 'UTC'));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setBrandingLanguage('en');
-          setBrandingTimeZone('UTC');
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
 
