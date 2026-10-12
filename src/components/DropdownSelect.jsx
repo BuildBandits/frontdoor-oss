@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
+import { isAllChecked, isItemChecked, toggleAll, toggleItem } from '../utils/selectAll.js';
 
 export default function DropdownSelect({
   value,
@@ -18,22 +19,33 @@ export default function DropdownSelect({
   const ref = useRef(null);
   const itemRefs = useRef([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [noneChecked, setNoneChecked] = useState(false);
 
   const selectedValues = useMemo(() => {
     if (multi) return Array.isArray(value) ? value : [];
     return [value];
   }, [multi, value]);
 
+  // A multi select with a "clear selection" option behaves like an Excel filter:
+  // an empty value means "no filter" and shows every item checked.
+  const hasClearOption = multi && options.some((option) => option.clearSelection);
+  const itemValues = useMemo(
+    () => options.filter((option) => !option.clearSelection).map((option) => option.value),
+    [options]
+  );
+  const showNoneChecked = noneChecked && selectedValues.length === 0;
+
+  const isOptionSelected = useCallback((option) => {
+    if (!multi) return option.value === value;
+    if (!hasClearOption) return selectedValues.includes(option.value);
+    return option.clearSelection
+      ? isAllChecked(selectedValues, showNoneChecked)
+      : isItemChecked(option.value, selectedValues, showNoneChecked);
+  }, [hasClearOption, multi, selectedValues, showNoneChecked, value]);
+
   useEffect(() => {
     if (!open) return undefined;
-    setActiveIndex(() => {
-      const selectedIndex = options.findIndex((option) => (
-        multi
-          ? (option.clearSelection ? selectedValues.length === 0 : selectedValues.includes(option.value))
-          : option.value === value
-      ));
-      return Math.max(0, selectedIndex);
-    });
+    setActiveIndex(() => Math.max(0, options.findIndex(isOptionSelected)));
     const onMouseDown = (event) => {
       if (ref.current && !ref.current.contains(event.target)) {
         setOpen(false);
@@ -48,7 +60,7 @@ export default function DropdownSelect({
       document.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [multi, open, options, selectedValues, value]);
+  }, [isOptionSelected, open, options]);
 
   useEffect(() => {
     if (!open) return;
@@ -77,9 +89,13 @@ export default function DropdownSelect({
 
   const handleSelect = (nextValue) => {
     if (multi) {
-      if (nextValue === '__clear__') {
-        onChange([]);
-        setOpen(false);
+      if (hasClearOption) {
+        const next = nextValue === '__clear__'
+          ? toggleAll(selectedValues, showNoneChecked)
+          : toggleItem(itemValues, selectedValues, showNoneChecked, nextValue);
+        setNoneChecked(next.noneChecked);
+        // "All" and "none" are both an empty value: skip a change that filters nothing new.
+        if (next.values.length > 0 || selectedValues.length > 0) onChange(next.values);
         return;
       }
       const nextValues = selectedValues.includes(nextValue)
@@ -158,9 +174,7 @@ export default function DropdownSelect({
         >
           <div className="max-h-72 overflow-auto py-1">
             {options.map((option, index) => {
-              const selected = multi
-                ? (option.clearSelection ? selectedValues.length === 0 : selectedValues.includes(option.value))
-                : option.value === value;
+              const selected = isOptionSelected(option);
               return (
                 <button
                   key={String(option.value)}

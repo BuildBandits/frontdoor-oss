@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Fixed
+- **Admin filter in Audit works like an Excel filter**: with *All admins* selected, every admin in the list is now checked too, so seeing everyone except one admin takes a single click instead of checking all the others. Checking every admin again selects *All admins*; unchecking *All admins* clears every checkbox, and with nothing checked the log is not filtered. ([#128](https://github.com/BuildBandits/frontdoor-oss/issues/128))
 - **Tour highlights the personal menu**: on desktop, step 6 of the Home tour sometimes left the opened personal menu under the dark overlay, because the highlight was measured before the menu had rendered (more likely on a busy Home). The highlight is now measured again whenever elements appear or disappear while the tour is open.
 
 ## [1.4.0] — 2026-10-09
