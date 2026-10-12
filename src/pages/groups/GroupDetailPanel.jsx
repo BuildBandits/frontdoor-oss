@@ -104,7 +104,7 @@ export default function GroupDetailPanel({
                   {!isEntraGroup(group) && (
                     <section
                     className={`rounded-2xl border border-gray-100 dark:border-gray-800 p-4 bg-white dark:bg-gray-900 xl:flex xl:flex-col xl:min-h-0 ${
-                      totalLinkedGroupCount === 0 ? 'xl:flex-none' : 'xl:flex-1 xl:basis-0'
+                      totalLinkedGroupCount === 0 && groupDetail.members.length > 0 ? 'xl:flex-none' : 'xl:flex-1 xl:basis-0'
                     }`}
                   >
                     <div className="flex w-full items-center justify-between gap-3">
@@ -211,7 +211,7 @@ export default function GroupDetailPanel({
                     className={`rounded-2xl border border-gray-100 dark:border-gray-800 p-4 bg-white dark:bg-gray-900 xl:flex xl:flex-col ${
                       isEntraGroup(group)
                         ? ''
-                        : 'xl:min-h-0 ' + (groupDetail.members.length === 0 ? 'xl:flex-none' : 'xl:flex-1 xl:basis-0')
+                        : 'xl:min-h-0 ' + (groupDetail.members.length === 0 && totalLinkedGroupCount > 0 ? 'xl:flex-none' : 'xl:flex-1 xl:basis-0')
                     }`}
                   >
                     <div className="flex w-full items-center justify-between gap-3">
