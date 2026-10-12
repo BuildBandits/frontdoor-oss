@@ -7,10 +7,12 @@ import {
 export { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE };
 
 // Dictionaries are loaded on demand, so a page only downloads the language it shows
-// (each one is a separate chunk of about 90 kB).
+// (each one is a separate chunk of about 90 kB). No `with { type: 'json' }` here: the
+// Vite dev server serves JSON as a JavaScript module, which the browser then refuses
+// as a JSON module (blank page). Tests add the attribute in test/setup.js.
 const DICTIONARY_LOADERS = {
-  en: () => import('./en.json', { with: { type: 'json' } }),
-  it: () => import('./it.json', { with: { type: 'json' } }),
+  en: () => import('./en.json'),
+  it: () => import('./it.json'),
 };
 
 const dictionaries = new Map();

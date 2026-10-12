@@ -2,8 +2,19 @@
 // module is imported, so each test file gets its own SQLite database and data
 // directories instead of sharing the repo's frontdoor.db and ./data.
 import fs from 'node:fs';
+import { registerHooks } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+
+// Frontend code imports JSON without `with { type: 'json' }` (the Vite dev server
+// needs that), while Node requires the attribute: add it to every JSON import.
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    const result = nextResolve(specifier, context);
+    if (!result.url.endsWith('.json')) return result;
+    return { ...result, importAttributes: { ...context.importAttributes, type: 'json' } };
+  },
+});
 
 const PREFIX = 'frontdoor-test-';
 const STALE_AFTER_MS = 60 * 60 * 1000;
