@@ -1,4 +1,4 @@
-import { Eye, Shield, X, Save, Users, ChevronDown, AppWindow, Pencil, Clock, Layers3 } from 'lucide-react';
+import { Eye, Shield, X, Save, Users, AppWindow, Pencil, Clock, Layers3 } from 'lucide-react';
 import UserAvatar from '../../components/UserAvatar';
 import AppIcon from '../../components/AppIcon';
 import { DEFAULT_GROUP_ID } from '../../../shared/groups.js';
@@ -21,8 +21,6 @@ export default function GroupDetailPanel({
   setEditingGroup,
   startEdit,
   canEdit,
-  activeGroupPanel,
-  setActiveGroupPanel,
   totalLinkedGroupCount,
   openAddGroups,
   linkedGroups,
@@ -105,18 +103,11 @@ export default function GroupDetailPanel({
                 <div className={`flex flex-col gap-3 xl:min-h-0 ${isEntraGroup(group) ? 'xl:h-auto' : 'xl:h-[560px]'}`}>
                   {!isEntraGroup(group) && (
                     <section
-                    className={`rounded-2xl border border-gray-100 dark:border-gray-800 p-4 transition-all duration-300 xl:flex xl:flex-col xl:min-h-0 ${
-                      activeGroupPanel === 'linked'
-                        ? 'xl:flex-[1.35] bg-white dark:bg-gray-900'
-                        : 'xl:flex-[0.34] bg-white/80 dark:bg-gray-950/50'
+                    className={`rounded-2xl border border-gray-100 dark:border-gray-800 p-4 bg-white dark:bg-gray-900 xl:flex xl:flex-col xl:min-h-0 ${
+                      totalLinkedGroupCount === 0 ? 'xl:flex-none' : 'xl:flex-1 xl:basis-0'
                     }`}
                   >
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setActiveGroupPanel('linked')}
-                      className="flex w-full items-center justify-between gap-3 text-left cursor-pointer"
-                    >
+                    <div className="flex w-full items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3">
                           <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
@@ -140,17 +131,16 @@ export default function GroupDetailPanel({
                         </div>
                         <p className="text-xs text-sky-600 dark:text-sky-400 mt-1">{g.linkedGroupsHelp}</p>
                       </div>
-                      <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-300 ${activeGroupPanel === 'linked' ? 'rotate-180 text-dark dark:text-gray-100' : ''}`} />
                     </div>
-                    <div className={`overflow-hidden transition-all duration-300 ${activeGroupPanel === 'linked' ? 'mt-4 max-h-[430px] opacity-100 xl:flex-1 xl:min-h-0' : 'max-h-0 opacity-0'}`}>
+                    <div className="mt-4 xl:flex-1 xl:min-h-0">
                       {totalLinkedGroupCount === 0 ? (
-                        <div className="flex flex-col items-center justify-center text-center py-6 text-gray-300 dark:text-gray-600 min-h-[140px]">
+                        <div className="flex flex-col items-center justify-center text-center py-3 text-gray-300 dark:text-gray-600">
                           <Layers3 className="w-8 h-8 mx-auto mb-2 opacity-40" />
                           <p className="text-sm">{g.noLinkedGroups}</p>
                           <p className="text-xs mt-1">{g.linkedGroupsHint}</p>
                         </div>
                       ) : (
-                        <div className="space-y-2 overflow-y-auto pr-3 scrollbar-gutter-stable xl:h-full">
+                        <div className="space-y-2 overflow-y-auto pr-3 scrollbar-gutter-stable max-h-[320px] xl:max-h-none xl:h-full">
                           {linkedGroups.map((childGroup) => (
                             <div key={childGroup.id} className="flex items-center justify-between py-1.5">
                               <div className="flex items-center gap-2 min-w-0">
@@ -218,18 +208,13 @@ export default function GroupDetailPanel({
                   )}
 
                   <section
-                    className={`rounded-2xl border border-gray-100 dark:border-gray-800 p-4 transition-all duration-300 ${
+                    className={`rounded-2xl border border-gray-100 dark:border-gray-800 p-4 bg-white dark:bg-gray-900 xl:flex xl:flex-col ${
                       isEntraGroup(group)
-                        ? 'xl:flex xl:flex-col bg-white dark:bg-gray-900'
-                        : 'xl:flex xl:flex-col xl:min-h-0 ' + (activeGroupPanel === 'members' ? 'xl:flex-[1.35] bg-white dark:bg-gray-900' : 'xl:flex-[0.34] bg-white/80 dark:bg-gray-950/50')
+                        ? ''
+                        : 'xl:min-h-0 ' + (groupDetail.members.length === 0 ? 'xl:flex-none' : 'xl:flex-1 xl:basis-0')
                     }`}
                   >
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setActiveGroupPanel('members')}
-                      className="flex w-full items-center justify-between gap-3 text-left cursor-pointer"
-                    >
+                    <div className="flex w-full items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3">
                           <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
@@ -263,24 +248,18 @@ export default function GroupDetailPanel({
                             : t.memberAssignedHelp}
                         </p>
                       </div>
-                      <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform duration-300 ${activeGroupPanel === 'members' ? 'rotate-180 text-dark dark:text-gray-100' : ''}`} />
                     </div>
-                    <div className={`overflow-hidden transition-all duration-300 ${isEntraGroup(group)
-                      ? 'mt-4 opacity-100'
-                      : activeGroupPanel === 'members'
-                        ? 'mt-4 opacity-100 xl:flex-1 xl:min-h-0'
-                        : 'max-h-0 opacity-0'
-                    }`}>
+                    <div className={`mt-4 ${isEntraGroup(group) ? '' : 'xl:flex-1 xl:min-h-0'}`}>
                       {groupDetail.members.length === 0 ? (
-                        <div className={`flex flex-col items-center justify-center text-center py-6 text-gray-300 dark:text-gray-600 ${
-                          isEntraGroup(group) ? 'min-h-[140px]' : 'min-h-[140px]'
+                        <div className={`flex flex-col items-center justify-center text-center text-gray-300 dark:text-gray-600 ${
+                          isEntraGroup(group) ? 'py-6 min-h-[140px]' : 'py-3'
                         }`}>
                           <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
                           <p className="text-sm">{t.noMembers}</p>
                           <p className="text-xs mt-1">{!isEntraGroup(group) && totalLinkedGroupCount > 0 ? g.linkedGroupsHint : t.memberAssignedHelp}</p>
                         </div>
                       ) : (
-                        <div className={`space-y-2 overflow-y-auto pr-3 scrollbar-gutter-stable ${isEntraGroup(group) ? 'max-h-[260px]' : 'xl:h-full'}`}>
+                        <div className={`space-y-2 overflow-y-auto pr-3 scrollbar-gutter-stable ${isEntraGroup(group) ? 'max-h-[260px]' : 'max-h-[320px] xl:max-h-none xl:h-full'}`}>
                           {groupDetail.members.map((m) => (
                             <div key={m.id} className="flex items-center justify-between py-1.5">
                               <div className="flex items-center gap-2">

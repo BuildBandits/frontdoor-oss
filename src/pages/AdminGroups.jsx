@@ -40,7 +40,6 @@ export default function AdminGroups() {
   const { dialog: confirmDialog, open: openConfirm, dialogProps: confirmDialogProps } = useConfirmDialog();
   const [groupSearch, setGroupSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('all');
-  const [activeGroupPanel, setActiveGroupPanel] = useState('members');
 
   const showToast = (message, type = 'success') => setPageNotice({ message, type });
 
@@ -257,7 +256,6 @@ export default function AdminGroups() {
     } else {
       setExpandedGroup(groupId);
       setGroupDetail(null);
-      setActiveGroupPanel('members');
       setEditingGroup(null);
       await loadGroupDetail(groupId);
     }
@@ -1211,8 +1209,6 @@ export default function AdminGroups() {
                 setEditingGroup={setEditingGroup}
                 startEdit={startEdit}
                 canEdit={canEdit}
-                activeGroupPanel={activeGroupPanel}
-                setActiveGroupPanel={setActiveGroupPanel}
                 totalLinkedGroupCount={totalLinkedGroupCount}
                 openAddGroups={openAddGroups}
                 linkedGroups={linkedGroups}
