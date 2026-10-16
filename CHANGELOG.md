@@ -13,6 +13,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Blank page with the development server**: since the dictionaries are loaded on demand, `npm run dev` showed a blank page because the browser refused the language file served by Vite. Production builds were not affected. The dictionaries are now imported without the JSON import attribute, which the tests add on their own.
 - **Tour highlights the personal menu**: on desktop, step 6 of the Home tour sometimes left the opened personal menu under the dark overlay, because the highlight was measured before the menu had rendered (more likely on a busy Home). The highlight is now measured again whenever elements appear or disappear while the tour is open.
 
+### Security
+- **Express 5.3.0**: `express` moves from 5.2.1 to 5.3.0, which brings patched `qs` (CVE-2026-2391, CVE-2026-82417, CVE-2026-82562: array limit bypasses and a denial of service in query string parsing) and `proxy-addr` (CVE-2026-90711). The same dependency refresh bumps `dotenv`, `uuid`, `concurrently`, `lucide-react` and `vite` to their latest patch or minor releases. ([#133](https://github.com/BuildBandits/frontdoor-oss/pull/133))
+
 ## [1.4.0] — 2026-10-09
 
 Security hardening before the repository goes public (PKCE and browser-bound Microsoft sign-in, cross-site requests refused, stricter session tokens, images-only media, a hardened plugin platform), tools for oversized app icons (startup report and *Optimize icons* in the media library), a lighter and steadier frontend (branding loaded once, only the active language downloaded, no English flash on load, accessible dialogs) and many fixes from a full repository review.

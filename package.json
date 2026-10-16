@@ -27,13 +27,13 @@
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dompurify": "^3.4.16",
-    "dotenv": "^18.0.5",
-    "express": "^5.2.1",
+    "dotenv": "^18.0.7",
+    "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "helmet": "^8.1.0",
     "jsdom": "^30.1.1",
     "jsonwebtoken": "^9.0.2",
-    "uuid": "^14.0.2"
+    "uuid": "^14.0.3"
   },
   "overrides": {
     "form-data": "^4.0.6",
@@ -68,17 +68,17 @@
     "@tailwindcss/postcss": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "axios": "^1.20.0",
-    "concurrently": "^10.0.5",
+    "concurrently": "^10.0.6",
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
-    "lucide-react": "^1.51.0",
+    "lucide-react": "^1.55.0",
     "postcss": "^8.5.29",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router": "^8.4.0",
     "tailwindcss": "^4.3.3",
-    "vite": "^8.1.6",
+    "vite": "^8.3.4",
     "zustand": "^5.0.15"
   }
 }
