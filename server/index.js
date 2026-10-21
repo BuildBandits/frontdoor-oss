@@ -6,6 +6,7 @@ import { getStartupConfig, validateStartupEnv } from './config.js';
 import { getBrandingSettings } from './services/branding.js';
 import { backfillMediaLibrary } from './services/mediaAssets.js';
 import { findLargeAppIcons, LARGE_ICON_THRESHOLD_BYTES } from './services/appIcons.js';
+import { sweepExpiredSessions } from './services/impersonation.js';
 
 const PORT = process.env.PORT || 3001;
 
@@ -90,6 +91,16 @@ function runLogRetentionPurge() {
   }
 }
 
+// Closes impersonation sessions that timed out while nobody was using them, so
+// their end is always in the audit log.
+function runImpersonationSweep() {
+  try {
+    sweepExpiredSessions();
+  } catch (error) {
+    console.error(`Frontdoor impersonation sweep failed: ${error.message}`);
+  }
+}
+
 try {
   const result = await backfillMediaLibrary();
   if (result.totalImported > 0) {
@@ -106,4 +117,7 @@ createApp().listen(PORT, () => {
   runLogRetentionPurge();
   const dailyRetentionTimer = setInterval(runLogRetentionPurge, 24 * 60 * 60 * 1000);
   dailyRetentionTimer.unref?.();
+  runImpersonationSweep();
+  const impersonationSweepTimer = setInterval(runImpersonationSweep, 60 * 1000);
+  impersonationSweepTimer.unref?.();
 });
