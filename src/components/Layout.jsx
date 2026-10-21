@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { ArrowUp, Activity, BookOpen, ChevronDown, Home, LogOut, Menu, Monitor, Moon, Palette, RotateCcw, Settings, Sparkles, Star, Sun, Users, UserCog, X, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import ImpersonationBanner from './ImpersonationBanner';
 import { useBranding } from '../stores/brandingStore';
 import { normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
 import BrandMark from './BrandMark';
@@ -33,6 +34,7 @@ export default function Layout({ children }) {
     updatePreferredColorScheme,
     resetPreferredColorScheme,
     resetAppOrder,
+    impersonation,
   } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -380,7 +382,8 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFAFA] dark:bg-gray-950">
-      <nav className="sticky top-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shadow-xs shadow-black/5">
+      <ImpersonationBanner ui={ui} timeZone={effectiveTimeZone} />
+      <nav className={`${impersonation ? '' : 'sticky top-0 '}z-40 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shadow-xs shadow-black/5`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between min-h-16 py-3 gap-4">
             <Link to="/" className="flex items-center gap-3 shrink-0">

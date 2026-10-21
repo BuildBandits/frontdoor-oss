@@ -28,6 +28,35 @@ export const useAuthStore = create((set, get) => ({
   // Only user profile data in localStorage (non-sensitive). Token lives only in httpOnly cookie.
   user: storedUser,
   isAuthenticated: Boolean(storedUser),
+  // Set while an admin acts as another user ({ sessionId, actor, expiresAt, reason }).
+  impersonation: null,
+  impersonationEndedNotice: false,
+
+  applySession: ({ user, impersonation = null }) => {
+    const endedOnItsOwn = Boolean(get().impersonation) && !impersonation;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeUser(user)));
+    set({ user, isAuthenticated: true, impersonation, impersonationEndedNotice: endedOnItsOwn || get().impersonationEndedNotice });
+  },
+
+  refreshSession: async () => {
+    const res = await api.get('/auth/me');
+    if (res.data?.user) get().applySession(res.data);
+    return res.data;
+  },
+
+  startImpersonation: async (userId, reason) => {
+    await api.post('/impersonation', { userId, reason });
+    return get().refreshSession();
+  },
+
+  stopImpersonation: async () => {
+    await api.post('/impersonation/stop');
+    // Cleared first, so a manual stop is not reported as "ended on its own".
+    set({ impersonation: null });
+    return get().refreshSession();
+  },
+
+  dismissImpersonationEndedNotice: () => set({ impersonationEndedNotice: false }),
 
   loginWithToken: (_token, user) => {
     // Token is already set as httpOnly cookie by the server callback.
@@ -44,7 +73,7 @@ export const useAuthStore = create((set, get) => ({
       // Continue logout even if API call fails
     }
     localStorage.removeItem(STORAGE_KEY);
-    set({ user: null, isAuthenticated: false });
+    set({ user: null, isAuthenticated: false, impersonation: null });
   },
 
   updateUser: (user) => {
@@ -54,6 +83,8 @@ export const useAuthStore = create((set, get) => ({
   },
 
   savePreferences: async (preferences, options = {}) => {
+    // Impersonation is read-only: the server refuses it anyway, so do not even try.
+    if (get().impersonation) return get().user;
     const previousUser = get().user;
     const optimisticUser = previousUser ? { ...previousUser, ...preferences } : { ...preferences };
     if (Object.prototype.hasOwnProperty.call(preferences, 'appOrder')) {
