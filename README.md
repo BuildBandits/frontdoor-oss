@@ -169,6 +169,7 @@ The image stores every writable path on the `/data` volume by default (`DATABASE
 | `ENTRA_GROUP_SYNC` | Discover Entra group memberships at login and enable admin import/force-sync flows | `false` (`true` in `docker-compose.yml`) |
 | `ENTRA_TENANT_REFRESH_MINUTES` | Minimum minutes between two refreshes of the tenant-wide Entra group catalog triggered by sign-ins (force sync always refreshes it; `0` refreshes at every sign-in) | `360` |
 | `JWT_EXPIRES_IN` | JWT token duration | `7d` |
+| `IMPERSONATION_TIMEOUT_MINUTES` | Minutes an admin can act as a user before the impersonation ends (clamped to 5–240) | `30` |
 | `JWT_ISSUER` | Issuer of the session and SSO tokens (satellites verifying tokens must use the same value) | `frontdoor` |
 | `ADMIN_EMAILS` | Comma-separated owner emails (auto-promoted) | - |
 | `ADMIN_API_KEY` | API key for bulk endpoints | - |
@@ -248,6 +249,18 @@ Frontdoor supports four role values:
 Users listed in `ADMIN_EMAILS` are auto-promoted to `owner` and remain protected from web UI changes while they stay in the compose/run list.
 
 Only `owner` can access Logs, Audit and Customize. `admin` and `admin_readonly` can access Apps, Groups and Users; the latter is read-only.
+
+#### Acting as a user (impersonation)
+
+Owners, admins and read-only admins can open a user's detail in **Admin → Users** and choose **Act as this user** to see Frontdoor exactly as that user does. A reason (up to 500 characters) is required.
+
+- Only active users with the `user` role can be impersonated, never yourself.
+- The session is read-only: every change is refused (`impersonation_read_only`), and apps cannot be opened (`impersonation_app_launch_blocked`; no SSO token is ever issued).
+- A banner on every page shows who you are acting as, and **Stop** returns you to your own account without signing in again.
+- The session ends on stop, on sign-out, when your own session expires, or after `IMPERSONATION_TIMEOUT_MINUTES` (default 30, between 5 and 240).
+- Start, end, blocked changes and blocked app launches are written to the audit log (target type `impersonation`); the Audit page (owner only) has an *Impersonation only* toggle and can show one session at a time. Ended sessions are purged together with the logs and left out of backups made with *exclude logs*.
+
+The session is kept in a separate host-only cookie (`frontdoor_impersonation`). The shared `frontdoor_token` cookie is never changed, so `shared-cookie` satellites keep seeing the admin, never the impersonated user.
 
 #### Avatars and log retention
 
@@ -412,9 +425,11 @@ Every error response is JSON with a human-readable `error` and a stable snake_ca
 | GET | `/api/health` | No | Health check |
 | GET | `/api/auth/microsoft` | No | Start the Microsoft sign-in (PKCE; optional `?redirect=<app slug>`) |
 | GET | `/api/auth/microsoft/callback` | No | Microsoft sign-in callback |
-| GET | `/api/auth/me` | Session | Current user and preferences |
+| GET | `/api/auth/me` | Session | Current user and preferences (`impersonation` is `null`, or `{ sessionId, actor, expiresAt, reason }` while acting as a user) |
 | PUT | `/api/auth/me/preferences` | Session | Update own preferences (Home view, language, time zone, theme, app order, favourites, tour) |
 | POST | `/api/auth/home-activity` | Session | Record Home activity (throttled) |
+| POST | `/api/impersonation` | Admin viewer | Start acting as a user (body `{ userId, reason }`; returns 201 `{ sessionId, expiresAt }`) |
+| POST | `/api/impersonation/stop` | Session | End the impersonation (returns `{ ok: true }`) |
 | POST | `/api/auth/logout` | No | Sign out (clears the cookie) |
 | GET | `/api/auth/dev-status` | No | Whether Dev Login is available |
 | POST | `/api/auth/dev-login` | No | Dev Login (development only, never in production) |
