@@ -42,8 +42,12 @@ router.post('/', authenticate, (req, res) => {
 });
 
 router.post('/stop', authenticate, (req, res) => {
-  if (req.impersonation) endSession(req.impersonation.sessionId, 'manual');
-  clearImpersonationCookie(res);
+  // A cross-origin caller never resolves the session (see authenticate), so it
+  // must not clear the cookie either: that would leave the session open unaudited.
+  if (req.impersonation) {
+    endSession(req.impersonation.sessionId, 'manual');
+    clearImpersonationCookie(res);
+  }
   res.json({ ok: true });
 });
 

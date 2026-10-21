@@ -17,9 +17,23 @@ const loadActiveUser = (userId) => db
 
 // The impersonation session behind the cookie, when it is still valid for this admin.
 // Sessions that can no longer be used are ended (and audited) here.
+// The host-only cookie is still sent by sibling origins (same-site), so only requests
+// from Frontdoor itself may use it; CORS session-check pages keep seeing the admin.
+function isFrontdoorRequest(req) {
+  const fetchSite = req.get('sec-fetch-site');
+  if (fetchSite) return fetchSite === 'same-origin' || fetchSite === 'none';
+  const origin = req.get('origin');
+  if (!origin) return true;
+  try {
+    return origin === new URL(process.env.FRONTEND_URL).origin;
+  } catch {
+    return false;
+  }
+}
+
 function resolveImpersonation(req, res, admin) {
   const token = req.cookies?.[IMPERSONATION_COOKIE];
-  if (!token) return null;
+  if (!token || !isFrontdoorRequest(req)) return null;
 
   const sessionId = readSessionCookie(token);
   const session = sessionId ? loadSession(sessionId) : null;
@@ -86,6 +100,14 @@ export const authenticate = (req, res, next) => {
     const user = loadActiveUser(decoded.userId);
 
     if (!user) {
+      // The admin behind an open impersonation session can no longer be used.
+      const cookie = req.cookies?.[IMPERSONATION_COOKIE];
+      const sessionId = cookie && readSessionCookie(cookie);
+      const session = sessionId ? loadSession(sessionId) : null;
+      if (session && !session.ended_at && session.admin_id === decoded.userId) {
+        endSession(session.id, 'admin_ineligible');
+        clearImpersonationCookie(res);
+      }
       return res.status(401).json({ error: 'User not found or inactive', code: 'user_not_found_or_inactive' });
     }
 

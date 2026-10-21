@@ -260,7 +260,7 @@ Owners, admins and read-only admins can open a user's detail in **Admin → User
 - The session ends on stop, on sign-out, when your own session expires, or after `IMPERSONATION_TIMEOUT_MINUTES` (default 30, between 5 and 240).
 - Start, end, blocked changes and blocked app launches are written to the audit log (target type `impersonation`); the Audit page (owner only) has an *Impersonation only* toggle and can show one session at a time. Ended sessions are purged together with the logs and left out of backups made with *exclude logs*.
 
-The session is kept in a separate host-only cookie (`frontdoor_impersonation`). The shared `frontdoor_token` cookie is never changed, so `shared-cookie` satellites keep seeing the admin, never the impersonated user.
+The session is kept in a separate host-only cookie (`frontdoor_impersonation`). The shared `frontdoor_token` cookie is never changed, and the impersonation cookie is only used on requests from Frontdoor itself, so `shared-cookie` satellites and cross-origin session-check pages (CORS) keep seeing the admin, never the impersonated user.
 
 #### Avatars and log retention
 

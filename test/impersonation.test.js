@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 
 process.env.JWT_SECRET = 'impersonation-http-test-secret-0123456789';
 
-const { default: db } = await import('../server/db.js');
+const { default: db, logRbacAudit } = await import('../server/db.js');
 const { createApp } = await import('../server/app.js');
 const { startSession, signSessionCookie, loadSession, endSession } = await import('../server/services/impersonation.js');
 
@@ -13,8 +13,10 @@ let baseUrl;
 
 const sessionToken = (userId) => jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '1h', issuer: 'frontdoor' });
 
-async function call(path, { method = 'GET', cookies = {}, body } = {}) {
-  const headers = { 'Sec-Fetch-Site': 'same-origin' };
+async function call(path, { method = 'GET', cookies = {}, body, headers: overrides = {} } = {}) {
+  // A null override drops the default header.
+  const headers = { 'Sec-Fetch-Site': 'same-origin', ...overrides };
+  for (const name of Object.keys(headers)) if (headers[name] === null) delete headers[name];
   const cookieHeader = Object.entries(cookies).map(([name, value]) => `${name}=${value}`).join('; ');
   if (cookieHeader) headers.Cookie = cookieHeader;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -61,6 +63,33 @@ test('/me returns the impersonated user and the real admin', async () => {
   assert.equal(body.impersonation.actor.id, 'h-admin');
   assert.equal(body.impersonation.reason, 'test session');
   assert.ok(Date.parse(body.impersonation.expiresAt) > Date.now());
+});
+
+test('cross-site requests keep seeing the admin and leave the session open', async () => {
+  const { sessionId, cookies } = impersonating('h-admin', 'h-user');
+  const sameSite = await call('/api/auth/me', { cookies, headers: { 'Sec-Fetch-Site': 'same-site' } });
+  const body = await sameSite.json();
+  assert.equal(body.user.id, 'h-admin');
+  assert.equal(body.impersonation, null);
+  assert.equal(loadSession(sessionId).ended_at, null);
+  assert.equal(setCookies(sameSite).some((cookie) => cookie.startsWith('frontdoor_impersonation=')), false);
+
+  const foreignOrigin = await (await call('/api/auth/me', { cookies, headers: { 'Sec-Fetch-Site': null, Origin: 'https://portal.example.com' } })).json();
+  assert.equal(foreignOrigin.user.id, 'h-admin');
+  assert.equal(foreignOrigin.impersonation, null);
+
+  const plain = await (await call('/api/auth/me', { cookies, headers: { 'Sec-Fetch-Site': null } })).json();
+  assert.equal(plain.user.id, 'h-user');
+});
+
+test('a deactivated admin ends the session as admin_ineligible', async () => {
+  db.prepare("INSERT INTO users (id, email, display_name, role, is_active) VALUES ('h-admin3', 'admin3@example.com', 'Admin Three', 'admin', 1)").run();
+  const { sessionId, cookies } = impersonating('h-admin3', 'h-user');
+  db.prepare("UPDATE users SET is_active = 0 WHERE id = 'h-admin3'").run();
+  const res = await call('/api/auth/me', { cookies });
+  assert.equal(res.status, 401);
+  assert.equal(loadSession(sessionId).end_reason, 'admin_ineligible');
+  assert.ok(setCookies(res).some((cookie) => cookie.startsWith('frontdoor_impersonation=;')));
 });
 
 test('/me without impersonation reports null', async () => {
@@ -233,10 +262,12 @@ test('the user can still launch the app themselves', async () => {
 test('the audit API marks and filters impersonation rows', async () => {
   const { sessionId, cookies } = impersonating('h-admin', 'h-user');
   await call('/api/auth/me/preferences', { method: 'PUT', cookies, body: { preferredLanguage: 'it' } });
+  logRbacAudit('h-admin', 'update', 'role', 'ordinary-row', { note: 'ordinary row' });
   const ownerCookies = { frontdoor_token: sessionToken('h-owner') };
 
   const filtered = await (await call(`/api/logs/audit?impersonation_session_id=${sessionId}`, { cookies: ownerCookies })).json();
   assert.deepEqual(filtered.logs.map((log) => log.action).sort(), ['start', 'write_blocked']);
+  assert.ok(!filtered.logs.some((log) => log.target_type === 'role'));
   for (const log of filtered.logs) {
     assert.equal(log.impersonation_session_id, sessionId);
     assert.equal(log.impersonated_user_id, 'h-user');
@@ -245,5 +276,7 @@ test('the audit API marks and filters impersonation rows', async () => {
   }
 
   const byType = await (await call('/api/logs/audit?target_type=impersonation', { cookies: ownerCookies })).json();
+  assert.ok(byType.logs.length > 0);
   assert.ok(byType.logs.every((log) => log.target_type === 'impersonation'));
+  assert.ok(!byType.logs.some((log) => log.target_id === 'ordinary-row'));
 });

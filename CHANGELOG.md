@@ -17,7 +17,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Tour highlights the personal menu**: on desktop, step 6 of the Home tour sometimes left the opened personal menu under the dark overlay, because the highlight was measured before the menu had rendered (more likely on a busy Home). The highlight is now measured again whenever elements appear or disappear while the tour is open.
 
 ### Security
-- **Impersonation cookie**: impersonation uses its own host-only cookie; the shared `frontdoor_token` cookie read by `shared-cookie` satellites is never changed, so satellites cannot receive the impersonated identity.
+- **Impersonation cookie**: impersonation uses its own host-only cookie; the shared `frontdoor_token` cookie read by `shared-cookie` satellites is never changed, and the impersonation cookie is only used on requests from Frontdoor itself, so `shared-cookie` satellites and cross-origin session-check pages (CORS) keep seeing the admin, never the impersonated user.
 - **Express 5.3.0**: `express` moves from 5.2.1 to 5.3.0, which brings patched `qs` (CVE-2026-2391, CVE-2026-82417, CVE-2026-82562: array limit bypasses and a denial of service in query string parsing) and `proxy-addr` (CVE-2026-90711). The same dependency refresh bumps `dotenv`, `uuid`, `concurrently`, `lucide-react` and `vite` to their latest patch or minor releases. ([#133](https://github.com/BuildBandits/frontdoor-oss/pull/133))
 
 ## [1.4.0] — 2026-10-09
