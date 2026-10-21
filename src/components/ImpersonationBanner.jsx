@@ -70,19 +70,19 @@ export default function ImpersonationBanner({ ui, timeZone }) {
   return (
     <>
       {toast}
-      <div role="status" className="sticky top-0 z-50 bg-amber-400 text-amber-950 dark:bg-amber-500">
+      <div className="sticky top-0 z-50 bg-amber-400 text-amber-950 dark:bg-amber-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
           <span className="inline-flex items-center gap-2 min-w-0">
             <Eye className="w-4 h-4 shrink-0" />
-            <span className="truncate">{formatMessage(ui.impersonation.banner, { name: user?.displayName || user?.email || '', time: endsAt })}</span>
+            <span role="status" className="truncate">{formatMessage(ui.impersonation.banner, { name: user?.displayName || user?.email || '', time: endsAt })}</span>
           </span>
           <span className="inline-flex items-center gap-3">
-            {stopFailed && <span className="text-xs">{ui.impersonation.stopFailed}</span>}
+            {stopFailed && <span role="status" className="text-xs">{ui.impersonation.stopFailed}</span>}
             <button
               type="button"
               onClick={handleStop}
               disabled={stopping}
-              className="rounded-lg bg-amber-950 px-3 py-1 text-xs font-semibold text-amber-50 hover:bg-amber-900 disabled:opacity-60"
+              className="rounded-lg bg-amber-950 px-3 py-1 text-xs font-semibold text-amber-50 hover:bg-amber-900 disabled:opacity-60 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber-950 focus-visible:ring-offset-2 focus-visible:ring-offset-amber-400 dark:focus-visible:ring-offset-amber-500"
             >
               {stopping ? ui.impersonation.stopping : ui.impersonation.stop}
             </button>

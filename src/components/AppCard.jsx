@@ -73,7 +73,7 @@ const AppCard = forwardRef(function AppCard(
                 handleClick();
               }}
               className="shrink-0 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-accent/40"
-              aria-label={getLabel('openAppNamed', app.name)}
+              aria-label={labels.appUnavailable || getLabel('openAppNamed', app.name)}
               aria-disabled={Boolean(labels.appUnavailable)}
             >
               <AppIcon app={app} className="w-8 h-8" textClassName="text-xl" alt={app.name} />
@@ -190,7 +190,7 @@ const AppCard = forwardRef(function AppCard(
                 handleClick();
               }}
               className="shrink-0 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-accent/40"
-              aria-label={getLabel('openAppNamed', app.name)}
+              aria-label={labels.appUnavailable || getLabel('openAppNamed', app.name)}
               aria-disabled={Boolean(labels.appUnavailable)}
             >
               <AppIcon app={app} className="w-12 h-12" textClassName="text-4xl" alt={app.name} />
