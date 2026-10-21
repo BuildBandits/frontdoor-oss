@@ -28,7 +28,7 @@ const BACKUP_VERSION = 1;
 const BACKUP_PROGRESS_STAGES = ['database', 'app-icons', 'branding', 'avatars', 'plugins'];
 
 // Tables left out when an export is made with excludeLogs.
-const LOG_TABLES = ['access_logs', 'rbac_audit_logs'];
+const LOG_TABLES = ['access_logs', 'rbac_audit_logs', 'impersonation_sessions'];
 const APP_VERSION = (() => {
   try {
     return JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version || null;

@@ -408,7 +408,7 @@ describe('backup privacy options', () => {
 
     const { archive, snapshot } = await createBackupArchive({ dbHandle: source, ...dirs, excludeLogs: true });
     assert.equal(snapshot.database.tables.some((table) => table.name === 'access_logs'), false);
-    assert.deepEqual(snapshot.options.excludedTables, ['access_logs', 'rbac_audit_logs']);
+    assert.deepEqual(snapshot.options.excludedTables, ['access_logs', 'rbac_audit_logs', 'impersonation_sessions']);
 
     const result = await restoreBackupArchive(archive, { dbHandle: target, ...dirs });
     assert.ok(result.tablesNotInArchive.includes('access_logs'));

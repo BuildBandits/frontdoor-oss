@@ -134,3 +134,35 @@ test('a failing table rebuild rolls back and leaves the original table intact', 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('legacy audit table gains the impersonation target type and session column', () => {
+  const { dir, databasePath } = createLegacyDatabase(`
+    CREATE TABLE rbac_audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      actor_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      target_type TEXT NOT NULL CHECK(target_type IN ('group', 'membership', 'permission', 'role', 'user_status', 'app', 'branding', 'auth', 'plugin')),
+      target_id TEXT,
+      details TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    INSERT INTO rbac_audit_logs (actor_id, action, target_type, target_id) VALUES ('u-1', 'update', 'role', 'u-2');
+  `);
+
+  try {
+    const result = startServerDatabase(databasePath);
+    assert.equal(result.status, 0, result.stderr);
+
+    const db = new Database(databasePath);
+    try {
+      assert.ok(columnsOf(db, 'rbac_audit_logs').includes('impersonation_session_id'));
+      assert.ok(columnsOf(db, 'impersonation_sessions').includes('expiry_reason'));
+      assert.equal(db.prepare('SELECT COUNT(*) AS count FROM rbac_audit_logs').get().count, 1);
+      db.prepare("INSERT INTO rbac_audit_logs (actor_id, action, target_type, target_id, impersonation_session_id) VALUES ('u-1', 'start', 'impersonation', 'u-2', 1)").run();
+    } finally {
+      db.close();
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

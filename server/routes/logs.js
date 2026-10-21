@@ -78,12 +78,15 @@ export function purgeLogsOlderThan(days = 90) {
     if (retentionDays === 0) {
       const accessRemoved = db.prepare('DELETE FROM access_logs').run().changes || 0;
       const auditRemoved = db.prepare('DELETE FROM rbac_audit_logs').run().changes || 0;
+      db.prepare('DELETE FROM impersonation_sessions WHERE ended_at IS NOT NULL').run();
       return { accessRemoved, auditRemoved };
     }
 
     const cutoff = utcDaysAgo(retentionDays);
     const accessRemoved = db.prepare('DELETE FROM access_logs WHERE created_at < datetime(\'now\', ?)').run(cutoff).changes || 0;
     const auditRemoved = db.prepare('DELETE FROM rbac_audit_logs WHERE created_at < datetime(\'now\', ?)').run(cutoff).changes || 0;
+    // A session ends after its last audit row, so it goes once all of them are gone.
+    db.prepare('DELETE FROM impersonation_sessions WHERE ended_at IS NOT NULL AND ended_at < datetime(\'now\', ?)').run(cutoff);
     return { accessRemoved, auditRemoved };
   })();
   return { retentionDays, ...result };

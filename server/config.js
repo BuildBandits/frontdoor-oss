@@ -45,6 +45,17 @@ export function getRequiredEnv(name, context = 'startup') {
   return value;
 }
 
+const IMPERSONATION_TIMEOUT_DEFAULT_MINUTES = 30;
+const IMPERSONATION_TIMEOUT_MIN_MINUTES = 5;
+const IMPERSONATION_TIMEOUT_MAX_MINUTES = 240;
+
+// How long an admin may act as a user before the session ends on its own.
+export function getImpersonationTimeoutMinutes() {
+  const minutes = Number.parseInt(process.env.IMPERSONATION_TIMEOUT_MINUTES ?? '', 10);
+  if (!Number.isFinite(minutes)) return IMPERSONATION_TIMEOUT_DEFAULT_MINUTES;
+  return Math.min(IMPERSONATION_TIMEOUT_MAX_MINUTES, Math.max(IMPERSONATION_TIMEOUT_MIN_MINUTES, minutes));
+}
+
 export function getStartupConfig() {
   const baseDomain = process.env.BASE_DOMAIN || 'frontdoor.local';
   const frontendUrl = process.env.FRONTEND_URL || 'https://frontdoor.local';
