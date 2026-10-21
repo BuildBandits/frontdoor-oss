@@ -229,3 +229,21 @@ test('the user can still launch the app themselves', async () => {
   const res = await call('/api/apps/crm/sso-redirect', { cookies: { frontdoor_token: sessionToken('h-user') } });
   assert.equal(res.status, 302);
 });
+
+test('the audit API marks and filters impersonation rows', async () => {
+  const { sessionId, cookies } = impersonating('h-admin', 'h-user');
+  await call('/api/auth/me/preferences', { method: 'PUT', cookies, body: { preferredLanguage: 'it' } });
+  const ownerCookies = { frontdoor_token: sessionToken('h-owner') };
+
+  const filtered = await (await call(`/api/logs/audit?impersonation_session_id=${sessionId}`, { cookies: ownerCookies })).json();
+  assert.deepEqual(filtered.logs.map((log) => log.action).sort(), ['start', 'write_blocked']);
+  for (const log of filtered.logs) {
+    assert.equal(log.impersonation_session_id, sessionId);
+    assert.equal(log.impersonated_user_id, 'h-user');
+    assert.equal(log.impersonated_user_name, 'User One');
+    assert.equal(log.actor_id, 'h-admin');
+  }
+
+  const byType = await (await call('/api/logs/audit?target_type=impersonation', { cookies: ownerCookies })).json();
+  assert.ok(byType.logs.every((log) => log.target_type === 'impersonation'));
+});
