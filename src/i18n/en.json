@@ -1548,6 +1548,8 @@
     "groups_not_found": "One or more groups were not found.",
     "icon_too_large": "The icon is too large: images up to 1 MB, SVG up to 512 KB.",
     "icon_unsupported_type": "The icon must be a PNG, JPEG, GIF, WEBP, BMP, AVIF, ICO or SVG image.",
+    "impersonation_already_active": "You are already acting as a user. Stop that session first.",
+    "impersonation_read_only": "This is read-only while you act as a user.",
     "insufficient_permissions": "You do not have permission to do this.",
     "internal_server_error": "Something went wrong on the server. Try again.",
     "invalid_app_mode": "The app mode is not valid.",

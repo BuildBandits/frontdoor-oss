@@ -70,7 +70,7 @@ test('the dev-login endpoint answers 404 in production and logout clears the ses
 
   const logout = await fetch(`${baseUrl}/api/auth/logout`, { method: 'POST' });
   assert.equal(logout.status, 200);
-  const cookie = logout.headers.get('set-cookie') || '';
+  const cookie = logout.headers.getSetCookie().find((value) => value.startsWith('frontdoor_token=;')) || '';
   assert.match(cookie, /^frontdoor_token=;/);
   assert.match(cookie, /Domain=\.example\.com/);
   assert.match(cookie, /Expires=Thu, 01 Jan 1970/);

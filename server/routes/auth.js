@@ -8,6 +8,7 @@ import db from '../db.js';
 import { createPreferenceUpdate } from '../services/userPreferences.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
+import { IMPERSONATION_COOKIE, clearImpersonationCookie, endSession, readSessionCookie } from '../services/impersonation.js';
 import { getAppTimeZone, getRequiredEnv, isDevLoginEnabled } from '../config.js';
 import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, isEntraUserDeleted, refreshGroupCacheFromTenant, syncUserEntraGroups } from '../services/entraGroups.js';
 import { ensureAvatarCached } from '../services/avatars.js';
@@ -398,10 +399,11 @@ router.get('/microsoft/callback', async (req, res) => {
   }
 });
 
-// Get current user
+// Get current user (the impersonated one while an admin acts as a user)
 router.get('/me', authenticate, (req, res) => {
   res.json({
     user: serializeCurrentUser(req.user),
+    impersonation: req.impersonation,
   });
 });
 
@@ -507,8 +509,11 @@ router.put('/me/preferences', authenticate, (req, res) => {
   });
 });
 
-// Logout — clear cookie
+// Logout — end any impersonation session, then clear the cookies
 router.post('/logout', (req, res) => {
+  const sessionId = readSessionCookie(req.cookies?.[IMPERSONATION_COOKIE]);
+  if (sessionId) endSession(sessionId, 'logout');
+  clearImpersonationCookie(res);
   const baseDomain = process.env.BASE_DOMAIN || 'frontdoor.local';
   res.clearCookie('frontdoor_token', { domain: `.${baseDomain}` });
   res.json({ ok: true });

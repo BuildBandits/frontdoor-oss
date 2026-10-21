@@ -1548,6 +1548,8 @@
     "groups_not_found": "Uno o più gruppi non sono stati trovati.",
     "icon_too_large": "L'icona è troppo grande: immagini fino a 1 MB, SVG fino a 512 KB.",
     "icon_unsupported_type": "L'icona deve essere un'immagine PNG, JPEG, GIF, WEBP, BMP, AVIF, ICO o SVG.",
+    "impersonation_already_active": "Stai già operando come un utente. Termina prima quella sessione.",
+    "impersonation_read_only": "Sola lettura mentre operi come un utente.",
     "insufficient_permissions": "Non hai i permessi per eseguire questa operazione.",
     "internal_server_error": "Si è verificato un errore sul server. Riprova.",
     "invalid_app_mode": "La modalità dell'app non è valida.",
