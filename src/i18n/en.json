@@ -153,6 +153,14 @@
     "appsLoadFailedTitle": "Apps could not be loaded",
     "appsLoadFailedBody": "Check your connection and try again."
   },
+  "impersonation": {
+    "banner": "You are acting as {name} · read-only · ends at {time}",
+    "stop": "Stop",
+    "stopping": "Stopping…",
+    "stopFailed": "The impersonation could not be stopped. Try again or sign out.",
+    "ended": "Impersonation ended. You are back to your own account.",
+    "appUnavailable": "Apps cannot be opened while you are acting as another user"
+  },
   "layout": {
     "personalHomeView": "Personal Home view",
     "personalHomeViewShort": "Home view",
@@ -1204,7 +1212,14 @@
       "toggleActiveTitle": "Do you want to {action} {name}?",
       "deleteUserTitle": "Delete permanently the user {name}?",
       "refresh": "Refresh users",
-      "pageSummary": "Page {page} of {pages} · {total} users"
+      "pageSummary": "Page {page} of {pages} · {total} users",
+      "impersonate": "Act as this user",
+      "impersonateTitle": "Act as {name}",
+      "impersonateBody": "You will see Frontdoor as this user sees it, in read-only mode. Apps cannot be opened. The session ends when you stop it, sign out or it times out, and it is recorded in the audit log.",
+      "impersonateReasonLabel": "Reason",
+      "impersonateReasonPlaceholder": "e.g. ticket #1234, the user cannot see an app",
+      "impersonateStart": "Start",
+      "impersonateFailed": "The impersonation could not be started."
     },
     "logs": {
       "title": "Access logs",
@@ -1276,7 +1291,11 @@
         "add_linked_groups": "Groups linked",
         "add_linked_entra_groups": "Entra groups linked",
         "remove_linked_group": "Group unlinked",
-        "remove_linked_entra_group": "Entra group unlinked"
+        "remove_linked_entra_group": "Entra group unlinked",
+        "start": "Started",
+        "end": "Ended",
+        "write_blocked": "Change blocked",
+        "app_launch_blocked": "App launch blocked"
       },
       "targetLabels": {
         "app": "App",
@@ -1287,7 +1306,8 @@
         "user_status": "User",
         "branding": "Customization",
         "auth": "Sign-in",
-        "plugin": "Plugin"
+        "plugin": "Plugin",
+        "impersonation": "Impersonation"
       },
       "events": {
         "fallback": "{action}: {targetType} {target}",
@@ -1350,6 +1370,12 @@
           "import": "Imported the plugin {target}",
           "update": "Updated the plugin {target}",
           "delete": "Deleted the plugin {target}"
+        },
+        "impersonation": {
+          "start": "Started acting as {target}",
+          "end": "Stopped acting as {target}",
+          "write_blocked": "Blocked a change while acting as {target}",
+          "app_launch_blocked": "Blocked opening {item} while acting as {target}"
         }
       },
       "fields": {
@@ -1428,7 +1454,14 @@
         "showRedirectSsoMode": "Redirect SSO mode",
         "showEntraAppMode": "Entra app mode",
         "pluginsEnabled": "Plugins",
-        "iconImage": "Icon image"
+        "iconImage": "Icon image",
+        "ipAddress": "IP address",
+        "userAgent": "Browser",
+        "expiresAt": "Expires",
+        "endReason": "Ended by",
+        "durationSeconds": "Duration (seconds)",
+        "method": "Method",
+        "path": "Path"
       },
       "values": {
         "role": {
@@ -1458,6 +1491,14 @@
           "not set": "not set",
           "removed": "removed",
           "updated": "updated"
+        },
+        "endReason": {
+          "manual": "Manual stop",
+          "logout": "Sign-out",
+          "timeout": "Timed out",
+          "session_expired": "Admin session expired",
+          "target_ineligible": "User no longer eligible",
+          "admin_ineligible": "Admin no longer eligible"
         }
       },
       "showSignIns": "Show sign-ins",
@@ -1465,7 +1506,11 @@
       "actorLabels": {
         "api-key": "API key (bulk import)",
         "system": "System"
-      }
+      },
+      "onlyImpersonation": "Impersonation only",
+      "impersonatingBadge": "Acting as {name}",
+      "sessionFilter": "Session #{id}",
+      "clearSessionFilter": "Show all sessions"
     }
   },
   "errors": {
@@ -1548,8 +1593,8 @@
     "groups_not_found": "One or more groups were not found.",
     "icon_too_large": "The icon is too large: images up to 1 MB, SVG up to 512 KB.",
     "icon_unsupported_type": "The icon must be a PNG, JPEG, GIF, WEBP, BMP, AVIF, ICO or SVG image.",
-    "impersonation_already_active": "You are already acting as a user. Stop that session first.",
-    "impersonation_read_only": "This is read-only while you act as a user.",
+    "impersonation_already_active": "Stop the current impersonation before starting a new one.",
+    "impersonation_read_only": "Not available while you are acting as another user.",
     "impersonation_app_launch_blocked": "Apps cannot be opened while you are acting as another user.",
     "impersonation_target_not_allowed": "Only active users with the User role can be impersonated.",
     "impersonation_reason_required": "Enter a reason (up to 500 characters).",
