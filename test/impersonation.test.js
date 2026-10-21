@@ -156,3 +156,76 @@ test('logout ends the session and clears both cookies', async () => {
   assert.ok(cleared.some((cookie) => cookie.startsWith('frontdoor_impersonation=;')));
   assert.ok(cleared.some((cookie) => cookie.startsWith('frontdoor_token=;')));
 });
+
+const start = (adminId, body) => call('/api/impersonation', { method: 'POST', cookies: { frontdoor_token: sessionToken(adminId) }, body });
+const impersonationCookieOf = (res) => setCookies(res).find((cookie) => cookie.startsWith('frontdoor_impersonation='));
+
+test('owner, admin and read-only admin can start; the cookie is host-only', async () => {
+  for (const adminId of ['h-owner', 'h-admin', 'h-readonly']) {
+    const res = await start(adminId, { userId: 'h-user', reason: 'ticket 7' });
+    assert.equal(res.status, 201, adminId);
+    const cookie = impersonationCookieOf(res);
+    assert.ok(cookie, adminId);
+    assert.doesNotMatch(cookie, /Domain=/i);
+    assert.match(cookie, /HttpOnly/i);
+    assert.match(cookie, /SameSite=Strict/i);
+    assert.ok(!setCookies(res).some((value) => value.startsWith('frontdoor_token=')), 'frontdoor_token must not change');
+    const { sessionId } = await res.json();
+    assert.deepEqual(auditActions(sessionId), ['start']);
+  }
+});
+
+test('guard rails refuse invalid starts', async () => {
+  const cases = [
+    ['h-user', { userId: 'h-user2', reason: 'x' }, 403, 'insufficient_permissions'],
+    ['h-admin', { userId: 'h-user', reason: '   ' }, 400, 'impersonation_reason_required'],
+    ['h-admin', { userId: 'h-user', reason: 'x'.repeat(501) }, 400, 'impersonation_reason_required'],
+    ['h-admin', { userId: 'missing', reason: 'x' }, 404, 'user_not_found'],
+    ['h-admin', { userId: 'h-admin', reason: 'x' }, 403, 'impersonation_target_not_allowed'],
+    ['h-admin', { userId: 'h-admin2', reason: 'x' }, 403, 'impersonation_target_not_allowed'],
+    ['h-owner', { userId: 'h-readonly', reason: 'x' }, 403, 'impersonation_target_not_allowed'],
+    ['h-admin', { userId: 'h-inactive', reason: 'x' }, 403, 'impersonation_target_not_allowed'],
+  ];
+  for (const [adminId, body, status, code] of cases) {
+    const res = await start(adminId, body);
+    assert.equal(res.status, status, `${adminId} → ${body.userId}`);
+    assert.equal((await res.json()).code, code);
+    assert.equal(impersonationCookieOf(res), undefined);
+  }
+});
+
+test('starting while impersonating is refused', async () => {
+  const { sessionId, cookies } = impersonating('h-admin', 'h-user');
+  const res = await call('/api/impersonation', { method: 'POST', cookies, body: { userId: 'h-user2', reason: 'nested' } });
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).code, 'impersonation_already_active');
+  assert.deepEqual(auditActions(sessionId), ['start', 'write_blocked']);
+});
+
+test('stop ends the session and restores the admin', async () => {
+  const { sessionId, cookies } = impersonating('h-admin', 'h-user');
+  const res = await call('/api/impersonation/stop', { method: 'POST', cookies });
+  assert.equal(res.status, 200);
+  assert.equal(loadSession(sessionId).end_reason, 'manual');
+  assert.deepEqual(auditActions(sessionId), ['start', 'end']);
+  assert.ok(setCookies(res).some((cookie) => cookie.startsWith('frontdoor_impersonation=;')));
+  const body = await (await call('/api/auth/me', { cookies: { frontdoor_token: cookies.frontdoor_token } })).json();
+  assert.equal(body.user.id, 'h-admin');
+});
+
+test('app launches are blocked server side and audited', async () => {
+  const { sessionId, cookies } = impersonating('h-admin', 'h-user');
+  for (const path of ['/api/apps/crm/sso-redirect', '/api/apps/portal/entra-redirect']) {
+    const res = await call(path, { cookies });
+    assert.equal(res.status, 403, path);
+    assert.equal(res.headers.get('location'), null);
+    assert.equal((await res.json()).code, 'impersonation_app_launch_blocked');
+  }
+  assert.deepEqual(auditActions(sessionId), ['start', 'app_launch_blocked', 'app_launch_blocked']);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM access_logs WHERE user_id = 'h-user'").get().count, 0);
+});
+
+test('the user can still launch the app themselves', async () => {
+  const res = await call('/api/apps/crm/sso-redirect', { cookies: { frontdoor_token: sessionToken('h-user') } });
+  assert.equal(res.status, 302);
+});
