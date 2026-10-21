@@ -417,6 +417,39 @@ describe('backup privacy options', () => {
     target.close();
   });
 
+  it('keeps impersonation sessions and the audit rows linked to them', async () => {
+    const source = new DatabaseSync(':memory:');
+    const target = new DatabaseSync(':memory:');
+    initSchema(source);
+    initSchema(target);
+    const ddl = `
+      CREATE TABLE impersonation_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, admin_id TEXT NOT NULL, target_user_id TEXT NOT NULL, reason TEXT NOT NULL,
+        expires_at TEXT NOT NULL, expiry_reason TEXT NOT NULL, ended_at TEXT, end_reason TEXT
+      );
+      CREATE TABLE rbac_audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT NOT NULL, action TEXT NOT NULL, target_type TEXT NOT NULL,
+        target_id TEXT, details TEXT, impersonation_session_id INTEGER
+      );`;
+    source.exec(ddl);
+    target.exec(ddl);
+    source.prepare('INSERT INTO impersonation_sessions (id, admin_id, target_user_id, reason, expires_at, expiry_reason, ended_at, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(7, 'admin-1', 'user-1', 'support case', '2026-01-01 10:30:00', 'timeout', '2026-01-01 10:10:00', 'manual');
+    source.prepare('INSERT INTO rbac_audit_logs (actor_id, action, target_type, target_id, impersonation_session_id) VALUES (?, ?, ?, ?, ?)')
+      .run('admin-1', 'start', 'impersonation', 'user-1', 7);
+    const dirs = emptyDirs();
+
+    const { archive } = await createBackupArchive({ dbHandle: source, ...dirs });
+    await restoreBackupArchive(archive, { dbHandle: target, ...dirs });
+
+    assert.deepEqual(toPlainObject(target.prepare('SELECT admin_id, target_user_id, reason, end_reason FROM impersonation_sessions WHERE id = 7').get()), {
+      admin_id: 'admin-1', target_user_id: 'user-1', reason: 'support case', end_reason: 'manual',
+    });
+    assert.equal(target.prepare('SELECT impersonation_session_id AS sid FROM rbac_audit_logs').get().sid, 7);
+    source.close();
+    target.close();
+  });
+
   it('encrypts with a passphrase and needs the same passphrase to verify or restore', async () => {
     const source = new DatabaseSync(':memory:');
     const target = new DatabaseSync(':memory:');
