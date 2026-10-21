@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router';
-import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, Wand2, Filter } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router';
+import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, Wand2, Filter, LogIn } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { useLatestRequest } from '../hooks/useLatestRequest';
@@ -22,8 +22,13 @@ import { formatLocalDateTime } from '../utils/dateTime';
 import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 
 export default function AdminUsers() {
-  const { user: currentUser } = useAuthStore();
+  const { user: currentUser, impersonation, startImpersonation } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [impersonationTarget, setImpersonationTarget] = useState(null);
+  const [impersonationReason, setImpersonationReason] = useState('');
+  const [impersonationStarting, setImpersonationStarting] = useState(false);
+  const [impersonationError, setImpersonationError] = useState('');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -140,6 +145,42 @@ export default function AdminUsers() {
       setUserDetail(null);
       setShowVisibleApps(false);
       await loadUserDetail(userId);
+    }
+  };
+
+  // Coming back from "Stop" in the impersonation banner: show that user's detail again.
+  const expandUserId = location.state?.expandUserId;
+  useEffect(() => {
+    if (!expandUserId) return;
+    navigate(location.pathname, { replace: true, state: null });
+    void toggleExpand(expandUserId);
+    // Runs once per navigation that carries the state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandUserId]);
+
+  const canImpersonate = (targetUser) => (
+    !impersonation
+    && targetUser.role === 'user'
+    && Boolean(targetUser.is_active)
+    && targetUser.id !== currentUser?.id
+  );
+
+  const openImpersonation = (targetUser) => {
+    setImpersonationTarget(targetUser);
+    setImpersonationReason('');
+    setImpersonationError('');
+  };
+
+  const confirmImpersonation = async (event) => {
+    event.preventDefault();
+    setImpersonationStarting(true);
+    setImpersonationError('');
+    try {
+      await startImpersonation(impersonationTarget.id, impersonationReason);
+      navigate('/');
+    } catch (err) {
+      setImpersonationError(apiErrorMessage(err, ui, u.impersonateFailed));
+      setImpersonationStarting(false);
     }
   };
 
@@ -1011,6 +1052,19 @@ export default function AdminUsers() {
                           </div>
                         </div>
                       )}
+
+                      {canImpersonate(user) && (
+                        <div className="col-span-full flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => openImpersonation(user)}
+                            className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 dark:bg-amber-950/45 dark:text-amber-300 dark:hover:bg-amber-900/50"
+                          >
+                            <LogIn className="h-4 w-4" />
+                            {u.impersonate}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -1030,6 +1084,39 @@ export default function AdminUsers() {
         onPrevious={() => setPage((current) => Math.max(1, current - 1))}
         onNext={() => setPage((current) => Math.min(pagination.pages, current + 1))}
       />
+
+      {impersonationTarget && (
+        <Modal onClose={() => !impersonationStarting && setImpersonationTarget(null)} labelledBy="impersonation-dialog-title">
+          <form onSubmit={confirmImpersonation} className="space-y-4">
+            <h2 id="impersonation-dialog-title" className="text-lg font-bold text-dark dark:text-gray-100">
+              {formatMessage(u.impersonateTitle, { name: impersonationTarget.display_name || impersonationTarget.email })}
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-300">{u.impersonateBody}</p>
+            <label className="block text-sm font-medium text-dark dark:text-gray-100">
+              {u.impersonateReasonLabel}
+              <textarea
+                data-autofocus
+                required
+                maxLength={500}
+                rows={3}
+                value={impersonationReason}
+                onChange={(event) => setImpersonationReason(event.target.value)}
+                placeholder={u.impersonateReasonPlaceholder}
+                className="mt-1 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+              />
+            </label>
+            {impersonationError && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{impersonationError}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setImpersonationTarget(null)} disabled={impersonationStarting} className="rounded-xl px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
+                {ui.common.cancel}
+              </button>
+              <button type="submit" disabled={impersonationStarting || !impersonationReason.trim()} className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-400 disabled:opacity-60">
+                {u.impersonateStart}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
       {showVisibleApps && (
         <Modal onClose={() => setShowVisibleApps(false)} closeOnEscape={false} labelledBy="users-dialog-1-title" panelClassName="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto" overlayClassName="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
