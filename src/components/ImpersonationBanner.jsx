@@ -16,12 +16,27 @@ export default function ImpersonationBanner({ ui, timeZone }) {
   const expiresAt = impersonation?.expiresAt;
 
   // Ask the server again right after the expiry, so the bar goes away on time.
+  // With clock skew the server may still report it active: keep asking every 5 s.
   useEffect(() => {
     if (!expiresAt) return undefined;
-    const delay = Math.max(0, Date.parse(expiresAt) - Date.now()) + 1000;
-    const timer = setTimeout(() => { void refreshSession().catch(() => {}); }, delay);
-    return () => clearTimeout(timer);
+    let timer;
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const data = await refreshSession();
+        if (!cancelled && data?.impersonation) timer = setTimeout(check, 5000);
+      } catch {
+        // Network error: the next page interaction will refresh the session anyway.
+      }
+    };
+    timer = setTimeout(check, Math.max(0, Date.parse(expiresAt) - Date.now()) + 1000);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [expiresAt, refreshSession]);
+
+  // The session ended on its own: leave the impersonated user's pages, as Stop does.
+  useEffect(() => {
+    if (impersonationEndedNotice) navigate('/admin/users');
+  }, [impersonationEndedNotice, navigate]);
 
   const endedNotice = impersonationEndedNotice ? { type: 'info', message: ui.impersonation.ended } : null;
   const toast = (

@@ -17,7 +17,33 @@ function readStoredUser() {
   }
 }
 
+// Not secret (the server cookie is the authority): only keeps the UI read-only until /auth/me answers after a reload.
+const IMPERSONATION_KEY = 'frontdoor_impersonation_state';
+
+function readStoredImpersonation() {
+  try {
+    return JSON.parse(localStorage.getItem(IMPERSONATION_KEY) || 'null');
+  } catch {
+    try {
+      localStorage.removeItem(IMPERSONATION_KEY);
+    } catch {
+      // Storage unavailable.
+    }
+    return null;
+  }
+}
+
+function persistImpersonation(impersonation) {
+  try {
+    if (impersonation) localStorage.setItem(IMPERSONATION_KEY, JSON.stringify(impersonation));
+    else localStorage.removeItem(IMPERSONATION_KEY);
+  } catch {
+    // Storage unavailable.
+  }
+}
+
 const storedUser = readStoredUser();
+const storedImpersonation = storedUser ? readStoredImpersonation() : null;
 
 function serializeUser(user) {
   if (!user) return null;
@@ -29,12 +55,13 @@ export const useAuthStore = create((set, get) => ({
   user: storedUser,
   isAuthenticated: Boolean(storedUser),
   // Set while an admin acts as another user ({ sessionId, actor, expiresAt, reason }).
-  impersonation: null,
+  impersonation: storedImpersonation,
   impersonationEndedNotice: false,
 
   applySession: ({ user, impersonation = null }) => {
     const endedOnItsOwn = Boolean(get().impersonation) && !impersonation;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeUser(user)));
+    persistImpersonation(impersonation);
     set({ user, isAuthenticated: true, impersonation, impersonationEndedNotice: endedOnItsOwn || get().impersonationEndedNotice });
   },
 
@@ -53,7 +80,13 @@ export const useAuthStore = create((set, get) => ({
     await api.post('/impersonation/stop');
     // Cleared first, so a manual stop is not reported as "ended on its own".
     set({ impersonation: null });
-    return get().refreshSession();
+    try {
+      return await get().refreshSession();
+    } catch {
+      // Stopped on the server but the profile is still the impersonated one: reload instead of leaving it writable.
+      window.location.assign('/admin/users');
+      return null;
+    }
   },
 
   dismissImpersonationEndedNotice: () => set({ impersonationEndedNotice: false }),
@@ -73,7 +106,8 @@ export const useAuthStore = create((set, get) => ({
       // Continue logout even if API call fails
     }
     localStorage.removeItem(STORAGE_KEY);
-    set({ user: null, isAuthenticated: false, impersonation: null });
+    persistImpersonation(null);
+    set({ user: null, isAuthenticated: false, impersonation: null, impersonationEndedNotice: false });
   },
 
   updateUser: (user) => {
