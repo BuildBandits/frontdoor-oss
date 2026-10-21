@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Eye } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
@@ -14,6 +14,7 @@ export default function ImpersonationBanner({ ui, timeZone }) {
   const [stopping, setStopping] = useState(false);
   const [stopFailed, setStopFailed] = useState(false);
   const expiresAt = impersonation?.expiresAt;
+  const endRedirected = useRef(false);
 
   // Ask the server again right after the expiry, so the bar goes away on time.
   // With clock skew the server may still report it active: keep asking every 5 s.
@@ -26,7 +27,8 @@ export default function ImpersonationBanner({ ui, timeZone }) {
         const data = await refreshSession();
         if (!cancelled && data?.impersonation) timer = setTimeout(check, 5000);
       } catch {
-        // Network error: the next page interaction will refresh the session anyway.
+        // Network error: keep trying until unmount or until the session changes.
+        if (!cancelled) timer = setTimeout(check, 5000);
       }
     };
     timer = setTimeout(check, Math.max(0, Date.parse(expiresAt) - Date.now()) + 1000);
@@ -34,9 +36,14 @@ export default function ImpersonationBanner({ ui, timeZone }) {
   }, [expiresAt, refreshSession]);
 
   // The session ended on its own: leave the impersonated user's pages, as Stop does.
+  // Latched so it fires once per end, not on every re-render while the notice is shown.
   useEffect(() => {
-    if (impersonationEndedNotice) navigate('/admin/users');
-  }, [impersonationEndedNotice, navigate]);
+    if (impersonation) endRedirected.current = false;
+    else if (impersonationEndedNotice && !endRedirected.current) {
+      endRedirected.current = true;
+      navigate('/admin/users', { replace: true });
+    }
+  }, [impersonation, impersonationEndedNotice, navigate]);
 
   const endedNotice = impersonationEndedNotice ? { type: 'info', message: ui.impersonation.ended } : null;
   const toast = (

@@ -43,7 +43,12 @@ function persistImpersonation(impersonation) {
 }
 
 const storedUser = readStoredUser();
-const storedImpersonation = storedUser ? readStoredImpersonation() : null;
+let storedImpersonation = storedUser ? readStoredImpersonation() : null;
+// A session that already expired must not keep the UI read-only after a reload.
+if (storedImpersonation && !(Date.parse(storedImpersonation.expiresAt) > Date.now())) {
+  persistImpersonation(null);
+  storedImpersonation = null;
+}
 
 function serializeUser(user) {
   if (!user) return null;
@@ -59,7 +64,8 @@ export const useAuthStore = create((set, get) => ({
   impersonationEndedNotice: false,
 
   applySession: ({ user, impersonation = null }) => {
-    const endedOnItsOwn = Boolean(get().impersonation) && !impersonation;
+    // "stopped" is set by a manual stop whose reload path lost the in-memory state.
+    const endedOnItsOwn = Boolean(get().impersonation) && !get().impersonation.stopped && !impersonation;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeUser(user)));
     persistImpersonation(impersonation);
     set({ user, isAuthenticated: true, impersonation, impersonationEndedNotice: endedOnItsOwn || get().impersonationEndedNotice });
@@ -78,12 +84,15 @@ export const useAuthStore = create((set, get) => ({
 
   stopImpersonation: async () => {
     await api.post('/impersonation/stop');
+    const previous = get().impersonation;
     // Cleared first, so a manual stop is not reported as "ended on its own".
     set({ impersonation: null });
     try {
       return await get().refreshSession();
     } catch {
       // Stopped on the server but the profile is still the impersonated one: reload instead of leaving it writable.
+      // The stored copy stays (UI read-only until /me answers) but is flagged so the next applySession reports no "ended" notice.
+      if (previous) persistImpersonation({ ...previous, stopped: true });
       window.location.assign('/admin/users');
       return null;
     }
@@ -96,6 +105,7 @@ export const useAuthStore = create((set, get) => ({
     // We only persist user profile data for the UI.
     const cachedUser = serializeUser(user);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cachedUser));
+    persistImpersonation(null);
     set({ user, isAuthenticated: true });
   },
 
