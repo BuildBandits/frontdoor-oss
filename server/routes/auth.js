@@ -13,6 +13,8 @@ import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, isE
 import { ensureAvatarCached } from '../services/avatars.js';
 import { verifySsoTokenChain } from '../services/verifySsoToken.js';
 import { dispatchPluginEvent } from '../services/plugins.js';
+import { recordEntraSyncOutcome } from '../services/syncNotifications.js';
+import { NOTIFICATION_TYPES, raiseNotification } from '../services/notifications.js';
 import { logRbacAudit } from '../db.js';
 import { isSupportedLanguage } from '../../shared/languages.js';
 import { isSupportedColorScheme, normalizeOptionalColorScheme } from '../../shared/colorSchemes.js';
@@ -240,12 +242,14 @@ router.get('/microsoft/callback', async (req, res) => {
     const microsoftId = profile.id;
     let entraGroups = null;
     if (isEntraGroupSyncEnabled()) {
+      const syncErrors = [];
       try {
         const refresh = await refreshGroupCacheFromTenant();
         if (!refresh.skipped) console.log(`Entra tenant group refresh [${microsoftId}]: ${refresh.discoveredGroups} groups`);
       } catch (error) {
         const hint = error.hint ? ` Hint: ${error.hint}` : '';
         console.warn(`Entra tenant group refresh skipped [${microsoftId}]: ${error.message}.${hint}`);
+        syncErrors.push({ scope: 'tenant-groups', message: error.message, hint: error.hint || null });
       }
       try {
         entraGroups = await discoverEntraGroupsForUser(microsoftId);
@@ -253,7 +257,9 @@ router.get('/microsoft/callback', async (req, res) => {
       } catch (error) {
         const hint = error.hint ? ` Hint: ${error.hint}` : '';
         console.warn(`Entra group sync skipped [${microsoftId}]: ${error.message}.${hint}`);
+        syncErrors.push({ scope: 'user-groups', message: error.message, hint: error.hint || null });
       }
+      recordEntraSyncOutcome('sign-in', syncErrors);
     }
 
     // Find or create user
@@ -284,6 +290,14 @@ router.get('/microsoft/callback', async (req, res) => {
 
     if (user) {
       // Existing user (either pre-registered or returning) — update profile
+      if (!user.last_login) {
+        raiseNotification({
+          type: NOTIFICATION_TYPES.USER_FIRST_SIGN_IN,
+          subjectKey: user.id,
+          severity: 'info',
+          payload: { userId: user.id, email, displayName },
+        });
+      }
       const shouldPromote = adminEmails.includes(email.toLowerCase()) && user.role !== 'owner';
       db.prepare(
         `UPDATE users SET microsoft_id = ?, display_name = ?, entra_missing_since = NULL, last_login = datetime('now'), last_activity_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`

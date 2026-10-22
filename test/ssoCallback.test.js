@@ -66,6 +66,21 @@ test('an active user signing in clears the "not found in Entra" mark', async (t)
   assert.equal(db.prepare("SELECT entra_missing_since FROM users WHERE id = 'sso-back'").get().entra_missing_since, null);
 });
 
+test('the first sign-in of an account created in advance raises a notification for admins', async (t) => {
+  db.prepare("INSERT INTO users (id, email, display_name, microsoft_id, role, is_active) VALUES ('sso-first', 'first@sso-test.local', 'First', 'ms-first', 'user', 1)").run();
+  graphProfile = { id: 'ms-first', mail: 'first@sso-test.local', displayName: 'First Sign-in' };
+
+  assert.equal((await signIn(t)).status, 302);
+  const row = db.prepare("SELECT severity, payload FROM notifications WHERE type = 'user_first_sign_in' AND subject_key = 'sso-first' AND resolved_at IS NULL").get();
+  assert.equal(row.severity, 'info');
+  assert.equal(JSON.parse(row.payload).displayName, 'First Sign-in');
+
+  // A later sign-in is not a first one.
+  db.prepare("UPDATE notifications SET resolved_at = datetime('now') WHERE subject_key = 'sso-first'").run();
+  assert.equal((await signIn(t)).status, 302);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE subject_key = 'sso-first' AND resolved_at IS NULL").get().n, 0);
+});
+
 test('sign-in start sends a PKCE challenge and binds the state to the browser', async (t) => {
   let authRequest = null;
   t.mock.method(ConfidentialClientApplication.prototype, 'getAuthCodeUrl', async (request) => {

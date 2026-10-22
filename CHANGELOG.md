@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+- **Notification center**: a bell in the top bar shows owners, admins and read-only admins what needs attention: users deactivated because they are no longer in Microsoft Entra, the first sign-in of accounts created in advance, Microsoft Entra sync errors, and imported Entra groups deleted in Entra. Each notification links to the page where it is handled; owners and admins can resolve it, and some resolve on their own. Read state is per admin; resolved notifications are kept `NOTIFICATION_RETENTION_DAYS` (default 30). ([#140](https://github.com/BuildBandits/frontdoor-oss/issues/140))
+
 ### Changed
 - **Linked groups and members side by side**: the detail of a local group on *Admin → Groups* shows *Linked groups* and *Members* together instead of one at a time, so a composite group no longer opens on an empty *Members* list. Each box takes half of the height and scrolls on its own; when only one of them is empty, it shrinks to its message and leaves the space to the other one. ([#129](https://github.com/BuildBandits/frontdoor-oss/issues/129))
 

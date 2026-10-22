@@ -7,6 +7,7 @@ import { normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorS
 import BrandMark from './BrandMark';
 import AppFooter from './AppFooter';
 import UserAvatar from './UserAvatar';
+import NotificationBell from './NotificationBell';
 import Tooltip from './Tooltip';
 import { formatMessage, getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { getSupportedTimeZoneOptions, normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
@@ -55,6 +56,7 @@ export default function Layout({ children }) {
   const role = user?.role;
   const canUseAdminPages = ['owner', 'admin', 'admin_readonly'].includes(role);
   const isOwner = role === 'owner';
+  const isAdminEditor = ['owner', 'admin'].includes(role);
   const showHomeNav = role !== 'user';
   const showLogoutAction = !hideLoginPage;
 
@@ -389,6 +391,7 @@ export default function Layout({ children }) {
             </Link>
 
             <div className="flex items-center gap-2 md:hidden">
+              {canUseAdminPages && <NotificationBell ui={ui} canResolve={isAdminEditor} timeZone={effectiveTimeZone} language={effectiveLanguage} />}
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen((value) => !value)}
@@ -445,6 +448,8 @@ export default function Layout({ children }) {
               )}
 
               <PluginSurface surface={PLUGIN_SURFACES.LAYOUT_NAV_DESKTOP} variant="nav" />
+
+              {canUseAdminPages && <NotificationBell ui={ui} canResolve={isAdminEditor} timeZone={effectiveTimeZone} language={effectiveLanguage} />}
 
               <div ref={accountMenuRef} className="relative ml-3 pl-3 border-l border-gray-100 dark:border-gray-800">
                 <button

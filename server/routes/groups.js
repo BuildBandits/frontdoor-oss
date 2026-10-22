@@ -8,6 +8,7 @@ import { getDescendantGroupIds } from '../services/groupHierarchy.js';
 import { transferGroupApps } from '../services/groupAppTransfer.js';
 import { iconUrlForApp } from '../services/appIcons.js';
 import { respondWithError } from '../services/errors.js';
+import { recordEntraSyncOutcome, notifyUsersDeactivatedFromEntra } from '../services/syncNotifications.js';
 import { diffAuditFields } from '../services/auditDetails.js';
 
 const router = express.Router();
@@ -110,6 +111,8 @@ router.post('/entra/force-sync', authenticate, isAdminEditor, async (req, res) =
     for (const user of deactivatedUsers) {
       logRbacAudit(req.user.id, 'deactivate', 'user_status', user.id, { email: user.email, role: user.role, reason: 'not_found_in_entra' });
     }
+    notifyUsersDeactivatedFromEntra(deactivatedUsers);
+    recordEntraSyncOutcome('force-sync', result.errors.filter((error) => error.scope));
     logRbacAudit(req.user.id, 'sync', 'group', null, {
       usersSynced: result.usersSynced,
       usersConsidered: result.usersConsidered,
@@ -121,6 +124,7 @@ router.post('/entra/force-sync', authenticate, isAdminEditor, async (req, res) =
     res.json(result);
   } catch (error) {
     console.error('Entra force-sync failed:', error.message);
+    recordEntraSyncOutcome('force-sync', [{ message: error.message, hint: error.hint || null }]);
     respondWithError(res, error, { status: 500, code: 'failed_to_sync_entra_users' });
   }
 });

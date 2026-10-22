@@ -168,6 +168,7 @@ The image stores every writable path on the `/data` volume by default (`DATABASE
 | `JWT_SECRET` | JWT signing secret | - |
 | `ENTRA_GROUP_SYNC` | Discover Entra group memberships at login and enable admin import/force-sync flows | `false` (`true` in `docker-compose.yml`) |
 | `ENTRA_TENANT_REFRESH_MINUTES` | Minimum minutes between two refreshes of the tenant-wide Entra group catalog triggered by sign-ins (force sync always refreshes it; `0` refreshes at every sign-in) | `360` |
+| `NOTIFICATION_RETENTION_DAYS` | Days a resolved admin notification is kept before the daily purge removes it | `30` |
 | `JWT_EXPIRES_IN` | JWT token duration | `7d` |
 | `JWT_ISSUER` | Issuer of the session and SSO tokens (satellites verifying tokens must use the same value) | `frontdoor` |
 | `ADMIN_EMAILS` | Comma-separated owner emails (auto-promoted) | - |

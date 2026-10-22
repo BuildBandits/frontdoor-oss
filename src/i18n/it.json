@@ -1581,6 +1581,7 @@
     "no_preference_updates": "Nessuna modifica delle preferenze fornita.",
     "not_authenticated": "Non hai effettuato l'accesso.",
     "not_found": "Non trovato.",
+    "notification_not_found": "Notifica non trovata o già risolta.",
     "owner_assignment_forbidden": "Il ruolo owner può essere assegnato solo dalla configurazione del server.",
     "permission_not_found": "Permesso non trovato.",
     "plugin_archive_empty_archive": "L'archivio del plugin è vuoto.",
@@ -1626,5 +1627,38 @@
     "user_not_found": "Utente non trovato.",
     "user_not_found_or_inactive": "Utente non trovato o non attivo.",
     "users_not_found": "{count} utenti selezionati non sono stati trovati."
+  },
+  "notifications": {
+    "title": "Notifiche",
+    "bell": "Notifiche",
+    "bellUnread": "Notifiche, {count} non lette",
+    "markAllRead": "Segna tutte come lette",
+    "empty": "Nessuna notifica aperta.",
+    "loadFailed": "Impossibile caricare le notifiche.",
+    "open": "Apri",
+    "resolve": "Risolvi",
+    "unread": "Non letta",
+    "sources": {
+      "sign-in": "al login",
+      "force-sync": "durante la sincronizzazione forzata"
+    },
+    "types": {
+      "user_deactivated_entra": {
+        "title": "Utente disattivato: non è più in Microsoft Entra",
+        "body": "{name} ({email}) è stato disattivato dalla sincronizzazione. Riattiva o elimina l'account."
+      },
+      "user_first_sign_in": {
+        "title": "Primo accesso",
+        "body": "{name} ha effettuato il primo accesso."
+      },
+      "entra_sync_failed": {
+        "title": "Sincronizzazione Microsoft Entra non riuscita",
+        "body": "{count} errori {source}. Controlla i permessi Microsoft Graph."
+      },
+      "entra_group_deleted": {
+        "title": "Gruppo Entra eliminato in Microsoft Entra",
+        "body": "{name}: {members} membri e {apps} app. Decidi come mantenere il loro accesso."
+      }
+    }
   }
 }
