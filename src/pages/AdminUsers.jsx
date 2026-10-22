@@ -29,7 +29,7 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState('all'); // all | owner | admin | admin_readonly | user
-  const [filterActive, setFilterActive] = useState('all'); // all | active | inactive
+  const [filterActive, setFilterActive] = useState('all'); // all | active | inactive | entraMissing | neverSignedIn
   const [filterPersonalization, setFilterPersonalization] = useState('all'); // all | customized | none
   const [expandedUser, setExpandedUser] = useState(null);
   const [userDetail, setUserDetail] = useState(null);
@@ -244,6 +244,7 @@ export default function AdminUsers() {
     if (filterActive === 'active' && !u.is_active) return false;
     if (filterActive === 'inactive' && u.is_active) return false;
     if (filterActive === 'entraMissing' && !u.entra_missing_since) return false;
+    if (filterActive === 'neverSignedIn' && u.last_login) return false;
     if (filterPersonalization === 'customized' && !hasAtLeastOnePersonalization(u)) return false;
     if (filterPersonalization === 'none' && hasAtLeastOnePersonalization(u)) return false;
     if (search.trim()) {
@@ -593,6 +594,7 @@ export default function AdminUsers() {
               { value: 'active', label: t.activeOnly },
               { value: 'inactive', label: t.inactiveOnly },
               { value: 'entraMissing', label: u.entraMissingOnly },
+              { value: 'neverSignedIn', label: u.neverSignedInOnly },
             ]}
             className="min-w-[190px]"
           />

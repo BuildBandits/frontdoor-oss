@@ -1161,6 +1161,7 @@
       "allPersonalizationStates": "Tutte",
       "personalizedOnly": "Con personalizzazioni",
       "entraMissingOnly": "Non trovati in Entra",
+      "neverSignedInOnly": "Mai collegati",
       "entraMissingBadge": "Non in Entra",
       "entraMissingSince": "Non trovato in Microsoft Entra dal {date}",
       "entraMissingLabel": "Non trovato in Entra dal",

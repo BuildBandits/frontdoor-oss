@@ -1161,6 +1161,7 @@
       "allPersonalizationStates": "All",
       "personalizedOnly": "With customizations",
       "entraMissingOnly": "Not found in Entra",
+      "neverSignedInOnly": "Never signed in",
       "entraMissingBadge": "Not in Entra",
       "entraMissingSince": "Not found in Microsoft Entra since {date}",
       "entraMissingLabel": "Not found in Entra since",
