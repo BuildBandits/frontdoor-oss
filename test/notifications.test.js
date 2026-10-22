@@ -68,6 +68,16 @@ test('a repeated event refreshes the open notification and shows it as unread ag
   resolveNotifications(NOTIFICATION_TYPES.USER_FIRST_SIGN_IN, 'svc-1');
 });
 
+test('recently resolved notifications stay listed for a week, older ones do not', () => {
+  const id = raiseNotification({ type: NOTIFICATION_TYPES.USER_DEACTIVATED_ENTRA, subjectKey: 'recent-1' });
+  resolveNotifications(NOTIFICATION_TYPES.USER_DEACTIVATED_ENTRA, 'recent-1');
+  const recent = listNotifications('n-admin', { includeResolved: true }).find((row) => row.id === id);
+  assert.ok(recent.resolved_at);
+  assert.equal(recent.resolved_by, null, 'resolved on its own');
+  db.prepare("UPDATE notifications SET resolved_at = datetime('now', '-8 days') WHERE id = ?").run(id);
+  assert.ok(!listNotifications('n-admin', { includeResolved: true }).some((row) => row.id === id));
+});
+
 test('read state is per admin and purge removes only old resolved notifications', () => {
   const id = raiseNotification({ type: NOTIFICATION_TYPES.ENTRA_SYNC_FAILED, subjectKey: 'svc-2' });
   const before = countUnreadNotifications('n-viewer');
