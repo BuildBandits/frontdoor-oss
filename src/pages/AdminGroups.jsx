@@ -698,19 +698,31 @@ export default function AdminGroups() {
     }
   };
 
-  const removeLinkedEntraGroup = async (entraGroupId, groupName) => {
+  const removeLinkedEntraGroup = (entraGroupId, groupName) => {
     if (!canEdit) {
       showToast(t.readOnly, 'error');
       return;
     }
-    try {
-      await api.delete(`/groups/${expandedGroup}/entra-groups/${entraGroupId}`);
-      showToast(g.linkedEntraGroupRemoved.replace('{name}', groupName));
-      await loadGroupDetail(expandedGroup);
-      await loadGroups();
-    } catch (err) {
-      showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
-    }
+    const parentGroupId = expandedGroup;
+    openConfirm({
+      title: g.removeLinkedGroupTitle.replace('{name}', groupName || g.thisGroup),
+      message: g.removeLinkedGroupMessage,
+      confirmLabel: g.removeLinkedGroup,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/groups/${parentGroupId}/entra-groups/${encodeURIComponent(entraGroupId)}`);
+          showToast(g.linkedEntraGroupRemoved.replace('{name}', groupName));
+        } catch (err) {
+          // Already gone (removed elsewhere or by an earlier click): just refresh the list.
+          if (err?.response?.data?.code !== 'linked_entra_group_not_found') {
+            showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
+            return;
+          }
+        }
+        await loadGroupDetail(parentGroupId);
+        await loadGroups();
+      },
+    });
   };
 
   const removeApp = async (appId, appName) => {
