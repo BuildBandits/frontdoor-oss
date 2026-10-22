@@ -9,7 +9,7 @@ import { getAccessibleGroupIdsForUser } from '../services/groupHierarchy.js';
 import { isSupportedLanguage } from '../../shared/languages.js';
 import { isSupportedColorScheme, normalizeOptionalColorScheme } from '../../shared/colorSchemes.js';
 import { isSupportedTimeZone, normalizeOptionalTimeZone } from '../../shared/timeZones.js';
-import { preonboardDirectoryUser, searchDirectoryUsers } from '../services/entraDirectory.js';
+import { preonboardDirectoryUsers, searchDirectoryUsers } from '../services/entraDirectory.js';
 import { respondWithError } from '../services/errors.js';
 
 const router = express.Router();
@@ -60,12 +60,14 @@ router.get('/directory/search', authenticate, isAdminEditor, async (req, res) =>
   }
 });
 
-// Create the account of an Entra user before the first sign-in (editor roles only)
+// Create the accounts of Entra users before their first sign-in (editor roles only)
 router.post('/preonboard', authenticate, isAdminEditor, async (req, res) => {
   try {
-    const { userId, email, groupIds } = await preonboardDirectoryUser(req.body?.microsoftId, req.body?.groupIds ?? []);
-    logRbacAudit(req.user.id, 'preonboard', 'user_status', userId, { email, groupIds });
-    res.status(201).json({ userId });
+    const { results, groupIds } = await preonboardDirectoryUsers(req.body?.microsoftIds, req.body?.groupIds ?? []);
+    for (const result of results) {
+      if (result.status === 'created') logRbacAudit(req.user.id, 'preonboard', 'user_status', result.userId, { email: result.email, groupIds });
+    }
+    res.json({ results: results.map(({ microsoftId, status, userId, code }) => ({ microsoftId, status, userId, code })) });
   } catch (error) {
     if (!error?.expose) console.error('User pre-onboarding failed:', error.message);
     respondWithError(res, error, { status: 500, code: 'user_preonboard_failed' });

@@ -11,7 +11,7 @@ process.env.ENTRA_GROUP_SYNC = 'true';
 
 const { default: db, DEFAULT_GROUP_ID } = await import('../server/db.js');
 const { createApp } = await import('../server/app.js');
-const { preonboardDirectoryUser, searchDirectoryUsers } = await import('../server/services/entraDirectory.js');
+const { PREONBOARD_MAX_USERS, preonboardDirectoryUsers, searchDirectoryUsers } = await import('../server/services/entraDirectory.js');
 const { forceSyncAllEntraUsers } = await import('../server/services/entraGroups.js');
 
 const NEW_HIRE = '00000000-0000-0000-0000-000000000101';
@@ -104,39 +104,54 @@ test('a missing Graph permission is reported with the User.Read.All hint', async
   });
 });
 
-test('pre-onboarding refuses Entra groups, unknown users and existing accounts', async (t) => {
-  mockGraph(t);
-  await assert.rejects(preonboardDirectoryUser(NEW_HIRE, ['pre-entra'], { acquireToken }), { code: 'preonboard_groups_invalid' });
-  await assert.rejects(preonboardDirectoryUser(GONE, [], { acquireToken }), { code: 'entra_user_not_found' });
-  await assert.rejects(preonboardDirectoryUser('not-a-guid', [], { acquireToken }), { code: 'entra_object_id_invalid' });
-  await assert.rejects(preonboardDirectoryUser(TAKEN, [], { acquireToken }), { code: 'user_already_exists' });
+test('pre-onboarding refuses a bad request as a whole', async (t) => {
+  const requested = mockGraph(t);
+  await assert.rejects(preonboardDirectoryUsers([NEW_HIRE], ['pre-entra'], { acquireToken }), { code: 'preonboard_groups_invalid' });
+  await assert.rejects(preonboardDirectoryUsers([], [], { acquireToken }), { code: 'microsoft_ids_required' });
+  const tooMany = Array.from({ length: PREONBOARD_MAX_USERS + 1 }, (_, i) => `00000000-0000-0000-0000-${String(i).padStart(12, '0')}`);
+  await assert.rejects(preonboardDirectoryUsers(tooMany, [], { acquireToken }), { code: 'preonboard_too_many_users' });
+  assert.equal(requested.length, 0, 'nothing is read from Graph before the request is validated');
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users WHERE microsoft_id = ?').get(NEW_HIRE).n, 0);
 });
 
 test('only admin editors can search the directory and pre-onboard', async () => {
   assert.equal((await call('GET', '/api/users/directory/search?q=new', 'pre-viewer')).status, 403);
-  assert.equal((await call('POST', '/api/users/preonboard', 'pre-viewer', { microsoftId: NEW_HIRE })).status, 403);
+  assert.equal((await call('POST', '/api/users/preonboard', 'pre-viewer', { microsoftIds: [NEW_HIRE] })).status, 403);
 });
 
-test('pre-onboarding creates a linked account in the default and chosen local groups, audited', async (t) => {
+test('pre-onboarding several users creates the valid ones and reports the others', async (t) => {
   mockGraph(t);
-  const res = await call('POST', '/api/users/preonboard', 'pre-admin', { microsoftId: NEW_HIRE, groupIds: ['pre-local'] });
-  assert.equal(res.status, 201);
-  const { userId } = await res.json();
+  const res = await call('POST', '/api/users/preonboard', 'pre-admin', { microsoftIds: [NEW_HIRE, TAKEN, GONE, 'not-a-guid', NEW_HIRE], groupIds: ['pre-local'] });
+  assert.equal(res.status, 200);
+  const { results } = await res.json();
+  const byId = Object.fromEntries(results.map((result) => [result.microsoftId, result]));
+  assert.equal(results.length, 4, 'duplicates are handled once');
+  assert.equal(byId[NEW_HIRE].status, 'created');
+  assert.deepEqual([byId[TAKEN].code, byId[GONE].code, byId['not-a-guid'].code], ['user_already_exists', 'entra_user_not_found', 'entra_object_id_invalid']);
 
+  const { userId } = byId[NEW_HIRE];
   const user = db.prepare('SELECT email, display_name, microsoft_id, role, is_active, last_login FROM users WHERE id = ?').get(userId);
   assert.deepEqual(user, { email: 'new.hire@contoso.com', display_name: 'New Hire', microsoft_id: NEW_HIRE, role: 'user', is_active: 1, last_login: null });
 
   const groups = db.prepare('SELECT group_id FROM user_group_members WHERE user_id = ? ORDER BY group_id').all(userId).map((row) => row.group_id);
   assert.deepEqual(groups, [DEFAULT_GROUP_ID, 'pre-local'].sort());
 
-  const audit = db.prepare("SELECT actor_id, details FROM rbac_audit_logs WHERE action = 'preonboard' AND target_id = ?").get(userId);
-  assert.equal(audit.actor_id, 'pre-admin');
-  assert.deepEqual(JSON.parse(audit.details).groupIds, ['pre-local']);
+  const audits = db.prepare("SELECT actor_id, target_id, details FROM rbac_audit_logs WHERE action = 'preonboard'").all();
+  assert.equal(audits.length, 1, 'only created users are audited');
+  assert.equal(audits[0].actor_id, 'pre-admin');
+  assert.equal(audits[0].target_id, userId);
+  assert.deepEqual(JSON.parse(audits[0].details).groupIds, ['pre-local']);
 
-  const again = await call('POST', '/api/users/preonboard', 'pre-admin', { microsoftId: NEW_HIRE });
-  assert.equal(again.status, 409);
-  assert.equal((await again.json()).code, 'user_already_exists');
+  const again = await (await call('POST', '/api/users/preonboard', 'pre-admin', { microsoftIds: [NEW_HIRE] })).json();
+  assert.deepEqual(again.results.map((result) => result.code), ['user_already_exists']);
+});
+
+test('a Graph permission error stops the whole request', async (t) => {
+  mockGraph(t);
+  t.mock.method(globalThis, 'fetch', async (url, options) => (String(url).startsWith('https://graph.microsoft.com/')
+    ? graphResponse(403, { error: { code: 'Authorization_RequestDenied' } })
+    : realFetch(url, options)));
+  await assert.rejects(preonboardDirectoryUsers([NEW_HIRE, TAKEN], [], { acquireToken }), { code: 'entra_directory_access_denied' });
 });
 
 test('force sync gives a pre-onboarded user its Entra groups and does not deactivate it', async (t) => {

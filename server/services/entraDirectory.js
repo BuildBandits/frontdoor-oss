@@ -84,20 +84,27 @@ export async function getDirectoryUser(objectId, { acquireToken = acquireGraphAp
   }
 }
 
-export async function preonboardDirectoryUser(objectId, groupIds = [], options = {}) {
+// Codes that concern one user only: the others in the same request still go ahead.
+const PER_USER_FAILURES = new Set(['entra_object_id_invalid', 'entra_user_not_found', 'entra_user_without_email', 'user_already_exists']);
+export const PREONBOARD_MAX_USERS = 50;
+
+function resolveLocalGroupIds(groupIds) {
   if (!Array.isArray(groupIds) || groupIds.some((id) => typeof id !== 'string')) {
     throw new UserFacingError('groupIds must be an array of group IDs', { statusCode: 400, code: 'group_ids_invalid' });
   }
-  const entraUser = await getDirectoryUser(objectId, options);
-  if (!entraUser.email) {
-    throw new UserFacingError('The Microsoft Entra user has no email or user principal name', { statusCode: 400, code: 'entra_user_without_email' });
-  }
-
   const requestedGroupIds = [...new Set(groupIds.filter((id) => id !== DEFAULT_GROUP_ID))];
   const findLocalGroup = db.prepare("SELECT id FROM user_groups WHERE id = ? AND source = 'local'");
   const invalid = requestedGroupIds.filter((id) => !findLocalGroup.get(id));
   if (invalid.length > 0) {
     throw new UserFacingError('Only existing local groups can be assigned', { statusCode: 400, code: 'preonboard_groups_invalid', details: { count: invalid.length } });
+  }
+  return requestedGroupIds;
+}
+
+async function createPreonboardedUser(objectId, groupIds, options) {
+  const entraUser = await getDirectoryUser(objectId, options);
+  if (!entraUser.email) {
+    throw new UserFacingError('The Microsoft Entra user has no email or user principal name', { statusCode: 400, code: 'entra_user_without_email' });
   }
 
   const create = db.transaction(() => {
@@ -116,10 +123,38 @@ export async function preonboardDirectoryUser(objectId, groupIds = [], options =
 
     // Same starting point as a brand-new user signing in: the default group, plus the chosen local groups.
     const addMember = db.prepare('INSERT OR IGNORE INTO user_group_members (user_id, group_id) VALUES (?, ?)');
-    for (const groupId of [DEFAULT_GROUP_ID, ...requestedGroupIds]) addMember.run(userId, groupId);
+    for (const groupId of [DEFAULT_GROUP_ID, ...groupIds]) addMember.run(userId, groupId);
 
     return userId;
   });
 
-  return { userId: create(), email: entraUser.email, groupIds: requestedGroupIds };
+  return { userId: create(), email: entraUser.email, displayName: entraUser.displayName };
+}
+
+/**
+ * Pre-onboards each Entra user on its own: one that is missing or already has an
+ * account is reported in its result and does not stop the others. Errors that
+ * would hit every user (Graph access, bad group list) fail the whole request.
+ */
+export async function preonboardDirectoryUsers(objectIds, groupIds = [], options = {}) {
+  if (!Array.isArray(objectIds) || objectIds.length === 0 || objectIds.some((id) => typeof id !== 'string')) {
+    throw new UserFacingError('microsoftIds must be a non-empty array', { statusCode: 400, code: 'microsoft_ids_required' });
+  }
+  const uniqueIds = [...new Set(objectIds)];
+  if (uniqueIds.length > PREONBOARD_MAX_USERS) {
+    throw new UserFacingError('Too many users in one request', { statusCode: 400, code: 'preonboard_too_many_users', details: { max: PREONBOARD_MAX_USERS } });
+  }
+  const localGroupIds = resolveLocalGroupIds(groupIds);
+
+  const results = [];
+  for (const microsoftId of uniqueIds) {
+    try {
+      const created = await createPreonboardedUser(microsoftId, localGroupIds, options);
+      results.push({ microsoftId, status: 'created', ...created });
+    } catch (error) {
+      if (!PER_USER_FAILURES.has(error?.code)) throw error;
+      results.push({ microsoftId, status: 'failed', code: error.code });
+    }
+  }
+  return { results, groupIds: localGroupIds };
 }

@@ -537,10 +537,8 @@ export default function AdminUsers() {
         <PreonboardUserModal
           ui={ui}
           onClose={() => setShowPreonboard(false)}
-          onCreated={(entraUser) => {
-            setShowPreonboard(false);
-            showToast(formatMessage(u.preonboard.created, { name: entraUser.displayName }));
-            void loadUsers();
+          onCompleted={(createdCount) => {
+            if (createdCount > 0) void loadUsers();
           }}
         />
       )}
