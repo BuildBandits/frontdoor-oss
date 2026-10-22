@@ -1204,7 +1204,30 @@
       "toggleActiveTitle": "Do you want to {action} {name}?",
       "deleteUserTitle": "Delete permanently the user {name}?",
       "refresh": "Refresh users",
-      "pageSummary": "Page {page} of {pages} · {total} users"
+      "pageSummary": "Page {page} of {pages} · {total} users",
+      "preonboard": {
+        "button": "Pre-onboard user",
+        "title": "Pre-onboard a user",
+        "help": "Create the Frontdoor account of someone who exists in Microsoft Entra but has not signed in yet, and choose the local groups they land in. Their Entra groups are added by the next sync or at the first sign-in.",
+        "searchPlaceholder": "Search Microsoft Entra by name or email...",
+        "searchHint": "Type at least 2 characters.",
+        "searching": "Searching Microsoft Entra...",
+        "noResults": "No user found in Microsoft Entra.",
+        "searchFailed": "Could not search Microsoft Entra.",
+        "alreadyInFrontdoor": "Already in Frontdoor",
+        "disabledInEntra": "Disabled in Entra",
+        "guest": "Guest",
+        "disabledInEntraHelp": "This account is disabled in Microsoft Entra: it can sign in only after it is enabled there.",
+        "changeUser": "Change user",
+        "groupsTitle": "Local groups",
+        "groupsHelp": "Optional. The default group is always added.",
+        "groupSearchPlaceholder": "Search local groups...",
+        "noLocalGroups": "There are no local groups besides the default one.",
+        "submit": "Pre-onboard",
+        "saving": "Creating...",
+        "saveFailed": "Could not pre-onboard the user.",
+        "created": "{name} is ready: the account is waiting for the first sign-in."
+      }
     },
     "logs": {
       "title": "Access logs",
@@ -1276,7 +1299,8 @@
         "add_linked_groups": "Groups linked",
         "add_linked_entra_groups": "Entra groups linked",
         "remove_linked_group": "Group unlinked",
-        "remove_linked_entra_group": "Entra group unlinked"
+        "remove_linked_entra_group": "Entra group unlinked",
+        "preonboard": "Pre-onboarded"
       },
       "targetLabels": {
         "app": "App",
@@ -1332,7 +1356,8 @@
         "user_status": {
           "activate": "Reactivated {target}",
           "deactivate": "Deactivated {target}",
-          "delete": "Deleted the user {target}"
+          "delete": "Deleted the user {target}",
+          "preonboard": "Pre-onboarded {target}"
         },
         "auth": {
           "login": "Signed in"
@@ -1505,15 +1530,22 @@
     "default_group_link": "Groups cannot be linked to the default group.",
     "default_group_rename": "The default group cannot be renamed.",
     "dev_login_disabled": "Dev login is not enabled.",
+    "directory_search_length": "Type 2 to 64 characters to search Microsoft Entra.",
     "email_invitations_unsupported": "Email invitations are no longer supported.",
     "entra_app_not_found": "Entra app not found.",
     "entra_application_id_invalid": "Enter a valid MyApps Application ID or launcher URL.",
+    "entra_directory_access_denied": "Microsoft Graph denied the directory read. Grant the User.Read.All application permission with admin consent.",
+    "entra_directory_lookup_failed": "Could not read the user from Microsoft Entra.",
+    "entra_directory_search_failed": "Could not search Microsoft Entra.",
     "entra_group_already_linked": "This Entra group is already linked to the container.",
     "entra_group_ids_required": "Select at least one Entra group.",
     "entra_group_not_discovered": "The Entra group was not found among the discovered groups. Refresh the list and try again.",
     "entra_group_read_only": "Entra-synced groups cannot be edited locally.",
     "entra_groups_not_found": "One or more Entra groups were not found.",
     "entra_membership_managed": "Memberships of Entra-synced groups are managed in Microsoft Entra.",
+    "entra_object_id_invalid": "A valid Microsoft Entra object ID is required.",
+    "entra_user_not_found": "The user was not found in Microsoft Entra.",
+    "entra_user_without_email": "The Microsoft Entra user has no email or user principal name.",
     "failed_to_check_icons": "The icon sizes could not be checked.",
     "failed_to_clean_icon_cache": "Could not clean the app icon cache.",
     "failed_to_compact_database": "Could not compact the database storage.",
@@ -1536,6 +1568,7 @@
     "graph_credentials_missing": "Microsoft Graph app credentials are not configured.",
     "graph_token_failed": "Could not get a Microsoft Graph token.",
     "group_description_invalid": "The group description must be text.",
+    "group_ids_invalid": "The group list is not valid.",
     "group_ids_required": "Select at least one group.",
     "group_link_circular": "Cannot create a circular group link.",
     "group_link_invalid": "The selected group cannot be linked.",
@@ -1608,6 +1641,7 @@
     "plugin_package_not_object": "The plugin package must be a JSON object.",
     "plugin_package_zip_invalid_base64": "The plugin ZIP package is not valid.",
     "plugin_system_disabled": "The plugin system is disabled.",
+    "preonboard_groups_invalid": "Only existing local groups can be chosen.",
     "slug_invalid": "The slug must use lowercase letters, numbers and hyphens (1-63 characters).",
     "slug_required": "The slug is required.",
     "source_group_not_found": "Source group not found.",
@@ -1622,9 +1656,11 @@
     "too_many_login_attempts": "Too many sign-in attempts. Try again later.",
     "too_many_requests": "Too many requests. Wait a moment and try again.",
     "transfer_same_group": "Source and target groups must be different.",
+    "user_already_exists": "This user already has a Frontdoor account.",
     "user_ids_required": "Select at least one user.",
     "user_not_found": "User not found.",
     "user_not_found_or_inactive": "User not found or inactive.",
+    "user_preonboard_failed": "Could not pre-onboard the user.",
     "users_not_found": "{count} selected users were not found."
   }
 }

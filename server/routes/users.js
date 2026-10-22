@@ -9,6 +9,8 @@ import { getAccessibleGroupIdsForUser } from '../services/groupHierarchy.js';
 import { isSupportedLanguage } from '../../shared/languages.js';
 import { isSupportedColorScheme, normalizeOptionalColorScheme } from '../../shared/colorSchemes.js';
 import { isSupportedTimeZone, normalizeOptionalTimeZone } from '../../shared/timeZones.js';
+import { preonboardDirectoryUser, searchDirectoryUsers } from '../services/entraDirectory.js';
+import { respondWithError } from '../services/errors.js';
 
 const router = express.Router();
 const composeAdminEmails = new Set(
@@ -45,6 +47,29 @@ router.get('/', authenticate, isAdminViewer, (req, res) => {
       is_compose_locked_admin: isComposeLockedAdmin(user.email),
     }));
   res.json({ users });
+});
+
+// Search the Entra tenant for users to pre-onboard (editor roles only)
+router.get('/directory/search', authenticate, isAdminEditor, async (req, res) => {
+  try {
+    const users = await searchDirectoryUsers(req.query.q);
+    res.json({ users });
+  } catch (error) {
+    console.error('Entra directory search failed:', error.message);
+    respondWithError(res, error, { status: 502, code: 'entra_directory_search_failed' });
+  }
+});
+
+// Create the account of an Entra user before the first sign-in (editor roles only)
+router.post('/preonboard', authenticate, isAdminEditor, async (req, res) => {
+  try {
+    const { userId, email, groupIds } = await preonboardDirectoryUser(req.body?.microsoftId, req.body?.groupIds ?? []);
+    logRbacAudit(req.user.id, 'preonboard', 'user_status', userId, { email, groupIds });
+    res.status(201).json({ userId });
+  } catch (error) {
+    if (!error?.expose) console.error('User pre-onboarding failed:', error.message);
+    respondWithError(res, error, { status: 500, code: 'user_preonboard_failed' });
+  }
 });
 
 // Serve cached user avatar or discover it on demand (authenticated)

@@ -1204,7 +1204,30 @@
       "toggleActiveTitle": "Vuoi {action} {name}?",
       "deleteUserTitle": "Eliminare definitivamente l'utente {name}?",
       "refresh": "Aggiorna utenti",
-      "pageSummary": "Pagina {page} di {pages} · {total} utenti"
+      "pageSummary": "Pagina {page} di {pages} · {total} utenti",
+      "preonboard": {
+        "button": "Pre-onboarding utente",
+        "title": "Pre-onboarding di un utente",
+        "help": "Crea l'account Frontdoor di una persona che esiste in Microsoft Entra ma non ha ancora effettuato l'accesso, e scegli i gruppi locali in cui atterrerà. I suoi gruppi Entra vengono aggiunti dalla prossima sincronizzazione o al primo accesso.",
+        "searchPlaceholder": "Cerca in Microsoft Entra per nome o email...",
+        "searchHint": "Scrivi almeno 2 caratteri.",
+        "searching": "Ricerca in Microsoft Entra...",
+        "noResults": "Nessun utente trovato in Microsoft Entra.",
+        "searchFailed": "Impossibile cercare in Microsoft Entra.",
+        "alreadyInFrontdoor": "Già in Frontdoor",
+        "disabledInEntra": "Disabilitato in Entra",
+        "guest": "Guest",
+        "disabledInEntraHelp": "Questo account è disabilitato in Microsoft Entra: potrà accedere solo dopo essere stato abilitato lì.",
+        "changeUser": "Cambia utente",
+        "groupsTitle": "Gruppi locali",
+        "groupsHelp": "Facoltativo. Il gruppo predefinito viene sempre aggiunto.",
+        "groupSearchPlaceholder": "Cerca gruppi locali...",
+        "noLocalGroups": "Non ci sono gruppi locali oltre a quello predefinito.",
+        "submit": "Pre-onboarding",
+        "saving": "Creazione...",
+        "saveFailed": "Impossibile completare il pre-onboarding dell'utente.",
+        "created": "{name} è pronto: l'account attende il primo accesso."
+      }
     },
     "logs": {
       "title": "Log di accesso",
@@ -1276,7 +1299,8 @@
         "add_linked_groups": "Gruppi collegati",
         "add_linked_entra_groups": "Gruppi Entra collegati",
         "remove_linked_group": "Gruppo scollegato",
-        "remove_linked_entra_group": "Gruppo Entra scollegato"
+        "remove_linked_entra_group": "Gruppo Entra scollegato",
+        "preonboard": "Pre-onboarding"
       },
       "targetLabels": {
         "app": "App",
@@ -1332,7 +1356,8 @@
         "user_status": {
           "activate": "Ha riattivato {target}",
           "deactivate": "Ha disattivato {target}",
-          "delete": "Ha eliminato l'utente {target}"
+          "delete": "Ha eliminato l'utente {target}",
+          "preonboard": "Pre-onboarding di {target}"
         },
         "auth": {
           "login": "Ha effettuato l'accesso"
@@ -1505,15 +1530,22 @@
     "default_group_link": "Non è possibile collegare gruppi al gruppo predefinito.",
     "default_group_rename": "Il gruppo predefinito non può essere rinominato.",
     "dev_login_disabled": "Il login di sviluppo non è abilitato.",
+    "directory_search_length": "Scrivi da 2 a 64 caratteri per cercare in Microsoft Entra.",
     "email_invitations_unsupported": "Gli inviti via email non sono più supportati.",
     "entra_app_not_found": "App Entra non trovata.",
     "entra_application_id_invalid": "Inserisci un Application ID di MyApps o un URL di avvio valido.",
+    "entra_directory_access_denied": "Microsoft Graph ha negato la lettura della directory. Concedi il permesso applicativo User.Read.All con consenso amministratore.",
+    "entra_directory_lookup_failed": "Impossibile leggere l'utente da Microsoft Entra.",
+    "entra_directory_search_failed": "Impossibile cercare in Microsoft Entra.",
     "entra_group_already_linked": "Questo gruppo Entra è già collegato al contenitore.",
     "entra_group_ids_required": "Seleziona almeno un gruppo Entra.",
     "entra_group_not_discovered": "Il gruppo Entra non è tra i gruppi rilevati. Aggiorna l'elenco e riprova.",
     "entra_group_read_only": "I gruppi sincronizzati con Entra non possono essere modificati localmente.",
     "entra_groups_not_found": "Uno o più gruppi Entra non sono stati trovati.",
     "entra_membership_managed": "Le membership dei gruppi sincronizzati con Entra si gestiscono in Microsoft Entra.",
+    "entra_object_id_invalid": "Serve un object ID Microsoft Entra valido.",
+    "entra_user_not_found": "L'utente non è stato trovato in Microsoft Entra.",
+    "entra_user_without_email": "L'utente Microsoft Entra non ha email né user principal name.",
     "failed_to_check_icons": "Impossibile controllare la dimensione delle icone.",
     "failed_to_clean_icon_cache": "Impossibile pulire la cache delle icone delle app.",
     "failed_to_compact_database": "Impossibile compattare lo spazio del database.",
@@ -1536,6 +1568,7 @@
     "graph_credentials_missing": "Le credenziali dell'app Microsoft Graph non sono configurate.",
     "graph_token_failed": "Impossibile ottenere un token Microsoft Graph.",
     "group_description_invalid": "La descrizione del gruppo deve essere un testo.",
+    "group_ids_invalid": "La lista dei gruppi non è valida.",
     "group_ids_required": "Seleziona almeno un gruppo.",
     "group_link_circular": "Impossibile creare un collegamento circolare tra gruppi.",
     "group_link_invalid": "Il gruppo selezionato non può essere collegato.",
@@ -1608,6 +1641,7 @@
     "plugin_package_not_object": "Il pacchetto del plugin deve essere un oggetto JSON.",
     "plugin_package_zip_invalid_base64": "Il pacchetto ZIP del plugin non è valido.",
     "plugin_system_disabled": "Il sistema dei plugin è disattivato.",
+    "preonboard_groups_invalid": "Si possono scegliere solo gruppi locali esistenti.",
     "slug_invalid": "Lo slug deve contenere lettere minuscole, numeri e trattini (1-63 caratteri).",
     "slug_required": "Lo slug è obbligatorio.",
     "source_group_not_found": "Gruppo di origine non trovato.",
@@ -1622,9 +1656,11 @@
     "too_many_login_attempts": "Troppi tentativi di accesso. Riprova più tardi.",
     "too_many_requests": "Troppe richieste. Attendi un momento e riprova.",
     "transfer_same_group": "Il gruppo di origine e quello di destinazione devono essere diversi.",
+    "user_already_exists": "Questo utente ha già un account Frontdoor.",
     "user_ids_required": "Seleziona almeno un utente.",
     "user_not_found": "Utente non trovato.",
     "user_not_found_or_inactive": "Utente non trovato o non attivo.",
+    "user_preonboard_failed": "Impossibile completare il pre-onboarding dell'utente.",
     "users_not_found": "{count} utenti selezionati non sono stati trovati."
   }
 }

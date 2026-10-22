@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router';
-import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, Wand2, Filter } from 'lucide-react';
+import { Eye, Shield, ShieldOff, UserCheck, UserX, UserPlus, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, Wand2, Filter } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { useLatestRequest } from '../hooks/useLatestRequest';
@@ -15,6 +15,7 @@ import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import Tooltip from '../components/Tooltip';
 import PaginationControls from '../components/PaginationControls';
+import PreonboardUserModal from './users/PreonboardUserModal';
 import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
 import { normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
@@ -38,6 +39,7 @@ export default function AdminUsers() {
   const [showVisibleApps, setShowVisibleApps] = useState(false);
   const [visibleAppsSearch, setVisibleAppsSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [showPreonboard, setShowPreonboard] = useState(false);
   const branding = useBranding();
   const brandingLanguage = normalizeLanguage(branding?.defaultLanguage);
   const brandingTimeZone = normalizeTimeZone(branding?.defaultTimeZone, 'UTC');
@@ -508,16 +510,40 @@ export default function AdminUsers() {
             {users.length} {ui.nav.users.toLowerCase()} {t.total} &middot; {activeCount} {t.active} &middot; {adminCount} {t.privileged}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void loadUsers()}
-          disabled={refreshing || loading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5 text-sm font-semibold text-dark dark:text-gray-100 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 max-sm:w-full"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          {ui.admin.users.refresh}
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {canEditUsers && (
+            <button
+              type="button"
+              onClick={() => setShowPreonboard(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 max-sm:w-full"
+            >
+              <UserPlus className="w-4 h-4" />
+              {u.preonboard.button}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void loadUsers()}
+            disabled={refreshing || loading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5 text-sm font-semibold text-dark dark:text-gray-100 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 max-sm:w-full"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {ui.admin.users.refresh}
+          </button>
+        </div>
       </div>
+
+      {showPreonboard && (
+        <PreonboardUserModal
+          ui={ui}
+          onClose={() => setShowPreonboard(false)}
+          onCreated={(entraUser) => {
+            setShowPreonboard(false);
+            showToast(formatMessage(u.preonboard.created, { name: entraUser.displayName }));
+            void loadUsers();
+          }}
+        />
+      )}
 
       {!canEditUsers && (
         <div className="mb-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
