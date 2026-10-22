@@ -1501,13 +1501,17 @@
           "admin_ineligible": "Admin non più idoneo"
         }
       },
-      "showSignIns": "Mostra accessi",
-      "signInsHidden": "Gli accessi degli amministratori sono nascosti: usa \"Mostra accessi\" per includerli.",
+      "eventFilter": "Eventi",
+      "eventScopes": {
+        "all": "Tutti gli eventi",
+        "changes": "Solo modifiche",
+        "impersonation": "Solo impersonation"
+      },
+      "signInsHidden": "Gli accessi degli amministratori sono nascosti: scegli \"Tutti gli eventi\" in Eventi per includerli.",
       "actorLabels": {
         "api-key": "Chiave API (import massivo)",
         "system": "Sistema"
       },
-      "onlyImpersonation": "Solo impersonation",
       "impersonatingBadge": "Come {name}",
       "sessionFilter": "Sessione #{id}",
       "clearSessionFilter": "Mostra tutte le sessioni"

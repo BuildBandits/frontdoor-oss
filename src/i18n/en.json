@@ -1501,13 +1501,17 @@
           "admin_ineligible": "Admin no longer eligible"
         }
       },
-      "showSignIns": "Show sign-ins",
-      "signInsHidden": "Administrator sign-ins are hidden; use \"Show sign-ins\" to include them.",
+      "eventFilter": "Events",
+      "eventScopes": {
+        "all": "All events",
+        "changes": "Changes only",
+        "impersonation": "Impersonation only"
+      },
+      "signInsHidden": "Administrator sign-ins are hidden; choose \"All events\" in Events to include them.",
       "actorLabels": {
         "api-key": "API key (bulk import)",
         "system": "System"
       },
-      "onlyImpersonation": "Impersonation only",
       "impersonatingBadge": "Acting as {name}",
       "sessionFilter": "Session #{id}",
       "clearSessionFilter": "Show all sessions"

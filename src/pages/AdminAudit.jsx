@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AlertCircle, Filter, LogIn, ShieldCheck, UserRound, X } from 'lucide-react';
+import { AlertCircle, Filter, ListFilter, ShieldCheck, UserRound, X } from 'lucide-react';
 import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
 import AuditDetails from '../components/AuditDetails';
@@ -18,18 +18,22 @@ import { resolveAppTimeZone } from '../../shared/timeZones.js';
 const PRIVILEGED_ROLES = new Set(['owner', 'admin', 'admin_readonly']);
 const SIGN_IN_TARGET_TYPE = 'auth';
 const SHOW_SIGN_INS_KEY = 'frontdoor.audit.showSignIns';
+// Which events to list: 'changes' hides sign-ins (default), 'all' includes them,
+// 'impersonation' keeps only impersonation sessions. Only changes/all is remembered.
+const EVENT_SCOPES = ['all', 'changes', 'impersonation'];
 
-function readShowSignIns() {
+function readEventScope() {
   try {
-    return window.localStorage.getItem(SHOW_SIGN_INS_KEY) === '1';
+    return window.localStorage.getItem(SHOW_SIGN_INS_KEY) === '1' ? 'all' : 'changes';
   } catch {
-    return false;
+    return 'changes';
   }
 }
 
-function writeShowSignIns(value) {
+function writeEventScope(scope) {
+  if (scope === 'impersonation') return;
   try {
-    window.localStorage.setItem(SHOW_SIGN_INS_KEY, value ? '1' : '0');
+    window.localStorage.setItem(SHOW_SIGN_INS_KEY, scope === 'all' ? '1' : '0');
   } catch {
     // Storage unavailable: the choice lasts for this page only.
   }
@@ -51,8 +55,9 @@ export default function AdminAudit() {
   const [selectedActorIds, setSelectedActorIds] = useState([]);
   // Administrator sign-ins are hidden by default (they drown out the changes);
   // the choice is remembered per browser.
-  const [showSignIns, setShowSignIns] = useState(() => readShowSignIns());
-  const [onlyImpersonation, setOnlyImpersonation] = useState(false);
+  const [eventScope, setEventScope] = useState(() => readEventScope());
+  const showSignIns = eventScope === 'all';
+  const onlyImpersonation = eventScope === 'impersonation';
   const [sessionFilter, setSessionFilter] = useState(null);
   const brandingLanguage = useBrandingLanguage();
   const brandingTimeZone = useBrandingTimeZone();
@@ -115,11 +120,9 @@ export default function AdminAudit() {
     setPage(1);
   }, [debouncedSearch, retentionDays, pageSize, selectedActorIds, showSignIns, onlyImpersonation, sessionFilter]);
 
-  const toggleShowSignIns = () => {
-    setShowSignIns((current) => {
-      writeShowSignIns(!current);
-      return !current;
-    });
+  const changeEventScope = (scope) => {
+    setEventScope(scope);
+    writeEventScope(scope);
   };
 
   useEffect(() => { loadLogs(page); }, [loadLogs, page]);
@@ -190,32 +193,14 @@ export default function AdminAudit() {
             ]}
             className="min-w-[140px]"
           />
-          <button
-            type="button"
-            onClick={toggleShowSignIns}
-            aria-pressed={showSignIns}
-            className={`inline-flex h-12 items-center gap-2 rounded-xl border px-3 text-sm font-medium transition-colors ${
-              showSignIns
-                ? 'border-accent bg-accent/10 text-dark dark:text-gray-100'
-                : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-            }`}
-          >
-            <LogIn className="w-4 h-4" />
-            {ui.admin.audit.showSignIns}
-          </button>
-          <button
-            type="button"
-            onClick={() => setOnlyImpersonation((value) => !value)}
-            aria-pressed={onlyImpersonation}
-            className={`inline-flex h-12 items-center gap-2 rounded-xl border px-3 text-sm font-medium transition-colors ${
-              onlyImpersonation
-                ? 'border-accent bg-accent/10 text-dark dark:text-gray-100'
-                : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-            }`}
-          >
-            <UserRound className="w-4 h-4" />
-            {ui.admin.audit.onlyImpersonation}
-          </button>
+          <DropdownSelect
+            value={eventScope}
+            onChange={changeEventScope}
+            label={ui.admin.audit.eventFilter}
+            icon={ListFilter}
+            options={EVENT_SCOPES.map((scope) => ({ value: scope, label: ui.admin.audit.eventScopes[scope] }))}
+            className="min-w-[220px]"
+          />
           {sessionFilter && (
             <button
               type="button"
@@ -254,7 +239,7 @@ export default function AdminAudit() {
             <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-40" />
             <p className="text-lg font-medium">{ui.admin.audit.emptyTitle}</p>
             <p className="text-sm mt-1">{ui.admin.audit.emptyBody}</p>
-            {!showSignIns && <p className="text-xs mt-2">{ui.admin.audit.signInsHidden}</p>}
+            {eventScope === 'changes' && <p className="text-xs mt-2">{ui.admin.audit.signInsHidden}</p>}
           </div>
         ) : (
           <>
