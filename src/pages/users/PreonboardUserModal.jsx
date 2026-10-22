@@ -238,7 +238,7 @@ export default function PreonboardUserModal({ onClose, onCreated, ui }) {
             className="flex items-center justify-center gap-2 px-5 py-2.5 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <UserPlus className="w-4 h-4" />
-            {saving ? p.saving : p.submit}
+            {saving ? p.saving : (selectedUser && groupIds.length === 0 ? p.submitWithoutGroups : p.submit)}
           </button>
         </div>
       </div>
