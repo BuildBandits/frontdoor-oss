@@ -1147,7 +1147,9 @@
       "convertToLocalTitle": "Convert {name} to a local group?",
       "convertToLocalMessage": "The group keeps its members and apps and becomes a local group, no longer synced with Microsoft Entra. Local groups that linked it keep including it.",
       "convertedToLocal": "{name} is now a local group",
-      "moveAppsToAnotherGroup": "Move apps to another group"
+      "moveAppsToAnotherGroup": "Move apps to another group",
+      "deletedInEntraLinked": "This Entra group was deleted in Microsoft Entra. Its members keep the access it gave through this group for now. Convert it to a local group to keep it, or unlink it to end it.",
+      "convertLinkedToLocalMessage": "A local group with the same members is created and linked here (and in every other group that linked the Entra group) instead of the Entra group."
     },
     "users": {
       "title": "Users",

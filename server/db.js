@@ -319,6 +319,9 @@ ensureColumn('branding_settings', 'hero_title_line1_i18n', 'hero_title_line1_i18
 ensureColumn('branding_settings', 'hero_title_line2_i18n', 'hero_title_line2_i18n TEXT');
 ensureColumn('branding_settings', 'hero_subtitle_i18n', 'hero_subtitle_i18n TEXT');
 ensureColumn('entra_group_cache', 'description', 'description TEXT');
+// Deletion flag of Entra groups linked into local groups without being imported.
+ensureColumn('entra_group_cache', 'deleted_at', 'deleted_at TEXT');
+ensureColumn('entra_group_cache', 'deleted_snapshot', 'deleted_snapshot TEXT');
 ensureColumn('media_assets', 'app_name', 'app_name TEXT');
 ensureColumn('media_assets', 'app_slug', 'app_slug TEXT');
 ensureColumn('media_assets', 'app_target_url', 'app_target_url TEXT');

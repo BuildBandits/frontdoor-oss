@@ -1147,7 +1147,9 @@
       "convertToLocalTitle": "Convertire {name} in gruppo locale?",
       "convertToLocalMessage": "Il gruppo mantiene membri e app e diventa un gruppo locale, non più sincronizzato con Microsoft Entra. I gruppi locali che lo collegavano continuano a includerlo.",
       "convertedToLocal": "{name} ora è un gruppo locale",
-      "moveAppsToAnotherGroup": "Sposta le app su un altro gruppo"
+      "moveAppsToAnotherGroup": "Sposta le app su un altro gruppo",
+      "deletedInEntraLinked": "Questo gruppo Entra è stato eliminato in Microsoft Entra. Per ora i suoi membri mantengono l'accesso che dava tramite questo gruppo. Convertilo in gruppo locale per mantenerlo, o scollegalo per chiuderlo.",
+      "convertLinkedToLocalMessage": "Viene creato un gruppo locale con gli stessi membri e collegato qui (e in ogni altro gruppo che collegava il gruppo Entra) al posto del gruppo Entra."
     },
     "users": {
       "title": "Utenti",

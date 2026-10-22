@@ -169,7 +169,7 @@ The image stores every writable path on the `/data` volume by default (`DATABASE
 | `ENTRA_GROUP_SYNC` | Discover Entra group memberships at login and enable admin import/force-sync flows | `false` (`true` in `docker-compose.yml`) |
 | `ENTRA_TENANT_REFRESH_MINUTES` | Minimum minutes between two refreshes of the tenant-wide Entra group catalog triggered by sign-ins (force sync always refreshes it; `0` refreshes at every sign-in) | `360` |
 | `NOTIFICATION_RETENTION_DAYS` | Days a resolved admin notification is kept before the daily purge removes it | `30` |
-| `ENTRA_DELETED_GROUP_POLICY` | What happens to the members of an imported group that Microsoft Entra reports deleted: `freeze` keeps their access until an admin converts the group to local, moves its apps or deletes it; `revoke` removes them at the next sign-in or sync, as before. Both flag the group, keep a snapshot and notify admins | `freeze` |
+| `ENTRA_DELETED_GROUP_POLICY` | What happens to the members of an Entra group that Microsoft Entra reports deleted, whether imported or only linked into local groups: `freeze` keeps their access until an admin converts the group to local, moves its apps, unlinks or deletes it; `revoke` removes them at the next sign-in or sync, as before. Both flag the group, keep a snapshot and notify admins | `freeze` |
 | `JWT_EXPIRES_IN` | JWT token duration | `7d` |
 | `JWT_ISSUER` | Issuer of the session and SSO tokens (satellites verifying tokens must use the same value) | `frontdoor` |
 | `ADMIN_EMAILS` | Comma-separated owner emails (auto-promoted) | - |

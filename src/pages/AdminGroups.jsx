@@ -410,6 +410,26 @@ export default function AdminGroups() {
     });
   };
 
+  const convertLinkedToLocal = (childGroup) => {
+    if (!canEdit) return;
+    const groupName = childGroup.display_name || childGroup.entra_group_id;
+    openConfirm({
+      title: g.convertToLocalTitle.replace('{name}', groupName),
+      message: g.convertLinkedToLocalMessage,
+      confirmLabel: g.convertToLocal,
+      onConfirm: async () => {
+        try {
+          const res = await api.post(`/groups/entra-links/${encodeURIComponent(childGroup.entra_group_id)}/convert-to-local`);
+          showToast(g.convertedToLocal.replace('{name}', res.data.name || groupName));
+          await loadGroups();
+          if (expandedGroup) await loadGroupDetail(expandedGroup);
+        } catch (err) {
+          showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
+        }
+      },
+    });
+  };
+
   const handleDelete = async (group) => {
     if (!canEdit) {
       showToast(ui.admin.groups.readOnly, 'error');
@@ -1244,6 +1264,7 @@ export default function AdminGroups() {
                 openAddApps={openAddApps}
                 removeApp={removeApp}
                 convertToLocal={convertToLocal}
+                convertLinkedToLocal={convertLinkedToLocal}
                 deleteGroup={handleDelete}
                 moveApps={(sourceGroupId) => navigate('/admin/group-transfer', { state: { sourceGroupId } })}
               />

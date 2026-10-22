@@ -16,6 +16,9 @@ const { getAccessibleGroupIdsForUser } = await import('../server/services/groupH
 
 const SALES = '00000000-0000-0000-0000-00000000a001';
 const OPS = '00000000-0000-0000-0000-00000000a002';
+// Linked into a local group without being imported.
+const TEAM = '00000000-0000-0000-0000-00000000a003';
+const NAMES = { [SALES]: 'Sales', [OPS]: 'Ops', [TEAM]: 'Team' };
 const ALICE = '00000000-0000-0000-0000-00000000b001';
 const BOB = '00000000-0000-0000-0000-00000000b002';
 const acquireToken = async () => 'test-token';
@@ -30,13 +33,13 @@ function mockGraph(t, { tenant, memberships }) {
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     const target = String(url);
     if (!target.startsWith('https://graph.microsoft.com/')) return realFetch(url, options);
-    if (target.includes('/groups?')) return graphResponse(200, { value: tenant.map((id) => ({ id, displayName: id === SALES ? 'Sales' : 'Ops' })) });
+    if (target.includes('/groups?')) return graphResponse(200, { value: tenant.map((id) => ({ id, displayName: NAMES[id] })) });
     const groupMatch = target.match(/\/groups\/([0-9a-f-]+)\?/);
     if (groupMatch) return tenant.includes(groupMatch[1]) ? graphResponse(200, { id: groupMatch[1] }) : notFound();
     const userMatch = target.match(/\/users\/([0-9a-f-]+)\/transitiveMemberOf/);
     if (userMatch) {
       const ids = (memberships[userMatch[1]] || []).filter((id) => tenant.includes(id));
-      return graphResponse(200, { value: ids.map((id) => ({ id, displayName: id === SALES ? 'Sales' : 'Ops' })) });
+      return graphResponse(200, { value: ids.map((id) => ({ id, displayName: NAMES[id] })) });
     }
     return notFound();
   });
@@ -49,6 +52,8 @@ const call = (method, path, userId) => realFetch(`${baseUrl}${path}`, { method, 
 const members = (groupId) => db.prepare('SELECT user_id FROM user_group_members WHERE group_id = ? ORDER BY user_id').all(groupId).map((row) => row.user_id);
 const groupRow = (id) => db.prepare('SELECT source, entra_group_id, entra_deleted_at, entra_deleted_snapshot FROM user_groups WHERE id = ?').get(id);
 const openNotification = (groupId) => db.prepare("SELECT * FROM notifications WHERE type = 'entra_group_deleted' AND subject_key = ? AND resolved_at IS NULL").get(groupId);
+const teamFlag = () => db.prepare('SELECT deleted_at, deleted_snapshot FROM entra_group_cache WHERE entra_group_id = ?').get(TEAM);
+const teamMemberships = () => db.prepare('SELECT user_id FROM entra_user_group_memberships WHERE entra_group_id = ? ORDER BY user_id').all(TEAM).map((row) => row.user_id);
 
 before(async () => {
   server = createApp().listen(0);
@@ -63,7 +68,9 @@ beforeEach(() => {
   for (const table of ['notification_reads', 'notifications', 'app_permissions', 'user_group_members', 'group_group_memberships', 'group_entra_group_memberships', 'entra_user_group_memberships']) {
     db.prepare(`DELETE FROM ${table}`).run();
   }
-  db.prepare("DELETE FROM user_groups WHERE id LIKE 'dg-%'").run();
+  db.prepare("DELETE FROM user_groups WHERE id LIKE 'dg-%' OR name LIKE 'Team%'").run();
+  db.prepare('DELETE FROM entra_group_cache WHERE entra_group_id IN (?, ?, ?)').run(SALES, OPS, TEAM);
+  db.prepare("INSERT INTO entra_group_cache (entra_group_id, display_name) VALUES (?, 'Team')").run(TEAM);
   db.prepare("DELETE FROM apps WHERE id LIKE 'dg-%'").run();
   db.prepare("DELETE FROM users WHERE id LIKE 'dg-%'").run();
   const insertUser = db.prepare('INSERT INTO users (id, email, display_name, microsoft_id, role) VALUES (?, ?, ?, ?, ?)');
@@ -75,6 +82,11 @@ beforeEach(() => {
   db.prepare("INSERT INTO group_entra_group_memberships (parent_group_id, entra_group_id) VALUES ('dg-parent', ?)").run(SALES);
   db.prepare("INSERT INTO apps (id, name, slug, target_url, mode) VALUES ('dg-crm', 'CRM', 'dg-crm', 'https://crm.example.com', 'redirect-plain')").run();
   db.prepare("INSERT INTO app_permissions (app_id, group_id) VALUES ('dg-crm', 'dg-sales')").run();
+  db.prepare("INSERT INTO user_groups (id, name, source) VALUES ('dg-team-access', 'Team access', 'local')").run();
+  db.prepare("INSERT INTO group_entra_group_memberships (parent_group_id, entra_group_id) VALUES ('dg-team-access', ?)").run(TEAM);
+  db.prepare("INSERT INTO apps (id, name, slug, target_url, mode) VALUES ('dg-wiki', 'Wiki', 'dg-wiki', 'https://wiki.example.com', 'redirect-plain')").run();
+  db.prepare("INSERT INTO app_permissions (app_id, group_id) VALUES ('dg-wiki', 'dg-team-access')").run();
+  db.prepare("INSERT INTO entra_user_group_memberships (user_id, entra_group_id, synced_at) VALUES ('dg-alice', ?, '2026-10-01 08:00:00')").run(TEAM);
   for (const user of ['dg-alice', 'dg-bob']) {
     db.prepare("INSERT INTO user_group_members (user_id, group_id) VALUES (?, 'dg-sales')").run(user);
     db.prepare("INSERT INTO entra_user_group_memberships (user_id, entra_group_id, synced_at) VALUES (?, ?, '2026-10-01 08:00:00')").run(user, SALES);
@@ -97,7 +109,7 @@ test('force sync flags a deleted group, keeps its members (freeze) and notifies 
 
   const notification = openNotification('dg-sales');
   assert.equal(notification.severity, 'warning');
-  assert.deepEqual(JSON.parse(notification.payload), { groupId: 'dg-sales', groupName: 'Sales', memberCount: 2, appCount: 1, linkedInCount: 1, policy: 'freeze' });
+  assert.deepEqual(JSON.parse(notification.payload), { groupId: 'dg-sales', parentGroupId: null, groupName: 'Sales', linkedOnly: false, memberCount: 2, appCount: 1, linkedInCount: 1, policy: 'freeze' });
 });
 
 test('a sign-in that would drop the group confirms the deletion first', async (t) => {
@@ -176,4 +188,85 @@ test('deleting a flagged group drops the frozen Entra memberships and resolves t
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM entra_user_group_memberships WHERE entra_group_id = ?').get(SALES).n, 0);
   assert.ok(!getAccessibleGroupIdsForUser('dg-alice').includes('dg-parent'), 'the linked local group no longer grants access');
   assert.equal(openNotification('dg-sales'), undefined);
+});
+
+test('a deleted Entra group that is only linked into a local group is flagged and frozen too', async (t) => {
+  mockGraph(t, { tenant: [SALES, OPS], memberships: { [ALICE]: [SALES, TEAM], [BOB]: [SALES] } });
+  await forceSyncAllEntraUsers({ acquireToken });
+
+  const flag = teamFlag();
+  assert.ok(flag.deleted_at);
+  const snapshot = JSON.parse(flag.deleted_snapshot);
+  assert.deepEqual(snapshot.members.map((member) => member.name), ['Alice']);
+  assert.deepEqual(snapshot.apps.map((app) => app.name), ['Wiki']);
+  assert.deepEqual(snapshot.linkedIn.map((group) => group.name), ['Team access']);
+
+  assert.deepEqual(teamMemberships(), ['dg-alice'], 'frozen: the cached membership is kept');
+  assert.ok(getAccessibleGroupIdsForUser('dg-alice').includes('dg-team-access'));
+
+  const payload = JSON.parse(openNotification(`entra:${TEAM}`).payload);
+  assert.equal(payload.linkedOnly, true);
+  assert.equal(payload.parentGroupId, 'dg-team-access');
+  assert.equal(groupRow('dg-sales').entra_deleted_at, null, 'the imported group still exists');
+
+  const detail = await (await call('GET', '/api/groups/dg-team-access', 'dg-admin')).json();
+  assert.ok(detail.childEntraGroups[0].deleted_at, 'the linking group shows the flag');
+});
+
+test('a sign-in that would drop a linked-only group confirms the deletion first', async (t) => {
+  mockGraph(t, { tenant: [SALES, OPS], memberships: {} });
+  await protectDeletedGroupsBeforeUserSync('dg-alice', [{ id: SALES }], { acquireToken });
+  syncUserEntraGroups('dg-alice', [{ id: SALES, displayName: 'Sales' }]);
+
+  assert.ok(teamFlag().deleted_at);
+  assert.deepEqual(teamMemberships(), ['dg-alice']);
+});
+
+test('with the revoke policy a linked-only group is flagged but its memberships go', async (t) => {
+  process.env.ENTRA_DELETED_GROUP_POLICY = 'revoke';
+  mockGraph(t, { tenant: [SALES, OPS], memberships: { [ALICE]: [SALES, TEAM], [BOB]: [SALES] } });
+  await forceSyncAllEntraUsers({ acquireToken });
+
+  assert.ok(teamFlag().deleted_at);
+  assert.deepEqual(teamMemberships(), []);
+  assert.ok(!getAccessibleGroupIdsForUser('dg-alice').includes('dg-team-access'));
+});
+
+test('a linked-only group restored in Entra is unflagged and its notification resolves', async (t) => {
+  mockGraph(t, { tenant: [SALES, OPS], memberships: { [ALICE]: [SALES, TEAM], [BOB]: [SALES] } });
+  await forceSyncAllEntraUsers({ acquireToken });
+  mockGraph(t, { tenant: [SALES, OPS, TEAM], memberships: { [ALICE]: [SALES, TEAM], [BOB]: [SALES] } });
+  await forceSyncAllEntraUsers({ acquireToken });
+
+  assert.equal(teamFlag().deleted_at, null);
+  assert.equal(openNotification(`entra:${TEAM}`), undefined);
+  assert.deepEqual(teamMemberships(), ['dg-alice']);
+});
+
+test('converting a linked-only group creates a local group with its members, linked where it was', async (t) => {
+  mockGraph(t, { tenant: [SALES, OPS], memberships: { [ALICE]: [SALES, TEAM], [BOB]: [SALES] } });
+  await forceSyncAllEntraUsers({ acquireToken });
+
+  const res = await call('POST', `/api/groups/entra-links/${TEAM}/convert-to-local`, 'dg-admin');
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.name, 'Team');
+  assert.deepEqual(members(body.groupId), ['dg-alice']);
+  assert.ok(db.prepare("SELECT 1 FROM group_group_memberships WHERE parent_group_id = 'dg-team-access' AND child_group_id = ?").get(body.groupId));
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM group_entra_group_memberships WHERE entra_group_id = ?').get(TEAM).n, 0);
+  assert.deepEqual(teamMemberships(), []);
+  assert.ok(getAccessibleGroupIdsForUser('dg-alice').includes('dg-team-access'), 'access continues through the new local group');
+  assert.equal(openNotification(`entra:${TEAM}`), undefined);
+
+  assert.equal((await call('POST', `/api/groups/entra-links/${TEAM}/convert-to-local`, 'dg-admin')).status, 400, 'nothing left to convert');
+});
+
+test('unlinking the last local group from a flagged linked-only group releases it', async (t) => {
+  mockGraph(t, { tenant: [SALES, OPS], memberships: { [ALICE]: [SALES, TEAM], [BOB]: [SALES] } });
+  await forceSyncAllEntraUsers({ acquireToken });
+
+  assert.equal((await call('DELETE', `/api/groups/dg-team-access/entra-groups/${TEAM}`, 'dg-admin')).status, 200);
+  assert.deepEqual(teamMemberships(), []);
+  assert.equal(teamFlag().deleted_at, null);
+  assert.equal(openNotification(`entra:${TEAM}`), undefined);
 });

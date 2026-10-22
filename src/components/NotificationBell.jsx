@@ -50,7 +50,7 @@ function describeNotification(notification, n) {
           members: payload.memberCount ?? 0,
           apps: payload.appCount ?? 0,
         }),
-        to: { pathname: '/admin/groups', state: { openGroupDetail: payload.groupId } },
+        to: { pathname: '/admin/groups', state: { openGroupDetail: payload.groupId || payload.parentGroupId } },
       };
     default:
       return { title: notification.type, body: '', to: null };
