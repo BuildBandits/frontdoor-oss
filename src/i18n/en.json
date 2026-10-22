@@ -1206,6 +1206,9 @@
       "deleteUserTitle": "Delete permanently the user {name}?",
       "refresh": "Refresh users",
       "pageSummary": "Page {page} of {pages} · {total} users",
+      "summaryActive": "active",
+      "summaryAwaitingFirstSignIn": "awaiting first sign-in",
+      "showAwaitingFirstSignIn": "Show the users who never signed in",
       "preonboard": {
         "button": "Pre-onboard users",
         "title": "Pre-onboard users",

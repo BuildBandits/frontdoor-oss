@@ -1206,6 +1206,9 @@
       "deleteUserTitle": "Eliminare definitivamente l'utente {name}?",
       "refresh": "Aggiorna utenti",
       "pageSummary": "Pagina {page} di {pages} · {total} utenti",
+      "summaryActive": "attivi",
+      "summaryAwaitingFirstSignIn": "in attesa del primo accesso",
+      "showAwaitingFirstSignIn": "Mostra gli utenti mai collegati",
       "preonboard": {
         "button": "Pre-onboarding utenti",
         "title": "Pre-onboarding utenti",

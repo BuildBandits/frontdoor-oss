@@ -501,6 +501,8 @@ export default function AdminUsers() {
 
   const adminCount = users.filter((u) => ['owner', 'admin'].includes(u.role) && u.is_active).length;
   const activeCount = users.filter((u) => u.is_active).length;
+  // Same rule as the "Never signed in" status filter: pre-onboarded accounts waiting for their first sign-in.
+  const awaitingFirstSignInCount = users.filter((u) => !u.last_login).length;
 
   return (
     <div>
@@ -508,7 +510,20 @@ export default function AdminUsers() {
         <div>
           <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{ui.admin.users.pageTitle}</h1>
           <p className="mt-1 text-gray-500 dark:text-gray-400">
-            {users.length} {ui.nav.users.toLowerCase()} {t.total} &middot; {activeCount} {t.active} &middot; {adminCount} {t.privileged}
+            {users.length} {ui.nav.users.toLowerCase()} {t.total} &middot; {activeCount} {u.summaryActive} &middot; {adminCount} {t.privileged}
+            {awaitingFirstSignInCount > 0 && (
+              <>
+                {' '}&middot;{' '}
+                <button
+                  type="button"
+                  onClick={() => setFilterActive('neverSignedIn')}
+                  title={u.showAwaitingFirstSignIn}
+                  className="hover:text-dark dark:hover:text-white hover:underline"
+                >
+                  {awaitingFirstSignInCount} {u.summaryAwaitingFirstSignIn}
+                </button>
+              </>
+            )}
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
