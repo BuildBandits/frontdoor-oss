@@ -1676,6 +1676,9 @@
         "title": "Entra group deleted in Microsoft Entra",
         "body": "{name}: {members} members and {apps} apps. Decide how to keep their access."
       }
-    }
+    },
+    "recentlyResolved": "Resolved in the last 7 days",
+    "resolvedAutomatically": "Resolved on its own: the condition is gone.",
+    "resolvedByAdmin": "Resolved by an admin."
   }
 }

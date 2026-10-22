@@ -1676,6 +1676,9 @@
         "title": "Gruppo Entra eliminato in Microsoft Entra",
         "body": "{name}: {members} membri e {apps} app. Decidi come mantenere il loro accesso."
       }
-    }
+    },
+    "recentlyResolved": "Risolte negli ultimi 7 giorni",
+    "resolvedAutomatically": "Risolta da sola: la condizione non c’è più.",
+    "resolvedByAdmin": "Risolta da un admin."
   }
 }

@@ -17,6 +17,7 @@ const KNOWN_TYPES = new Set(Object.values(NOTIFICATION_TYPES));
 const SEVERITIES = new Set(['info', 'warning', 'critical']);
 const DEFAULT_RETENTION_DAYS = 30;
 const LIST_LIMIT = 100;
+const RECENTLY_RESOLVED_DAYS = 7;
 
 function parsePayload(value) {
   try {
@@ -65,16 +66,20 @@ export function getOpenNotification(type, subjectKey) {
   return row ? { ...row, payload: parsePayload(row.payload) } : null;
 }
 
-export function listNotifications(userId, { includeResolved = false } = {}) {
+/**
+ * Open notifications, plus (with `includeResolved`) the ones resolved in the last
+ * `resolvedWithinDays` days, so a notification that resolved on its own stays visible.
+ */
+export function listNotifications(userId, { includeResolved = false, resolvedWithinDays = RECENTLY_RESOLVED_DAYS } = {}) {
   return db.prepare(`
     SELECT n.id, n.type, n.severity, n.subject_key, n.payload, n.created_at, n.updated_at, n.resolved_at, n.resolved_by,
       CASE WHEN r.user_id IS NULL THEN 0 ELSE 1 END AS is_read
     FROM notifications n
     LEFT JOIN notification_reads r ON r.notification_id = n.id AND r.user_id = ?
-    WHERE ? = 1 OR n.resolved_at IS NULL
-    ORDER BY n.resolved_at IS NOT NULL, n.updated_at DESC
+    WHERE n.resolved_at IS NULL OR (? = 1 AND datetime(n.resolved_at) >= datetime('now', ?))
+    ORDER BY n.resolved_at IS NOT NULL, COALESCE(n.resolved_at, n.updated_at) DESC
     LIMIT ${LIST_LIMIT}
-  `).all(userId, includeResolved ? 1 : 0).map((row) => ({ ...row, is_read: Boolean(row.is_read), payload: parsePayload(row.payload) }));
+  `).all(userId, includeResolved ? 1 : 0, `-${resolvedWithinDays} days`).map((row) => ({ ...row, is_read: Boolean(row.is_read), payload: parsePayload(row.payload) }));
 }
 
 export function countUnreadNotifications(userId) {

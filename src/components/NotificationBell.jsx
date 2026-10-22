@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { AlertCircle, AlertTriangle, Bell, CheckCheck, Info } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Bell, CheckCheck, CheckCircle2, Info } from 'lucide-react';
 import api from '../services/api';
 import { formatMessage } from '../i18n';
 import { formatLocalDateTime } from '../utils/dateTime';
@@ -69,7 +69,7 @@ export default function NotificationBell({ ui, canResolve, timeZone, language })
 
   const load = useCallback(async () => {
     try {
-      const res = await api.get('/notifications');
+      const res = await api.get('/notifications', { params: { include_resolved: 1 } });
       setNotifications(Array.isArray(res.data.notifications) ? res.data.notifications : []);
       setUnreadCount(Number(res.data.unreadCount) || 0);
       setFailed(false);
@@ -117,7 +117,8 @@ export default function NotificationBell({ ui, canResolve, timeZone, language })
     try {
       const res = await api.post(`/notifications/${id}/resolve`);
       setUnreadCount(Number(res.data.unreadCount) || 0);
-      setNotifications((prev) => prev.filter((item) => item.id !== id));
+      // It moves to the recently resolved list instead of disappearing.
+      void load();
     } catch {
       void load();
     }
@@ -135,6 +136,50 @@ export default function NotificationBell({ ui, canResolve, timeZone, language })
   };
 
   const label = unreadCount > 0 ? formatMessage(n.bellUnread, { count: unreadCount }) : n.bell;
+  const openNotifications = notifications.filter((item) => !item.resolved_at);
+  const resolvedNotifications = notifications.filter((item) => item.resolved_at);
+
+  const renderNotification = (notification) => {
+    const { title, body, detail, to } = describeNotification(notification, n);
+    const resolved = Boolean(notification.resolved_at);
+    const severity = SEVERITY_STYLES[notification.severity] || SEVERITY_STYLES.warning;
+    const Icon = resolved ? CheckCircle2 : severity.icon;
+    return (
+      <li key={notification.id} className={`px-4 py-3 ${resolved ? 'opacity-70' : notification.is_read ? '' : 'bg-accent/5'}`}>
+        <div className="flex items-start gap-3">
+          <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${resolved ? 'text-gray-400 dark:text-gray-500' : severity.className}`} aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-dark dark:text-gray-100">
+              {!resolved && !notification.is_read && <span className="sr-only">{n.unread}: </span>}
+              {title}
+            </p>
+            {body && <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-300 wrap-anywhere">{body}</p>}
+            {detail && <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500 wrap-anywhere">{detail}</p>}
+            {resolved && (
+              <p className="mt-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                {notification.resolved_by ? n.resolvedByAdmin : n.resolvedAutomatically}
+              </p>
+            )}
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]">
+              <span className="text-gray-400 dark:text-gray-500">
+                {formatLocalDateTime(notification.resolved_at || notification.updated_at, { timeZone, locale: language })}
+              </span>
+              {to && (
+                <button type="button" onClick={() => openTarget(notification, to)} className="font-medium text-accent-dark hover:underline">
+                  {n.open}
+                </button>
+              )}
+              {canResolve && !resolved && (
+                <button type="button" onClick={() => resolve(notification.id)} className="font-medium text-gray-500 dark:text-gray-400 hover:text-dark dark:hover:text-white hover:underline">
+                  {n.resolve}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </li>
+    );
+  };
 
   return (
     <div ref={ref} className="relative">
@@ -176,43 +221,21 @@ export default function NotificationBell({ ui, canResolve, timeZone, language })
             ) : notifications.length === 0 ? (
               <p className="px-4 py-6 text-sm text-gray-400 dark:text-gray-500">{n.empty}</p>
             ) : (
-              <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                {notifications.map((notification) => {
-                  const { title, body, detail, to } = describeNotification(notification, n);
-                  const severity = SEVERITY_STYLES[notification.severity] || SEVERITY_STYLES.warning;
-                  const Icon = severity.icon;
-                  return (
-                    <li key={notification.id} className={`px-4 py-3 ${notification.is_read ? '' : 'bg-accent/5'}`}>
-                      <div className="flex items-start gap-3">
-                        <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${severity.className}`} aria-hidden="true" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-dark dark:text-gray-100">
-                            {!notification.is_read && <span className="sr-only">{n.unread}: </span>}
-                            {title}
-                          </p>
-                          {body && <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-300 wrap-anywhere">{body}</p>}
-                          {detail && <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500 wrap-anywhere">{detail}</p>}
-                          <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px]">
-                            <span className="text-gray-400 dark:text-gray-500">
-                              {formatLocalDateTime(notification.updated_at, { timeZone, locale: language })}
-                            </span>
-                            {to && (
-                              <button type="button" onClick={() => openTarget(notification, to)} className="font-medium text-accent-dark hover:underline">
-                                {n.open}
-                              </button>
-                            )}
-                            {canResolve && (
-                              <button type="button" onClick={() => resolve(notification.id)} className="font-medium text-gray-500 dark:text-gray-400 hover:text-dark dark:hover:text-white hover:underline">
-                                {n.resolve}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+              <>
+                {openNotifications.length === 0 ? (
+                  <p className="px-4 py-4 text-sm text-gray-400 dark:text-gray-500">{n.empty}</p>
+                ) : (
+                  <ul className="divide-y divide-gray-100 dark:divide-gray-800">{openNotifications.map(renderNotification)}</ul>
+                )}
+                {resolvedNotifications.length > 0 && (
+                  <>
+                    <h3 className="border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                      {n.recentlyResolved}
+                    </h3>
+                    <ul className="divide-y divide-gray-100 dark:divide-gray-800">{resolvedNotifications.map(renderNotification)}</ul>
+                  </>
+                )}
+              </>
             )}
           </div>
         </div>
