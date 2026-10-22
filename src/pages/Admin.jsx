@@ -11,6 +11,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
+import { sortOptionsByLabel } from '../utils/sortOptions';
 import { normalizeEntraApplicationId } from '../../shared/entra.js';
 import { normalizeAppSlug, suggestAppSlug } from '../../shared/appSlug.js';
 import PluginSurface from '../pluginHost/PluginSurface';
@@ -637,10 +638,10 @@ export default function Admin() {
     { value: 'entra-app', label: a.entraApp, active: 'bg-violet-600 text-white border-violet-600', visible: modeVisibility.showEntraAppMode !== false },
   ];
   const visibleModeOptions = modeOptions.filter((opt) => opt.alwaysVisible || opt.visible);
-  const visibleModeFilterOptions = [
+  const visibleModeFilterOptions = sortOptionsByLabel([
     { value: 'all', label: a.allConnections, active: 'bg-gray-900 dark:bg-gray-100 text-white border-gray-900' },
     ...visibleModeOptions,
-  ];
+  ], language);
   const currentModeFilterOption = visibleModeFilterOptions.find((opt) => opt.value === appModeFilter) || visibleModeFilterOptions[0];
   const hasTagFilters = selectedTagFilters.length > 0;
   const currentModeOption = modeOptions.find((opt) => opt.value === form.mode);

@@ -17,6 +17,7 @@ import Tooltip from '../components/Tooltip';
 import PaginationControls from '../components/PaginationControls';
 import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
+import { sortOptionsByLabel } from '../utils/sortOptions';
 import { normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
 import { formatLocalDateTime } from '../utils/dateTime';
 import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
@@ -84,7 +85,8 @@ export default function AdminUsers() {
 
   const showToast = useCallback((message, type = 'success') => setPageNotice({ message, type }), []);
 
-  const ui = getUiStrings(resolveAppLanguage(currentUser?.preferredLanguage, brandingLanguage));
+  const language = resolveAppLanguage(currentUser?.preferredLanguage, brandingLanguage);
+  const ui = getUiStrings(language);
   const t = ui.admin.common;
   const u = ui.admin.users;
   const timeZone = resolveAppTimeZone(currentUser?.preferredTimeZone, brandingTimeZone);
@@ -550,13 +552,13 @@ export default function AdminUsers() {
             onChange={setFilterRole}
             label={t.role}
             icon={Shield}
-            options={[
+            options={sortOptionsByLabel([
               { value: 'all', label: t.allRoles },
               { value: 'owner', label: u.ownerBadge },
               { value: 'admin', label: u.adminBadge },
               { value: 'admin_readonly', label: t.readOnlyRole },
               { value: 'user', label: t.usersOnly },
-            ]}
+            ], language)}
             className="min-w-[190px]"
           />
           <DropdownSelect
@@ -564,12 +566,12 @@ export default function AdminUsers() {
             onChange={setFilterActive}
             label={t.status}
             icon={Clock}
-            options={[
+            options={sortOptionsByLabel([
               { value: 'all', label: t.allStatuses },
               { value: 'active', label: t.activeOnly },
               { value: 'inactive', label: t.inactiveOnly },
               { value: 'entraMissing', label: u.entraMissingOnly },
-            ]}
+            ], language)}
             className="min-w-[190px]"
           />
           <DropdownSelect
@@ -577,11 +579,11 @@ export default function AdminUsers() {
             onChange={setFilterPersonalization}
             label={u.personalizationFilterLabel}
             icon={Wand2}
-            options={[
+            options={sortOptionsByLabel([
               { value: 'all', label: u.allPersonalizationStates },
               { value: 'customized', label: u.personalizedOnly },
               { value: 'none', label: u.noPersonalizations },
-            ]}
+            ], language)}
             className="min-w-[260px]"
           />
           <DropdownSelect

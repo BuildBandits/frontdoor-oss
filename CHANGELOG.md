@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Changed
+- **Filter menus in alphabetical order**: the options of the filter menus (users by role, status and personalization, audit and plugin audit by admin and action, apps by connection mode, media library by kind) are listed alphabetically in the current language, with *All* always first. Numeric menus (period, rows) and short fixed choices keep their order.
 - **Linked groups and members side by side**: the detail of a local group on *Admin → Groups* shows *Linked groups* and *Members* together instead of one at a time, so a composite group no longer opens on an empty *Members* list. Each box takes half of the height and scrolls on its own; when only one of them is empty, it shrinks to its message and leaves the space to the other one. ([#129](https://github.com/BuildBandits/frontdoor-oss/issues/129))
 
 ### Fixed
