@@ -49,7 +49,7 @@ export default function AuditDetails({ event, ui }) {
       {event.changes.length > 0 && (
         <ul className="space-y-0.5 text-[11px] text-gray-600 dark:text-gray-300">
           {event.changes.map((change) => (
-            <li key={change.field} className="wrap-break-word">
+            <li key={change.field} className="wrap-anywhere">
               <span className="font-medium text-gray-700 dark:text-gray-200">{change.label}:</span>{' '}
               <span className="text-gray-400 dark:text-gray-500" title={titleFor(change.fullFrom)}>{change.from}</span>
               {' → '}
@@ -60,18 +60,18 @@ export default function AuditDetails({ event, ui }) {
       )}
 
       {event.facts.length > 0 && (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px]">
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5 text-[11px]">
           {event.facts.map((fact) => (
             <div key={fact.key} className="contents">
-              <dt className="text-gray-400 dark:text-gray-500">{fact.label}</dt>
-              <dd className="text-gray-600 dark:text-gray-300 wrap-break-word">{fact.value}</dd>
+              <dt className="text-gray-400 dark:text-gray-500 whitespace-nowrap">{fact.label}</dt>
+              <dd className="min-w-0 text-gray-600 dark:text-gray-300 wrap-anywhere">{fact.value}</dd>
             </div>
           ))}
         </dl>
       )}
 
       {event.text && (
-        <p className="text-[11px] text-gray-500 dark:text-gray-400 wrap-break-word">{event.text}</p>
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 wrap-anywhere">{event.text}</p>
       )}
 
       {event.raw && (
