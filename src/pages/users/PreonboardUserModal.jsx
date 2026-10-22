@@ -24,7 +24,7 @@ export default function PreonboardUserModal({ onClose, onCreated, ui }) {
   const [groupIds, setGroupIds] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
-  const searchRequest = useLatestRequest();
+  const { begin: beginSearch, cancel: cancelSearch } = useLatestRequest();
 
   useEffect(() => {
     let cancelled = false;
@@ -41,14 +41,14 @@ export default function PreonboardUserModal({ onClose, onCreated, ui }) {
   const term = query.trim();
   useEffect(() => {
     if (term.length < SEARCH_MIN_LENGTH) {
-      searchRequest.cancel();
+      cancelSearch();
       setResults([]);
       setSearching(false);
       setSearchError(null);
       return undefined;
     }
     const timer = setTimeout(async () => {
-      const isLatest = searchRequest.begin();
+      const isLatest = beginSearch();
       setSearching(true);
       setSearchError(null);
       try {
@@ -63,7 +63,7 @@ export default function PreonboardUserModal({ onClose, onCreated, ui }) {
       }
     }, SEARCH_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [term, searchRequest, ui, p.searchFailed]);
+  }, [term, beginSearch, cancelSearch, ui, p.searchFailed]);
 
   const visibleGroups = useMemo(() => {
     const q = groupSearch.trim().toLowerCase();
