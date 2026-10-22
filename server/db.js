@@ -282,6 +282,9 @@ ensureColumn('user_groups', 'source', "source TEXT DEFAULT 'local' CHECK(source 
 ensureColumn('user_groups', 'entra_group_id', 'entra_group_id TEXT');
 ensureColumn('user_groups', 'entra_display_name', 'entra_display_name TEXT');
 ensureColumn('user_groups', 'entra_synced_at', 'entra_synced_at TEXT');
+// Set when Microsoft Entra reports an imported group deleted; the snapshot keeps its members and apps.
+ensureColumn('user_groups', 'entra_deleted_at', 'entra_deleted_at TEXT');
+ensureColumn('user_groups', 'entra_deleted_snapshot', 'entra_deleted_snapshot TEXT');
 ensureColumn('apps', 'icon_file_name', 'icon_file_name TEXT');
 ensureColumn('users', 'home_desktop_view', "home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact'))");
 ensureColumn('users', 'preferred_language', 'preferred_language TEXT');

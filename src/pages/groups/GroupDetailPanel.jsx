@@ -3,6 +3,55 @@ import UserAvatar from '../../components/UserAvatar';
 import AppIcon from '../../components/AppIcon';
 import { DEFAULT_GROUP_ID } from '../../../shared/groups.js';
 
+function readSnapshot(value) {
+  try {
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Shown on an imported group that Microsoft Entra reports deleted: what it held when
+// the deletion was detected, and the ways to keep (or end) that access.
+function DeletedInEntraNotice({ group, detail, g, canEdit, convertToLocal, deleteGroup, moveApps }) {
+  const snapshot = readSnapshot(detail.group.entra_deleted_snapshot);
+  const frozen = detail.deletedGroupPolicy !== 'revoke';
+  const names = (items) => (items || []).map((item) => item.name).join(', ');
+  return (
+    <div role="alert" className="mb-5 rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-800 dark:text-red-200">
+      <p className="font-semibold">{g.deletedInEntraTitle}</p>
+      <p className="mt-1">{frozen ? g.deletedInEntraFrozen : g.deletedInEntraRevoked}</p>
+      {snapshot && (
+        <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5 text-xs">
+          <dt className="font-medium whitespace-nowrap">{g.deletedInEntraMembers.replace('{count}', snapshot.members?.length ?? 0)}</dt>
+          <dd className="min-w-0 wrap-anywhere">{names(snapshot.members) || '—'}</dd>
+          <dt className="font-medium whitespace-nowrap">{g.deletedInEntraApps.replace('{count}', snapshot.apps?.length ?? 0)}</dt>
+          <dd className="min-w-0 wrap-anywhere">{names(snapshot.apps) || '—'}</dd>
+          {snapshot.linkedIn?.length > 0 && (
+            <>
+              <dt className="font-medium whitespace-nowrap">{g.deletedInEntraLinkedIn.replace('{count}', snapshot.linkedIn.length)}</dt>
+              <dd className="min-w-0 wrap-anywhere">{names(snapshot.linkedIn)}</dd>
+            </>
+          )}
+        </dl>
+      )}
+      {canEdit && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={() => convertToLocal(group)} className="rounded-full bg-dark px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800">
+            {g.convertToLocal}
+          </button>
+          <button type="button" onClick={() => moveApps(group.id)} className="rounded-full border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-dark dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800">
+            {g.moveAppsToAnotherGroup}
+          </button>
+          <button type="button" onClick={() => deleteGroup(group)} className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">
+            {g.deleteGroup}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GroupDetailPanel({
   group,
   ui,
@@ -32,6 +81,9 @@ export default function GroupDetailPanel({
   removeMember,
   openAddApps,
   removeApp,
+  convertToLocal,
+  deleteGroup,
+  moveApps,
 }) {
   return (
     <>
@@ -44,6 +96,17 @@ export default function GroupDetailPanel({
             </div>
           ) : groupDetail ? (
             <>
+              {groupDetail.group?.entra_deleted_at && (
+                <DeletedInEntraNotice
+                  group={group}
+                  detail={groupDetail}
+                  g={g}
+                  canEdit={canEdit}
+                  convertToLocal={convertToLocal}
+                  deleteGroup={deleteGroup}
+                  moveApps={moveApps}
+                />
+              )}
               {/* Edit group info */}
               <div className="mb-5 pb-5 border-b border-gray-100 dark:border-gray-800">
                 {editingGroup === group.id ? (

@@ -9,7 +9,7 @@ import { createPreferenceUpdate } from '../services/userPreferences.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { getAppTimeZone, getRequiredEnv, isDevLoginEnabled } from '../config.js';
-import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, isEntraUserDeleted, refreshGroupCacheFromTenant, syncUserEntraGroups } from '../services/entraGroups.js';
+import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, isEntraUserDeleted, protectDeletedGroupsBeforeUserSync, refreshGroupCacheFromTenant, syncUserEntraGroups } from '../services/entraGroups.js';
 import { ensureAvatarCached } from '../services/avatars.js';
 import { verifySsoTokenChain } from '../services/verifySsoToken.js';
 import { dispatchPluginEvent } from '../services/plugins.js';
@@ -325,6 +325,11 @@ router.get('/microsoft/callback', async (req, res) => {
     }
 
     if (entraGroups) {
+      try {
+        await protectDeletedGroupsBeforeUserSync(user.id, entraGroups);
+      } catch (error) {
+        console.warn(`Entra deleted-group check skipped [${user.id}]: ${error.message}`);
+      }
       const entraSync = syncUserEntraGroups(user.id, entraGroups);
       if (entraSync.discoveredGroups === 0) {
         console.log(`No Entra groups discovered [${user.id}]; nothing to import yet.`);

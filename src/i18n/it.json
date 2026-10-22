@@ -1135,7 +1135,19 @@
       "sourceFilter": "Origine",
       "sourceAll": "Tutti",
       "sourceLocal": "Locali",
-      "sourceEntra": "Microsoft Entra"
+      "sourceEntra": "Microsoft Entra",
+      "deletedInEntraBadge": "Eliminato in Entra",
+      "deletedInEntraTitle": "Questo gruppo è stato eliminato in Microsoft Entra",
+      "deletedInEntraFrozen": "Per ora i membri mantengono l'accesso: Frontdoor ha congelato il gruppo quando ha rilevato l'eliminazione. Convertilo in gruppo locale per mantenere l'accesso, sposta le sue app su un altro gruppo o eliminalo per chiudere l'accesso.",
+      "deletedInEntraRevoked": "I membri vengono rimossi al loro accesso o alla prossima sincronizzazione (ENTRA_DELETED_GROUP_POLICY=revoke). Qui sotto chi aveva accesso quando è stata rilevata l'eliminazione.",
+      "deletedInEntraMembers": "Membri ({count})",
+      "deletedInEntraApps": "App ({count})",
+      "deletedInEntraLinkedIn": "Collegato in ({count})",
+      "convertToLocal": "Converti in gruppo locale",
+      "convertToLocalTitle": "Convertire {name} in gruppo locale?",
+      "convertToLocalMessage": "Il gruppo mantiene membri e app e diventa un gruppo locale, non più sincronizzato con Microsoft Entra. I gruppi locali che lo collegavano continuano a includerlo.",
+      "convertedToLocal": "{name} ora è un gruppo locale",
+      "moveAppsToAnotherGroup": "Sposta le app su un altro gruppo"
     },
     "users": {
       "title": "Utenti",
@@ -1276,7 +1288,8 @@
         "add_linked_groups": "Gruppi collegati",
         "add_linked_entra_groups": "Gruppi Entra collegati",
         "remove_linked_group": "Gruppo scollegato",
-        "remove_linked_entra_group": "Gruppo Entra scollegato"
+        "remove_linked_entra_group": "Gruppo Entra scollegato",
+        "convert_to_local": "Convertito in locale"
       },
       "targetLabels": {
         "app": "App",
@@ -1309,7 +1322,8 @@
           "remove_linked_entra_group": "Ha scollegato il gruppo Entra {item} da {target}",
           "import_one": "Ha importato 1 gruppo da Microsoft Entra",
           "add_linked_groups_one": "Ha collegato 1 gruppo a {target}",
-          "add_linked_entra_groups_one": "Ha collegato 1 gruppo Entra a {target}"
+          "add_linked_entra_groups_one": "Ha collegato 1 gruppo Entra a {target}",
+          "convert_to_local": "Ha convertito {target} in gruppo locale"
         },
         "membership": {
           "add_members": "Ha aggiunto {count} membri a {target}",
@@ -1544,6 +1558,7 @@
     "group_name_taken": "Esiste già un gruppo con questo nome.",
     "group_name_too_long": "Il nome del gruppo non può superare i 100 caratteri.",
     "group_name_too_short": "Il nome del gruppo deve contenere almeno 2 caratteri.",
+    "group_not_deleted_in_entra": "Si possono convertire solo i gruppi importati eliminati in Microsoft Entra.",
     "group_not_found": "Gruppo non trovato.",
     "groups_not_found": "Uno o più gruppi non sono stati trovati.",
     "icon_too_large": "L'icona è troppo grande: immagini fino a 1 MB, SVG fino a 512 KB.",

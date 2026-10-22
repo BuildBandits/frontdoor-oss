@@ -1,6 +1,7 @@
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import db from '../db.js';
 import { UserFacingError } from './errors.js';
+import { NOTIFICATION_TYPES, raiseNotification, resolveNotifications } from './notifications.js';
 
 const DEFAULT_SCOPES = ['User.Read', 'openid', 'profile', 'email'];
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0';
@@ -238,9 +239,11 @@ function syncImportedMemberships(userId, groups, syncedAt, context = loadImporte
       .map((row) => row.group_id);
   }
   const removeMembership = db.prepare('DELETE FROM user_group_members WHERE user_id = ? AND group_id = ?');
+  // Read fresh: a group can be flagged as deleted in Entra during the same force sync.
+  const frozenGroupIds = new Set(frozenGroups().map((group) => group.id));
   let membershipsRemoved = 0;
   for (const groupId of currentGroupIds) {
-    if (desiredGroupIds.has(groupId)) continue;
+    if (desiredGroupIds.has(groupId) || frozenGroupIds.has(groupId)) continue;
     membershipsRemoved += removeMembership.run(userId, groupId).changes;
   }
 
@@ -380,6 +383,139 @@ const TENANT_REFRESH_INTERVAL_MS = (() => {
 let lastTenantRefreshAt = 0;
 let tenantRefreshInFlight = null;
 
+// --- Imported groups deleted in Microsoft Entra ---
+// Deleting a group in Entra would otherwise empty its Frontdoor copy user by user,
+// silently. The group is flagged instead, with a snapshot of its members and apps,
+// an admin is notified, and with the default "freeze" policy its memberships are
+// kept until an admin converts it to a local group or deletes it.
+
+export function getDeletedGroupPolicy() {
+  return process.env.ENTRA_DELETED_GROUP_POLICY === 'revoke' ? 'revoke' : 'freeze';
+}
+
+function frozenGroups() {
+  if (getDeletedGroupPolicy() !== 'freeze') return [];
+  return db.prepare("SELECT id, entra_group_id FROM user_groups WHERE source = 'entra' AND entra_deleted_at IS NOT NULL").all();
+}
+
+function frozenEntraGroupIds() {
+  return frozenGroups().map((group) => group.entra_group_id).filter(Boolean);
+}
+
+export function snapshotGroup(groupId) {
+  const group = db.prepare('SELECT id, name, entra_group_id, entra_display_name FROM user_groups WHERE id = ?').get(groupId);
+  if (!group) return null;
+  const members = db.prepare(`
+    SELECT u.id, COALESCE(u.display_name, u.email) AS name
+    FROM user_group_members m JOIN users u ON u.id = m.user_id
+    WHERE m.group_id = ? ORDER BY name
+  `).all(groupId);
+  const apps = db.prepare(`
+    SELECT a.id, a.name FROM app_permissions p JOIN apps a ON a.id = p.app_id
+    WHERE p.group_id = ? ORDER BY a.name
+  `).all(groupId);
+  const linkedIn = group.entra_group_id
+    ? db.prepare(`
+      SELECT g.id, g.name FROM group_entra_group_memberships gem JOIN user_groups g ON g.id = gem.parent_group_id
+      WHERE gem.entra_group_id = ? ORDER BY g.name
+    `).all(group.entra_group_id)
+    : [];
+  return {
+    groupId: group.id,
+    groupName: group.name,
+    entraGroupId: group.entra_group_id,
+    entraDisplayName: group.entra_display_name,
+    members,
+    apps,
+    linkedIn,
+  };
+}
+
+function flagGroupDeletedInEntra(group) {
+  const snapshot = snapshotGroup(group.id);
+  const policy = getDeletedGroupPolicy();
+  const flagged = db.prepare(`
+    UPDATE user_groups SET entra_deleted_at = datetime('now'), entra_deleted_snapshot = ?
+    WHERE id = ? AND entra_deleted_at IS NULL
+  `).run(JSON.stringify(snapshot), group.id).changes;
+  if (!flagged) return null;
+  raiseNotification({
+    type: NOTIFICATION_TYPES.ENTRA_GROUP_DELETED,
+    subjectKey: group.id,
+    severity: policy === 'freeze' ? 'warning' : 'critical',
+    payload: {
+      groupId: group.id,
+      groupName: snapshot.groupName,
+      memberCount: snapshot.members.length,
+      appCount: snapshot.apps.length,
+      linkedInCount: snapshot.linkedIn.length,
+      policy,
+    },
+  });
+  console.warn(`Imported Entra group deleted in Entra [${group.id}]: ${snapshot.members.length} members, ${snapshot.apps.length} apps, policy=${policy}`);
+  return snapshot;
+}
+
+function clearGroupDeletedInEntra(group) {
+  db.prepare('UPDATE user_groups SET entra_deleted_at = NULL, entra_deleted_snapshot = NULL WHERE id = ?').run(group.id);
+  resolveNotifications(NOTIFICATION_TYPES.ENTRA_GROUP_DELETED, group.id);
+  console.log(`Imported Entra group restored in Entra [${group.id}]`);
+}
+
+// True only for Graph's "resource not found", as for users: errors never count as a deletion.
+async function isEntraGroupDeleted(entraGroupId, accessToken) {
+  try {
+    await fetchGraphPage(`${GRAPH_BASE_URL}/groups/${encodeURIComponent(entraGroupId)}?$select=id`, accessToken);
+    return false;
+  } catch (error) {
+    return error?.status === 404 && error?.graphCode === 'Request_ResourceNotFound';
+  }
+}
+
+/**
+ * Checks imported groups against Microsoft Entra. With `catalogIds` (a complete tenant
+ * catalog), groups listed there are restored if flagged, the others are confirmed one
+ * by one. With `candidateEntraIds`, only those groups are confirmed. `checked` caches
+ * Graph answers within one run.
+ */
+export async function detectDeletedImportedGroups(accessToken, { catalogIds = null, candidateEntraIds = null, checked = new Map() } = {}) {
+  const imported = db.prepare(`
+    SELECT id, entra_group_id, entra_deleted_at FROM user_groups
+    WHERE source = 'entra' AND entra_group_id IS NOT NULL
+  `).all();
+  const flagged = [];
+  const restored = [];
+  for (const group of imported) {
+    if (candidateEntraIds && !candidateEntraIds.has(group.entra_group_id)) continue;
+    if (catalogIds?.has(group.entra_group_id)) {
+      if (group.entra_deleted_at) {
+        clearGroupDeletedInEntra(group);
+        restored.push(group.id);
+      }
+      continue;
+    }
+    if (group.entra_deleted_at) continue;
+    if (!checked.has(group.entra_group_id)) checked.set(group.entra_group_id, await isEntraGroupDeleted(group.entra_group_id, accessToken));
+    if (checked.get(group.entra_group_id) && flagGroupDeletedInEntra(group)) flagged.push(group.id);
+  }
+  return { flagged, restored };
+}
+
+/**
+ * Before a user's memberships are synced: imported groups the user is about to leave
+ * may have been deleted in Entra rather than left. Confirm those first, so a deletion
+ * is flagged (and frozen) before any membership is removed.
+ */
+export async function protectDeletedGroupsBeforeUserSync(userId, entraGroups, { acquireToken = acquireGraphAppToken, accessToken = null, checked } = {}) {
+  const reported = new Set((entraGroups || []).map((group) => group?.id).filter(Boolean));
+  const leaving = db.prepare(`
+    SELECT g.entra_group_id FROM user_group_members m JOIN user_groups g ON g.id = m.group_id
+    WHERE m.user_id = ? AND g.source = 'entra' AND g.entra_group_id IS NOT NULL AND g.entra_deleted_at IS NULL
+  `).all(userId).map((row) => row.entra_group_id).filter((id) => !reported.has(id));
+  if (leaving.length === 0) return { flagged: [], restored: [] };
+  return detectDeletedImportedGroups(accessToken || await acquireToken(), { candidateEntraIds: new Set(leaving), checked });
+}
+
 function storeTenantGroups(groups) {
   const syncAt = sqliteNow();
   const discoveredGroups = db.transaction(() => upsertDiscoveredGroups(groups, syncAt))();
@@ -398,7 +534,10 @@ export async function refreshGroupCacheFromTenant({ force = false } = {}) {
   if (!tenantRefreshInFlight) {
     tenantRefreshInFlight = (async () => {
       const appToken = await acquireGraphAppToken();
-      return storeTenantGroups(await fetchAllTenantGroups(appToken));
+      const tenantGroups = await fetchAllTenantGroups(appToken);
+      const discovered = storeTenantGroups(tenantGroups);
+      await detectDeletedImportedGroups(appToken, { catalogIds: new Set(tenantGroups.map((group) => group.id)) });
+      return discovered;
     })().finally(() => { tenantRefreshInFlight = null; });
   }
   return { discoveredGroups: await tenantRefreshInFlight, skipped: false };
@@ -442,7 +581,8 @@ export function syncUserEntraGroups(userId, entraGroups, context = undefined) {
   const syncTransaction = db.transaction(() => {
     const discoveredGroups = upsertDiscoveredGroups(currentGroups, syncAt);
     // Drop only the cached memberships Graph no longer reports; the rest are refreshed by the upsert.
-    const currentIds = currentGroups.map((group) => group.id);
+    // Imported groups deleted in Entra keep their cached memberships while frozen.
+    const currentIds = [...currentGroups.map((group) => group.id), ...frozenEntraGroupIds()];
     if (currentIds.length > 0) {
       db.prepare(`DELETE FROM entra_user_group_memberships WHERE user_id = ? AND entra_group_id NOT IN (${currentIds.map(() => '?').join(', ')})`)
         .run(userId, ...currentIds);
@@ -618,7 +758,9 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
 
   let tenantGroupsDiscovered = 0;
   try {
-    tenantGroupsDiscovered = storeTenantGroups(await fetchAllTenantGroups(accessToken));
+    const tenantGroups = await fetchAllTenantGroups(accessToken);
+    tenantGroupsDiscovered = storeTenantGroups(tenantGroups);
+    await detectDeletedImportedGroups(accessToken, { catalogIds: new Set(tenantGroups.map((group) => group.id)) });
   } catch (error) {
     const hint = formatGraphAccessHint(error, 'force-sync');
     errors.push({
@@ -651,9 +793,11 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
   let membershipsRemoved = 0;
 
   const importedGroupContext = loadImportedGroupContext();
+  const deletionChecks = new Map();
   for (const user of users) {
     try {
       const groups = await fetchEntraGroupsForUserId(user.microsoft_id, accessToken);
+      await protectDeletedGroupsBeforeUserSync(user.id, groups, { accessToken, checked: deletionChecks });
       const result = syncUserEntraGroups(user.id, groups, importedGroupContext);
       if (user.entra_missing_since) {
         db.prepare('UPDATE users SET entra_missing_since = NULL WHERE id = ?').run(user.id);
