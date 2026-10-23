@@ -50,7 +50,8 @@ function describeNotification(notification, n) {
           members: payload.memberCount ?? 0,
           apps: payload.appCount ?? 0,
         }),
-        to: { pathname: '/admin/groups', state: { openGroupDetail: payload.groupId } },
+        // Open the group with the list filtered to it, so it is the only one shown.
+        to: { pathname: '/admin/groups', state: { openGroupDetail: payload.groupId || payload.parentGroupId, groupSearch: payload.parentGroupName || payload.groupName } },
       };
     default:
       return { title: notification.type, body: '', to: null };
