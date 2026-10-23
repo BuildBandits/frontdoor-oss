@@ -109,7 +109,7 @@ test('force sync flags a deleted group, keeps its members (freeze) and notifies 
 
   const notification = openNotification('dg-sales');
   assert.equal(notification.severity, 'warning');
-  assert.deepEqual(JSON.parse(notification.payload), { groupId: 'dg-sales', parentGroupId: null, groupName: 'Sales', linkedOnly: false, memberCount: 2, appCount: 1, linkedInCount: 1, policy: 'freeze' });
+  assert.deepEqual(JSON.parse(notification.payload), { groupId: 'dg-sales', parentGroupId: null, parentGroupName: null, groupName: 'Sales', linkedOnly: false, memberCount: 2, appCount: 1, linkedInCount: 1, policy: 'freeze' });
 });
 
 test('a sign-in that would drop the group confirms the deletion first', async (t) => {
@@ -207,6 +207,7 @@ test('a deleted Entra group that is only linked into a local group is flagged an
   const payload = JSON.parse(openNotification(`entra:${TEAM}`).payload);
   assert.equal(payload.linkedOnly, true);
   assert.equal(payload.parentGroupId, 'dg-team-access');
+  assert.equal(payload.parentGroupName, 'Team access', 'the bell filters the group list on it');
   assert.equal(groupRow('dg-sales').entra_deleted_at, null, 'the imported group still exists');
 
   const detail = await (await call('GET', '/api/groups/dg-team-access', 'dg-admin')).json();

@@ -497,6 +497,7 @@ function notifyGroupDeleted(subjectKey, snapshot, policy) {
       groupId: snapshot.groupId,
       // Linked-only groups have no page of their own: the first linking group shows them.
       parentGroupId: snapshot.groupId ? null : snapshot.linkedIn[0]?.id || null,
+      parentGroupName: snapshot.groupId ? null : snapshot.linkedIn[0]?.name || null,
       groupName: snapshot.groupName,
       linkedOnly: !snapshot.groupId,
       memberCount: snapshot.members.length,
