@@ -152,6 +152,8 @@ export default function AdminUsers() {
   const expandUserId = location.state?.expandUserId;
   useEffect(() => {
     if (!expandUserId) return;
+    // Filter the list to that user: otherwise it may sit on another page.
+    if (location.state?.userSearch) setSearch(location.state.userSearch);
     navigate(location.pathname, { replace: true, state: null });
     void toggleExpand(expandUserId);
     // Runs once per navigation that carries the state.

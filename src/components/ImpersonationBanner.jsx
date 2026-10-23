@@ -53,11 +53,12 @@ export default function ImpersonationBanner({ ui, timeZone }) {
 
   const handleStop = async () => {
     const targetUserId = user?.id;
+    const targetUserSearch = user?.email || user?.displayName || '';
     setStopping(true);
     setStopFailed(false);
     try {
       await stopImpersonation();
-      navigate('/admin/users', { state: { expandUserId: targetUserId } });
+      navigate('/admin/users', { state: { expandUserId: targetUserId, userSearch: targetUserSearch } });
     } catch {
       setStopFailed(true);
     } finally {
