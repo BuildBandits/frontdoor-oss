@@ -13,6 +13,7 @@ import { useBrandingLanguage, useBrandingTimeZone } from '../stores/brandingStor
 import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { describeAuditLog } from '../utils/auditFormatters';
 import { formatIsoDateTime } from '../utils/dateTime';
+import { sortOptionsByLabel } from '../utils/sortOptions';
 import { resolveAppTimeZone } from '../../shared/timeZones.js';
 
 const PRIVILEGED_ROLES = new Set(['owner', 'admin', 'admin_readonly']);
@@ -63,7 +64,8 @@ export default function AdminAudit() {
   const brandingTimeZone = useBrandingTimeZone();
   const timeZone = resolveAppTimeZone(user?.preferredTimeZone, brandingTimeZone);
 
-  const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
+  const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
+  const ui = getUiStrings(language);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,13 +161,13 @@ export default function AdminAudit() {
             icon={ShieldCheck}
             multi
             emptyLabel={ui.admin.audit.allAdmins}
-            options={[
+            options={sortOptionsByLabel([
               { value: '__all__', label: ui.admin.audit.allAdmins, clearSelection: true },
               ...adminUsers.map((user) => ({
                 value: user.id,
                 label: user.display_name || user.email,
               })),
-            ]}
+            ], language)}
             className="min-w-[240px]"
           />
           <DropdownSelect

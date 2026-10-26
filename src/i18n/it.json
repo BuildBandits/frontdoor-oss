@@ -449,7 +449,7 @@
       "updated": "aggiornate",
       "removedUser": "Utente rimosso",
       "removedApp": "App rimossa",
-      "noLogin": "mai loggato",
+      "noLogin": "Mai collegato",
       "inactive": "Disattivato",
       "active": "Attivo",
       "total": "totali",
@@ -882,6 +882,12 @@
       "noGroupsFound": "Nessun gruppo trovato.",
       "selectedGroups": "gruppi selezionati",
       "selectedGroupSummary": "gruppi selezionati",
+      "groupFilterLabel": "Mostra gruppi",
+      "groupFilterAll": "Tutti",
+      "groupFilterSelected": "Selezionati",
+      "groupFilterUnselected": "Non selezionati",
+      "showSelectedGroups": "Mostra i gruppi selezionati",
+      "noSelectedGroups": "Nessun gruppo selezionato.",
       "save": "Salva",
       "saving": "Salvataggio...",
       "appCreated": "App creata",
@@ -1052,6 +1058,12 @@
       "groupsFound": "{count} gruppi trovati",
       "selectedCount": "{count} selezionati",
       "selectAllFiltered": "Seleziona tutti i filtrati",
+      "selectionFilterLabel": "Mostra gruppi",
+      "selectionAll": "Tutti",
+      "selectionSelected": "Selezionati",
+      "selectionUnselected": "Non selezionati",
+      "showSelectedGroups": "Mostra i gruppi selezionati",
+      "noSelectedGroups": "Nessun gruppo selezionato.",
       "knownMembersInCatalog": "{count} membri noti nel catalogo",
       "localNamePrefix": "Nome locale: {name}",
       "notYetImported": "Ancora non importato",
@@ -1143,7 +1155,21 @@
       "sourceFilter": "Origine",
       "sourceAll": "Tutti",
       "sourceLocal": "Locali",
-      "sourceEntra": "Microsoft Entra"
+      "sourceEntra": "Microsoft Entra",
+      "deletedInEntraBadge": "Eliminato in Entra",
+      "deletedInEntraTitle": "Questo gruppo è stato eliminato in Microsoft Entra",
+      "deletedInEntraFrozen": "Per ora i membri mantengono l'accesso: Frontdoor ha congelato il gruppo quando ha rilevato l'eliminazione. Convertilo in gruppo locale per mantenere l'accesso, sposta le sue app su un altro gruppo o eliminalo per chiudere l'accesso.",
+      "deletedInEntraRevoked": "I membri vengono rimossi al loro accesso o alla prossima sincronizzazione (ENTRA_DELETED_GROUP_POLICY=revoke). Qui sotto chi aveva accesso quando è stata rilevata l'eliminazione.",
+      "deletedInEntraMembers": "Membri ({count})",
+      "deletedInEntraApps": "App ({count})",
+      "deletedInEntraLinkedIn": "Collegato in ({count})",
+      "convertToLocal": "Converti in gruppo locale",
+      "convertToLocalTitle": "Convertire {name} in gruppo locale?",
+      "convertToLocalMessage": "Il gruppo mantiene membri e app e diventa un gruppo locale, non più sincronizzato con Microsoft Entra. I gruppi locali che lo collegavano continuano a includerlo.",
+      "convertedToLocal": "{name} ora è un gruppo locale",
+      "moveAppsToAnotherGroup": "Sposta le app su un altro gruppo",
+      "deletedInEntraLinked": "Questo gruppo Entra è stato eliminato in Microsoft Entra. Per ora i suoi membri mantengono l'accesso che dava tramite questo gruppo. Convertilo in gruppo locale per mantenerlo, o scollegalo per chiuderlo.",
+      "convertLinkedToLocalMessage": "Viene creato un gruppo locale con gli stessi membri e collegato qui (e in ogni altro gruppo che collegava il gruppo Entra) al posto del gruppo Entra."
     },
     "users": {
       "title": "Utenti",
@@ -1169,6 +1195,7 @@
       "allPersonalizationStates": "Tutte",
       "personalizedOnly": "Con personalizzazioni",
       "entraMissingOnly": "Non trovati in Entra",
+      "neverSignedInOnly": "Mai collegati",
       "entraMissingBadge": "Non in Entra",
       "entraMissingSince": "Non trovato in Microsoft Entra dal {date}",
       "entraMissingLabel": "Non trovato in Entra dal",
@@ -1219,7 +1246,41 @@
       "impersonateReasonLabel": "Motivazione",
       "impersonateReasonPlaceholder": "es. ticket #1234, l'utente non vede un'app",
       "impersonateStart": "Avvia",
-      "impersonateFailed": "Impossibile avviare l'impersonation."
+      "impersonateFailed": "Impossibile avviare l'impersonation.",
+      "summaryActive": "attivi",
+      "summaryAwaitingFirstSignIn": "in attesa del primo accesso",
+      "showAwaitingFirstSignIn": "Mostra gli utenti mai collegati",
+      "preonboard": {
+        "button": "Pre-onboarding utenti",
+        "title": "Pre-onboarding utenti",
+        "help": "Crea gli account Frontdoor di persone che esistono in Microsoft Entra ma non hanno ancora effettuato l'accesso, e scegli i gruppi locali in cui atterreranno. Cerca e aggiungi tutte le persone che ti servono, poi continua. I loro gruppi Entra vengono aggiunti dalla prossima sincronizzazione o al primo accesso.",
+        "searchPlaceholder": "Cerca in Microsoft Entra per nome o email...",
+        "searchHint": "Scrivi almeno 2 caratteri.",
+        "searching": "Ricerca in Microsoft Entra...",
+        "noResults": "Nessun utente trovato in Microsoft Entra.",
+        "searchFailed": "Impossibile cercare in Microsoft Entra.",
+        "alreadyInFrontdoor": "Già in Frontdoor",
+        "disabledInEntra": "Disabilitato in Entra",
+        "guest": "Guest",
+        "disabledInEntraHelp": "Alcuni account sono disabilitati in Microsoft Entra: potranno accedere solo dopo essere stati abilitati lì.",
+        "groupsTitle": "Gruppi locali",
+        "groupsHelp": "Facoltativo: puoi completare il pre-onboarding senza sceglierne e aggiungerli in seguito. Il gruppo predefinito viene sempre aggiunto.",
+        "groupSearchPlaceholder": "Cerca gruppi locali...",
+        "noLocalGroups": "Non ci sono gruppi locali oltre a quello predefinito.",
+        "submit": "Pre-onboarding",
+        "submitWithoutGroups": "Pre-onboarding senza gruppi locali",
+        "saving": "Creazione...",
+        "saveFailed": "Impossibile completare il pre-onboarding dell'utente.",
+        "selectedUsers": "Utenti selezionati",
+        "removeUser": "Rimuovi {name}",
+        "added": "Aggiunto",
+        "maxUsers": "Puoi fare il pre-onboarding di massimo {max} utenti alla volta.",
+        "selectedSummary": "{count} utenti selezionati",
+        "changeUsers": "Modifica selezione",
+        "continue": "Continua ({count})",
+        "doneSummary": "{created} utenti su {total} pronti. I loro account attendono il primo accesso.",
+        "statusCreated": "Creato"
+      }
     },
     "logs": {
       "title": "Log di accesso",
@@ -1295,7 +1356,9 @@
         "start": "Avviata",
         "end": "Terminata",
         "write_blocked": "Modifica bloccata",
-        "app_launch_blocked": "Avvio app bloccato"
+        "app_launch_blocked": "Avvio app bloccato",
+        "convert_to_local": "Convertito in locale",
+        "preonboard": "Pre-onboarding"
       },
       "targetLabels": {
         "app": "App",
@@ -1329,7 +1392,8 @@
           "remove_linked_entra_group": "Ha scollegato il gruppo Entra {item} da {target}",
           "import_one": "Ha importato 1 gruppo da Microsoft Entra",
           "add_linked_groups_one": "Ha collegato 1 gruppo a {target}",
-          "add_linked_entra_groups_one": "Ha collegato 1 gruppo Entra a {target}"
+          "add_linked_entra_groups_one": "Ha collegato 1 gruppo Entra a {target}",
+          "convert_to_local": "Ha convertito {target} in gruppo locale"
         },
         "membership": {
           "add_members": "Ha aggiunto {count} membri a {target}",
@@ -1352,7 +1416,8 @@
         "user_status": {
           "activate": "Ha riattivato {target}",
           "deactivate": "Ha disattivato {target}",
-          "delete": "Ha eliminato l'utente {target}"
+          "delete": "Ha eliminato l'utente {target}",
+          "preonboard": "Pre-onboarding di {target}"
         },
         "auth": {
           "login": "Ha effettuato l'accesso"
@@ -1554,15 +1619,22 @@
     "default_group_link": "Non è possibile collegare gruppi al gruppo predefinito.",
     "default_group_rename": "Il gruppo predefinito non può essere rinominato.",
     "dev_login_disabled": "Il login di sviluppo non è abilitato.",
+    "directory_search_length": "Scrivi da 2 a 64 caratteri per cercare in Microsoft Entra.",
     "email_invitations_unsupported": "Gli inviti via email non sono più supportati.",
     "entra_app_not_found": "App Entra non trovata.",
     "entra_application_id_invalid": "Inserisci un Application ID di MyApps o un URL di avvio valido.",
+    "entra_directory_access_denied": "Microsoft Graph ha negato la lettura della directory. Concedi il permesso applicativo User.Read.All con consenso amministratore.",
+    "entra_directory_lookup_failed": "Impossibile leggere l'utente da Microsoft Entra.",
+    "entra_directory_search_failed": "Impossibile cercare in Microsoft Entra.",
     "entra_group_already_linked": "Questo gruppo Entra è già collegato al contenitore.",
     "entra_group_ids_required": "Seleziona almeno un gruppo Entra.",
     "entra_group_not_discovered": "Il gruppo Entra non è tra i gruppi rilevati. Aggiorna l'elenco e riprova.",
     "entra_group_read_only": "I gruppi sincronizzati con Entra non possono essere modificati localmente.",
     "entra_groups_not_found": "Uno o più gruppi Entra non sono stati trovati.",
     "entra_membership_managed": "Le membership dei gruppi sincronizzati con Entra si gestiscono in Microsoft Entra.",
+    "entra_object_id_invalid": "Serve un object ID Microsoft Entra valido.",
+    "entra_user_not_found": "L'utente non è stato trovato in Microsoft Entra.",
+    "entra_user_without_email": "L'utente Microsoft Entra non ha email né user principal name.",
     "failed_to_check_icons": "Impossibile controllare la dimensione delle icone.",
     "failed_to_clean_icon_cache": "Impossibile pulire la cache delle icone delle app.",
     "failed_to_compact_database": "Impossibile compattare lo spazio del database.",
@@ -1585,6 +1657,7 @@
     "graph_credentials_missing": "Le credenziali dell'app Microsoft Graph non sono configurate.",
     "graph_token_failed": "Impossibile ottenere un token Microsoft Graph.",
     "group_description_invalid": "La descrizione del gruppo deve essere un testo.",
+    "group_ids_invalid": "La lista dei gruppi non è valida.",
     "group_ids_required": "Seleziona almeno un gruppo.",
     "group_link_circular": "Impossibile creare un collegamento circolare tra gruppi.",
     "group_link_invalid": "Il gruppo selezionato non può essere collegato.",
@@ -1593,6 +1666,7 @@
     "group_name_taken": "Esiste già un gruppo con questo nome.",
     "group_name_too_long": "Il nome del gruppo non può superare i 100 caratteri.",
     "group_name_too_short": "Il nome del gruppo deve contenere almeno 2 caratteri.",
+    "group_not_deleted_in_entra": "Si possono convertire solo i gruppi importati eliminati in Microsoft Entra.",
     "group_not_found": "Gruppo non trovato.",
     "groups_not_found": "Uno o più gruppi non sono stati trovati.",
     "icon_too_large": "L'icona è troppo grande: immagini fino a 1 MB, SVG fino a 512 KB.",
@@ -1632,9 +1706,11 @@
     "media_asset_in_use": "Questo file è ancora usato da un'app o dalle impostazioni di branding.",
     "media_asset_not_found": "File multimediale non trovato.",
     "membership_not_found": "Membership non trovata.",
+    "microsoft_ids_required": "Scegli almeno un utente per il pre-onboarding.",
     "no_preference_updates": "Nessuna modifica delle preferenze fornita.",
     "not_authenticated": "Non hai effettuato l'accesso.",
     "not_found": "Non trovato.",
+    "notification_not_found": "Notifica non trovata o già risolta.",
     "owner_assignment_forbidden": "Il ruolo owner può essere assegnato solo dalla configurazione del server.",
     "permission_not_found": "Permesso non trovato.",
     "plugin_archive_empty_archive": "L'archivio del plugin è vuoto.",
@@ -1662,6 +1738,8 @@
     "plugin_package_not_object": "Il pacchetto del plugin deve essere un oggetto JSON.",
     "plugin_package_zip_invalid_base64": "Il pacchetto ZIP del plugin non è valido.",
     "plugin_system_disabled": "Il sistema dei plugin è disattivato.",
+    "preonboard_groups_invalid": "Si possono scegliere solo gruppi locali esistenti.",
+    "preonboard_too_many_users": "Puoi fare il pre-onboarding di massimo {max} utenti alla volta.",
     "slug_invalid": "Lo slug deve contenere lettere minuscole, numeri e trattini (1-63 caratteri).",
     "slug_required": "Lo slug è obbligatorio.",
     "source_group_not_found": "Gruppo di origine non trovato.",
@@ -1676,9 +1754,47 @@
     "too_many_login_attempts": "Troppi tentativi di accesso. Riprova più tardi.",
     "too_many_requests": "Troppe richieste. Attendi un momento e riprova.",
     "transfer_same_group": "Il gruppo di origine e quello di destinazione devono essere diversi.",
+    "user_already_exists": "Questo utente ha già un account Frontdoor.",
     "user_ids_required": "Seleziona almeno un utente.",
     "user_not_found": "Utente non trovato.",
     "user_not_found_or_inactive": "Utente non trovato o non attivo.",
+    "user_preonboard_failed": "Impossibile completare il pre-onboarding dell'utente.",
     "users_not_found": "{count} utenti selezionati non sono stati trovati."
+  },
+  "notifications": {
+    "title": "Notifiche",
+    "bell": "Notifiche",
+    "bellUnread": "Notifiche, {count} non lette",
+    "markAllRead": "Segna tutte come lette",
+    "empty": "Nessuna notifica aperta.",
+    "loadFailed": "Impossibile caricare le notifiche.",
+    "open": "Apri",
+    "resolve": "Risolvi",
+    "unread": "Non letta",
+    "sources": {
+      "sign-in": "al login",
+      "force-sync": "durante la sincronizzazione forzata"
+    },
+    "types": {
+      "user_deactivated_entra": {
+        "title": "Utente disattivato: non è più in Microsoft Entra",
+        "body": "{name} ({email}) è stato disattivato dalla sincronizzazione. Riattiva o elimina l'account."
+      },
+      "user_first_sign_in": {
+        "title": "Primo accesso",
+        "body": "{name} ha effettuato il primo accesso."
+      },
+      "entra_sync_failed": {
+        "title": "Sincronizzazione Microsoft Entra non riuscita",
+        "body": "{count} errori {source}. Controlla i permessi Microsoft Graph."
+      },
+      "entra_group_deleted": {
+        "title": "Gruppo Entra eliminato in Microsoft Entra",
+        "body": "{name}: {members} membri e {apps} app. Decidi come mantenere il loro accesso."
+      }
+    },
+    "recentlyResolved": "Risolte negli ultimi 7 giorni",
+    "resolvedAutomatically": "Risolta da sola: la condizione non c’è più.",
+    "resolvedByAdmin": "Risolta da un admin."
   }
 }

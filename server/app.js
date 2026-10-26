@@ -15,6 +15,7 @@ import pluginsRoutes from './routes/plugins.js';
 import usersRoutes from './routes/users.js';
 import groupsRoutes from './routes/groups.js';
 import logsRoutes from './routes/logs.js';
+import notificationsRoutes from './routes/notifications.js';
 import { isPluginSystemEnabled } from './services/branding.js';
 import { PLUGIN_ASSET_DIR, isServablePluginEntry } from './services/plugins.js';
 
@@ -144,6 +145,7 @@ export function createApp() {
   app.use('/api/users', usersRoutes);
   app.use('/api/groups', groupsRoutes);
   app.use('/api/logs', logsRoutes);
+  app.use('/api/notifications', notificationsRoutes);
 
   // Unknown API routes get a JSON 404 instead of the SPA page.
   app.use('/api', (req, res) => {

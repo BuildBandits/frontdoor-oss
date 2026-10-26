@@ -1,6 +1,7 @@
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import db from '../db.js';
 import { UserFacingError } from './errors.js';
+import { NOTIFICATION_TYPES, raiseNotification, resolveNotifications } from './notifications.js';
 
 const DEFAULT_SCOPES = ['User.Read', 'openid', 'profile', 'email'];
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0';
@@ -83,7 +84,7 @@ function getGraphClient() {
   });
 }
 
-async function acquireGraphAppToken() {
+export async function acquireGraphAppToken() {
   const client = getGraphClient();
   if (!client) {
     throw new UserFacingError('Microsoft Graph app credentials are not configured', { statusCode: 400, code: 'graph_credentials_missing' });
@@ -111,7 +112,7 @@ function graphErrorCode(body) {
 
 // Fetches one Graph page with a timeout, retrying throttling and temporary
 // unavailability (429/503/504) as Graph asks via Retry-After, a few times at most.
-async function fetchGraphPage(url, accessToken, { maxAttempts = GRAPH_MAX_ATTEMPTS, timeoutMs = GRAPH_TIMEOUT_MS } = {}) {
+export async function fetchGraphPage(url, accessToken, { maxAttempts = GRAPH_MAX_ATTEMPTS, timeoutMs = GRAPH_TIMEOUT_MS } = {}) {
   let response;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
@@ -238,9 +239,11 @@ function syncImportedMemberships(userId, groups, syncedAt, context = loadImporte
       .map((row) => row.group_id);
   }
   const removeMembership = db.prepare('DELETE FROM user_group_members WHERE user_id = ? AND group_id = ?');
+  // Read fresh: a group can be flagged as deleted in Entra during the same force sync.
+  const frozenGroupIds = new Set(frozenGroups().map((group) => group.id));
   let membershipsRemoved = 0;
   for (const groupId of currentGroupIds) {
-    if (desiredGroupIds.has(groupId)) continue;
+    if (desiredGroupIds.has(groupId) || frozenGroupIds.has(groupId)) continue;
     membershipsRemoved += removeMembership.run(userId, groupId).changes;
   }
 
@@ -380,6 +383,250 @@ const TENANT_REFRESH_INTERVAL_MS = (() => {
 let lastTenantRefreshAt = 0;
 let tenantRefreshInFlight = null;
 
+// --- Entra groups deleted in Microsoft Entra ---
+// Frontdoor relies on an Entra group in two ways: imported (a Frontdoor copy in
+// user_groups) or only linked into local groups (group_entra_group_memberships).
+// Deleting it in Entra would otherwise remove its members' access user by user,
+// silently. Instead the group is flagged with a snapshot of who had access, an
+// admin is notified, and with the default "freeze" policy the memberships are kept
+// until an admin converts it to a local group, moves its apps, unlinks or deletes it.
+//
+// Imported groups are flagged on user_groups; linked-only groups on entra_group_cache.
+
+export function getDeletedGroupPolicy() {
+  return process.env.ENTRA_DELETED_GROUP_POLICY === 'revoke' ? 'revoke' : 'freeze';
+}
+
+export const linkedEntraSubjectKey = (entraGroupId) => `entra:${entraGroupId}`;
+
+const IMPORTED_ENTRA_IDS_SQL = "SELECT entra_group_id FROM user_groups WHERE source = 'entra' AND entra_group_id IS NOT NULL";
+
+// Every Entra group Frontdoor relies on, with its deletion flag.
+function trackedEntraGroups() {
+  const imported = db.prepare(`
+    SELECT id AS group_id, entra_group_id, entra_deleted_at AS deleted_at FROM user_groups
+    WHERE source = 'entra' AND entra_group_id IS NOT NULL
+  `).all().map((row) => ({ ...row, kind: 'imported' }));
+  const linked = db.prepare(`
+    SELECT DISTINCT gem.entra_group_id, c.deleted_at FROM group_entra_group_memberships gem
+    LEFT JOIN entra_group_cache c ON c.entra_group_id = gem.entra_group_id
+    WHERE gem.entra_group_id NOT IN (${IMPORTED_ENTRA_IDS_SQL})
+  `).all().map((row) => ({ ...row, kind: 'linked' }));
+  return [...imported, ...linked];
+}
+
+function frozenGroups() {
+  if (getDeletedGroupPolicy() !== 'freeze') return [];
+  return db.prepare("SELECT id, entra_group_id FROM user_groups WHERE source = 'entra' AND entra_deleted_at IS NOT NULL").all();
+}
+
+// Entra IDs whose cached memberships the sync must keep while frozen.
+function frozenEntraGroupIds() {
+  if (getDeletedGroupPolicy() !== 'freeze') return [];
+  const linked = db.prepare(`
+    SELECT c.entra_group_id FROM entra_group_cache c
+    WHERE c.deleted_at IS NOT NULL
+      AND EXISTS (SELECT 1 FROM group_entra_group_memberships gem WHERE gem.entra_group_id = c.entra_group_id)
+  `).all().map((row) => row.entra_group_id);
+  return [...frozenGroups().map((group) => group.entra_group_id).filter(Boolean), ...linked];
+}
+
+function linkingGroups(entraGroupId) {
+  return db.prepare(`
+    SELECT g.id, g.name FROM group_entra_group_memberships gem JOIN user_groups g ON g.id = gem.parent_group_id
+    WHERE gem.entra_group_id = ? ORDER BY g.name
+  `).all(entraGroupId);
+}
+
+export function snapshotGroup(groupId) {
+  const group = db.prepare('SELECT id, name, entra_group_id, entra_display_name FROM user_groups WHERE id = ?').get(groupId);
+  if (!group) return null;
+  const members = db.prepare(`
+    SELECT u.id, COALESCE(u.display_name, u.email) AS name
+    FROM user_group_members m JOIN users u ON u.id = m.user_id
+    WHERE m.group_id = ? ORDER BY name
+  `).all(groupId);
+  const apps = db.prepare(`
+    SELECT a.id, a.name FROM app_permissions p JOIN apps a ON a.id = p.app_id
+    WHERE p.group_id = ? ORDER BY a.name
+  `).all(groupId);
+  return {
+    groupId: group.id,
+    groupName: group.name,
+    entraGroupId: group.entra_group_id,
+    entraDisplayName: group.entra_display_name,
+    members,
+    apps,
+    linkedIn: group.entra_group_id ? linkingGroups(group.entra_group_id) : [],
+  };
+}
+
+/** Snapshot of an Entra group linked into local groups without being imported. */
+export function snapshotLinkedEntraGroup(entraGroupId) {
+  const cached = db.prepare('SELECT display_name FROM entra_group_cache WHERE entra_group_id = ?').get(entraGroupId);
+  const members = db.prepare(`
+    SELECT u.id, COALESCE(u.display_name, u.email) AS name
+    FROM entra_user_group_memberships m JOIN users u ON u.id = m.user_id
+    WHERE m.entra_group_id = ? ORDER BY name
+  `).all(entraGroupId);
+  const linkedIn = linkingGroups(entraGroupId);
+  // Apps reached through the local groups that link it.
+  const apps = linkedIn.length > 0
+    ? db.prepare(`
+      SELECT DISTINCT a.id, a.name FROM app_permissions p JOIN apps a ON a.id = p.app_id
+      WHERE p.group_id IN (${linkedIn.map(() => '?').join(', ')}) ORDER BY a.name
+    `).all(...linkedIn.map((group) => group.id))
+    : [];
+  return {
+    groupId: null,
+    groupName: cached?.display_name || entraGroupId,
+    entraGroupId,
+    entraDisplayName: cached?.display_name || null,
+    members,
+    apps,
+    linkedIn,
+  };
+}
+
+function notifyGroupDeleted(subjectKey, snapshot, policy) {
+  raiseNotification({
+    type: NOTIFICATION_TYPES.ENTRA_GROUP_DELETED,
+    subjectKey,
+    severity: policy === 'freeze' ? 'warning' : 'critical',
+    payload: {
+      groupId: snapshot.groupId,
+      // Linked-only groups have no page of their own: the first linking group shows them.
+      parentGroupId: snapshot.groupId ? null : snapshot.linkedIn[0]?.id || null,
+      parentGroupName: snapshot.groupId ? null : snapshot.linkedIn[0]?.name || null,
+      groupName: snapshot.groupName,
+      linkedOnly: !snapshot.groupId,
+      memberCount: snapshot.members.length,
+      appCount: snapshot.apps.length,
+      linkedInCount: snapshot.linkedIn.length,
+      policy,
+    },
+  });
+}
+
+function flagGroupDeletedInEntra(tracked) {
+  const policy = getDeletedGroupPolicy();
+  let snapshot;
+  let flagged;
+  if (tracked.kind === 'imported') {
+    snapshot = snapshotGroup(tracked.group_id);
+    flagged = db.prepare(`
+      UPDATE user_groups SET entra_deleted_at = datetime('now'), entra_deleted_snapshot = ?
+      WHERE id = ? AND entra_deleted_at IS NULL
+    `).run(JSON.stringify(snapshot), tracked.group_id).changes;
+  } else {
+    snapshot = snapshotLinkedEntraGroup(tracked.entra_group_id);
+    flagged = db.prepare(`
+      INSERT INTO entra_group_cache (entra_group_id, display_name, deleted_at, deleted_snapshot)
+      VALUES (?, ?, datetime('now'), ?)
+      ON CONFLICT(entra_group_id) DO UPDATE SET deleted_at = excluded.deleted_at, deleted_snapshot = excluded.deleted_snapshot
+      WHERE entra_group_cache.deleted_at IS NULL
+    `).run(tracked.entra_group_id, snapshot.groupName, JSON.stringify(snapshot)).changes;
+  }
+  if (!flagged) return null;
+  notifyGroupDeleted(tracked.kind === 'imported' ? tracked.group_id : linkedEntraSubjectKey(tracked.entra_group_id), snapshot, policy);
+  console.warn(`Entra group deleted in Entra [${tracked.kind} ${tracked.group_id || tracked.entra_group_id}]: ${snapshot.members.length} members, ${snapshot.apps.length} apps, policy=${policy}`);
+  return snapshot;
+}
+
+function clearGroupDeletedInEntra(tracked) {
+  if (tracked.kind === 'imported') {
+    db.prepare('UPDATE user_groups SET entra_deleted_at = NULL, entra_deleted_snapshot = NULL WHERE id = ?').run(tracked.group_id);
+    resolveNotifications(NOTIFICATION_TYPES.ENTRA_GROUP_DELETED, tracked.group_id);
+  } else {
+    clearLinkedEntraGroupDeleted(tracked.entra_group_id);
+  }
+  console.log(`Entra group restored in Entra [${tracked.kind} ${tracked.group_id || tracked.entra_group_id}]`);
+}
+
+/** Clears the deletion flag of a linked-only Entra group and resolves its notification. */
+export function clearLinkedEntraGroupDeleted(entraGroupId, resolvedBy = null) {
+  db.prepare('UPDATE entra_group_cache SET deleted_at = NULL, deleted_snapshot = NULL WHERE entra_group_id = ?').run(entraGroupId);
+  resolveNotifications(NOTIFICATION_TYPES.ENTRA_GROUP_DELETED, linkedEntraSubjectKey(entraGroupId), resolvedBy);
+}
+
+/**
+ * After links are removed: a flagged linked-only Entra group that no local group links
+ * any more has nothing left to protect. Its frozen memberships are dropped and the
+ * flag and notification are cleared.
+ */
+export function releaseUnlinkedDeletedEntraGroups(resolvedBy = null) {
+  const orphans = db.prepare(`
+    SELECT entra_group_id FROM entra_group_cache c
+    WHERE c.deleted_at IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM group_entra_group_memberships gem WHERE gem.entra_group_id = c.entra_group_id)
+      AND c.entra_group_id NOT IN (${IMPORTED_ENTRA_IDS_SQL})
+  `).all().map((row) => row.entra_group_id);
+  for (const entraGroupId of orphans) {
+    db.prepare('DELETE FROM entra_user_group_memberships WHERE entra_group_id = ?').run(entraGroupId);
+    clearLinkedEntraGroupDeleted(entraGroupId, resolvedBy);
+  }
+  return orphans;
+}
+
+// True only for Graph's "resource not found", as for users: errors never count as a deletion.
+async function isEntraGroupDeleted(entraGroupId, accessToken) {
+  try {
+    await fetchGraphPage(`${GRAPH_BASE_URL}/groups/${encodeURIComponent(entraGroupId)}?$select=id`, accessToken);
+    return false;
+  } catch (error) {
+    return error?.status === 404 && error?.graphCode === 'Request_ResourceNotFound';
+  }
+}
+
+/**
+ * Checks the Entra groups Frontdoor relies on. With `catalogIds` (a complete tenant
+ * catalog), groups listed there are restored if flagged, the others are confirmed one
+ * by one. With `candidateEntraIds`, only those groups are confirmed. `checked` caches
+ * Graph answers within one run.
+ */
+export async function detectDeletedEntraGroups(accessToken, { catalogIds = null, candidateEntraIds = null, checked = new Map() } = {}) {
+  const flagged = [];
+  const restored = [];
+  for (const tracked of trackedEntraGroups()) {
+    const id = tracked.entra_group_id;
+    if (candidateEntraIds && !candidateEntraIds.has(id)) continue;
+    if (catalogIds?.has(id)) {
+      if (tracked.deleted_at) {
+        clearGroupDeletedInEntra(tracked);
+        restored.push(id);
+      }
+      continue;
+    }
+    if (tracked.deleted_at) continue;
+    if (!checked.has(id)) checked.set(id, await isEntraGroupDeleted(id, accessToken));
+    if (checked.get(id) && flagGroupDeletedInEntra(tracked)) flagged.push(id);
+  }
+  return { flagged, restored };
+}
+
+/**
+ * Before a user's memberships are synced: Entra groups the user is about to leave
+ * (imported, or linked into local groups) may have been deleted in Entra rather than
+ * left. Confirm those first, so a deletion is flagged (and frozen) before any
+ * membership is removed.
+ */
+export async function protectDeletedGroupsBeforeUserSync(userId, entraGroups, { acquireToken = acquireGraphAppToken, accessToken = null, checked } = {}) {
+  const reported = new Set((entraGroups || []).map((group) => group?.id).filter(Boolean));
+  const imported = db.prepare(`
+    SELECT g.entra_group_id FROM user_group_members m JOIN user_groups g ON g.id = m.group_id
+    WHERE m.user_id = ? AND g.source = 'entra' AND g.entra_group_id IS NOT NULL AND g.entra_deleted_at IS NULL
+  `).all(userId);
+  const linked = db.prepare(`
+    SELECT m.entra_group_id FROM entra_user_group_memberships m
+    LEFT JOIN entra_group_cache c ON c.entra_group_id = m.entra_group_id
+    WHERE m.user_id = ? AND c.deleted_at IS NULL
+      AND EXISTS (SELECT 1 FROM group_entra_group_memberships gem WHERE gem.entra_group_id = m.entra_group_id)
+  `).all(userId);
+  const leaving = [...imported, ...linked].map((row) => row.entra_group_id).filter((id) => !reported.has(id));
+  if (leaving.length === 0) return { flagged: [], restored: [] };
+  return detectDeletedEntraGroups(accessToken || await acquireToken(), { candidateEntraIds: new Set(leaving), checked });
+}
+
 function storeTenantGroups(groups) {
   const syncAt = sqliteNow();
   const discoveredGroups = db.transaction(() => upsertDiscoveredGroups(groups, syncAt))();
@@ -398,7 +645,10 @@ export async function refreshGroupCacheFromTenant({ force = false } = {}) {
   if (!tenantRefreshInFlight) {
     tenantRefreshInFlight = (async () => {
       const appToken = await acquireGraphAppToken();
-      return storeTenantGroups(await fetchAllTenantGroups(appToken));
+      const tenantGroups = await fetchAllTenantGroups(appToken);
+      const discovered = storeTenantGroups(tenantGroups);
+      await detectDeletedEntraGroups(appToken, { catalogIds: new Set(tenantGroups.map((group) => group.id)) });
+      return discovered;
     })().finally(() => { tenantRefreshInFlight = null; });
   }
   return { discoveredGroups: await tenantRefreshInFlight, skipped: false };
@@ -442,7 +692,8 @@ export function syncUserEntraGroups(userId, entraGroups, context = undefined) {
   const syncTransaction = db.transaction(() => {
     const discoveredGroups = upsertDiscoveredGroups(currentGroups, syncAt);
     // Drop only the cached memberships Graph no longer reports; the rest are refreshed by the upsert.
-    const currentIds = currentGroups.map((group) => group.id);
+    // Imported groups deleted in Entra keep their cached memberships while frozen.
+    const currentIds = [...currentGroups.map((group) => group.id), ...frozenEntraGroupIds()];
     if (currentIds.length > 0) {
       db.prepare(`DELETE FROM entra_user_group_memberships WHERE user_id = ? AND entra_group_id NOT IN (${currentIds.map(() => '?').join(', ')})`)
         .run(userId, ...currentIds);
@@ -607,7 +858,7 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
   }
 
   const users = db.prepare(`
-    SELECT id, email, role, microsoft_id, entra_missing_since
+    SELECT id, email, display_name, role, microsoft_id, entra_missing_since
     FROM users
     WHERE microsoft_id IS NOT NULL AND is_active = 1
     ORDER BY email
@@ -618,7 +869,9 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
 
   let tenantGroupsDiscovered = 0;
   try {
-    tenantGroupsDiscovered = storeTenantGroups(await fetchAllTenantGroups(accessToken));
+    const tenantGroups = await fetchAllTenantGroups(accessToken);
+    tenantGroupsDiscovered = storeTenantGroups(tenantGroups);
+    await detectDeletedEntraGroups(accessToken, { catalogIds: new Set(tenantGroups.map((group) => group.id)) });
   } catch (error) {
     const hint = formatGraphAccessHint(error, 'force-sync');
     errors.push({
@@ -651,9 +904,11 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
   let membershipsRemoved = 0;
 
   const importedGroupContext = loadImportedGroupContext();
+  const deletionChecks = new Map();
   for (const user of users) {
     try {
       const groups = await fetchEntraGroupsForUserId(user.microsoft_id, accessToken);
+      await protectDeletedGroupsBeforeUserSync(user.id, groups, { accessToken, checked: deletionChecks });
       const result = syncUserEntraGroups(user.id, groups, importedGroupContext);
       if (user.entra_missing_since) {
         db.prepare('UPDATE users SET entra_missing_since = NULL WHERE id = ?').run(user.id);
@@ -667,7 +922,7 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
       // Only Graph's "resource not found" counts: any other 404 is a real error.
       if (error.status === 404 && error.graphCode === 'Request_ResourceNotFound') {
         usersNotFound += 1;
-        if (handleUserMissingFromEntra(user)) deactivatedUsers.push({ id: user.id, email: user.email, role: user.role });
+        if (handleUserMissingFromEntra(user)) deactivatedUsers.push({ id: user.id, email: user.email, display_name: user.display_name, role: user.role });
         continue;
       }
       const hint = formatGraphAccessHint(error, 'force-sync');

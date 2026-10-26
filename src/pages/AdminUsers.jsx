@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { Eye, Shield, ShieldOff, UserCheck, UserX, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, Wand2, Filter, LogIn } from 'lucide-react';
+import { Eye, Shield, ShieldOff, UserCheck, UserX, UserPlus, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, Wand2, Filter, LogIn } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { useLatestRequest } from '../hooks/useLatestRequest';
@@ -15,8 +15,10 @@ import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import Tooltip from '../components/Tooltip';
 import PaginationControls from '../components/PaginationControls';
+import PreonboardUserModal from './users/PreonboardUserModal';
 import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
+import { sortOptionsByLabel } from '../utils/sortOptions';
 import { normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
 import { formatLocalDateTime } from '../utils/dateTime';
 import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
@@ -33,7 +35,7 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState('all'); // all | owner | admin | admin_readonly | user
-  const [filterActive, setFilterActive] = useState('all'); // all | active | inactive
+  const [filterActive, setFilterActive] = useState('all'); // all | active | inactive | entraMissing | neverSignedIn
   const [filterPersonalization, setFilterPersonalization] = useState('all'); // all | customized | none
   const [expandedUser, setExpandedUser] = useState(null);
   const [userDetail, setUserDetail] = useState(null);
@@ -43,6 +45,7 @@ export default function AdminUsers() {
   const [showVisibleApps, setShowVisibleApps] = useState(false);
   const [visibleAppsSearch, setVisibleAppsSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [showPreonboard, setShowPreonboard] = useState(false);
   const branding = useBranding();
   const brandingLanguage = normalizeLanguage(branding?.defaultLanguage);
   const brandingTimeZone = normalizeTimeZone(branding?.defaultTimeZone, 'UTC');
@@ -89,7 +92,8 @@ export default function AdminUsers() {
 
   const showToast = useCallback((message, type = 'success') => setPageNotice({ message, type }), []);
 
-  const ui = getUiStrings(resolveAppLanguage(currentUser?.preferredLanguage, brandingLanguage));
+  const language = resolveAppLanguage(currentUser?.preferredLanguage, brandingLanguage);
+  const ui = getUiStrings(language);
   const t = ui.admin.common;
   const u = ui.admin.users;
   const timeZone = resolveAppTimeZone(currentUser?.preferredTimeZone, brandingTimeZone);
@@ -114,6 +118,13 @@ export default function AdminUsers() {
   }, [showToast, t.errorLoadingUsers]);
 
   useEffect(() => { void loadUsers({ showLoading: true }); }, [loadUsers]);
+  // Opened from a notification: search for that user, then drop the route state.
+  useEffect(() => {
+    const incomingSearch = location.state?.userSearch;
+    if (!incomingSearch) return;
+    setSearch(incomingSearch);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate]);
   useEffect(() => {
     setPage(1);
   }, [search, filterRole, filterActive, filterPersonalization, pageSize]);
@@ -285,6 +296,7 @@ export default function AdminUsers() {
     if (filterActive === 'active' && !u.is_active) return false;
     if (filterActive === 'inactive' && u.is_active) return false;
     if (filterActive === 'entraMissing' && !u.entra_missing_since) return false;
+    if (filterActive === 'neverSignedIn' && u.last_login) return false;
     if (filterPersonalization === 'customized' && !hasAtLeastOnePersonalization(u)) return false;
     if (filterPersonalization === 'none' && hasAtLeastOnePersonalization(u)) return false;
     if (search.trim()) {
@@ -541,6 +553,8 @@ export default function AdminUsers() {
 
   const adminCount = users.filter((u) => ['owner', 'admin'].includes(u.role) && u.is_active).length;
   const activeCount = users.filter((u) => u.is_active).length;
+  // Same rule as the "Never signed in" status filter: pre-onboarded accounts waiting for their first sign-in.
+  const awaitingFirstSignInCount = users.filter((u) => !u.last_login).length;
 
   return (
     <div>
@@ -548,19 +562,54 @@ export default function AdminUsers() {
         <div>
           <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{ui.admin.users.pageTitle}</h1>
           <p className="mt-1 text-gray-500 dark:text-gray-400">
-            {users.length} {ui.nav.users.toLowerCase()} {t.total} &middot; {activeCount} {t.active} &middot; {adminCount} {t.privileged}
+            {users.length} {ui.nav.users.toLowerCase()} {t.total} &middot; {activeCount} {u.summaryActive} &middot; {adminCount} {t.privileged}
+            {awaitingFirstSignInCount > 0 && (
+              <>
+                {' '}&middot;{' '}
+                <button
+                  type="button"
+                  onClick={() => setFilterActive('neverSignedIn')}
+                  title={u.showAwaitingFirstSignIn}
+                  className="hover:text-dark dark:hover:text-white hover:underline"
+                >
+                  {awaitingFirstSignInCount} {u.summaryAwaitingFirstSignIn}
+                </button>
+              </>
+            )}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void loadUsers()}
-          disabled={refreshing || loading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5 text-sm font-semibold text-dark dark:text-gray-100 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 max-sm:w-full"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          {ui.admin.users.refresh}
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {canEditUsers && (
+            <button
+              type="button"
+              onClick={() => setShowPreonboard(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 max-sm:w-full"
+            >
+              <UserPlus className="w-4 h-4" />
+              {u.preonboard.button}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void loadUsers()}
+            disabled={refreshing || loading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5 text-sm font-semibold text-dark dark:text-gray-100 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 max-sm:w-full"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {ui.admin.users.refresh}
+          </button>
+        </div>
       </div>
+
+      {showPreonboard && (
+        <PreonboardUserModal
+          ui={ui}
+          onClose={() => setShowPreonboard(false)}
+          onCompleted={(createdCount) => {
+            if (createdCount > 0) void loadUsers();
+          }}
+        />
+      )}
 
       {!canEditUsers && (
         <div className="mb-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
@@ -593,13 +642,13 @@ export default function AdminUsers() {
             onChange={setFilterRole}
             label={t.role}
             icon={Shield}
-            options={[
+            options={sortOptionsByLabel([
               { value: 'all', label: t.allRoles },
               { value: 'owner', label: u.ownerBadge },
               { value: 'admin', label: u.adminBadge },
               { value: 'admin_readonly', label: t.readOnlyRole },
               { value: 'user', label: t.usersOnly },
-            ]}
+            ], language)}
             className="min-w-[190px]"
           />
           <DropdownSelect
@@ -607,12 +656,13 @@ export default function AdminUsers() {
             onChange={setFilterActive}
             label={t.status}
             icon={Clock}
-            options={[
+            options={sortOptionsByLabel([
               { value: 'all', label: t.allStatuses },
               { value: 'active', label: t.activeOnly },
               { value: 'inactive', label: t.inactiveOnly },
               { value: 'entraMissing', label: u.entraMissingOnly },
-            ]}
+              { value: 'neverSignedIn', label: u.neverSignedInOnly },
+            ], language)}
             className="min-w-[190px]"
           />
           <DropdownSelect
@@ -620,11 +670,11 @@ export default function AdminUsers() {
             onChange={setFilterPersonalization}
             label={u.personalizationFilterLabel}
             icon={Wand2}
-            options={[
+            options={sortOptionsByLabel([
               { value: 'all', label: u.allPersonalizationStates },
               { value: 'customized', label: u.personalizedOnly },
               { value: 'none', label: u.noPersonalizations },
-            ]}
+            ], language)}
             className="min-w-[260px]"
           />
           <DropdownSelect

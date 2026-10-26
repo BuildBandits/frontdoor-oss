@@ -5,10 +5,13 @@ import { logRbacAudit } from '../db.js';
 import { authenticate, isAdminViewer, isAdminEditor, ROLE_OWNER } from '../middleware/auth.js';
 import { ensureAvatarCached, serveAvatarForUser } from '../services/avatars.js';
 import { iconUrlForApp } from '../services/appIcons.js';
+import { NOTIFICATION_TYPES, resolveNotifications } from '../services/notifications.js';
 import { getAccessibleGroupIdsForUser } from '../services/groupHierarchy.js';
 import { isSupportedLanguage } from '../../shared/languages.js';
 import { isSupportedColorScheme, normalizeOptionalColorScheme } from '../../shared/colorSchemes.js';
 import { isSupportedTimeZone, normalizeOptionalTimeZone } from '../../shared/timeZones.js';
+import { preonboardDirectoryUsers, searchDirectoryUsers } from '../services/entraDirectory.js';
+import { respondWithError } from '../services/errors.js';
 
 const router = express.Router();
 const composeAdminEmails = new Set(
@@ -45,6 +48,31 @@ router.get('/', authenticate, isAdminViewer, (req, res) => {
       is_compose_locked_admin: isComposeLockedAdmin(user.email),
     }));
   res.json({ users });
+});
+
+// Search the Entra tenant for users to pre-onboard (editor roles only)
+router.get('/directory/search', authenticate, isAdminEditor, async (req, res) => {
+  try {
+    const users = await searchDirectoryUsers(req.query.q);
+    res.json({ users });
+  } catch (error) {
+    console.error('Entra directory search failed:', error.message);
+    respondWithError(res, error, { status: 502, code: 'entra_directory_search_failed' });
+  }
+});
+
+// Create the accounts of Entra users before their first sign-in (editor roles only)
+router.post('/preonboard', authenticate, isAdminEditor, async (req, res) => {
+  try {
+    const { results, groupIds } = await preonboardDirectoryUsers(req.body?.microsoftIds, req.body?.groupIds ?? []);
+    for (const result of results) {
+      if (result.status === 'created') logRbacAudit(req.user.id, 'preonboard', 'user_status', result.userId, { email: result.email, groupIds });
+    }
+    res.json({ results: results.map(({ microsoftId, status, userId, code }) => ({ microsoftId, status, userId, code })) });
+  } catch (error) {
+    if (!error?.expose) console.error('User pre-onboarding failed:', error.message);
+    respondWithError(res, error, { status: 500, code: 'user_preonboard_failed' });
+  }
 });
 
 // Serve cached user avatar or discover it on demand (authenticated)
@@ -287,6 +315,7 @@ router.put('/:id/active', authenticate, isAdminEditor, (req, res) => {
     WHERE id = ?
   `).run(activeValue, activeValue, id);
   logRbacAudit(req.user.id, activeValue ? 'activate' : 'deactivate', 'user_status', id, { email: user.email, role: user.role });
+  if (activeValue) resolveNotifications(NOTIFICATION_TYPES.USER_DEACTIVATED_ENTRA, id, req.user.id);
   res.json({ is_active: activeValue });
 });
 
@@ -321,6 +350,8 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   });
   deleteAll();
   logRbacAudit(req.user.id, 'delete', 'user_status', id, { name: user.display_name, email: user.email, role: user.role });
+  resolveNotifications(NOTIFICATION_TYPES.USER_DEACTIVATED_ENTRA, id, req.user.id);
+  resolveNotifications(NOTIFICATION_TYPES.USER_FIRST_SIGN_IN, id, req.user.id);
 
   res.json({ deleted: true });
 });
