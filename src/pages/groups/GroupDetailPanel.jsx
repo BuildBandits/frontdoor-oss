@@ -3,6 +3,81 @@ import UserAvatar from '../../components/UserAvatar';
 import AppIcon from '../../components/AppIcon';
 import { DEFAULT_GROUP_ID } from '../../../shared/groups.js';
 
+function readSnapshot(value) {
+  try {
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Under an Entra group linked into this local group (not imported) that Microsoft
+// Entra reports deleted: who had access through it, and the way to keep it.
+function LinkedDeletedNotice({ childGroup, g, canEdit, convertLinkedToLocal }) {
+  const snapshot = readSnapshot(childGroup.deleted_snapshot);
+  const memberNames = (snapshot?.members || []).map((member) => member.name).join(', ');
+  return (
+    <div role="alert" className="mt-1 ml-6 rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-xs text-red-800 dark:text-red-200">
+      <p>{g.deletedInEntraLinked}</p>
+      {snapshot && (
+        <p className="mt-1 wrap-anywhere">
+          <span className="font-medium">{g.deletedInEntraMembers.replace('{count}', snapshot.members?.length ?? 0)}:</span> {memberNames || '—'}
+        </p>
+      )}
+      {canEdit && (
+        <button
+          type="button"
+          onClick={() => convertLinkedToLocal(childGroup)}
+          className="mt-2 rounded-full bg-dark px-3 py-1 text-xs font-semibold text-white hover:bg-gray-800"
+        >
+          {g.convertToLocal}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Shown on an imported group that Microsoft Entra reports deleted: what it held when
+// the deletion was detected, and the ways to keep (or end) that access.
+function DeletedInEntraNotice({ group, detail, g, canEdit, convertToLocal, deleteGroup, moveApps }) {
+  const snapshot = readSnapshot(detail.group.entra_deleted_snapshot);
+  const frozen = detail.deletedGroupPolicy !== 'revoke';
+  const names = (items) => (items || []).map((item) => item.name).join(', ');
+  return (
+    <div role="alert" className="mb-5 rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-800 dark:text-red-200">
+      <p className="font-semibold">{g.deletedInEntraTitle}</p>
+      <p className="mt-1">{frozen ? g.deletedInEntraFrozen : g.deletedInEntraRevoked}</p>
+      {snapshot && (
+        <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5 text-xs">
+          <dt className="font-medium whitespace-nowrap">{g.deletedInEntraMembers.replace('{count}', snapshot.members?.length ?? 0)}</dt>
+          <dd className="min-w-0 wrap-anywhere">{names(snapshot.members) || '—'}</dd>
+          <dt className="font-medium whitespace-nowrap">{g.deletedInEntraApps.replace('{count}', snapshot.apps?.length ?? 0)}</dt>
+          <dd className="min-w-0 wrap-anywhere">{names(snapshot.apps) || '—'}</dd>
+          {snapshot.linkedIn?.length > 0 && (
+            <>
+              <dt className="font-medium whitespace-nowrap">{g.deletedInEntraLinkedIn.replace('{count}', snapshot.linkedIn.length)}</dt>
+              <dd className="min-w-0 wrap-anywhere">{names(snapshot.linkedIn)}</dd>
+            </>
+          )}
+        </dl>
+      )}
+      {canEdit && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={() => convertToLocal(group)} className="rounded-full bg-dark px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800">
+            {g.convertToLocal}
+          </button>
+          <button type="button" onClick={() => moveApps(group.id)} className="rounded-full border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-dark dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800">
+            {g.moveAppsToAnotherGroup}
+          </button>
+          <button type="button" onClick={() => deleteGroup(group)} className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">
+            {g.deleteGroup}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GroupDetailPanel({
   group,
   ui,
@@ -32,6 +107,10 @@ export default function GroupDetailPanel({
   removeMember,
   openAddApps,
   removeApp,
+  convertToLocal,
+  convertLinkedToLocal,
+  deleteGroup,
+  moveApps,
 }) {
   return (
     <>
@@ -44,6 +123,17 @@ export default function GroupDetailPanel({
             </div>
           ) : groupDetail ? (
             <>
+              {groupDetail.group?.entra_deleted_at && (
+                <DeletedInEntraNotice
+                  group={group}
+                  detail={groupDetail}
+                  g={g}
+                  canEdit={canEdit}
+                  convertToLocal={convertToLocal}
+                  deleteGroup={deleteGroup}
+                  moveApps={moveApps}
+                />
+              )}
               {/* Edit group info */}
               <div className="mb-5 pb-5 border-b border-gray-100 dark:border-gray-800">
                 {editingGroup === group.id ? (
@@ -175,27 +265,35 @@ export default function GroupDetailPanel({
                               </div>
                               <div className="space-y-2">
                                 {linkedEntraGroups.map((childGroup) => (
-                                  <div key={childGroup.entra_group_id} className="flex items-center justify-between py-1.5">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <Layers3 className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-                                      <div className="min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <span className="text-sm text-dark dark:text-gray-100 truncate">{childGroup.display_name || childGroup.entra_group_id}</span>
-                                          <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded-sm font-medium">{g.entraBadge}</span>
+                                  <div key={childGroup.entra_group_id} className="py-1.5">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <Layers3 className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-sm text-dark dark:text-gray-100 truncate">{childGroup.display_name || childGroup.entra_group_id}</span>
+                                            <span className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded-sm font-medium">{g.entraBadge}</span>
+                                            {childGroup.deleted_at && (
+                                              <span className="text-[10px] bg-red-100 text-red-700 dark:bg-red-950/55 dark:text-red-300 px-1.5 py-0.5 rounded-sm font-medium">{g.deletedInEntraBadge}</span>
+                                            )}
+                                          </div>
+                                          {childGroup.description && (
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{childGroup.description}</p>
+                                          )}
                                         </div>
-                                        {childGroup.description && (
-                                          <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{childGroup.description}</p>
-                                        )}
                                       </div>
+                                      <button
+                                        onClick={() => removeLinkedEntraGroup(childGroup.entra_group_id, childGroup.display_name || childGroup.entra_group_id)}
+                                        disabled={!canEdit}
+                                        className="text-gray-300 dark:text-gray-600 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        title={g.removeLinkedGroup}
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
                                     </div>
-                                    <button
-                                      onClick={() => removeLinkedEntraGroup(childGroup.entra_group_id, childGroup.display_name || childGroup.entra_group_id)}
-                                      disabled={!canEdit}
-                                      className="text-gray-300 dark:text-gray-600 hover:text-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                      title={g.removeLinkedGroup}
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
+                                    {childGroup.deleted_at && (
+                                      <LinkedDeletedNotice childGroup={childGroup} g={g} canEdit={canEdit} convertLinkedToLocal={convertLinkedToLocal} />
+                                    )}
                                   </div>
                                 ))}
                               </div>

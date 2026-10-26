@@ -223,3 +223,24 @@ test('the audit API can leave out sign-in events and still counts correctly', as
   assert.equal(withoutSignIns.pagination.total, 1);
   assert.deepEqual(withoutSignIns.logs.map((log) => log.action), ['update']);
 });
+
+test('impersonation rows read as sentences about the user', () => {
+  const ui = getUiStrings('en');
+  const event = describeAuditLog({
+    action: 'app_launch_blocked',
+    target_type: 'impersonation',
+    target_id: 'u-1',
+    details: JSON.stringify({ appId: 'a-1', slug: 'crm', refs: { users: { 'u-1': 'User One' }, apps: { 'a-1': 'CRM' } } }),
+  }, { ui });
+  assert.equal(event.targetTypeLabel, 'Impersonation');
+  assert.equal(event.actionLabel, 'App launch blocked');
+  assert.equal(event.summary.template, ui.admin.audit.events.impersonation.app_launch_blocked);
+  assert.equal(event.summary.values.target, 'User One');
+  assert.equal(event.summary.values.item, 'CRM');
+
+  const end = describeAuditLog({
+    action: 'end', target_type: 'impersonation', target_id: 'u-1',
+    details: JSON.stringify({ endReason: 'timeout', durationSeconds: 1800 }),
+  }, { ui });
+  assert.equal(end.facts.find((fact) => fact.key === 'endReason').value, 'Timed out');
+});

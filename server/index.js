@@ -5,7 +5,9 @@ import { purgeLogsOlderThan } from './routes/logs.js';
 import { getStartupConfig, validateStartupEnv } from './config.js';
 import { getBrandingSettings } from './services/branding.js';
 import { backfillMediaLibrary } from './services/mediaAssets.js';
+import { purgeResolvedNotifications } from './services/notifications.js';
 import { findLargeAppIcons, LARGE_ICON_THRESHOLD_BYTES } from './services/appIcons.js';
+import { sweepExpiredSessions } from './services/impersonation.js';
 
 const PORT = process.env.PORT || 3001;
 
@@ -85,8 +87,22 @@ function runLogRetentionPurge() {
     if (accessRemoved > 0 || auditRemoved > 0) {
       console.log(`Frontdoor log retention purge: removed ${accessRemoved} access logs and ${auditRemoved} audit logs older than ${retentionDays} days`);
     }
+    const notificationsRemoved = purgeResolvedNotifications();
+    if (notificationsRemoved > 0) {
+      console.log(`Frontdoor notification purge: removed ${notificationsRemoved} resolved notifications`);
+    }
   } catch (error) {
     console.error(`Frontdoor log retention purge failed: ${error.message}`);
+  }
+}
+
+// Closes impersonation sessions that timed out while nobody was using them, so
+// their end is always in the audit log.
+function runImpersonationSweep() {
+  try {
+    sweepExpiredSessions();
+  } catch (error) {
+    console.error(`Frontdoor impersonation sweep failed: ${error.message}`);
   }
 }
 
@@ -106,4 +122,7 @@ createApp().listen(PORT, () => {
   runLogRetentionPurge();
   const dailyRetentionTimer = setInterval(runLogRetentionPurge, 24 * 60 * 60 * 1000);
   dailyRetentionTimer.unref?.();
+  runImpersonationSweep();
+  const impersonationSweepTimer = setInterval(runImpersonationSweep, 60 * 1000);
+  impersonationSweepTimer.unref?.();
 });

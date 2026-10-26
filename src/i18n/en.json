@@ -153,6 +153,14 @@
     "appsLoadFailedTitle": "Apps could not be loaded",
     "appsLoadFailedBody": "Check your connection and try again."
   },
+  "impersonation": {
+    "banner": "You are acting as {name} · read-only · ends at {time}",
+    "stop": "Stop",
+    "stopping": "Stopping…",
+    "stopFailed": "The impersonation could not be stopped. Try again or sign out.",
+    "ended": "Impersonation ended. You are back to your own account.",
+    "appUnavailable": "Apps cannot be opened while you are acting as another user"
+  },
   "layout": {
     "personalHomeView": "Personal Home view",
     "personalHomeViewShort": "Home view",
@@ -441,7 +449,7 @@
       "updated": "updated",
       "removedUser": "Removed user",
       "removedApp": "Removed app",
-      "noLogin": "Never logged in",
+      "noLogin": "Never signed in",
       "inactive": "Inactive",
       "active": "Active",
       "total": "total",
@@ -874,6 +882,12 @@
       "noGroupsFound": "No groups found.",
       "selectedGroups": "selected groups",
       "selectedGroupSummary": "selected groups",
+      "groupFilterLabel": "Show groups",
+      "groupFilterAll": "All",
+      "groupFilterSelected": "Selected",
+      "groupFilterUnselected": "Not selected",
+      "showSelectedGroups": "Show selected groups",
+      "noSelectedGroups": "No group selected yet.",
       "save": "Save",
       "saving": "Saving...",
       "appCreated": "App created",
@@ -1044,6 +1058,12 @@
       "groupsFound": "{count} groups found",
       "selectedCount": "{count} selected",
       "selectAllFiltered": "Select all filtered",
+      "selectionFilterLabel": "Show groups",
+      "selectionAll": "All",
+      "selectionSelected": "Selected",
+      "selectionUnselected": "Not selected",
+      "showSelectedGroups": "Show selected groups",
+      "noSelectedGroups": "No group selected yet.",
       "knownMembersInCatalog": "{count} members known in the catalog",
       "localNamePrefix": "Local name: {name}",
       "notYetImported": "Not yet imported",
@@ -1135,7 +1155,21 @@
       "sourceFilter": "Source",
       "sourceAll": "All",
       "sourceLocal": "Local",
-      "sourceEntra": "Microsoft Entra"
+      "sourceEntra": "Microsoft Entra",
+      "deletedInEntraBadge": "Deleted in Entra",
+      "deletedInEntraTitle": "This group was deleted in Microsoft Entra",
+      "deletedInEntraFrozen": "Its members keep their access for now: Frontdoor froze the group when the deletion was detected. Convert it to a local group to keep the access, move its apps to another group, or delete it to end the access.",
+      "deletedInEntraRevoked": "Its members are removed as they sign in or at the next sync (ENTRA_DELETED_GROUP_POLICY=revoke). Below is who had access when the deletion was detected.",
+      "deletedInEntraMembers": "Members ({count})",
+      "deletedInEntraApps": "Apps ({count})",
+      "deletedInEntraLinkedIn": "Linked in ({count})",
+      "convertToLocal": "Convert to local group",
+      "convertToLocalTitle": "Convert {name} to a local group?",
+      "convertToLocalMessage": "The group keeps its members and apps and becomes a local group, no longer synced with Microsoft Entra. Local groups that linked it keep including it.",
+      "convertedToLocal": "{name} is now a local group",
+      "moveAppsToAnotherGroup": "Move apps to another group",
+      "deletedInEntraLinked": "This Entra group was deleted in Microsoft Entra. Its members keep the access it gave through this group for now. Convert it to a local group to keep it, or unlink it to end it.",
+      "convertLinkedToLocalMessage": "A local group with the same members is created and linked here (and in every other group that linked the Entra group) instead of the Entra group."
     },
     "users": {
       "title": "Users",
@@ -1161,6 +1195,7 @@
       "allPersonalizationStates": "All",
       "personalizedOnly": "With customizations",
       "entraMissingOnly": "Not found in Entra",
+      "neverSignedInOnly": "Never signed in",
       "entraMissingBadge": "Not in Entra",
       "entraMissingSince": "Not found in Microsoft Entra since {date}",
       "entraMissingLabel": "Not found in Entra since",
@@ -1204,7 +1239,48 @@
       "toggleActiveTitle": "Do you want to {action} {name}?",
       "deleteUserTitle": "Delete permanently the user {name}?",
       "refresh": "Refresh users",
-      "pageSummary": "Page {page} of {pages} · {total} users"
+      "pageSummary": "Page {page} of {pages} · {total} users",
+      "impersonate": "Act as this user",
+      "impersonateTitle": "Act as {name}",
+      "impersonateBody": "You will see Frontdoor as this user sees it, in read-only mode. Apps cannot be opened. The session ends when you stop it, sign out or it times out, and it is recorded in the audit log.",
+      "impersonateReasonLabel": "Reason",
+      "impersonateReasonPlaceholder": "e.g. ticket #1234, the user cannot see an app",
+      "impersonateStart": "Start",
+      "impersonateFailed": "The impersonation could not be started.",
+      "summaryActive": "active",
+      "summaryAwaitingFirstSignIn": "awaiting first sign-in",
+      "showAwaitingFirstSignIn": "Show the users who never signed in",
+      "preonboard": {
+        "button": "Pre-onboard users",
+        "title": "Pre-onboard users",
+        "help": "Create the Frontdoor accounts of people who exist in Microsoft Entra but have not signed in yet, and choose the local groups they land in. Search and add as many people as you need, then continue. Their Entra groups are added by the next sync or at the first sign-in.",
+        "searchPlaceholder": "Search Microsoft Entra by name or email...",
+        "searchHint": "Type at least 2 characters.",
+        "searching": "Searching Microsoft Entra...",
+        "noResults": "No user found in Microsoft Entra.",
+        "searchFailed": "Could not search Microsoft Entra.",
+        "alreadyInFrontdoor": "Already in Frontdoor",
+        "disabledInEntra": "Disabled in Entra",
+        "guest": "Guest",
+        "disabledInEntraHelp": "Some accounts are disabled in Microsoft Entra: they can sign in only after they are enabled there.",
+        "groupsTitle": "Local groups",
+        "groupsHelp": "Optional: you can pre-onboard without choosing any, and add groups later. The default group is always added.",
+        "groupSearchPlaceholder": "Search local groups...",
+        "noLocalGroups": "There are no local groups besides the default one.",
+        "submit": "Pre-onboard",
+        "submitWithoutGroups": "Pre-onboard without local groups",
+        "saving": "Creating...",
+        "saveFailed": "Could not pre-onboard the user.",
+        "selectedUsers": "Selected users",
+        "removeUser": "Remove {name}",
+        "added": "Added",
+        "maxUsers": "You can pre-onboard up to {max} users at a time.",
+        "selectedSummary": "{count} users selected",
+        "changeUsers": "Change selection",
+        "continue": "Continue ({count})",
+        "doneSummary": "{created} of {total} users pre-onboarded. Their accounts are waiting for the first sign-in.",
+        "statusCreated": "Pre-onboarded"
+      }
     },
     "logs": {
       "title": "Access logs",
@@ -1276,7 +1352,13 @@
         "add_linked_groups": "Groups linked",
         "add_linked_entra_groups": "Entra groups linked",
         "remove_linked_group": "Group unlinked",
-        "remove_linked_entra_group": "Entra group unlinked"
+        "remove_linked_entra_group": "Entra group unlinked",
+        "start": "Started",
+        "end": "Ended",
+        "write_blocked": "Change blocked",
+        "app_launch_blocked": "App launch blocked",
+        "convert_to_local": "Converted to local",
+        "preonboard": "Pre-onboarded"
       },
       "targetLabels": {
         "app": "App",
@@ -1287,7 +1369,8 @@
         "user_status": "User",
         "branding": "Customization",
         "auth": "Sign-in",
-        "plugin": "Plugin"
+        "plugin": "Plugin",
+        "impersonation": "Impersonation"
       },
       "events": {
         "fallback": "{action}: {targetType} {target}",
@@ -1309,7 +1392,8 @@
           "remove_linked_entra_group": "Unlinked the Entra group {item} from {target}",
           "import_one": "Imported 1 group from Microsoft Entra",
           "add_linked_groups_one": "Linked 1 group to {target}",
-          "add_linked_entra_groups_one": "Linked 1 Entra group to {target}"
+          "add_linked_entra_groups_one": "Linked 1 Entra group to {target}",
+          "convert_to_local": "Converted {target} to a local group"
         },
         "membership": {
           "add_members": "Added {count} members to {target}",
@@ -1332,7 +1416,8 @@
         "user_status": {
           "activate": "Reactivated {target}",
           "deactivate": "Deactivated {target}",
-          "delete": "Deleted the user {target}"
+          "delete": "Deleted the user {target}",
+          "preonboard": "Pre-onboarded {target}"
         },
         "auth": {
           "login": "Signed in"
@@ -1350,6 +1435,12 @@
           "import": "Imported the plugin {target}",
           "update": "Updated the plugin {target}",
           "delete": "Deleted the plugin {target}"
+        },
+        "impersonation": {
+          "start": "Started acting as {target}",
+          "end": "Stopped acting as {target}",
+          "write_blocked": "Blocked a change while acting as {target}",
+          "app_launch_blocked": "Blocked opening {item} while acting as {target}"
         }
       },
       "fields": {
@@ -1428,7 +1519,14 @@
         "showRedirectSsoMode": "Redirect SSO mode",
         "showEntraAppMode": "Entra app mode",
         "pluginsEnabled": "Plugins",
-        "iconImage": "Icon image"
+        "iconImage": "Icon image",
+        "ipAddress": "IP address",
+        "userAgent": "Browser",
+        "expiresAt": "Expires",
+        "endReason": "Ended by",
+        "durationSeconds": "Duration (seconds)",
+        "method": "Method",
+        "path": "Path"
       },
       "values": {
         "role": {
@@ -1458,14 +1556,30 @@
           "not set": "not set",
           "removed": "removed",
           "updated": "updated"
+        },
+        "endReason": {
+          "manual": "Manual stop",
+          "logout": "Sign-out",
+          "timeout": "Timed out",
+          "session_expired": "Admin session expired",
+          "target_ineligible": "User no longer eligible",
+          "admin_ineligible": "Admin no longer eligible"
         }
       },
-      "showSignIns": "Show sign-ins",
-      "signInsHidden": "Administrator sign-ins are hidden; use \"Show sign-ins\" to include them.",
+      "eventFilter": "Events",
+      "eventScopes": {
+        "all": "All events",
+        "changes": "Changes only",
+        "impersonation": "Impersonation only"
+      },
+      "signInsHidden": "Administrator sign-ins are hidden; choose \"All events\" in Events to include them.",
       "actorLabels": {
         "api-key": "API key (bulk import)",
         "system": "System"
-      }
+      },
+      "impersonatingBadge": "Acting as {name}",
+      "sessionFilter": "Session #{id}",
+      "clearSessionFilter": "Show all sessions"
     }
   },
   "errors": {
@@ -1505,15 +1619,22 @@
     "default_group_link": "Groups cannot be linked to the default group.",
     "default_group_rename": "The default group cannot be renamed.",
     "dev_login_disabled": "Dev login is not enabled.",
+    "directory_search_length": "Type 2 to 64 characters to search Microsoft Entra.",
     "email_invitations_unsupported": "Email invitations are no longer supported.",
     "entra_app_not_found": "Entra app not found.",
     "entra_application_id_invalid": "Enter a valid MyApps Application ID or launcher URL.",
+    "entra_directory_access_denied": "Microsoft Graph denied the directory read. Grant the User.Read.All application permission with admin consent.",
+    "entra_directory_lookup_failed": "Could not read the user from Microsoft Entra.",
+    "entra_directory_search_failed": "Could not search Microsoft Entra.",
     "entra_group_already_linked": "This Entra group is already linked to the container.",
     "entra_group_ids_required": "Select at least one Entra group.",
     "entra_group_not_discovered": "The Entra group was not found among the discovered groups. Refresh the list and try again.",
     "entra_group_read_only": "Entra-synced groups cannot be edited locally.",
     "entra_groups_not_found": "One or more Entra groups were not found.",
     "entra_membership_managed": "Memberships of Entra-synced groups are managed in Microsoft Entra.",
+    "entra_object_id_invalid": "A valid Microsoft Entra object ID is required.",
+    "entra_user_not_found": "The user was not found in Microsoft Entra.",
+    "entra_user_without_email": "The Microsoft Entra user has no email or user principal name.",
     "failed_to_check_icons": "The icon sizes could not be checked.",
     "failed_to_clean_icon_cache": "Could not clean the app icon cache.",
     "failed_to_compact_database": "Could not compact the database storage.",
@@ -1536,6 +1657,7 @@
     "graph_credentials_missing": "Microsoft Graph app credentials are not configured.",
     "graph_token_failed": "Could not get a Microsoft Graph token.",
     "group_description_invalid": "The group description must be text.",
+    "group_ids_invalid": "The group list is not valid.",
     "group_ids_required": "Select at least one group.",
     "group_link_circular": "Cannot create a circular group link.",
     "group_link_invalid": "The selected group cannot be linked.",
@@ -1544,10 +1666,16 @@
     "group_name_taken": "A group with this name already exists.",
     "group_name_too_long": "The group name must be 100 characters or less.",
     "group_name_too_short": "The group name must be at least 2 characters long.",
+    "group_not_deleted_in_entra": "Only imported groups deleted in Microsoft Entra can be converted.",
     "group_not_found": "Group not found.",
     "groups_not_found": "One or more groups were not found.",
     "icon_too_large": "The icon is too large: images up to 1 MB, SVG up to 512 KB.",
     "icon_unsupported_type": "The icon must be a PNG, JPEG, GIF, WEBP, BMP, AVIF, ICO or SVG image.",
+    "impersonation_already_active": "Stop the current impersonation before starting a new one.",
+    "impersonation_read_only": "Not available while you are acting as another user.",
+    "impersonation_app_launch_blocked": "Apps cannot be opened while you are acting as another user.",
+    "impersonation_target_not_allowed": "Only active users with the User role can be impersonated.",
+    "impersonation_reason_required": "Enter a reason (up to 500 characters).",
     "insufficient_permissions": "You do not have permission to do this.",
     "internal_server_error": "Something went wrong on the server. Try again.",
     "invalid_app_mode": "The app mode is not valid.",
@@ -1578,9 +1706,11 @@
     "media_asset_in_use": "This file is still used by an app or by the branding settings.",
     "media_asset_not_found": "Media file not found.",
     "membership_not_found": "Membership not found.",
+    "microsoft_ids_required": "Choose at least one user to pre-onboard.",
     "no_preference_updates": "No preference changes were provided.",
     "not_authenticated": "You are not signed in.",
     "not_found": "Not found.",
+    "notification_not_found": "Notification not found or already resolved.",
     "owner_assignment_forbidden": "The owner role can only be assigned from the server configuration.",
     "permission_not_found": "Permission not found.",
     "plugin_archive_empty_archive": "The plugin archive is empty.",
@@ -1608,6 +1738,8 @@
     "plugin_package_not_object": "The plugin package must be a JSON object.",
     "plugin_package_zip_invalid_base64": "The plugin ZIP package is not valid.",
     "plugin_system_disabled": "The plugin system is disabled.",
+    "preonboard_groups_invalid": "Only existing local groups can be chosen.",
+    "preonboard_too_many_users": "You can pre-onboard up to {max} users at a time.",
     "slug_invalid": "The slug must use lowercase letters, numbers and hyphens (1-63 characters).",
     "slug_required": "The slug is required.",
     "source_group_not_found": "Source group not found.",
@@ -1622,9 +1754,47 @@
     "too_many_login_attempts": "Too many sign-in attempts. Try again later.",
     "too_many_requests": "Too many requests. Wait a moment and try again.",
     "transfer_same_group": "Source and target groups must be different.",
+    "user_already_exists": "This user already has a Frontdoor account.",
     "user_ids_required": "Select at least one user.",
     "user_not_found": "User not found.",
     "user_not_found_or_inactive": "User not found or inactive.",
+    "user_preonboard_failed": "Could not pre-onboard the user.",
     "users_not_found": "{count} selected users were not found."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "bell": "Notifications",
+    "bellUnread": "Notifications, {count} unread",
+    "markAllRead": "Mark all as read",
+    "empty": "No open notifications.",
+    "loadFailed": "Could not load the notifications.",
+    "open": "Open",
+    "resolve": "Resolve",
+    "unread": "Unread",
+    "sources": {
+      "sign-in": "at sign-in",
+      "force-sync": "during the forced sync"
+    },
+    "types": {
+      "user_deactivated_entra": {
+        "title": "User deactivated: no longer in Microsoft Entra",
+        "body": "{name} ({email}) was deactivated by the sync. Reactivate or delete the account."
+      },
+      "user_first_sign_in": {
+        "title": "First sign-in",
+        "body": "{name} signed in for the first time."
+      },
+      "entra_sync_failed": {
+        "title": "Microsoft Entra sync failed",
+        "body": "{count} errors {source}. Check the Microsoft Graph permissions."
+      },
+      "entra_group_deleted": {
+        "title": "Entra group deleted in Microsoft Entra",
+        "body": "{name}: {members} members and {apps} apps. Decide how to keep their access."
+      }
+    },
+    "recentlyResolved": "Resolved in the last 7 days",
+    "resolvedAutomatically": "Resolved on its own: the condition is gone.",
+    "resolvedByAdmin": "Resolved by an admin."
   }
 }

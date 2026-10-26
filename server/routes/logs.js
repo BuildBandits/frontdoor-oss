@@ -78,12 +78,15 @@ export function purgeLogsOlderThan(days = 90) {
     if (retentionDays === 0) {
       const accessRemoved = db.prepare('DELETE FROM access_logs').run().changes || 0;
       const auditRemoved = db.prepare('DELETE FROM rbac_audit_logs').run().changes || 0;
+      db.prepare('DELETE FROM impersonation_sessions WHERE ended_at IS NOT NULL').run();
       return { accessRemoved, auditRemoved };
     }
 
     const cutoff = utcDaysAgo(retentionDays);
     const accessRemoved = db.prepare('DELETE FROM access_logs WHERE created_at < datetime(\'now\', ?)').run(cutoff).changes || 0;
     const auditRemoved = db.prepare('DELETE FROM rbac_audit_logs WHERE created_at < datetime(\'now\', ?)').run(cutoff).changes || 0;
+    // A session ends after its last audit row, so it goes once all of them are gone.
+    db.prepare('DELETE FROM impersonation_sessions WHERE ended_at IS NOT NULL AND ended_at < datetime(\'now\', ?)').run(cutoff);
     return { accessRemoved, auditRemoved };
   })();
   return { retentionDays, ...result };
@@ -149,7 +152,7 @@ function parseCsvList(value) {
     .filter(Boolean);
 }
 
-function buildAuditWhere({ action, target_type, excludeTargetTypes = [], actorIds, from, to, retentionDays, q }) {
+function buildAuditWhere({ action, target_type, excludeTargetTypes = [], actorIds, impersonationSessionId, from, to, retentionDays, q }) {
   let where = `a.created_at >= datetime('now', ?)`;
   const params = [`-${retentionDays} days`];
 
@@ -160,6 +163,10 @@ function buildAuditWhere({ action, target_type, excludeTargetTypes = [], actorId
   if (target_type) {
     where += ' AND a.target_type = ?';
     params.push(target_type);
+  }
+  if (impersonationSessionId) {
+    where += ' AND a.impersonation_session_id = ?';
+    params.push(impersonationSessionId);
   }
   if (excludeTargetTypes.length > 0) {
     where += ` AND a.target_type NOT IN (${excludeTargetTypes.map(() => '?').join(', ')})`;
@@ -253,16 +260,21 @@ function loadAuditLogs(req, res) {
   const q = parseSearch(req.query.q);
   const parsedActorIds = parseCsvList(actor_ids || actor_id);
   const excludeTargetTypes = parseCsvList(req.query.exclude_target_types);
+  const parsedSessionId = Number.parseInt(req.query.impersonation_session_id ?? '', 10);
+  const impersonationSessionId = Number.isInteger(parsedSessionId) && parsedSessionId > 0 ? parsedSessionId : null;
 
-  const { where, params } = buildAuditWhere({ action, target_type, excludeTargetTypes, actorIds: parsedActorIds, from, to, retentionDays, q });
+  const { where, params } = buildAuditWhere({ action, target_type, excludeTargetTypes, actorIds: parsedActorIds, impersonationSessionId, from, to, retentionDays, q });
 
   const total = db.prepare(`SELECT COUNT(*) AS count FROM rbac_audit_logs a LEFT JOIN users u ON a.actor_id = u.id WHERE ${where}`).get(...params).count;
 
   const logs = db.prepare(`
-    SELECT a.id, a.actor_id, a.action, a.target_type, a.target_id, a.details, a.created_at,
-      u.display_name AS actor_name, u.email AS actor_email
+    SELECT a.id, a.actor_id, a.action, a.target_type, a.target_id, a.details, a.created_at, a.impersonation_session_id,
+      u.display_name AS actor_name, u.email AS actor_email,
+      s.target_user_id AS impersonated_user_id, tu.display_name AS impersonated_user_name
     FROM rbac_audit_logs a
     LEFT JOIN users u ON a.actor_id = u.id
+    LEFT JOIN impersonation_sessions s ON a.impersonation_session_id = s.id
+    LEFT JOIN users tu ON s.target_user_id = tu.id
     WHERE ${where}
     ORDER BY a.created_at DESC, a.id DESC
     LIMIT ? OFFSET ?

@@ -87,7 +87,7 @@ function AppRoutes() {
   const pluginRoutes = usePluginRegistry((snapshot) => snapshot.routes);
   const pluginRuntimeApi = usePluginRuntimeApi();
   const pluginsEnabled = pluginRuntimeApi?.pluginsEnabled === true;
-  const { isAuthenticated, user, updateUser } = useAuthStore();
+  const { isAuthenticated, user, applySession } = useAuthStore();
   useColorScheme(user?.preferredColorScheme);
   const { effective: language } = useDocumentLanguage(user?.preferredLanguage);
   // Re-render the whole app when a dictionary finishes loading.
@@ -107,7 +107,7 @@ function AppRoutes() {
     api.get('/auth/me')
       .then((res) => {
         if (!cancelled && res.data?.user) {
-          updateUser(res.data.user);
+          applySession(res.data);
         }
       })
       .catch(() => {});
@@ -115,7 +115,7 @@ function AppRoutes() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, user?.id, updateUser]);
+  }, [isAuthenticated, user?.id, applySession]);
 
   const coreRoutes = [
     { path: '/login', element: <Login />, access: PLUGIN_ACCESS.PUBLIC, layout: 'none' },

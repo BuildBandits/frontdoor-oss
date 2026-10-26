@@ -8,11 +8,14 @@ import db from '../db.js';
 import { createPreferenceUpdate } from '../services/userPreferences.js';
 import { DEFAULT_GROUP_ID } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
+import { IMPERSONATION_COOKIE, clearImpersonationCookie, endSession, readSessionCookie } from '../services/impersonation.js';
 import { getAppTimeZone, getRequiredEnv, isDevLoginEnabled } from '../config.js';
-import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, isEntraUserDeleted, refreshGroupCacheFromTenant, syncUserEntraGroups } from '../services/entraGroups.js';
+import { discoverEntraGroupsForUser, getAuthScopes, isEntraGroupSyncEnabled, isEntraUserDeleted, protectDeletedGroupsBeforeUserSync, refreshGroupCacheFromTenant, syncUserEntraGroups } from '../services/entraGroups.js';
 import { ensureAvatarCached } from '../services/avatars.js';
 import { verifySsoTokenChain } from '../services/verifySsoToken.js';
 import { dispatchPluginEvent } from '../services/plugins.js';
+import { recordEntraSyncOutcome } from '../services/syncNotifications.js';
+import { NOTIFICATION_TYPES, raiseNotification } from '../services/notifications.js';
 import { logRbacAudit } from '../db.js';
 import { isSupportedLanguage } from '../../shared/languages.js';
 import { isSupportedColorScheme, normalizeOptionalColorScheme } from '../../shared/colorSchemes.js';
@@ -240,12 +243,14 @@ router.get('/microsoft/callback', async (req, res) => {
     const microsoftId = profile.id;
     let entraGroups = null;
     if (isEntraGroupSyncEnabled()) {
+      const syncErrors = [];
       try {
         const refresh = await refreshGroupCacheFromTenant();
         if (!refresh.skipped) console.log(`Entra tenant group refresh [${microsoftId}]: ${refresh.discoveredGroups} groups`);
       } catch (error) {
         const hint = error.hint ? ` Hint: ${error.hint}` : '';
         console.warn(`Entra tenant group refresh skipped [${microsoftId}]: ${error.message}.${hint}`);
+        syncErrors.push({ scope: 'tenant-groups', message: error.message, hint: error.hint || null });
       }
       try {
         entraGroups = await discoverEntraGroupsForUser(microsoftId);
@@ -253,7 +258,9 @@ router.get('/microsoft/callback', async (req, res) => {
       } catch (error) {
         const hint = error.hint ? ` Hint: ${error.hint}` : '';
         console.warn(`Entra group sync skipped [${microsoftId}]: ${error.message}.${hint}`);
+        syncErrors.push({ scope: 'user-groups', message: error.message, hint: error.hint || null });
       }
+      recordEntraSyncOutcome('sign-in', syncErrors);
     }
 
     // Find or create user
@@ -284,6 +291,14 @@ router.get('/microsoft/callback', async (req, res) => {
 
     if (user) {
       // Existing user (either pre-registered or returning) — update profile
+      if (!user.last_login) {
+        raiseNotification({
+          type: NOTIFICATION_TYPES.USER_FIRST_SIGN_IN,
+          subjectKey: user.id,
+          severity: 'info',
+          payload: { userId: user.id, email, displayName },
+        });
+      }
       const shouldPromote = adminEmails.includes(email.toLowerCase()) && user.role !== 'owner';
       db.prepare(
         `UPDATE users SET microsoft_id = ?, display_name = ?, entra_missing_since = NULL, last_login = datetime('now'), last_activity_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
@@ -311,6 +326,11 @@ router.get('/microsoft/callback', async (req, res) => {
     }
 
     if (entraGroups) {
+      try {
+        await protectDeletedGroupsBeforeUserSync(user.id, entraGroups);
+      } catch (error) {
+        console.warn(`Entra deleted-group check skipped [${user.id}]: ${error.message}`);
+      }
       const entraSync = syncUserEntraGroups(user.id, entraGroups);
       if (entraSync.discoveredGroups === 0) {
         console.log(`No Entra groups discovered [${user.id}]; nothing to import yet.`);
@@ -398,10 +418,11 @@ router.get('/microsoft/callback', async (req, res) => {
   }
 });
 
-// Get current user
+// Get current user (the impersonated one while an admin acts as a user)
 router.get('/me', authenticate, (req, res) => {
   res.json({
     user: serializeCurrentUser(req.user),
+    impersonation: req.impersonation,
   });
 });
 
@@ -507,8 +528,11 @@ router.put('/me/preferences', authenticate, (req, res) => {
   });
 });
 
-// Logout — clear cookie
+// Logout — end any impersonation session, then clear the cookies
 router.post('/logout', (req, res) => {
+  const sessionId = readSessionCookie(req.cookies?.[IMPERSONATION_COOKIE]);
+  if (sessionId) endSession(sessionId, 'logout');
+  clearImpersonationCookie(res);
   const baseDomain = process.env.BASE_DOMAIN || 'frontdoor.local';
   res.clearCookie('frontdoor_token', { domain: `.${baseDomain}` });
   res.json({ ok: true });

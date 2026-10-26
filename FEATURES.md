@@ -65,6 +65,7 @@ How Frontdoor hands the user off to a target application:
 - **Local groups** with names, descriptions, members, and app permissions.
 - **Entra group import** — discover groups from Microsoft Graph and import them as local groups linked by `entra_group_id`.
 - **Force-sync** — refresh all Entra group memberships across users (app-only Graph call).
+- **Entra groups deleted in Entra** — both imported groups and Entra groups only linked into local groups. Detected on the tenant catalog refresh and before a user's memberships are synced (confirmed by Graph `404`), flagged with a snapshot of members, apps and linking groups, and notified. By default the group is frozen (`ENTRA_DELETED_GROUP_POLICY=freeze`): members keep their access until an admin converts it to a local group (members, apps and links kept), moves its apps, unlinks or deletes it. A group restored in Entra is unflagged on its own.
 - **Group-of-groups** — composite local groups can include other local groups *and* reference discovered Entra groups directly (without importing them).
 - **Transitive membership resolution** — recursive SQL resolves inherited access across the full chain.
 - **App-permission transfer** 🕶️ — copy or move all app permissions from one group to another in a single action.
@@ -73,6 +74,7 @@ How Frontdoor hands the user off to a target application:
 ## Users 🔧
 
 - List, search, role-edit, activate/deactivate, delete (with cascade cleanup).
+- **Pre-onboarding** — search the Entra tenant (app-only Graph) and create the accounts of users who have not signed in yet (up to 50 at a time), linked by object ID, directly in the default group and the chosen local groups. Entra groups are added by the next sync or at the first sign-in.
 - **Per-user "visible apps"** modal — see exactly which apps a user can reach and through which group.
 - **Avatars** from Microsoft 365 photos with Gravatar fallback and generated initials as last resort. Disk-cached (configurable TTL); prewarm script for batch fetch.
 - Compose-locked admins are visibly flagged and cannot be demoted from the UI.
@@ -106,6 +108,13 @@ The `/admin/customization` page covers:
 - `/admin/logs` viewer: paginated (50–250/page), search by email / app / IP, period filter (1 to 90 days), timezone-aware rendering.
 - **Top apps** analytics — most-accessed apps in the selected period with click counts.
 - Unique-users metric per period.
+
+## Notifications 🛡️
+
+- **Bell in the top bar** for owners, admins and read-only admins, with the unread count; refreshed on navigation and every minute.
+- One open notification per event and subject (a repeat refreshes it); each links to the page where it is handled. Owners and admins can resolve them; some resolve on their own (user reactivated, sync working again).
+- Events: user deactivated because it is no longer in Microsoft Entra, first sign-in of an account created in advance, Microsoft Entra sync errors (at sign-in or during force sync), imported Entra group deleted in Entra.
+- Read state is per admin; resolved notifications are purged after `NOTIFICATION_RETENTION_DAYS` (default 30). The audit log stays the history.
 
 ## Audit Trail 🛡️
 

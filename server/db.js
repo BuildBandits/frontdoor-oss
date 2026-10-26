@@ -165,10 +165,25 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     actor_id TEXT NOT NULL,
     action TEXT NOT NULL,
-    target_type TEXT NOT NULL CHECK(target_type IN ('group', 'membership', 'permission', 'role', 'user_status', 'app', 'branding', 'auth', 'plugin')),
+    target_type TEXT NOT NULL CHECK(target_type IN ('group', 'membership', 'permission', 'role', 'user_status', 'app', 'branding', 'auth', 'plugin', 'impersonation')),
     target_id TEXT,
     details TEXT,
+    impersonation_session_id INTEGER,
     created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS impersonation_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id TEXT NOT NULL,
+    target_user_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    ip_address TEXT,
+    user_agent TEXT,
+    started_at TEXT DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL,
+    expiry_reason TEXT NOT NULL CHECK(expiry_reason IN ('timeout', 'session_expired')),
+    ended_at TEXT,
+    end_reason TEXT CHECK(end_reason IN ('manual', 'logout', 'timeout', 'session_expired', 'target_ineligible', 'admin_ineligible'))
   );
 
   CREATE TABLE IF NOT EXISTS auth_pending_states (
@@ -198,6 +213,26 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 
+  -- Admin notification center: one open notification per (type, subject_key).
+  CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'warning' CHECK(severity IN ('info', 'warning', 'critical')),
+    subject_key TEXT NOT NULL,
+    payload TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    resolved_at TEXT,
+    resolved_by TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS notification_reads (
+    notification_id TEXT NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    read_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (notification_id, user_id)
+  );
+
   -- Secondary indexes for RBAC join performance
   CREATE INDEX IF NOT EXISTS idx_auth_pending_states_created ON auth_pending_states(created_at);
   CREATE INDEX IF NOT EXISTS idx_user_group_members_group ON user_group_members(group_id);
@@ -216,10 +251,14 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_rbac_audit_actor ON rbac_audit_logs(actor_id);
   CREATE INDEX IF NOT EXISTS idx_rbac_audit_target ON rbac_audit_logs(target_type, target_id);
   CREATE INDEX IF NOT EXISTS idx_rbac_audit_created ON rbac_audit_logs(created_at);
+  CREATE INDEX IF NOT EXISTS idx_impersonation_sessions_open ON impersonation_sessions(ended_at, expires_at);
+  CREATE INDEX IF NOT EXISTS idx_impersonation_sessions_admin ON impersonation_sessions(admin_id);
   CREATE INDEX IF NOT EXISTS idx_entra_group_cache_last_seen ON entra_group_cache(last_seen_at);
   CREATE INDEX IF NOT EXISTS idx_entra_user_group_memberships_group ON entra_user_group_memberships(entra_group_id);
   CREATE INDEX IF NOT EXISTS idx_plugin_registry_enabled ON plugin_registry(enabled);
   CREATE INDEX IF NOT EXISTS idx_plugin_registry_source ON plugin_registry(source);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_open_subject ON notifications(type, subject_key) WHERE resolved_at IS NULL;
+  CREATE INDEX IF NOT EXISTS idx_notifications_resolved ON notifications(resolved_at);
 `);
 
 const ensuredColumns = [];
@@ -260,6 +299,9 @@ ensureColumn('user_groups', 'source', "source TEXT DEFAULT 'local' CHECK(source 
 ensureColumn('user_groups', 'entra_group_id', 'entra_group_id TEXT');
 ensureColumn('user_groups', 'entra_display_name', 'entra_display_name TEXT');
 ensureColumn('user_groups', 'entra_synced_at', 'entra_synced_at TEXT');
+// Set when Microsoft Entra reports an imported group deleted; the snapshot keeps its members and apps.
+ensureColumn('user_groups', 'entra_deleted_at', 'entra_deleted_at TEXT');
+ensureColumn('user_groups', 'entra_deleted_snapshot', 'entra_deleted_snapshot TEXT');
 ensureColumn('apps', 'icon_file_name', 'icon_file_name TEXT');
 ensureColumn('users', 'home_desktop_view', "home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact'))");
 ensureColumn('users', 'preferred_language', 'preferred_language TEXT');
@@ -271,6 +313,7 @@ ensureColumn('users', 'favorite_apps', 'favorite_apps TEXT');
 ensureColumn('users', 'favorite_apps_updated_at', 'favorite_apps_updated_at TEXT');
 ensureColumn('users', 'home_tour_seen_at', 'home_tour_seen_at TEXT');
 ensureColumn('users', 'last_activity_at', 'last_activity_at TEXT');
+ensureColumn('rbac_audit_logs', 'impersonation_session_id', 'impersonation_session_id INTEGER');
 ensureColumn('branding_settings', 'show_app_mode_badges', 'show_app_mode_badges INTEGER DEFAULT 1');
 ensureColumn('branding_settings', 'default_home_desktop_view', "default_home_desktop_view TEXT DEFAULT 'cards' CHECK(default_home_desktop_view IN ('cards', 'compact'))");
 ensureColumn('branding_settings', 'default_compact_view', 'default_compact_view INTEGER DEFAULT 0');
@@ -294,6 +337,9 @@ ensureColumn('branding_settings', 'hero_title_line1_i18n', 'hero_title_line1_i18
 ensureColumn('branding_settings', 'hero_title_line2_i18n', 'hero_title_line2_i18n TEXT');
 ensureColumn('branding_settings', 'hero_subtitle_i18n', 'hero_subtitle_i18n TEXT');
 ensureColumn('entra_group_cache', 'description', 'description TEXT');
+// Deletion flag of Entra groups linked into local groups without being imported.
+ensureColumn('entra_group_cache', 'deleted_at', 'deleted_at TEXT');
+ensureColumn('entra_group_cache', 'deleted_snapshot', 'deleted_snapshot TEXT');
 ensureColumn('media_assets', 'app_name', 'app_name TEXT');
 ensureColumn('media_assets', 'app_slug', 'app_slug TEXT');
 ensureColumn('media_assets', 'app_target_url', 'app_target_url TEXT');
@@ -457,19 +503,20 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_media_assets_app_slug ON media_assets(ap
 // Migration: expand RBAC audit target types on existing databases.
 {
   const auditSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='rbac_audit_logs'").get();
-  if (auditSchema && (!auditSchema.sql.includes("'app'") || !auditSchema.sql.includes("'branding'") || !auditSchema.sql.includes("'auth'") || !auditSchema.sql.includes("'plugin'"))) {
+  if (auditSchema && !auditSchema.sql.includes("'impersonation'")) {
     runTableRebuild(`
       CREATE TABLE rbac_audit_logs_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         actor_id TEXT NOT NULL,
         action TEXT NOT NULL,
-        target_type TEXT NOT NULL CHECK(target_type IN ('group', 'membership', 'permission', 'role', 'user_status', 'app', 'branding', 'auth', 'plugin')),
+        target_type TEXT NOT NULL CHECK(target_type IN ('group', 'membership', 'permission', 'role', 'user_status', 'app', 'branding', 'auth', 'plugin', 'impersonation')),
         target_id TEXT,
         details TEXT,
+        impersonation_session_id INTEGER,
         created_at TEXT DEFAULT (datetime('now'))
       );
-      INSERT INTO rbac_audit_logs_new (id, actor_id, action, target_type, target_id, details, created_at)
-      SELECT id, actor_id, action, target_type, target_id, details, created_at
+      INSERT INTO rbac_audit_logs_new (id, actor_id, action, target_type, target_id, details, impersonation_session_id, created_at)
+      SELECT id, actor_id, action, target_type, target_id, details, impersonation_session_id, created_at
       FROM rbac_audit_logs;
       DROP TABLE rbac_audit_logs;
       ALTER TABLE rbac_audit_logs_new RENAME TO rbac_audit_logs;
@@ -575,6 +622,9 @@ ensureColumn('users', 'entra_missing_since', 'entra_missing_since TEXT');
 ensureColumn('auth_pending_states', 'code_verifier', 'code_verifier TEXT');
 ensureColumn('auth_pending_states', 'browser_nonce_hash', 'browser_nonce_hash TEXT');
 
+// Created here, not in the schema block: legacy audit tables only get the column above.
+db.exec('CREATE INDEX IF NOT EXISTS idx_rbac_audit_impersonation ON rbac_audit_logs(impersonation_session_id)');
+
 // --- RBAC Bootstrap: "default" group + backfill ---
 
 // Ensure "default" group exists
@@ -609,13 +659,14 @@ if (memberResult.changes > 0) console.log(`RBAC: added ${memberResult.changes} u
 /**
  * Log an RBAC mutation for audit trail. Never throws — failures are logged to stderr.
  * Names of the entities involved are snapshotted into `details.refs`, so the row
- * stays readable after those entities are renamed or deleted.
+ * stays readable after those entities are renamed or deleted. Rows written while an
+ * admin acts as a user carry that impersonation session's id.
  */
-function logRbacAudit(actorId, action, targetType, targetId, details = null) {
+function logRbacAudit(actorId, action, targetType, targetId, details = null, impersonationSessionId = null) {
   try {
     const payload = withAuditRefs(db, { action, targetType, targetId, details });
-    db.prepare('INSERT INTO rbac_audit_logs (actor_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)')
-      .run(actorId, action, targetType, targetId, payload ? JSON.stringify(payload) : null);
+    db.prepare('INSERT INTO rbac_audit_logs (actor_id, action, target_type, target_id, details, impersonation_session_id) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(actorId, action, targetType, targetId, payload ? JSON.stringify(payload) : null, impersonationSessionId);
   } catch (e) {
     console.error('RBAC audit log write failed:', e.message);
   }
