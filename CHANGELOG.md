@@ -17,6 +17,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Security
 - **Express 5.3.0**: `express` moves from 5.2.1 to 5.3.0, which brings patched `qs` (CVE-2026-2391, CVE-2026-82417, CVE-2026-82562: array limit bypasses and a denial of service in query string parsing) and `proxy-addr` (CVE-2026-90711). The same dependency refresh bumps `dotenv`, `uuid`, `concurrently`, `lucide-react` and `vite` to their latest patch or minor releases. ([#133](https://github.com/BuildBandits/frontdoor-oss/pull/133))
+- **body-parser 2.4.0 and ip-address 10.7.5**: the lockfile picks up the patched `body-parser` (GHSA-27r3-jxmh-p828, high: denial of service via trailing bytes after a compressed request body) and `ip-address` (GHSA-rxp7-6hxx-x8q5, moderate: quadratic time on long IPv6 zone identifiers).
 
 ## [1.4.0] — 2026-10-09
 
