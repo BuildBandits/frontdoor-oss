@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-10-26
+
+Support and Microsoft Entra lifecycle tools for admins: read-only impersonation of a user with a full audit trail, pre-onboarding of Entra users before their first sign-in, a notification center for what needs attention, and protection of the access given by Entra groups deleted in Entra. Group dialogs and lists get shared *All / Selected / Not selected* and source filters, filter menus are sorted alphabetically, and dependency updates fix advisories in `express`, `qs`, `body-parser` and `ip-address`.
+
+**Upgrading:** the database migrates automatically. New optional settings: `IMPERSONATION_TIMEOUT_MINUTES` (default 30), `NOTIFICATION_RETENTION_DAYS` (default 30) and `ENTRA_DELETED_GROUP_POLICY` (`freeze` by default; `revoke` keeps the previous behaviour). Pre-onboarding needs the Microsoft Graph `User.Read.All` application permission with admin consent, also when `ENTRA_GROUP_SYNC` is off; nothing else changes in the Entra app registration.
+
 ### Added
 - **Admin impersonation**: owners, admins and read-only admins can act as a regular user, read-only, to reproduce support issues. A reason is required, a banner shows on every page, and the session ends on stop, sign-out, admin session expiry or `IMPERSONATION_TIMEOUT_MINUTES` (default 30). App launches are blocked server side. Start, end, blocked changes and blocked launches are audited, and the Audit page can filter by session. ([#134](https://github.com/BuildBandits/frontdoor-oss/issues/134))
 - **Notification center**: a bell in the top bar shows owners, admins and read-only admins what needs attention: users deactivated because they are no longer in Microsoft Entra, the first sign-in of accounts created in advance, Microsoft Entra sync errors, and imported Entra groups deleted in Entra. Each notification links to the page where it is handled; owners and admins can resolve it, and some resolve on their own. Read state is per admin; resolved notifications are kept `NOTIFICATION_RETENTION_DAYS` (default 30). ([#140](https://github.com/BuildBandits/frontdoor-oss/issues/140))
