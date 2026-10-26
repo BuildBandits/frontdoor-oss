@@ -66,6 +66,22 @@ test('an active user signing in clears the "not found in Entra" mark', async (t)
   assert.equal(db.prepare("SELECT entra_missing_since FROM users WHERE id = 'sso-back'").get().entra_missing_since, null);
 });
 
+test('a pre-onboarded user signing in for the first time keeps the account and its local groups', async (t) => {
+  db.prepare("INSERT INTO users (id, email, display_name, microsoft_id, role, is_active) VALUES ('sso-pre', 'pre@sso-test.local', 'Pre', 'ms-pre', 'user', 1)").run();
+  db.prepare("INSERT INTO user_groups (id, name, source) VALUES ('sso-pre-local', 'Onboarding', 'local')").run();
+  db.prepare("INSERT INTO user_group_members (user_id, group_id) VALUES ('sso-pre', 'sso-pre-local')").run();
+  graphProfile = { id: 'ms-pre', mail: 'pre@sso-test.local', displayName: 'Pre Onboarded' };
+
+  const res = await signIn(t);
+  assert.equal(res.status, 302);
+  assert.doesNotMatch(res.headers.get('location') || '', /error=/);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM users WHERE microsoft_id = 'ms-pre'").get().n, 1);
+  const user = db.prepare("SELECT display_name, last_login FROM users WHERE id = 'sso-pre'").get();
+  assert.equal(user.display_name, 'Pre Onboarded');
+  assert.ok(user.last_login);
+  assert.ok(db.prepare("SELECT 1 FROM user_group_members WHERE user_id = 'sso-pre' AND group_id = 'sso-pre-local'").get());
+});
+
 test('sign-in start sends a PKCE challenge and binds the state to the browser', async (t) => {
   let authRequest = null;
   t.mock.method(ConfidentialClientApplication.prototype, 'getAuthCodeUrl', async (request) => {

@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+- **Pre-onboarding of Entra users**: *Admin → Users → Pre-onboard users* searches the Microsoft Entra tenant and creates the accounts of people who have not signed in yet (up to 50 at a time), linked by object ID, in the default group and the chosen local groups, which are optional. A summary shows who was created and who was skipped (already in Frontdoor, not found in Entra). The Entra group sync covers these users too, the first sign-in completes the profile, and the action is in the audit log. Only accounts that exist in Entra can be pre-onboarded; the directory search needs the `User.Read.All` application permission, also when `ENTRA_GROUP_SYNC` is off. ([#138](https://github.com/BuildBandits/frontdoor-oss/issues/138))
+
 ### Changed
 - **Filter menus in alphabetical order**: the options of the filter menus (users by role, status and personalization, audit and plugin audit by admin and action, apps by connection mode, media library by kind) are listed alphabetically in the current language, with *All* always first. Numeric menus (period, rows) and short fixed choices keep their order.
 - **Selected groups filter in *Manage groups***: the dialog that assigns an app to groups has an *All / Selected / Not selected* filter, combined with the search, and the selected-groups counter opens the *Selected* view. Groups unchecked while a filtered view is open stay listed until the filter changes, so the selection can be reviewed and trimmed in one place. ([#137](https://github.com/BuildBandits/frontdoor-oss/issues/137))
