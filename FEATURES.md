@@ -65,6 +65,7 @@ How Frontdoor hands the user off to a target application:
 - **Local groups** with names, descriptions, members, and app permissions.
 - **Entra group import** — discover groups from Microsoft Graph and import them as local groups linked by `entra_group_id`.
 - **Force-sync** — refresh all Entra group memberships across users (app-only Graph call).
+- **Entra groups deleted in Entra** — both imported groups and Entra groups only linked into local groups. Detected on the tenant catalog refresh and before a user's memberships are synced (confirmed by Graph `404`), flagged with a snapshot of members, apps and linking groups, and notified. By default the group is frozen (`ENTRA_DELETED_GROUP_POLICY=freeze`): members keep their access until an admin converts it to a local group (members, apps and links kept), moves its apps, unlinks or deletes it. A group restored in Entra is unflagged on its own.
 - **Group-of-groups** — composite local groups can include other local groups *and* reference discovered Entra groups directly (without importing them).
 - **Transitive membership resolution** — recursive SQL resolves inherited access across the full chain.
 - **App-permission transfer** 🕶️ — copy or move all app permissions from one group to another in a single action.

@@ -282,6 +282,9 @@ ensureColumn('user_groups', 'source', "source TEXT DEFAULT 'local' CHECK(source 
 ensureColumn('user_groups', 'entra_group_id', 'entra_group_id TEXT');
 ensureColumn('user_groups', 'entra_display_name', 'entra_display_name TEXT');
 ensureColumn('user_groups', 'entra_synced_at', 'entra_synced_at TEXT');
+// Set when Microsoft Entra reports an imported group deleted; the snapshot keeps its members and apps.
+ensureColumn('user_groups', 'entra_deleted_at', 'entra_deleted_at TEXT');
+ensureColumn('user_groups', 'entra_deleted_snapshot', 'entra_deleted_snapshot TEXT');
 ensureColumn('apps', 'icon_file_name', 'icon_file_name TEXT');
 ensureColumn('users', 'home_desktop_view', "home_desktop_view TEXT DEFAULT 'cards' CHECK(home_desktop_view IN ('cards', 'compact'))");
 ensureColumn('users', 'preferred_language', 'preferred_language TEXT');
@@ -316,6 +319,9 @@ ensureColumn('branding_settings', 'hero_title_line1_i18n', 'hero_title_line1_i18
 ensureColumn('branding_settings', 'hero_title_line2_i18n', 'hero_title_line2_i18n TEXT');
 ensureColumn('branding_settings', 'hero_subtitle_i18n', 'hero_subtitle_i18n TEXT');
 ensureColumn('entra_group_cache', 'description', 'description TEXT');
+// Deletion flag of Entra groups linked into local groups without being imported.
+ensureColumn('entra_group_cache', 'deleted_at', 'deleted_at TEXT');
+ensureColumn('entra_group_cache', 'deleted_snapshot', 'deleted_snapshot TEXT');
 ensureColumn('media_assets', 'app_name', 'app_name TEXT');
 ensureColumn('media_assets', 'app_slug', 'app_slug TEXT');
 ensureColumn('media_assets', 'app_target_url', 'app_target_url TEXT');

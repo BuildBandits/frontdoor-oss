@@ -3,12 +3,22 @@ import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { DEFAULT_GROUP_ID, logRbacAudit } from '../db.js';
 import { authenticate, isAdminViewer, isAdminEditor } from '../middleware/auth.js';
-import { forceSyncAllEntraUsers, importEntraGroups, listDiscoveredEntraGroups } from '../services/entraGroups.js';
+import {
+  clearLinkedEntraGroupDeleted,
+  forceSyncAllEntraUsers,
+  getDeletedGroupPolicy,
+  importEntraGroups,
+  listDiscoveredEntraGroups,
+  releaseUnlinkedDeletedEntraGroups,
+  snapshotGroup,
+  snapshotLinkedEntraGroup,
+} from '../services/entraGroups.js';
 import { getDescendantGroupIds } from '../services/groupHierarchy.js';
 import { transferGroupApps } from '../services/groupAppTransfer.js';
 import { iconUrlForApp } from '../services/appIcons.js';
 import { respondWithError } from '../services/errors.js';
 import { recordEntraSyncOutcome, notifyUsersDeactivatedFromEntra } from '../services/syncNotifications.js';
+import { NOTIFICATION_TYPES, resolveNotifications } from '../services/notifications.js';
 import { diffAuditFields } from '../services/auditDetails.js';
 
 const router = express.Router();
@@ -36,7 +46,9 @@ function getLinkedEntraGroups(parentGroupId) {
       COALESCE(c.display_name, gm.entra_group_id) AS display_name,
       c.description,
       c.first_seen_at,
-      c.last_seen_at
+      c.last_seen_at,
+      c.deleted_at,
+      c.deleted_snapshot
     FROM group_entra_group_memberships gm
     LEFT JOIN entra_group_cache c ON c.entra_group_id = gm.entra_group_id
     WHERE gm.parent_group_id = ?
@@ -112,7 +124,8 @@ router.post('/entra/force-sync', authenticate, isAdminEditor, async (req, res) =
       logRbacAudit(req.user.id, 'deactivate', 'user_status', user.id, { email: user.email, role: user.role, reason: 'not_found_in_entra' });
     }
     notifyUsersDeactivatedFromEntra(deactivatedUsers);
-    recordEntraSyncOutcome('force-sync', result.errors.filter((error) => error.scope));
+    // The "no linked users yet" message is informational, not a failure.
+    recordEntraSyncOutcome('force-sync', result.errors.filter((error) => error.scope || error.userId));
     logRbacAudit(req.user.id, 'sync', 'group', null, {
       usersSynced: result.usersSynced,
       usersConsidered: result.usersConsidered,
@@ -127,6 +140,91 @@ router.post('/entra/force-sync', authenticate, isAdminEditor, async (req, res) =
     recordEntraSyncOutcome('force-sync', [{ message: error.message, hint: error.hint || null }]);
     respondWithError(res, error, { status: 500, code: 'failed_to_sync_entra_users' });
   }
+});
+
+// Deleting an imported group that Entra already deleted also drops the cached Entra
+// memberships kept while it was frozen, so linked local groups stop granting access.
+function deleteFrozenEntraMemberships(group) {
+  if (group.source === 'entra' && group.entra_group_id && group.entra_deleted_at) {
+    db.prepare('DELETE FROM entra_user_group_memberships WHERE entra_group_id = ?').run(group.entra_group_id);
+  }
+}
+
+// Turn an imported group deleted in Entra into a local group with the same members and
+// apps; local groups that linked the Entra group now link the converted group.
+router.post('/:id/convert-to-local', authenticate, isAdminEditor, (req, res) => {
+  const group = db.prepare('SELECT * FROM user_groups WHERE id = ?').get(req.params.id);
+  if (!group) return res.status(404).json({ error: 'Group not found', code: 'group_not_found' });
+  if (group.source !== 'entra' || !group.entra_deleted_at) {
+    return res.status(400).json({ error: 'Only imported groups deleted in Microsoft Entra can be converted', code: 'group_not_deleted_in_entra' });
+  }
+
+  const snapshot = snapshotGroup(group.id);
+  const convert = db.transaction(() => {
+    const parents = db.prepare('SELECT parent_group_id FROM group_entra_group_memberships WHERE entra_group_id = ?').all(group.entra_group_id);
+    const linkParent = db.prepare('INSERT OR IGNORE INTO group_group_memberships (parent_group_id, child_group_id) VALUES (?, ?)');
+    for (const { parent_group_id: parentId } of parents) {
+      if (parentId !== group.id) linkParent.run(parentId, group.id);
+    }
+    db.prepare('DELETE FROM group_entra_group_memberships WHERE entra_group_id = ?').run(group.entra_group_id);
+    db.prepare('DELETE FROM entra_user_group_memberships WHERE entra_group_id = ?').run(group.entra_group_id);
+    db.prepare(`
+      UPDATE user_groups
+      SET source = 'local', entra_group_id = NULL, entra_display_name = NULL, entra_synced_at = NULL,
+        entra_deleted_at = NULL, entra_deleted_snapshot = NULL
+      WHERE id = ?
+    `).run(group.id);
+  });
+  convert();
+
+  logRbacAudit(req.user.id, 'convert_to_local', 'group', group.id, {
+    name: group.name,
+    entraGroupId: group.entra_group_id,
+    userIds: snapshot.members.map((member) => member.id),
+    appIds: snapshot.apps.map((app) => app.id),
+    groupIds: snapshot.linkedIn.map((parent) => parent.id),
+  });
+  resolveNotifications(NOTIFICATION_TYPES.ENTRA_GROUP_DELETED, group.id, req.user.id);
+  res.json({ converted: true, memberCount: snapshot.members.length, appCount: snapshot.apps.length, linkedInCount: snapshot.linkedIn.length });
+});
+
+// Turn an Entra group deleted in Entra, linked into local groups without being imported,
+// into a new local group with the members it had; the linking groups include it instead.
+router.post('/entra-links/:entraGroupId/convert-to-local', authenticate, isAdminEditor, (req, res) => {
+  const { entraGroupId } = req.params;
+  const cached = db.prepare('SELECT display_name, deleted_at FROM entra_group_cache WHERE entra_group_id = ?').get(entraGroupId);
+  const imported = db.prepare('SELECT id FROM user_groups WHERE entra_group_id = ?').get(entraGroupId);
+  const linked = db.prepare('SELECT COUNT(*) AS n FROM group_entra_group_memberships WHERE entra_group_id = ?').get(entraGroupId).n;
+  if (!cached?.deleted_at || imported || linked === 0) {
+    return res.status(400).json({ error: 'Only linked Entra groups deleted in Microsoft Entra can be converted', code: 'group_not_deleted_in_entra' });
+  }
+
+  const snapshot = snapshotLinkedEntraGroup(entraGroupId);
+  const baseName = sanitizeName(cached.display_name || entraGroupId) || entraGroupId;
+  const nameTaken = db.prepare('SELECT 1 FROM user_groups WHERE name = ?');
+  let name = baseName;
+  for (let suffix = 2; nameTaken.get(name); suffix += 1) name = `${baseName} (${suffix})`;
+
+  const groupId = uuidv4();
+  const convert = db.transaction(() => {
+    db.prepare('INSERT INTO user_groups (id, name, description) VALUES (?, ?, ?)').run(groupId, name, '');
+    const addMember = db.prepare('INSERT OR IGNORE INTO user_group_members (user_id, group_id) VALUES (?, ?)');
+    for (const member of snapshot.members) addMember.run(member.id, groupId);
+    const linkParent = db.prepare('INSERT OR IGNORE INTO group_group_memberships (parent_group_id, child_group_id) VALUES (?, ?)');
+    for (const parent of snapshot.linkedIn) linkParent.run(parent.id, groupId);
+    db.prepare('DELETE FROM group_entra_group_memberships WHERE entra_group_id = ?').run(entraGroupId);
+    db.prepare('DELETE FROM entra_user_group_memberships WHERE entra_group_id = ?').run(entraGroupId);
+    clearLinkedEntraGroupDeleted(entraGroupId, req.user.id);
+  });
+  convert();
+
+  logRbacAudit(req.user.id, 'convert_to_local', 'group', groupId, {
+    name,
+    entraGroupId,
+    userIds: snapshot.members.map((member) => member.id),
+    groupIds: snapshot.linkedIn.map((parent) => parent.id),
+  });
+  res.json({ converted: true, groupId, name, memberCount: snapshot.members.length, linkedInCount: snapshot.linkedIn.length });
 });
 
 router.post('/bulk-delete', authenticate, isAdminEditor, (req, res) => {
@@ -144,7 +242,7 @@ router.post('/bulk-delete', authenticate, isAdminEditor, (req, res) => {
     return res.status(400).json({ error: 'groupIds must contain at least one valid group id', code: 'group_ids_required' });
   }
   const placeholders = uniqueGroupIds.map(() => '?').join(', ');
-  const groups = db.prepare(`SELECT id, name, source FROM user_groups WHERE id IN (${placeholders})`).all(...uniqueGroupIds);
+  const groups = db.prepare(`SELECT id, name, source, entra_group_id, entra_deleted_at FROM user_groups WHERE id IN (${placeholders})`).all(...uniqueGroupIds);
 
   if (groups.length !== uniqueGroupIds.length) {
     return res.status(404).json({ error: 'One or more groups were not found', code: 'groups_not_found' });
@@ -161,11 +259,14 @@ router.post('/bulk-delete', authenticate, isAdminEditor, (req, res) => {
       db.prepare('DELETE FROM app_permissions WHERE group_id = ?').run(group.id);
       db.prepare('DELETE FROM group_group_memberships WHERE parent_group_id = ? OR child_group_id = ?').run(group.id, group.id);
       db.prepare('DELETE FROM group_entra_group_memberships WHERE parent_group_id = ?').run(group.id);
+      deleteFrozenEntraMemberships(group);
       db.prepare('DELETE FROM user_groups WHERE id = ?').run(group.id);
       logRbacAudit(req.user.id, 'delete', 'group', group.id, { name: group.name, bulk: true });
+      resolveNotifications(NOTIFICATION_TYPES.ENTRA_GROUP_DELETED, group.id, req.user.id);
     }
   });
   deleteAll();
+  releaseUnlinkedDeletedEntraGroups(req.user.id);
 
   res.json({
     message: `${groups.length} groups deleted`,
@@ -206,7 +307,7 @@ router.get('/:id', authenticate, isAdminViewer, (req, res) => {
 
   const childEntraGroups = getLinkedEntraGroups(req.params.id);
 
-  res.json({ group, members, apps, childGroups, childEntraGroups });
+  res.json({ group, members, apps, childGroups, childEntraGroups, deletedGroupPolicy: getDeletedGroupPolicy() });
 });
 
 // Create group (editor roles only)
@@ -291,10 +392,13 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
     db.prepare('DELETE FROM app_permissions WHERE group_id = ?').run(req.params.id);
     db.prepare('DELETE FROM group_group_memberships WHERE parent_group_id = ? OR child_group_id = ?').run(req.params.id, req.params.id);
     db.prepare('DELETE FROM group_entra_group_memberships WHERE parent_group_id = ?').run(req.params.id);
+    deleteFrozenEntraMemberships(group);
     db.prepare('DELETE FROM user_groups WHERE id = ?').run(req.params.id);
   });
   deleteAll();
+  releaseUnlinkedDeletedEntraGroups(req.user.id);
   logRbacAudit(req.user.id, 'delete', 'group', req.params.id, { name: group.name });
+  resolveNotifications(NOTIFICATION_TYPES.ENTRA_GROUP_DELETED, req.params.id, req.user.id);
 
   res.json({ deleted: true });
 });
@@ -450,6 +554,7 @@ router.delete('/:id/entra-groups/:entraGroupId', authenticate, isAdminEditor, (r
   `).run(req.params.id, req.params.entraGroupId);
 
   if (result.changes === 0) return res.status(404).json({ error: 'Linked Entra group not found', code: 'linked_entra_group_not_found' });
+  releaseUnlinkedDeletedEntraGroups(req.user.id);
   logRbacAudit(req.user.id, 'remove_linked_entra_group', 'group', req.params.id, { entraGroupId: req.params.entraGroupId });
   res.json({ removed: true });
 });

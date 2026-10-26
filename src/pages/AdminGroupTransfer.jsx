@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRightLeft, Copy, MoveRight, RefreshCw } from 'lucide-react';
+import { useLocation } from 'react-router';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { useBrandingLanguage } from '../stores/brandingStore';
@@ -20,7 +21,8 @@ export default function AdminGroupTransfer() {
   const brandingLanguage = useBrandingLanguage();
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [groupSearch, setGroupSearch] = useState('');
-  const [sourceGroupId, setSourceGroupId] = useState('');
+  const location = useLocation();
+  const [sourceGroupId, setSourceGroupId] = useState(() => location.state?.sourceGroupId || '');
   const [targetGroupId, setTargetGroupId] = useState('');
   const [sourceDetail, setSourceDetail] = useState(null);
   const [loadingSourceDetail, setLoadingSourceDetail] = useState(false);

@@ -1147,7 +1147,21 @@
       "sourceFilter": "Source",
       "sourceAll": "All",
       "sourceLocal": "Local",
-      "sourceEntra": "Microsoft Entra"
+      "sourceEntra": "Microsoft Entra",
+      "deletedInEntraBadge": "Deleted in Entra",
+      "deletedInEntraTitle": "This group was deleted in Microsoft Entra",
+      "deletedInEntraFrozen": "Its members keep their access for now: Frontdoor froze the group when the deletion was detected. Convert it to a local group to keep the access, move its apps to another group, or delete it to end the access.",
+      "deletedInEntraRevoked": "Its members are removed as they sign in or at the next sync (ENTRA_DELETED_GROUP_POLICY=revoke). Below is who had access when the deletion was detected.",
+      "deletedInEntraMembers": "Members ({count})",
+      "deletedInEntraApps": "Apps ({count})",
+      "deletedInEntraLinkedIn": "Linked in ({count})",
+      "convertToLocal": "Convert to local group",
+      "convertToLocalTitle": "Convert {name} to a local group?",
+      "convertToLocalMessage": "The group keeps its members and apps and becomes a local group, no longer synced with Microsoft Entra. Local groups that linked it keep including it.",
+      "convertedToLocal": "{name} is now a local group",
+      "moveAppsToAnotherGroup": "Move apps to another group",
+      "deletedInEntraLinked": "This Entra group was deleted in Microsoft Entra. Its members keep the access it gave through this group for now. Convert it to a local group to keep it, or unlink it to end it.",
+      "convertLinkedToLocalMessage": "A local group with the same members is created and linked here (and in every other group that linked the Entra group) instead of the Entra group."
     },
     "users": {
       "title": "Users",
@@ -1324,6 +1338,7 @@
         "add_linked_entra_groups": "Entra groups linked",
         "remove_linked_group": "Group unlinked",
         "remove_linked_entra_group": "Entra group unlinked",
+        "convert_to_local": "Converted to local",
         "preonboard": "Pre-onboarded"
       },
       "targetLabels": {
@@ -1357,7 +1372,8 @@
           "remove_linked_entra_group": "Unlinked the Entra group {item} from {target}",
           "import_one": "Imported 1 group from Microsoft Entra",
           "add_linked_groups_one": "Linked 1 group to {target}",
-          "add_linked_entra_groups_one": "Linked 1 Entra group to {target}"
+          "add_linked_entra_groups_one": "Linked 1 Entra group to {target}",
+          "convert_to_local": "Converted {target} to a local group"
         },
         "membership": {
           "add_members": "Added {count} members to {target}",
@@ -1601,6 +1617,7 @@
     "group_name_taken": "A group with this name already exists.",
     "group_name_too_long": "The group name must be 100 characters or less.",
     "group_name_too_short": "The group name must be at least 2 characters long.",
+    "group_not_deleted_in_entra": "Only imported groups deleted in Microsoft Entra can be converted.",
     "group_not_found": "Group not found.",
     "groups_not_found": "One or more groups were not found.",
     "icon_too_large": "The icon is too large: images up to 1 MB, SVG up to 512 KB.",

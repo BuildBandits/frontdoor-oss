@@ -391,6 +391,46 @@ export default function AdminGroups() {
     setImportingEntra(false);
   };
 
+  const convertToLocal = (group) => {
+    if (!canEdit) return;
+    const groupName = groupLabel(group);
+    openConfirm({
+      title: g.convertToLocalTitle.replace('{name}', groupName),
+      message: g.convertToLocalMessage,
+      confirmLabel: g.convertToLocal,
+      onConfirm: async () => {
+        try {
+          await api.post(`/groups/${group.id}/convert-to-local`);
+          showToast(g.convertedToLocal.replace('{name}', groupName));
+          await loadGroups();
+          await loadGroupDetail(group.id);
+        } catch (err) {
+          showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
+        }
+      },
+    });
+  };
+
+  const convertLinkedToLocal = (childGroup) => {
+    if (!canEdit) return;
+    const groupName = childGroup.display_name || childGroup.entra_group_id;
+    openConfirm({
+      title: g.convertToLocalTitle.replace('{name}', groupName),
+      message: g.convertLinkedToLocalMessage,
+      confirmLabel: g.convertToLocal,
+      onConfirm: async () => {
+        try {
+          const res = await api.post(`/groups/entra-links/${encodeURIComponent(childGroup.entra_group_id)}/convert-to-local`);
+          showToast(g.convertedToLocal.replace('{name}', res.data.name || groupName));
+          await loadGroups();
+          if (expandedGroup) await loadGroupDetail(expandedGroup);
+        } catch (err) {
+          showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
+        }
+      },
+    });
+  };
+
   const handleDelete = async (group) => {
     if (!canEdit) {
       showToast(ui.admin.groups.readOnly, 'error');
@@ -659,19 +699,31 @@ export default function AdminGroups() {
     }
   };
 
-  const removeLinkedEntraGroup = async (entraGroupId, groupName) => {
+  const removeLinkedEntraGroup = (entraGroupId, groupName) => {
     if (!canEdit) {
       showToast(t.readOnly, 'error');
       return;
     }
-    try {
-      await api.delete(`/groups/${expandedGroup}/entra-groups/${entraGroupId}`);
-      showToast(g.linkedEntraGroupRemoved.replace('{name}', groupName));
-      await loadGroupDetail(expandedGroup);
-      await loadGroups();
-    } catch (err) {
-      showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
-    }
+    const parentGroupId = expandedGroup;
+    openConfirm({
+      title: g.removeLinkedGroupTitle.replace('{name}', groupName || g.thisGroup),
+      message: g.removeLinkedGroupMessage,
+      confirmLabel: g.removeLinkedGroup,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/groups/${parentGroupId}/entra-groups/${encodeURIComponent(entraGroupId)}`);
+          showToast(g.linkedEntraGroupRemoved.replace('{name}', groupName));
+        } catch (err) {
+          // Already gone (removed elsewhere or by an earlier click): just refresh the list.
+          if (err?.response?.data?.code !== 'linked_entra_group_not_found') {
+            showToast(apiErrorMessage(err, ui, t.errorSaving), 'error');
+            return;
+          }
+        }
+        await loadGroupDetail(parentGroupId);
+        await loadGroups();
+      },
+    });
   };
 
   const removeApp = async (appId, appName) => {
@@ -1153,6 +1205,9 @@ export default function AdminGroups() {
                       {group.source === 'entra' && (
                         <span className="inline-flex items-center gap-1 text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded-sm font-medium">{g.entraBadge}</span>
                       )}
+                      {group.entra_deleted_at && (
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-red-100 text-red-700 dark:bg-red-950/55 dark:text-red-300 px-1.5 py-0.5 rounded-sm font-medium">{g.deletedInEntraBadge}</span>
+                      )}
                       {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) > 0 && (
                         <span className="inline-flex items-center gap-1 text-[10px] bg-accent/10 dark:bg-accent-dark/20 text-accent-dark dark:text-gray-100 px-1.5 py-0.5 rounded-sm font-medium">
                           <Layers3 className="w-3 h-3" />
@@ -1220,6 +1275,10 @@ export default function AdminGroups() {
                 removeMember={removeMember}
                 openAddApps={openAddApps}
                 removeApp={removeApp}
+                convertToLocal={convertToLocal}
+                convertLinkedToLocal={convertLinkedToLocal}
+                deleteGroup={handleDelete}
+                moveApps={(sourceGroupId) => navigate('/admin/group-transfer', { state: { sourceGroupId } })}
               />
             </div>
           ))}
