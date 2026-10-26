@@ -1639,6 +1639,7 @@
     "no_preference_updates": "No preference changes were provided.",
     "not_authenticated": "You are not signed in.",
     "not_found": "Not found.",
+    "notification_not_found": "Notification not found or already resolved.",
     "owner_assignment_forbidden": "The owner role can only be assigned from the server configuration.",
     "permission_not_found": "Permission not found.",
     "plugin_archive_empty_archive": "The plugin archive is empty.",
@@ -1688,5 +1689,41 @@
     "user_not_found_or_inactive": "User not found or inactive.",
     "user_preonboard_failed": "Could not pre-onboard the user.",
     "users_not_found": "{count} selected users were not found."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "bell": "Notifications",
+    "bellUnread": "Notifications, {count} unread",
+    "markAllRead": "Mark all as read",
+    "empty": "No open notifications.",
+    "loadFailed": "Could not load the notifications.",
+    "open": "Open",
+    "resolve": "Resolve",
+    "unread": "Unread",
+    "sources": {
+      "sign-in": "at sign-in",
+      "force-sync": "during the forced sync"
+    },
+    "types": {
+      "user_deactivated_entra": {
+        "title": "User deactivated: no longer in Microsoft Entra",
+        "body": "{name} ({email}) was deactivated by the sync. Reactivate or delete the account."
+      },
+      "user_first_sign_in": {
+        "title": "First sign-in",
+        "body": "{name} signed in for the first time."
+      },
+      "entra_sync_failed": {
+        "title": "Microsoft Entra sync failed",
+        "body": "{count} errors {source}. Check the Microsoft Graph permissions."
+      },
+      "entra_group_deleted": {
+        "title": "Entra group deleted in Microsoft Entra",
+        "body": "{name}: {members} members and {apps} apps. Decide how to keep their access."
+      }
+    },
+    "recentlyResolved": "Resolved in the last 7 days",
+    "resolvedAutomatically": "Resolved on its own: the condition is gone.",
+    "resolvedByAdmin": "Resolved by an admin."
   }
 }

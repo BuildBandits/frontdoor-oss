@@ -607,7 +607,7 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
   }
 
   const users = db.prepare(`
-    SELECT id, email, role, microsoft_id, entra_missing_since
+    SELECT id, email, display_name, role, microsoft_id, entra_missing_since
     FROM users
     WHERE microsoft_id IS NOT NULL AND is_active = 1
     ORDER BY email
@@ -667,7 +667,7 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
       // Only Graph's "resource not found" counts: any other 404 is a real error.
       if (error.status === 404 && error.graphCode === 'Request_ResourceNotFound') {
         usersNotFound += 1;
-        if (handleUserMissingFromEntra(user)) deactivatedUsers.push({ id: user.id, email: user.email, role: user.role });
+        if (handleUserMissingFromEntra(user)) deactivatedUsers.push({ id: user.id, email: user.email, display_name: user.display_name, role: user.role });
         continue;
       }
       const hint = formatGraphAccessHint(error, 'force-sync');

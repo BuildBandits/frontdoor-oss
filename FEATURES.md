@@ -108,6 +108,13 @@ The `/admin/customization` page covers:
 - **Top apps** analytics — most-accessed apps in the selected period with click counts.
 - Unique-users metric per period.
 
+## Notifications 🛡️
+
+- **Bell in the top bar** for owners, admins and read-only admins, with the unread count; refreshed on navigation and every minute.
+- One open notification per event and subject (a repeat refreshes it); each links to the page where it is handled. Owners and admins can resolve them; some resolve on their own (user reactivated, sync working again).
+- Events: user deactivated because it is no longer in Microsoft Entra, first sign-in of an account created in advance, Microsoft Entra sync errors (at sign-in or during force sync), imported Entra group deleted in Entra.
+- Read state is per admin; resolved notifications are purged after `NOTIFICATION_RETENTION_DAYS` (default 30). The audit log stays the history.
+
 ## Audit Trail 🛡️
 
 - `rbac_audit_logs` captures privileged mutations: role changes, user activation, group/app edits, branding updates, cache refresh, backup operations.

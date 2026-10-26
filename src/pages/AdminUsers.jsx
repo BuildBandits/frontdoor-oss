@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { Eye, Shield, ShieldOff, UserCheck, UserX, UserPlus, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, Wand2, Filter } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
@@ -26,6 +26,7 @@ import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js
 export default function AdminUsers() {
   const { user: currentUser } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -113,6 +114,13 @@ export default function AdminUsers() {
   }, [showToast, t.errorLoadingUsers]);
 
   useEffect(() => { void loadUsers({ showLoading: true }); }, [loadUsers]);
+  // Opened from a notification: search for that user, then drop the route state.
+  useEffect(() => {
+    const incomingSearch = location.state?.userSearch;
+    if (!incomingSearch) return;
+    setSearch(incomingSearch);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate]);
   useEffect(() => {
     setPage(1);
   }, [search, filterRole, filterActive, filterPersonalization, pageSize]);

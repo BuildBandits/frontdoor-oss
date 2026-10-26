@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- **Notification center**: a bell in the top bar shows owners, admins and read-only admins what needs attention: users deactivated because they are no longer in Microsoft Entra, the first sign-in of accounts created in advance, Microsoft Entra sync errors, and imported Entra groups deleted in Entra. Each notification links to the page where it is handled; owners and admins can resolve it, and some resolve on their own. Read state is per admin; resolved notifications are kept `NOTIFICATION_RETENTION_DAYS` (default 30). ([#140](https://github.com/BuildBandits/frontdoor-oss/issues/140))
 - **Pre-onboarding of Entra users**: *Admin → Users → Pre-onboard users* searches the Microsoft Entra tenant and creates the accounts of people who have not signed in yet (up to 50 at a time), linked by object ID, in the default group and the chosen local groups, which are optional. A summary shows who was created and who was skipped (already in Frontdoor, not found in Entra). The Entra group sync covers these users too, the first sign-in completes the profile, and the action is in the audit log. Only accounts that exist in Entra can be pre-onboarded; the directory search needs the `User.Read.All` application permission, also when `ENTRA_GROUP_SYNC` is off. ([#138](https://github.com/BuildBandits/frontdoor-oss/issues/138))
 
 ### Changed

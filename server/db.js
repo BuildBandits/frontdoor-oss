@@ -198,6 +198,26 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 
+  -- Admin notification center: one open notification per (type, subject_key).
+  CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'warning' CHECK(severity IN ('info', 'warning', 'critical')),
+    subject_key TEXT NOT NULL,
+    payload TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    resolved_at TEXT,
+    resolved_by TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS notification_reads (
+    notification_id TEXT NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    read_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (notification_id, user_id)
+  );
+
   -- Secondary indexes for RBAC join performance
   CREATE INDEX IF NOT EXISTS idx_auth_pending_states_created ON auth_pending_states(created_at);
   CREATE INDEX IF NOT EXISTS idx_user_group_members_group ON user_group_members(group_id);
@@ -220,6 +240,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_entra_user_group_memberships_group ON entra_user_group_memberships(entra_group_id);
   CREATE INDEX IF NOT EXISTS idx_plugin_registry_enabled ON plugin_registry(enabled);
   CREATE INDEX IF NOT EXISTS idx_plugin_registry_source ON plugin_registry(source);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_open_subject ON notifications(type, subject_key) WHERE resolved_at IS NULL;
+  CREATE INDEX IF NOT EXISTS idx_notifications_resolved ON notifications(resolved_at);
 `);
 
 const ensuredColumns = [];

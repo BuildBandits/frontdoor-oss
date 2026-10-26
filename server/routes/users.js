@@ -5,6 +5,7 @@ import { logRbacAudit } from '../db.js';
 import { authenticate, isAdminViewer, isAdminEditor, ROLE_OWNER } from '../middleware/auth.js';
 import { ensureAvatarCached, serveAvatarForUser } from '../services/avatars.js';
 import { iconUrlForApp } from '../services/appIcons.js';
+import { NOTIFICATION_TYPES, resolveNotifications } from '../services/notifications.js';
 import { getAccessibleGroupIdsForUser } from '../services/groupHierarchy.js';
 import { isSupportedLanguage } from '../../shared/languages.js';
 import { isSupportedColorScheme, normalizeOptionalColorScheme } from '../../shared/colorSchemes.js';
@@ -314,6 +315,7 @@ router.put('/:id/active', authenticate, isAdminEditor, (req, res) => {
     WHERE id = ?
   `).run(activeValue, activeValue, id);
   logRbacAudit(req.user.id, activeValue ? 'activate' : 'deactivate', 'user_status', id, { email: user.email, role: user.role });
+  if (activeValue) resolveNotifications(NOTIFICATION_TYPES.USER_DEACTIVATED_ENTRA, id, req.user.id);
   res.json({ is_active: activeValue });
 });
 
@@ -348,6 +350,8 @@ router.delete('/:id', authenticate, isAdminEditor, (req, res) => {
   });
   deleteAll();
   logRbacAudit(req.user.id, 'delete', 'user_status', id, { name: user.display_name, email: user.email, role: user.role });
+  resolveNotifications(NOTIFICATION_TYPES.USER_DEACTIVATED_ENTRA, id, req.user.id);
+  resolveNotifications(NOTIFICATION_TYPES.USER_FIRST_SIGN_IN, id, req.user.id);
 
   res.json({ deleted: true });
 });

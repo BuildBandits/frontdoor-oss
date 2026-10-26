@@ -5,6 +5,7 @@ import { purgeLogsOlderThan } from './routes/logs.js';
 import { getStartupConfig, validateStartupEnv } from './config.js';
 import { getBrandingSettings } from './services/branding.js';
 import { backfillMediaLibrary } from './services/mediaAssets.js';
+import { purgeResolvedNotifications } from './services/notifications.js';
 import { findLargeAppIcons, LARGE_ICON_THRESHOLD_BYTES } from './services/appIcons.js';
 
 const PORT = process.env.PORT || 3001;
@@ -84,6 +85,10 @@ function runLogRetentionPurge() {
     const { accessRemoved, auditRemoved } = purgeLogsOlderThan(retentionDays);
     if (accessRemoved > 0 || auditRemoved > 0) {
       console.log(`Frontdoor log retention purge: removed ${accessRemoved} access logs and ${auditRemoved} audit logs older than ${retentionDays} days`);
+    }
+    const notificationsRemoved = purgeResolvedNotifications();
+    if (notificationsRemoved > 0) {
+      console.log(`Frontdoor notification purge: removed ${notificationsRemoved} resolved notifications`);
     }
   } catch (error) {
     console.error(`Frontdoor log retention purge failed: ${error.message}`);
