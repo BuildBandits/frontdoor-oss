@@ -387,6 +387,8 @@ If you want to use **Sincronizza gruppi** (or enable `ENTRA_GROUP_SYNC=true` for
 
 Both the login flow and the Force Sync action call Graph app-only, so without these application permissions the group features will return 403 errors even if the user is a global admin.
 
+**Pre-onboarding** (*Admin → Users → Pre-onboard users*) searches the tenant directory with the same app-only token and needs `User.Read.All` with admin consent, also when `ENTRA_GROUP_SYNC` is off. Only accounts that already exist in Microsoft Entra can be pre-onboarded: each Frontdoor account is linked by object ID (up to 50 users at a time), starts in the default group plus the chosen local groups, and is completed at the first sign-in. The Entra group sync (scheduled or *Force Sync*) also covers pre-onboarded users, so their Entra groups can appear before they sign in.
+
 #### Step 5: Set environment variables
 
 ```bash
