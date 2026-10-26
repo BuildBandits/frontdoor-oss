@@ -65,7 +65,9 @@ export default function Home() {
     updateAppOrder,
     updateFavoriteApps,
     markHomeTourSeen,
+    impersonation,
   } = useAuthStore();
+  const isImpersonating = Boolean(impersonation);
   const [apps, setApps] = useState([]);
   const branding = useBranding();
   const [search, setSearch] = useState('');
@@ -169,10 +171,10 @@ export default function Home() {
 
   const userId = user?.id;
   useEffect(() => {
-    if (!userId) return undefined;
+    if (!userId || isImpersonating) return undefined;
     void api.post('/auth/home-activity').catch(() => {});
     return undefined;
-  }, [userId]);
+  }, [userId, isImpersonating]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 767px)');
@@ -253,12 +255,12 @@ export default function Home() {
   useEffect(() => {
     if (!user || !languageReady) return undefined;
 
-    if (!user.homeTourSeenAt && !tourDismissed) {
+    if (!user.homeTourSeenAt && !tourDismissed && !isImpersonating) {
       openTour();
     }
 
     return undefined;
-  }, [user, languageReady, tourDismissed, openTour]);
+  }, [user, languageReady, tourDismissed, isImpersonating, openTour]);
 
   useEffect(() => {
     setTourDismissed(false);
@@ -434,6 +436,7 @@ export default function Home() {
   }, [currentTourStep, isMobileViewport, tourOpen]);
 
   const toggleFavorite = useCallback((appId) => {
+    if (isImpersonating) return;
     setFavorites((prev) => {
       const next = prev.includes(appId) ? prev.filter((id) => id !== appId) : [...prev, appId];
       localStorage.setItem(LS_FAVORITES, JSON.stringify(next));
@@ -453,7 +456,7 @@ export default function Home() {
       });
       return next;
     });
-  }, [updateFavoriteApps, user?.id]);
+  }, [updateFavoriteApps, user?.id, isImpersonating]);
 
   const favoritesSet = useMemo(() => new Set(favorites), [favorites]);
   const appOrder = Array.isArray(user?.appOrder) && user.appOrder.length > 0 ? user.appOrder : null;
@@ -499,12 +502,13 @@ export default function Home() {
   }, [sortedApps]);
 
   const launchApp = useCallback((app) => {
+    if (isImpersonating) return;
     if (!app || !app.url) return;
     if (app.mode !== 'redirect' && app.mode !== 'entra-app') {
       api.post(`/apps/${app.slug}/track-access`).catch(() => {});
     }
     window.open(app.url, '_blank', 'noopener');
-  }, []);
+  }, [isImpersonating]);
 
   const handleSearchKeyDown = (event) => {
     if (event.key !== 'Enter') return;
@@ -580,10 +584,11 @@ export default function Home() {
     externalBadgeShort: ui.home.externalBadgeShort,
     internalLinkBadgeShort: ui.home.internalLinkBadgeShort,
     ssoBadgeShort: ui.home.ssoBadgeShort,
-  }), [ui]);
+    appUnavailable: isImpersonating ? ui.impersonation.appUnavailable : null,
+  }), [ui, isImpersonating]);
 
   const filtersActive = search.trim().length > 0 || selectedTags.length > 0;
-  const dragEnabled = !groupByTag && !filtersActive && !compactView;
+  const dragEnabled = !groupByTag && !filtersActive && !compactView && !isImpersonating;
   const appCountLabel = (filtered.length === 1 ? ui.home.appCountOne : ui.home.appCount).replace('{count}', String(filtered.length));
   const hideMobileCompactControls = mobileCompactViewForced;
   const tourStepIndex = tourStep;

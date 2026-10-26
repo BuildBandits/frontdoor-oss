@@ -74,6 +74,7 @@ function targetRefType(action, targetType) {
     case 'role':
     case 'user_status':
     case 'auth':
+    case 'impersonation':
       return 'users';
     default:
       return null;

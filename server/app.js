@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.js';
+import impersonationRoutes from './routes/impersonation.js';
 import brandingRoutes from './routes/branding.js';
 import appsRoutes from './routes/apps.js';
 import backupsRoutes from './routes/backups.js';
@@ -135,6 +136,7 @@ export function createApp() {
     return express.static(PLUGIN_ASSET_DIR, { dotfiles: 'deny' })(req, res, next);
   });
   app.use('/api/auth', authRoutes);
+  app.use('/api/impersonation', impersonationRoutes);
   app.use('/api/branding', brandingRoutes);
   app.use('/api/apps', appsRoutes);
   app.use('/api/backups', backupsRoutes);

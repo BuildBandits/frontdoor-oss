@@ -17,7 +17,38 @@ function readStoredUser() {
   }
 }
 
+// Not secret (the server cookie is the authority): only keeps the UI read-only until /auth/me answers after a reload.
+const IMPERSONATION_KEY = 'frontdoor_impersonation_state';
+
+function readStoredImpersonation() {
+  try {
+    return JSON.parse(localStorage.getItem(IMPERSONATION_KEY) || 'null');
+  } catch {
+    try {
+      localStorage.removeItem(IMPERSONATION_KEY);
+    } catch {
+      // Storage unavailable.
+    }
+    return null;
+  }
+}
+
+function persistImpersonation(impersonation) {
+  try {
+    if (impersonation) localStorage.setItem(IMPERSONATION_KEY, JSON.stringify(impersonation));
+    else localStorage.removeItem(IMPERSONATION_KEY);
+  } catch {
+    // Storage unavailable.
+  }
+}
+
 const storedUser = readStoredUser();
+let storedImpersonation = storedUser ? readStoredImpersonation() : null;
+// A session that already expired must not keep the UI read-only after a reload.
+if (storedImpersonation && !(Date.parse(storedImpersonation.expiresAt) > Date.now())) {
+  persistImpersonation(null);
+  storedImpersonation = null;
+}
 
 function serializeUser(user) {
   if (!user) return null;
@@ -28,12 +59,53 @@ export const useAuthStore = create((set, get) => ({
   // Only user profile data in localStorage (non-sensitive). Token lives only in httpOnly cookie.
   user: storedUser,
   isAuthenticated: Boolean(storedUser),
+  // Set while an admin acts as another user ({ sessionId, actor, expiresAt, reason }).
+  impersonation: storedImpersonation,
+  impersonationEndedNotice: false,
+
+  applySession: ({ user, impersonation = null }) => {
+    // "stopped" is set by a manual stop whose reload path lost the in-memory state.
+    const endedOnItsOwn = Boolean(get().impersonation) && !get().impersonation.stopped && !impersonation;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeUser(user)));
+    persistImpersonation(impersonation);
+    set({ user, isAuthenticated: true, impersonation, impersonationEndedNotice: endedOnItsOwn || get().impersonationEndedNotice });
+  },
+
+  refreshSession: async () => {
+    const res = await api.get('/auth/me');
+    if (res.data?.user) get().applySession(res.data);
+    return res.data;
+  },
+
+  startImpersonation: async (userId, reason) => {
+    await api.post('/impersonation', { userId, reason });
+    return get().refreshSession();
+  },
+
+  stopImpersonation: async () => {
+    await api.post('/impersonation/stop');
+    const previous = get().impersonation;
+    // Cleared first, so a manual stop is not reported as "ended on its own".
+    set({ impersonation: null });
+    try {
+      return await get().refreshSession();
+    } catch {
+      // Stopped on the server but the profile is still the impersonated one: reload instead of leaving it writable.
+      // The stored copy stays (UI read-only until /me answers) but is flagged so the next applySession reports no "ended" notice.
+      if (previous) persistImpersonation({ ...previous, stopped: true });
+      window.location.assign('/admin/users');
+      return null;
+    }
+  },
+
+  dismissImpersonationEndedNotice: () => set({ impersonationEndedNotice: false }),
 
   loginWithToken: (_token, user) => {
     // Token is already set as httpOnly cookie by the server callback.
     // We only persist user profile data for the UI.
     const cachedUser = serializeUser(user);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cachedUser));
+    persistImpersonation(null);
     set({ user, isAuthenticated: true });
   },
 
@@ -44,7 +116,8 @@ export const useAuthStore = create((set, get) => ({
       // Continue logout even if API call fails
     }
     localStorage.removeItem(STORAGE_KEY);
-    set({ user: null, isAuthenticated: false });
+    persistImpersonation(null);
+    set({ user: null, isAuthenticated: false, impersonation: null, impersonationEndedNotice: false });
   },
 
   updateUser: (user) => {
@@ -54,6 +127,8 @@ export const useAuthStore = create((set, get) => ({
   },
 
   savePreferences: async (preferences, options = {}) => {
+    // Impersonation is read-only: the server refuses it anyway, so do not even try.
+    if (get().impersonation) return get().user;
     const previousUser = get().user;
     const optimisticUser = previousUser ? { ...previousUser, ...preferences } : { ...preferences };
     if (Object.prototype.hasOwnProperty.call(preferences, 'appOrder')) {

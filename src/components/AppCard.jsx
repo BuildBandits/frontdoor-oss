@@ -24,6 +24,8 @@ const AppCard = forwardRef(function AppCard(
   const shouldShowDescriptionTooltip = !compact && description.trim().length > 69;
 
   const handleClick = () => {
+    // Set by Home while an admin acts as another user: apps stay closed.
+    if (labels.appUnavailable) return;
     // Fire-and-forget access tracking. For mode='redirect' and
     // mode='entra-app' the server already logs via the dedicated redirect
     // endpoint, so we skip the explicit track call to avoid duplicate rows.
@@ -57,11 +59,13 @@ const AppCard = forwardRef(function AppCard(
         <div
           ref={ref}
           onClick={handleClick}
-          className={`group flex items-center gap-3 bg-white dark:bg-gray-900 rounded-xl px-4 py-2.5 border border-gray-100 dark:border-gray-800 hover:border-accent hover:shadow-md hover:shadow-accent/10 transition-all duration-150 cursor-pointer ${
+          title={labels.appUnavailable || undefined}
+          aria-disabled={Boolean(labels.appUnavailable)}
+          className={`group flex items-center gap-3 bg-white dark:bg-gray-900 rounded-xl px-4 py-2.5 border border-gray-100 dark:border-gray-800 hover:border-accent hover:shadow-md hover:shadow-accent/10 transition-all duration-150 ${labels.appUnavailable ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${
             tourHighlight ? 'relative z-20 scale-[1.01]' : ''
           }`}
         >
-          <Tooltip content={getLabel('openAppNamed', app.name)}>
+          <Tooltip content={labels.appUnavailable || getLabel('openAppNamed', app.name)}>
             <button
               type="button"
               onClick={(e) => {
@@ -69,7 +73,8 @@ const AppCard = forwardRef(function AppCard(
                 handleClick();
               }}
               className="shrink-0 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-accent/40"
-              aria-label={getLabel('openAppNamed', app.name)}
+              aria-label={labels.appUnavailable || getLabel('openAppNamed', app.name)}
+              aria-disabled={Boolean(labels.appUnavailable)}
             >
               <AppIcon app={app} className="w-8 h-8" textClassName="text-xl" alt={app.name} />
             </button>
@@ -177,7 +182,7 @@ const AppCard = forwardRef(function AppCard(
           </Tooltip>
         )}
         <div className="flex items-start justify-between mb-4">
-          <Tooltip content={getLabel('openAppNamed', app.name)}>
+          <Tooltip content={labels.appUnavailable || getLabel('openAppNamed', app.name)}>
             <button
               type="button"
               onClick={(e) => {
@@ -185,7 +190,8 @@ const AppCard = forwardRef(function AppCard(
                 handleClick();
               }}
               className="shrink-0 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-accent/40"
-              aria-label={getLabel('openAppNamed', app.name)}
+              aria-label={labels.appUnavailable || getLabel('openAppNamed', app.name)}
+              aria-disabled={Boolean(labels.appUnavailable)}
             >
               <AppIcon app={app} className="w-12 h-12" textClassName="text-4xl" alt={app.name} />
             </button>
@@ -235,7 +241,7 @@ const AppCard = forwardRef(function AppCard(
         </div>
         {/* Fixed-height content (one-line title, two-line description, one tag row)
             keeps every card the same height, with or without description and tags. */}
-        <button onClick={handleClick} className="w-full flex-1 text-left cursor-pointer">
+        <button onClick={handleClick} title={labels.appUnavailable || undefined} aria-disabled={Boolean(labels.appUnavailable)} className={`w-full flex-1 text-left ${labels.appUnavailable ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
           <h3 className="text-lg font-bold text-dark dark:text-gray-100 mb-1.5 truncate group-hover:text-dark/80 dark:group-hover:text-gray-200 transition-colors" title={app.name}>
             {app.name}
           </h3>
@@ -307,14 +313,14 @@ function InfoModal({ app, onClose, labels = {} }) {
           className={LONG_DESCRIPTION_CLASSES}
           dangerouslySetInnerHTML={{ __html: sanitizedLongDescription }}
         />
-        <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+        {!labels.appUnavailable && <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
           <button
             onClick={() => { onClose(); window.open(app.url, '_blank', 'noopener'); }}
             className="w-full py-3 bg-dark text-white rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors"
           >
             {typeof labels.openAppNamed === 'function' ? labels.openAppNamed(app.name) : app.name}
           </button>
-        </div>
+        </div>}
     </Modal>
   );
 }

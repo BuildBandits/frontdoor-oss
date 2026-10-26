@@ -27,6 +27,12 @@ function buildGroupFilterClause(groupIds) {
   };
 }
 
+// Admins acting as a user must never reach an app as that user: no token, no redirect.
+function refuseLaunchWhileImpersonating(req, res, app) {
+  logRbacAudit(req.actor.id, 'app_launch_blocked', 'impersonation', req.user.id, { appId: app.id, slug: app.slug }, req.impersonation.sessionId);
+  return res.status(403).json({ error: 'Apps cannot be opened while acting as a user', code: 'impersonation_app_launch_blocked' });
+}
+
 // List active apps visible to current user (RBAC applies to all, including admins)
 router.get('/', authenticate, (req, res) => {
   const accessibleGroupIds = getAccessibleGroupIdsForUser(req.user.id);
@@ -66,6 +72,7 @@ router.get('/:slug/sso-redirect', authenticate, (req, res) => {
   if (!app) {
     return res.status(404).json({ error: 'App not found', code: 'app_not_found' });
   }
+  if (req.impersonation) return refuseLaunchWhileImpersonating(req, res, app);
 
   // RBAC check: user must have group permission (applies to every mode)
   const accessibleGroupIds = getAccessibleGroupIdsForUser(req.user.id);
@@ -176,6 +183,7 @@ router.get('/:slug/entra-redirect', authenticate, (req, res) => {
   if (!app || app.mode !== 'entra-app') {
     return res.status(404).json({ error: 'Entra app not found', code: 'entra_app_not_found' });
   }
+  if (req.impersonation) return refuseLaunchWhileImpersonating(req, res, app);
 
   // RBAC check: user must have group permission
   const accessibleGroupIds = getAccessibleGroupIdsForUser(req.user.id);

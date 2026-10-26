@@ -153,6 +153,14 @@
     "appsLoadFailedTitle": "Impossibile caricare le app",
     "appsLoadFailedBody": "Controlla la connessione e riprova."
   },
+  "impersonation": {
+    "banner": "Stai agendo come {name} · sola lettura · termina alle {time}",
+    "stop": "Termina",
+    "stopping": "Chiusura…",
+    "stopFailed": "Impossibile terminare l'impersonation. Riprova o esci.",
+    "ended": "Impersonation terminata. Sei tornato al tuo account.",
+    "appUnavailable": "Le app non si possono aprire mentre agisci come un altro utente"
+  },
   "layout": {
     "personalHomeView": "Vista Home personale",
     "personalHomeViewShort": "Vista Home",
@@ -1232,6 +1240,13 @@
       "deleteUserTitle": "Eliminare definitivamente l'utente {name}?",
       "refresh": "Aggiorna utenti",
       "pageSummary": "Pagina {page} di {pages} · {total} utenti",
+      "impersonate": "Agisci come questo utente",
+      "impersonateTitle": "Agisci come {name}",
+      "impersonateBody": "Vedrai Frontdoor come lo vede questo utente, in sola lettura. Le app non si possono aprire. La sessione termina quando la chiudi, esci o scade, e viene registrata nell'audit.",
+      "impersonateReasonLabel": "Motivazione",
+      "impersonateReasonPlaceholder": "es. ticket #1234, l'utente non vede un'app",
+      "impersonateStart": "Avvia",
+      "impersonateFailed": "Impossibile avviare l'impersonation.",
       "summaryActive": "attivi",
       "summaryAwaitingFirstSignIn": "in attesa del primo accesso",
       "showAwaitingFirstSignIn": "Mostra gli utenti mai collegati",
@@ -1338,6 +1353,10 @@
         "add_linked_entra_groups": "Gruppi Entra collegati",
         "remove_linked_group": "Gruppo scollegato",
         "remove_linked_entra_group": "Gruppo Entra scollegato",
+        "start": "Avviata",
+        "end": "Terminata",
+        "write_blocked": "Modifica bloccata",
+        "app_launch_blocked": "Avvio app bloccato",
         "convert_to_local": "Convertito in locale",
         "preonboard": "Pre-onboarding"
       },
@@ -1350,7 +1369,8 @@
         "user_status": "Utente",
         "branding": "Personalizzazione",
         "auth": "Accesso",
-        "plugin": "Plugin"
+        "plugin": "Plugin",
+        "impersonation": "Impersonation"
       },
       "events": {
         "fallback": "{action}: {targetType} {target}",
@@ -1415,6 +1435,12 @@
           "import": "Ha importato il plugin {target}",
           "update": "Ha modificato il plugin {target}",
           "delete": "Ha eliminato il plugin {target}"
+        },
+        "impersonation": {
+          "start": "Ha iniziato ad agire come {target}",
+          "end": "Ha smesso di agire come {target}",
+          "write_blocked": "Modifica bloccata mentre agiva come {target}",
+          "app_launch_blocked": "Apertura di {item} bloccata mentre agiva come {target}"
         }
       },
       "fields": {
@@ -1493,7 +1519,14 @@
         "showRedirectSsoMode": "Modalità redirect SSO",
         "showEntraAppMode": "Modalità app Entra",
         "pluginsEnabled": "Plugin",
-        "iconImage": "Immagine icona"
+        "iconImage": "Immagine icona",
+        "ipAddress": "Indirizzo IP",
+        "userAgent": "Browser",
+        "expiresAt": "Scadenza",
+        "endReason": "Terminata per",
+        "durationSeconds": "Durata (secondi)",
+        "method": "Metodo",
+        "path": "Percorso"
       },
       "values": {
         "role": {
@@ -1523,14 +1556,30 @@
           "not set": "non impostata",
           "removed": "rimossa",
           "updated": "aggiornata"
+        },
+        "endReason": {
+          "manual": "Chiusura manuale",
+          "logout": "Uscita",
+          "timeout": "Scaduta",
+          "session_expired": "Sessione admin scaduta",
+          "target_ineligible": "Utente non più idoneo",
+          "admin_ineligible": "Admin non più idoneo"
         }
       },
-      "showSignIns": "Mostra accessi",
-      "signInsHidden": "Gli accessi degli amministratori sono nascosti: usa \"Mostra accessi\" per includerli.",
+      "eventFilter": "Eventi",
+      "eventScopes": {
+        "all": "Tutti gli eventi",
+        "changes": "Solo modifiche",
+        "impersonation": "Solo impersonation"
+      },
+      "signInsHidden": "Gli accessi degli amministratori sono nascosti: scegli \"Tutti gli eventi\" in Eventi per includerli.",
       "actorLabels": {
         "api-key": "Chiave API (import massivo)",
         "system": "Sistema"
-      }
+      },
+      "impersonatingBadge": "Come {name}",
+      "sessionFilter": "Sessione #{id}",
+      "clearSessionFilter": "Mostra tutte le sessioni"
     }
   },
   "errors": {
@@ -1622,6 +1671,11 @@
     "groups_not_found": "Uno o più gruppi non sono stati trovati.",
     "icon_too_large": "L'icona è troppo grande: immagini fino a 1 MB, SVG fino a 512 KB.",
     "icon_unsupported_type": "L'icona deve essere un'immagine PNG, JPEG, GIF, WEBP, BMP, AVIF, ICO o SVG.",
+    "impersonation_already_active": "Termina l'impersonation in corso prima di avviarne un'altra.",
+    "impersonation_read_only": "Non disponibile mentre agisci come un altro utente.",
+    "impersonation_app_launch_blocked": "Le app non si possono aprire mentre agisci come un altro utente.",
+    "impersonation_target_not_allowed": "Si possono impersonare solo utenti attivi con ruolo Utente.",
+    "impersonation_reason_required": "Inserisci una motivazione (massimo 500 caratteri).",
     "insufficient_permissions": "Non hai i permessi per eseguire questa operazione.",
     "internal_server_error": "Si è verificato un errore sul server. Riprova.",
     "invalid_app_mode": "La modalità dell'app non è valida.",
