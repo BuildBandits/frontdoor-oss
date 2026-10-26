@@ -1,9 +1,10 @@
-import { useState } from 'react';
 import { X, Save } from 'lucide-react';
 import Modal from '../../components/Modal';
 import ClearableSearchField from '../../components/ClearableSearchField';
+import SegmentedControl from '../../components/SegmentedControl';
+import { useSelectionFilter } from '../../hooks/useSelectionFilter';
+import { SELECTION_FILTERS } from '../../utils/selectionFilter.js';
 import { DEFAULT_GROUP_ID } from '../../../shared/groups.js';
-import { GROUP_SELECTION_FILTERS, filterGroupsBySelection } from './groupSelectionFilter.js';
 
 export default function GroupAssignmentModal(props) {
   if (!props.pendingGroupAssignApp) return null;
@@ -32,18 +33,12 @@ function GroupAssignmentDialog({
   assigningGroups,
   groupAssignAllowNoChanges,
 }) {
-  const [selectionFilter, setSelectionFilter] = useState('all');
-  const [selectionSnapshot, setSelectionSnapshot] = useState(null);
-  const visibleGroups = filterGroupsBySelection(filteredGroups, selectionFilter, selectionSnapshot);
+  const selectionFilter = useSelectionFilter(groupAssignSelection);
+  const visibleGroups = selectionFilter.apply(filteredGroups);
   const selectionFilterLabels = {
     all: a.groupFilterAll,
     selected: a.groupFilterSelected,
     unselected: a.groupFilterUnselected,
-  };
-
-  const changeSelectionFilter = (filter) => {
-    setSelectionFilter(filter);
-    setSelectionSnapshot(filter === 'all' ? null : [...groupAssignSelection]);
   };
 
   return (
@@ -96,30 +91,16 @@ function GroupAssignmentDialog({
               searchShortcutLabel={ui.common.searchShortcut}
             />
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <div role="group" aria-label={a.groupFilterLabel} className="inline-flex rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-0.5">
-                {GROUP_SELECTION_FILTERS.map((filter) => {
-                  const active = selectionFilter === filter;
-                  return (
-                    <button
-                      key={filter}
-                      type="button"
-                      onClick={() => changeSelectionFilter(filter)}
-                      aria-pressed={active}
-                      className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${
-                        active
-                          ? 'bg-white dark:bg-gray-800 text-dark dark:text-gray-100 shadow-sm'
-                          : 'text-gray-600 dark:text-gray-300 hover:text-dark dark:hover:text-white'
-                      }`}
-                    >
-                      {selectionFilterLabels[filter]}
-                    </button>
-                  );
-                })}
-              </div>
+              <SegmentedControl
+                label={a.groupFilterLabel}
+                value={selectionFilter.filter}
+                onChange={selectionFilter.setFilter}
+                options={SELECTION_FILTERS.map((value) => ({ value, label: selectionFilterLabels[value] }))}
+              />
               <div className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => changeSelectionFilter('selected')}
+                  onClick={() => selectionFilter.setFilter('selected')}
                   disabled={groupAssignSelection.length === 0}
                   title={a.showSelectedGroups}
                   className="hover:text-dark dark:hover:text-white hover:underline disabled:no-underline disabled:hover:text-gray-400 dark:disabled:hover:text-gray-500"
@@ -129,7 +110,7 @@ function GroupAssignmentDialog({
                 <span>{visibleGroups.length} {t.groups}</span>
               </div>
             </div>
-            {hasGroupAssignSearch && selectionFilter !== 'selected' && (
+            {hasGroupAssignSearch && selectionFilter.filter !== 'selected' && (
               <div className="mt-2 flex justify-end">
                 <button
                   type="button"
@@ -151,7 +132,7 @@ function GroupAssignmentDialog({
             </div>
           ) : visibleGroups.length === 0 ? (
             <div className="text-sm text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-900 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-3 py-4">
-              {selectionFilter === 'selected' && !hasGroupAssignSearch ? a.noSelectedGroups : ui.admin.apps.noGroupsFound}
+              {selectionFilter.filter === 'selected' && !hasGroupAssignSearch ? a.noSelectedGroups : ui.admin.apps.noGroupsFound}
             </div>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2 max-h-[48vh] overflow-y-auto pr-1">
