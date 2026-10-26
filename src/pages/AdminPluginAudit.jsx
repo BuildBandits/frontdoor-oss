@@ -12,6 +12,7 @@ import { useBrandingLanguage, useBrandingTimeZone } from '../stores/brandingStor
 import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { describeAuditLog } from '../utils/auditFormatters';
 import { formatIsoDateTime } from '../utils/dateTime';
+import { sortOptionsByLabel } from '../utils/sortOptions';
 import { resolveAppTimeZone } from '../../shared/timeZones.js';
 
 const PRIVILEGED_ROLES = new Set(['owner', 'admin', 'admin_readonly']);
@@ -36,7 +37,8 @@ export default function AdminPluginAudit() {
   const brandingTimeZone = useBrandingTimeZone();
   const timeZone = resolveAppTimeZone(user?.preferredTimeZone, brandingTimeZone);
 
-  const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
+  const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
+  const ui = getUiStrings(language);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,10 +155,11 @@ export default function AdminPluginAudit() {
               className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-hidden max-w-[220px]"
             >
               <option value="">{ui.admin.audit.allAdmins}</option>
-              {adminUsers.map((currentUser) => (
-                <option key={currentUser.id} value={currentUser.id}>
-                  {currentUser.display_name || currentUser.email}
-                </option>
+              {sortOptionsByLabel(adminUsers.map((currentUser) => ({
+                value: currentUser.id,
+                label: currentUser.display_name || currentUser.email,
+              })), language).map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </div>
@@ -169,10 +172,11 @@ export default function AdminPluginAudit() {
               className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-hidden"
             >
               <option value="">{ui.admin.pluginAudit.allActions}</option>
-              {ACTION_OPTIONS.map((value) => (
-                <option key={value} value={value}>
-                  {ui.admin.pluginAudit.actionLabels[value] || value}
-                </option>
+              {sortOptionsByLabel(ACTION_OPTIONS.map((value) => ({
+                value,
+                label: ui.admin.pluginAudit.actionLabels[value] || value,
+              })), language).map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </div>
