@@ -19,6 +19,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Linked groups and members side by side**: the detail of a local group on *Admin → Groups* shows *Linked groups* and *Members* together instead of one at a time, so a composite group no longer opens on an empty *Members* list. Each box takes half of the height and scrolls on its own; when only one of them is empty, it shrinks to its message and leaves the space to the other one. ([#129](https://github.com/BuildBandits/frontdoor-oss/issues/129))
 
 ### Fixed
+- **Problem groups notice**: clicking a group in *Groups without apps* or *Groups without members* on *Admin → Groups* did nothing visible when the group was on another page of the list or hidden by the source filter. The list is now filtered to that group, which opens.
 - **Blank page with the development server**: since the dictionaries are loaded on demand, `npm run dev` showed a blank page because the browser refused the language file served by Vite. Production builds were not affected. The dictionaries are now imported without the JSON import attribute, which the tests add on their own.
 - **Tour highlights the personal menu**: on desktop, step 6 of the Home tour sometimes left the opened personal menu under the dark overlay, because the highlight was measured before the menu had rendered (more likely on a busy Home). The highlight is now measured again whenever elements appear or disappear while the tour is open.
 

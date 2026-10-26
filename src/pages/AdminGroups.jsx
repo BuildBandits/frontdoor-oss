@@ -263,8 +263,11 @@ export default function AdminGroups() {
   };
 
   const openGroupAndScroll = async (groupId, preserveSearch = false) => {
-    if (!preserveSearch && !filteredGroups.some((group) => group.id === groupId) && groupSearch.trim()) {
-      setGroupSearch('');
+    // Filter the list to the group: otherwise it may sit on another page or behind the source filter.
+    const target = groups.find((group) => group.id === groupId);
+    if (!preserveSearch && target) {
+      setGroupSearch(groupLabel(target));
+      setSourceFilter('all');
     }
     setScrollTargetGroupId(groupId);
     if (expandedGroup !== groupId) {
