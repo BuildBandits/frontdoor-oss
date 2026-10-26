@@ -8,6 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Changed
 - **Filter menus in alphabetical order**: the options of the filter menus (users by role, status and personalization, audit and plugin audit by admin and action, apps by connection mode, media library by kind) are listed alphabetically in the current language, with *All* always first. Numeric menus (period, rows) and short fixed choices keep their order.
+- **Selected groups filter in *Manage groups***: the dialog that assigns an app to groups has an *All / Selected / Not selected* filter, combined with the search, and the selected-groups counter opens the *Selected* view. Groups unchecked while a filtered view is open stay listed until the filter changes, so the selection can be reviewed and trimmed in one place. ([#137](https://github.com/BuildBandits/frontdoor-oss/issues/137))
+- **Segmented filters for groups**: *Admin → Groups* filters by source with an *All / Local / Microsoft Entra* control that keeps the counts visible, and the *Import from Entra* and *Add linked groups* dialogs get the same *All / Selected / Not selected* filter as *Manage groups*, with the selected counter opening the *Selected* view. ([#143](https://github.com/BuildBandits/frontdoor-oss/issues/143))
 - **Linked groups and members side by side**: the detail of a local group on *Admin → Groups* shows *Linked groups* and *Members* together instead of one at a time, so a composite group no longer opens on an empty *Members* list. Each box takes half of the height and scrolls on its own; when only one of them is empty, it shrinks to its message and leaves the space to the other one. ([#129](https://github.com/BuildBandits/frontdoor-oss/issues/129))
 
 ### Fixed
@@ -16,6 +18,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Security
 - **Express 5.3.0**: `express` moves from 5.2.1 to 5.3.0, which brings patched `qs` (CVE-2026-2391, CVE-2026-82417, CVE-2026-82562: array limit bypasses and a denial of service in query string parsing) and `proxy-addr` (CVE-2026-90711). The same dependency refresh bumps `dotenv`, `uuid`, `concurrently`, `lucide-react` and `vite` to their latest patch or minor releases. ([#133](https://github.com/BuildBandits/frontdoor-oss/pull/133))
+- **body-parser 2.4.0 and ip-address 10.7.5**: the lockfile picks up the patched `body-parser` (GHSA-27r3-jxmh-p828, high: denial of service via trailing bytes after a compressed request body) and `ip-address` (GHSA-rxp7-6hxx-x8q5, moderate: quadratic time on long IPv6 zone identifiers).
 
 ## [1.4.0] — 2026-10-09
 
