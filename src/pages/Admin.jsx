@@ -595,9 +595,9 @@ export default function Admin() {
   };
   const filteredGroups = groups.filter(groupMatchesSearch);
   const hasGroupAssignSearch = groupAssignSearch.trim().length > 0;
-  const selectVisibleGroups = () => {
-    if (filteredGroups.length === 0) return;
-    setGroupAssignSelection((prev) => Array.from(new Set([...prev, ...filteredGroups.map((group) => group.id)])));
+  const selectVisibleGroups = (visibleGroups = filteredGroups) => {
+    if (visibleGroups.length === 0) return;
+    setGroupAssignSelection((prev) => Array.from(new Set([...prev, ...visibleGroups.map((group) => group.id)])));
   };
   const allTags = useMemo(() => {
     const tagSet = new Set();

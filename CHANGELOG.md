@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Changed
+- **Selected groups filter in *Manage groups***: the dialog that assigns an app to groups has an *All / Selected / Not selected* filter, combined with the search, and the selected-groups counter opens the *Selected* view. Groups unchecked while a filtered view is open stay listed until the filter changes, so the selection can be reviewed and trimmed in one place. ([#137](https://github.com/BuildBandits/frontdoor-oss/issues/137))
 - **Linked groups and members side by side**: the detail of a local group on *Admin → Groups* shows *Linked groups* and *Members* together instead of one at a time, so a composite group no longer opens on an empty *Members* list. Each box takes half of the height and scrolls on its own; when only one of them is empty, it shrinks to its message and leaves the space to the other one. ([#129](https://github.com/BuildBandits/frontdoor-oss/issues/129))
 
 ### Fixed
