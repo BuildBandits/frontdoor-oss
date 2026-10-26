@@ -18,6 +18,7 @@ import GroupDetailPanel from './groups/GroupDetailPanel';
 import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
+import SegmentedControl from '../components/SegmentedControl';
 import PaginationControls from '../components/PaginationControls';
 import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
@@ -365,8 +366,8 @@ export default function AdminGroups() {
     );
   };
 
-  const selectVisibleEntraGroups = () => {
-    const visibleIds = filteredEntraCandidates
+  const selectVisibleEntraGroups = (visibleGroups = filteredEntraCandidates) => {
+    const visibleIds = visibleGroups
       .filter((group) => !group.is_imported)
       .map((group) => group.entra_group_id);
     setSelectedEntraGroups((prev) => Array.from(new Set([...prev, ...visibleIds])));
@@ -801,13 +802,13 @@ export default function AdminGroups() {
       group.entra_group_id || '',
     ].join(' ').toLowerCase().includes(q);
   });
-  const selectVisibleLinkedGroups = () => {
-    const visibleIds = filteredLinkableGroups.map((group) => group.id);
+  const selectVisibleLinkedGroups = (visibleGroups = filteredLinkableGroups) => {
+    const visibleIds = visibleGroups.map((group) => group.id);
     setSelectedLinkedGroupIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
   };
 
-  const selectVisibleLinkedEntraGroups = () => {
-    const visibleIds = filteredLinkableEntraGroups.map((group) => group.entra_group_id);
+  const selectVisibleLinkedEntraGroups = (visibleGroups = filteredLinkableEntraGroups) => {
+    const visibleIds = visibleGroups.map((group) => group.entra_group_id);
     setSelectedLinkedEntraGroupIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
   };
 
@@ -1055,17 +1056,16 @@ export default function AdminGroups() {
               searchShortcutLabel={ui.common.searchShortcut}
             />
           </div>
-          <DropdownSelect
+          <SegmentedControl
+            size="lg"
+            label={g.sourceFilter}
             value={sourceFilter}
             onChange={setSourceFilter}
-            label={g.sourceFilter}
-            icon={Layers3}
             options={[
-              { value: 'all', label: `${g.sourceAll} (${groups.length})` },
-              { value: 'local', label: `${g.sourceLocal} (${sourceCounts.local})` },
-              { value: 'entra', label: `${g.sourceEntra} (${sourceCounts.entra})` },
+              { value: 'all', label: g.sourceAll, count: groups.length },
+              { value: 'local', label: g.sourceLocal, count: sourceCounts.local },
+              { value: 'entra', label: g.sourceEntra, count: sourceCounts.entra },
             ]}
-            className="min-w-[220px]"
           />
           <DropdownSelect
             value={pageSize}

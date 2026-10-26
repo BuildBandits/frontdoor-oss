@@ -74,6 +74,7 @@ How Frontdoor hands the user off to a target application:
 ## Users 🔧
 
 - List, search, role-edit, activate/deactivate, delete (with cascade cleanup).
+- **Pre-onboarding** — search the Entra tenant (app-only Graph) and create the accounts of users who have not signed in yet (up to 50 at a time), linked by object ID, directly in the default group and the chosen local groups. Entra groups are added by the next sync or at the first sign-in.
 - **Per-user "visible apps"** modal — see exactly which apps a user can reach and through which group.
 - **Avatars** from Microsoft 365 photos with Gravatar fallback and generated initials as last resort. Disk-cached (configurable TTL); prewarm script for batch fetch.
 - Compose-locked admins are visibly flagged and cannot be demoted from the UI.

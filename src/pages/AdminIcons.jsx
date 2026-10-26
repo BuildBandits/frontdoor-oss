@@ -13,6 +13,7 @@ import useDebouncedValue from '../hooks/useDebouncedValue';
 import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { blobToDataUrl, downscaleIconDataUrl, isResizableIconType } from '../utils/iconImages';
 import { formatLocalDateTime } from '../utils/dateTime';
+import { sortOptionsByLabel } from '../utils/sortOptions';
 import { resolveAppTimeZone } from '../../shared/timeZones.js';
 
 const KIND_ORDER = ['app-icon', 'branding-logo'];
@@ -64,7 +65,8 @@ export default function AdminIcons() {
   const canEditApps = user?.role !== 'admin_readonly';
   const [expandedAssetIds, setExpandedAssetIds] = useState([]);
 
-  const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
+  const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
+  const ui = getUiStrings(language);
   const timeZone = resolveAppTimeZone(user?.preferredTimeZone, brandingTimeZone);
 
   const handleSearchChange = (value) => {
@@ -368,10 +370,14 @@ export default function AdminIcons() {
               onChange={(e) => handleKindChange(e.target.value)}
               className="bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-hidden"
             >
-              <option value="all">{ui.common.all}</option>
-              <option value="app-icon">{ui.admin.icons.kindAppIcon}</option>
-              <option value="branding-logo">{ui.admin.icons.kindBrandingLogo}</option>
-              <option value="orphan">{ui.admin.icons.kindOrphan}</option>
+              {sortOptionsByLabel([
+                { value: 'all', label: ui.common.all },
+                { value: 'app-icon', label: ui.admin.icons.kindAppIcon },
+                { value: 'branding-logo', label: ui.admin.icons.kindBrandingLogo },
+                { value: 'orphan', label: ui.admin.icons.kindOrphan },
+              ], language).map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </div>
 

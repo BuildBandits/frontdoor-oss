@@ -84,7 +84,7 @@ function getGraphClient() {
   });
 }
 
-async function acquireGraphAppToken() {
+export async function acquireGraphAppToken() {
   const client = getGraphClient();
   if (!client) {
     throw new UserFacingError('Microsoft Graph app credentials are not configured', { statusCode: 400, code: 'graph_credentials_missing' });
@@ -112,7 +112,7 @@ function graphErrorCode(body) {
 
 // Fetches one Graph page with a timeout, retrying throttling and temporary
 // unavailability (429/503/504) as Graph asks via Retry-After, a few times at most.
-async function fetchGraphPage(url, accessToken, { maxAttempts = GRAPH_MAX_ATTEMPTS, timeoutMs = GRAPH_TIMEOUT_MS } = {}) {
+export async function fetchGraphPage(url, accessToken, { maxAttempts = GRAPH_MAX_ATTEMPTS, timeoutMs = GRAPH_TIMEOUT_MS } = {}) {
   let response;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
