@@ -34,6 +34,7 @@ import {
   requestHomeTourAccountMenuOpen,
 } from '../utils/homeTour';
 import { getBrowserHomepageDocs } from '../utils/browserHomeDocs';
+import DocsHelpLink from '../components/DocsHelpLink';
 
 const LS_FAVORITES = 'frontdoor_favorites';
 const LS_FAVORITES_OWNER = 'frontdoor_favorites_owner';
@@ -1111,6 +1112,7 @@ export default function Home() {
                   <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                     {ui.home.tour.browserDocsHint}
                   </p>
+                  <DocsHelpLink page="users/browser-homepage" className="mt-2" />
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {tourBrowserDocs.map((doc) => (
                       <a

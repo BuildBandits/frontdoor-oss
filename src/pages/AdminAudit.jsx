@@ -15,6 +15,7 @@ import { describeAuditLog } from '../utils/auditFormatters';
 import { formatIsoDateTime } from '../utils/dateTime';
 import { sortOptionsByLabel } from '../utils/sortOptions';
 import { resolveAppTimeZone } from '../../shared/timeZones.js';
+import DocsHelpLink from '../components/DocsHelpLink';
 
 const PRIVILEGED_ROLES = new Set(['owner', 'admin', 'admin_readonly']);
 const SIGN_IN_TARGET_TYPE = 'auth';
@@ -138,6 +139,7 @@ export default function AdminAudit() {
           <div>
             <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{ui.admin.audit.pageTitle}</h1>
             <p className="text-gray-500 dark:text-gray-400 mt-1">{ui.admin.audit.subtitle}</p>
+            <DocsHelpLink page="admins/logs" className="mt-2" />
           </div>
         </div>
       </div>
