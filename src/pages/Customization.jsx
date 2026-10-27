@@ -13,6 +13,7 @@ import { getSupportedTimeZoneOptions, normalizeTimeZone } from '../../shared/tim
 import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
 import { MAX_RASTER_LOGO_BYTES, MAX_SVG_ICON_BYTES } from '../../shared/iconLimits.js';
+import DocsHelpLink from '../components/DocsHelpLink';
 
 // Hero texts default to the translated Home copy (see emptyBrandingFor).
 const emptyBranding = {
@@ -476,6 +477,7 @@ export default function Customization() {
         <div>
           <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{ui.customization.title}</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">{ui.customization.subtitle}</p>
+          <DocsHelpLink page="admins/customization" className="mt-2" />
         </div>
       </div>
 

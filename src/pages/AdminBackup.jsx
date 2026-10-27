@@ -8,6 +8,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useBrandingLanguage } from '../stores/brandingStore';
 import { getUiStrings, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
+import DocsHelpLink from '../components/DocsHelpLink';
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes)) return '-';
@@ -363,6 +364,7 @@ export default function AdminBackup() {
         <div>
           <h1 className="mt-3 text-2xl font-extrabold text-dark dark:text-gray-100">{copy.pageTitle}</h1>
           <p className="mt-1 max-w-3xl text-gray-500 dark:text-gray-400">{copy.subtitle}</p>
+          <DocsHelpLink page="admins/backup" className="mt-2" />
         </div>
       </div>
 

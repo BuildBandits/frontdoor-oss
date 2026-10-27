@@ -13,6 +13,7 @@ import { useBrandingLanguage, useBrandingTimeZone } from '../stores/brandingStor
 import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { formatLocalDateTime } from '../utils/dateTime';
 import { resolveAppTimeZone } from '../../shared/timeZones.js';
+import DocsHelpLink from '../components/DocsHelpLink';
 
 export default function AdminLogs() {
   const { user } = useAuthStore();
@@ -84,6 +85,7 @@ export default function AdminLogs() {
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{ui.admin.logs.pageTitle}</h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">{ui.admin.logs.subtitle}</p>
+        <DocsHelpLink page="admins/logs" className="mt-2" />
       </div>
 
       <div className="mb-6 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">

@@ -22,6 +22,7 @@ import SegmentedControl from '../components/SegmentedControl';
 import PaginationControls from '../components/PaginationControls';
 import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
+import DocsHelpLink from '../components/DocsHelpLink';
 
 
 export default function AdminGroups() {
@@ -895,6 +896,7 @@ export default function AdminGroups() {
         <div>
           <h1 className="text-2xl font-extrabold text-dark dark:text-gray-100">{ui.admin.groups.pageTitle}</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">{ui.admin.groups.subtitle}</p>
+          <DocsHelpLink page="admins/groups" className="mt-2" />
         </div>
 
         <div className="flex items-center gap-3 max-sm:flex-col max-sm:items-stretch">

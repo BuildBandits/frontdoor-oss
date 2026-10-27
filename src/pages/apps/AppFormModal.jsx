@@ -2,6 +2,7 @@ import { X, Save, Copy, Users } from 'lucide-react';
 import TagInput from '../../components/TagInput';
 import AppIcon from '../../components/AppIcon';
 import Modal from '../../components/Modal';
+import DocsHelpLink from '../../components/DocsHelpLink';
 import { normalizeEntraApplicationId } from '../../../shared/entra.js';
 
 export default function AppFormModal({
@@ -47,6 +48,7 @@ export default function AppFormModal({
               <h2 id="apps-dialog-1-title" className="text-xl font-bold text-dark dark:text-gray-100">
                 {editing === 'new' ? ui.admin.apps.newApp : ui.admin.apps.editApp}
               </h2>
+              <DocsHelpLink page="admins/apps" className="ml-auto mr-2" />
               <button type="button" onClick={close} aria-label={ui.common.closeDialog} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="w-5 h-5" />
               </button>

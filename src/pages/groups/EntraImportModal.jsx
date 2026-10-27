@@ -1,5 +1,6 @@
 import { Plus, X, Users } from 'lucide-react';
 import Modal from '../../components/Modal';
+import DocsHelpLink from '../../components/DocsHelpLink';
 import ClearableSearchField from '../../components/ClearableSearchField';
 import SegmentedControl from '../../components/SegmentedControl';
 import { useSelectionFilter } from '../../hooks/useSelectionFilter';
@@ -40,6 +41,7 @@ function EntraImportDialog({
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {t.entraHelp}
             </p>
+            <DocsHelpLink page="operators/entra" className="mt-2" />
           </div>
           <button type="button" onClick={requestCloseActiveModal} aria-label={ui.common.closeDialog} className="p-2 text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
             <X className="w-5 h-5" />

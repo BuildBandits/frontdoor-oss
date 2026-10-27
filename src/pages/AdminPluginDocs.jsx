@@ -9,6 +9,7 @@ import {
   moduleExample,
   PLUGIN_DOC_ENV_HINTS,
 } from '../pluginHost/pluginDocsContent';
+import DocsHelpLink from '../components/DocsHelpLink';
 
 export default function AdminPluginDocs() {
   const { user } = useAuthStore();
@@ -29,6 +30,7 @@ export default function AdminPluginDocs() {
           </div>
           <h1 className="mt-3 text-2xl font-extrabold text-dark dark:text-gray-100">{t.pageTitle}</h1>
           <p className="mt-1 max-w-3xl text-gray-500 dark:text-gray-400">{t.subtitle}</p>
+          <DocsHelpLink page="integrators/plugins" className="mt-2" />
         </div>
 
         <div className="flex flex-wrap gap-2">

@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+- **Help links to the web documentation**: admin pages (Backup, Groups, Logs, Audit, Customize, Plugin docs), the Microsoft Entra group import and app dialogs, the personal menu and the browser homepage guide show a *Help* link to the matching page of the [web documentation](https://frontdoor.buildbandits.com/docs/), in the user's language. It opens in a new tab; `APP_DOCS_URL` in `src/config/appInfo.js` holds the base URL, and an empty value hides the links. ([#152](https://github.com/BuildBandits/frontdoor-oss/issues/152))
+
 ## [1.5.0] — 2026-10-26
 
 Support and Microsoft Entra lifecycle tools for admins: read-only impersonation of a user with a full audit trail, pre-onboarding of Entra users before their first sign-in, a notification center for what needs attention, and protection of the access given by Entra groups deleted in Entra. Group dialogs and lists get shared *All / Selected / Not selected* and source filters, filter menus are sorted alphabetically, and dependency updates fix advisories in `express`, `qs`, `body-parser` and `ip-address`.

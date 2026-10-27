@@ -10,6 +10,7 @@ import AppFooter from './AppFooter';
 import UserAvatar from './UserAvatar';
 import NotificationBell from './NotificationBell';
 import Tooltip from './Tooltip';
+import DocsHelpLink from './DocsHelpLink';
 import { formatMessage, getSupportedLanguageOptions, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { getSupportedTimeZoneOptions, normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
 import PluginSurface from '../pluginHost/PluginSurface';
@@ -695,6 +696,7 @@ export default function Layout({ children }) {
                       <Sparkles className="w-4 h-4" />
                       {ui.layout.takeTour}
                     </button>
+                    <DocsHelpLink page="users/personal-menu" className="px-3 py-2" />
                     <div className="my-1 h-px bg-gray-100 dark:bg-gray-800" />
                     {showLogoutAction && (
                       <button
@@ -962,6 +964,7 @@ export default function Layout({ children }) {
                   <Sparkles className="w-4 h-4" />
                   {ui.layout.takeTour}
                 </button>
+                <DocsHelpLink page="users/personal-menu" className="px-3 py-2" />
               </div>
             </div>
           </div>
