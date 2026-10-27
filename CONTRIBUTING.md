@@ -6,7 +6,7 @@ By participating you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## Development setup
 
-The full quick-start (Node and Docker paths) lives in the [README](README.md#quick-start-nodejs). In short:
+The full setup (Node and Docker paths) lives in the web documentation: [Run with Node.js and the local demo](https://frontdoor.buildbandits.com/docs/operators/nodejs/) and [Install with Docker](https://frontdoor.buildbandits.com/docs/operators/docker/). In short:
 
 ```bash
 npm install

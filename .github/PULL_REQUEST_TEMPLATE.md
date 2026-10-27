@@ -24,7 +24,7 @@ Closes #
 - [ ] All commits are **signed off** (DCO): `git commit -s` adds the `Signed-off-by` trailer.
 - [ ] Lint and tests pass locally: `npm run lint` and `npm test`.
 - [ ] I updated `CHANGELOG.md` under `[Unreleased]` (unless this PR is an internal refactor with no user-visible change).
-- [ ] I updated relevant documentation (`README.md`, inline docs).
+- [ ] I updated relevant documentation (`README.md`, `FEATURES.md`, inline docs, or the web docs in BuildBandits/frontdoor.buildbandits.com).
 - [ ] No PII (emails, names, tokens) in new log statements.
 - [ ] New SQL queries are parameterized.
 - [ ] New HTML rendered from user input goes through DOMPurify.

@@ -1,6 +1,6 @@
 # Frontdoor — Feature Map
 
-A capability-oriented overview of what Frontdoor does. The [README](README.md) covers the elevator pitch and quick start; this document is the structured tour.
+A capability-oriented overview of what Frontdoor does. The [README](README.md) covers the elevator pitch and quick start, and the [web documentation](https://frontdoor.buildbandits.com/docs/) covers setup, configuration and day-to-day use in detail; this document is the structured tour.
 
 Legend: 🛡️ owner-only · 🔧 admin-only · 🕶️ hidden (no nav entry)
 
