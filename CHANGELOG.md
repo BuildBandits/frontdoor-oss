@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Security
+- **Code scanning fixes**: group names and descriptions, and Microsoft Entra group names, are stripped of HTML tags in linear time and can no longer rebuild a tag from nested input such as `<<b>script>` (CodeQL: polynomial ReDoS and incomplete multi-character sanitization). Plugin asset path segments are trimmed without a backtracking regex. App icon and media library files are resolved only inside their directory, so a stored file name with path separators, for example from a crafted backup, is refused instead of reaching files elsewhere on disk.
+
 ## [1.5.1] — 2026-10-29
 
 First public release. Docker images are published to GitHub Container Registry (`ghcr.io/buildbandits/frontdoor-oss`) for every release, the app links its admin pages and dialogs to the matching page of the web documentation, the README becomes a short entry point to that documentation, and dependencies get their latest patch and minor updates, including a fix for a `qs` advisory.
