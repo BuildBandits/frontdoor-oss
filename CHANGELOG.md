@@ -8,7 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [1.5.1] — 2026-10-29
 
-First public release. Docker images are published to GitHub Container Registry (`ghcr.io/buildbandits/frontdoor-oss`) for every release, the app links its admin pages and dialogs to the matching page of the web documentation, the README becomes a short entry point to that documentation, and dependencies get their latest patch and minor updates.
+First public release. Docker images are published to GitHub Container Registry (`ghcr.io/buildbandits/frontdoor-oss`) for every release, the app links its admin pages and dialogs to the matching page of the web documentation, the README becomes a short entry point to that documentation, and dependencies get their latest patch and minor updates, including a fix for a `qs` advisory.
 
 **Upgrading:** nothing to change. Instead of building the image, a Docker deployment can now pull `ghcr.io/buildbandits/frontdoor-oss:1.5.1` (or `:latest`).
 
@@ -19,6 +19,9 @@ First public release. Docker images are published to GitHub Container Registry (
 ### Changed
 - **README**: shortened to an entry point (what Frontdoor is, quick start, stack, links). Installation, configuration, Microsoft Entra setup, API, satellite app authentication, upgrade and plugin details now live only in the [web documentation](https://frontdoor.buildbandits.com/docs/); `docs/plugins.md` points there too. ([#151](https://github.com/BuildBandits/frontdoor-oss/issues/151))
 - **Dependencies**: `@azure/msal-node` 7.1.1, `dotenv` 18.0.9, `lucide-react` 1.61.0, `postcss` 8.5.31, `react-router` 8.5.0, `vite` 8.3.5 and `zustand` 5.0.16. ([#155](https://github.com/BuildBandits/frontdoor-oss/pull/155))
+
+### Security
+- **qs 6.17.1**: the `qs` dependency of `express` and `body-parser` moves from 6.16.0 to 6.17.1, which fixes an uncaught `TypeError` in `qs.stringify` with `arrayFormat: 'comma'` (CVE-2026-110816, denial of service). Frontdoor does not call `qs.stringify` itself.
 
 ## [1.5.0] — 2026-10-26
 
