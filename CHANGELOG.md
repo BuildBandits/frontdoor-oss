@@ -7,7 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Changed
-- **Contact address**: conduct reports, trademark requests and private maintainer matters go to `frontdoor@buildbandits.com`, which replaces the placeholder addresses in CODE_OF_CONDUCT.md and TRADEMARK.md and the "contact a maintainer through GitHub" fallback in SECURITY.md. MAINTAINERS.md lists the current areas of each maintainer.
+- **Contact address**: conduct reports, trademark requests and private maintainer matters go to `frontdoor@buildbandits.com`, which replaces the placeholder addresses in CODE_OF_CONDUCT.md and TRADEMARK.md and the "contact a maintainer through GitHub" fallback in SECURITY.md. MAINTAINERS.md lists the current areas of each maintainer, and LICENSE names both maintainers as copyright holders.
 
 ### Security
 - **Code scanning fixes**: group names and descriptions, and Microsoft Entra group names, are stripped of HTML tags in linear time and can no longer rebuild a tag from nested input such as `<<b>script>` (CodeQL: polynomial ReDoS and incomplete multi-character sanitization). Plugin asset path segments are trimmed without a backtracking regex. App icon and media library files are resolved only inside their directory, so a stored file name with path separators, for example from a crafted backup, is refused instead of reaching files elsewhere on disk.
