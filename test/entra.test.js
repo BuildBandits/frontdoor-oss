@@ -5,15 +5,15 @@ import { extractMyAppsApplicationId, isValidEntraApplicationId, normalizeEntraAp
 
 describe('entra application id helpers', () => {
   it('extracts the app id from a full MyApps launcher URL', () => {
-    const input = 'https://launcher.myapps.microsoft.com/api/signin/d86f5bc4-85e1-4783-a129-c8baea8927c2?tenantId=27ad5cd6-8142-4989-b9bf-c5075d53c1dc';
-    assert.equal(extractMyAppsApplicationId(input), 'd86f5bc4-85e1-4783-a129-c8baea8927c2');
-    assert.equal(normalizeEntraApplicationId(input), 'd86f5bc4-85e1-4783-a129-c8baea8927c2');
+    const input = 'https://launcher.myapps.microsoft.com/api/signin/aaaabbbb-cccc-dddd-eeee-ffff00001111?tenantId=00000000-0000-0000-0000-000000000000';
+    assert.equal(extractMyAppsApplicationId(input), 'aaaabbbb-cccc-dddd-eeee-ffff00001111');
+    assert.equal(normalizeEntraApplicationId(input), 'aaaabbbb-cccc-dddd-eeee-ffff00001111');
     assert.equal(isValidEntraApplicationId(extractMyAppsApplicationId(input)), true);
   });
 
   it('keeps a bare application id intact', () => {
-    const input = 'D86F5BC4-85E1-4783-A129-C8BAEA8927C2';
-    assert.equal(normalizeEntraApplicationId(input), 'd86f5bc4-85e1-4783-a129-c8baea8927c2');
+    const input = 'AAAABBBB-CCCC-DDDD-EEEE-FFFF00001111';
+    assert.equal(normalizeEntraApplicationId(input), 'aaaabbbb-cccc-dddd-eeee-ffff00001111');
     assert.equal(isValidEntraApplicationId(input), true);
   });
 });
