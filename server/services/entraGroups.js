@@ -2,6 +2,7 @@ import { ConfidentialClientApplication } from '@azure/msal-node';
 import db from '../db.js';
 import { UserFacingError } from './errors.js';
 import { NOTIFICATION_TYPES, raiseNotification, resolveNotifications } from './notifications.js';
+import { stripTags } from './textSanitize.js';
 
 const DEFAULT_SCOPES = ['User.Read', 'openid', 'profile', 'email'];
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0';
@@ -38,12 +39,12 @@ export function getAuthScopes() {
 }
 
 function sanitizeGroupName(name) {
-  const clean = (name || '').toString().replace(/<[^>]*>/g, '').trim().replace(/\s+/g, ' ');
+  const clean = stripTags(name || '').trim().replace(/\s+/g, ' ');
   return clean || 'Entra group';
 }
 
 function sanitizeOptionalText(value) {
-  return (value || '').toString().replace(/<[^>]*>/g, '').trim().replace(/\s+/g, ' ') || null;
+  return stripTags(value || '').trim().replace(/\s+/g, ' ') || null;
 }
 
 function resolveUniqueEntraGroupName(displayName, entraGroupId, reservedNames = new Set(), currentGroupName = null) {

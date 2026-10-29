@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { applySvgSafeHeaders, isSvgBuffer, isSvgContentType, sanitizeSvgBuffer } from './svgSanitize.js';
 import { RASTER_ICON_TYPES, normalizeImageContentType } from './imageTypes.js';
+import { resolveFileInDir } from './textSanitize.js';
 
 // path.resolve() ensures the configured dir is absolute even when the env var
 // uses a relative form like "./data/branding" — required by res.sendFile().
@@ -67,8 +68,9 @@ function resolveStoredMediaAssetPath(row, {
   if (!row?.kind || !row?.stored_file_name) return null;
   const assetDir = getAssetDirForKind(row.kind, { appIconDir, brandingDir });
   if (!assetDir) return null;
-  const absolutePath = path.join(assetDir, row.stored_file_name);
-  return fs.existsSync(absolutePath) ? absolutePath : null;
+  // A stored name that is not a plain file name (e.g. from a crafted backup) never leaves the asset directory.
+  const absolutePath = resolveFileInDir(assetDir, row.stored_file_name);
+  return absolutePath && fs.existsSync(absolutePath) ? absolutePath : null;
 }
 
 function toPublicMediaAsset(row, assetDirs = {}) {

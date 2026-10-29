@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { extractPluginPackageZip } from '../../shared/packageZip.js';
 import { isPluginSystemEnabled } from './branding.js';
 import { isPublicDestination } from './networkGuard.js';
+import { trimDashes } from './textSanitize.js';
 const PLUGIN_ASSET_DIR = path.resolve(process.env.PLUGIN_ASSET_DIR || path.join(process.cwd(), 'data', 'plugins'));
 
 function safeJsonParse(value, fallback) {
@@ -140,7 +141,7 @@ async function ensurePluginAssetDir() {
 }
 
 function normalizePathSegment(value, fallback = 'plugin') {
-  return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || fallback;
+  return trimDashes(String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-')) || fallback;
 }
 
 function isLocalPluginEntry(entry) {
