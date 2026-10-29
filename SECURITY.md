@@ -17,7 +17,7 @@ We currently support only the latest minor release on `main`. There are no LTS b
 
 Send a private report to:
 
-Use GitHub's private vulnerability reporting: on the repository page open **Security → Report a vulnerability**. If that option is not available, contact a maintainer directly through GitHub and ask for a private channel.
+Use GitHub's private vulnerability reporting: on the repository page open **Security → Report a vulnerability**. If that option is not available, write to [frontdoor@buildbandits.com](mailto:frontdoor@buildbandits.com) and ask for a private channel; do not include vulnerability details in that first message.
 
 Include in your report:
 

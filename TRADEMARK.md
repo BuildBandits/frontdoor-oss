@@ -38,7 +38,7 @@ If you are unsure whether a specific use falls inside or outside fair use, ask. 
 
 Send a written request to:
 
-`<trademark@TBD>` *(this address will be set when the project is migrated to its permanent home; until then, contact a maintainer directly via GitHub)*
+[frontdoor@buildbandits.com](mailto:frontdoor@buildbandits.com)
 
 Include:
 
