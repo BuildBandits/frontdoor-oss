@@ -8,9 +8,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Added
 - **Help links to the web documentation**: admin pages (Backup, Groups, Logs, Audit, Customize, Plugin docs), the Microsoft Entra group import and app dialogs, the personal menu and the browser homepage guide show a *Help* link to the matching page of the [web documentation](https://frontdoor.buildbandits.com/docs/), in the user's language. It opens in a new tab; `APP_DOCS_URL` in `src/config/appInfo.js` holds the base URL, and an empty value hides the links. ([#152](https://github.com/BuildBandits/frontdoor-oss/issues/152))
+- **Docker images on GitHub Container Registry**: a published GitHub Release pushes `ghcr.io/buildbandits/frontdoor-oss` tagged `X.Y.Z`, `X.Y` and `latest`; every push to `main` updates `dev`.
 
 ### Changed
 - **README**: shortened to an entry point (what Frontdoor is, quick start, stack, links). Installation, configuration, Microsoft Entra setup, API, satellite app authentication, upgrade and plugin details now live only in the [web documentation](https://frontdoor.buildbandits.com/docs/); `docs/plugins.md` points there too. ([#151](https://github.com/BuildBandits/frontdoor-oss/issues/151))
+- **Dependencies**: `@azure/msal-node` 7.1.1, `dotenv` 18.0.9, `lucide-react` 1.61.0, `postcss` 8.5.31, `react-router` 8.5.0, `vite` 8.3.5 and `zustand` 5.0.16. ([#155](https://github.com/BuildBandits/frontdoor-oss/pull/155))
 
 ## [1.5.0] — 2026-10-26
 

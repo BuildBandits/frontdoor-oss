@@ -37,6 +37,8 @@ cp .env.example.docker .env   # fill in your Microsoft Entra and domain settings
 docker compose up -d --build
 ```
 
+Prebuilt images are published to GitHub Container Registry for every release: `ghcr.io/buildbandits/frontdoor-oss:latest`, `:X.Y.Z` and `:X.Y`, plus `:dev` from `main`.
+
 See [Install with Docker](https://frontdoor.buildbandits.com/docs/operators/docker/) and [Microsoft Entra setup](https://frontdoor.buildbandits.com/docs/operators/entra/) for a real deployment.
 
 ## Stack
