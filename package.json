@@ -1,6 +1,6 @@
 {
   "name": "oss-frontdoor",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "private": true,
   "description": "Self-hosted authentication gateway and app catalog with Microsoft Entra ID SSO, RBAC and per-group app visibility",
   "type": "module",

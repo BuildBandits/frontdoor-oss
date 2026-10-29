@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+## [1.5.2] — 2026-10-29
+
+Fixes for the first code scanning results after the repository went public: HTML tags are stripped from group names and descriptions in linear time and can no longer be rebuilt from nested input, and app icon and media library files are always resolved inside their directory. The project now has a dedicated contact address, `frontdoor@buildbandits.com`.
+
+**Upgrading:** nothing to change. A lone `<` without a closing `>` in a group name or description is now removed when the group is saved or synced from Microsoft Entra.
+
 ### Changed
 - **Contact address**: conduct reports, trademark requests and private maintainer matters go to `frontdoor@buildbandits.com`, which replaces the placeholder addresses in CODE_OF_CONDUCT.md and TRADEMARK.md and the "contact a maintainer through GitHub" fallback in SECURITY.md. MAINTAINERS.md lists the current areas of each maintainer, and LICENSE names both maintainers as copyright holders.
 
