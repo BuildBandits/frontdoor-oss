@@ -12,7 +12,7 @@ This Code of Conduct applies within all project spaces (repository, issues, pull
 
 Reports of unacceptable behavior may be sent privately to the maintainers at:
 
-`<conduct@TBD>` *(this address will be set when the project is migrated to its permanent home)*
+[frontdoor@buildbandits.com](mailto:frontdoor@buildbandits.com)
 
 All reports are reviewed and investigated promptly and fairly. Maintainers are obligated to respect the privacy and safety of the reporter.
 
