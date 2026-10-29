@@ -20,13 +20,14 @@ import { respondWithError } from '../services/errors.js';
 import { recordEntraSyncOutcome, notifyUsersDeactivatedFromEntra } from '../services/syncNotifications.js';
 import { NOTIFICATION_TYPES, resolveNotifications } from '../services/notifications.js';
 import { diffAuditFields } from '../services/auditDetails.js';
+import { stripTags } from '../services/textSanitize.js';
 
 const router = express.Router();
 
 // Sanitize group name: strip HTML tags, limit length
 function sanitizeName(name) {
   if (!name) return null;
-  return name.replace(/<[^>]*>/g, '').trim().slice(0, 100);
+  return stripTags(name).trim().slice(0, 100);
 }
 
 // Returns { error, code } for an invalid group name, or null when the name is valid.
@@ -317,7 +318,7 @@ router.post('/', authenticate, isAdminEditor, (req, res) => {
   if (nameError) return res.status(400).json(nameError);
 
   const cleanName = sanitizeName(name);
-  const cleanDesc = description ? description.replace(/<[^>]*>/g, '').trim().slice(0, 500) : '';
+  const cleanDesc = description ? stripTags(description).trim().slice(0, 500) : '';
 
   const existing = db.prepare('SELECT id FROM user_groups WHERE name = ?').get(cleanName);
   if (existing) return res.status(409).json({ error: 'A group with this name already exists', code: 'group_name_taken' });
@@ -352,7 +353,7 @@ router.put('/:id', authenticate, isAdminEditor, (req, res) => {
   // null clears the description; undefined leaves it unchanged.
   const cleanDesc = description === null
     ? ''
-    : (description !== undefined ? description.replace(/<[^>]*>/g, '').trim().slice(0, 500) : null);
+    : (description !== undefined ? stripTags(description).trim().slice(0, 500) : null);
 
   if (group.id === DEFAULT_GROUP_ID && cleanName && cleanName !== 'default') {
     return res.status(400).json({ error: 'Cannot rename the default group', code: 'default_group_rename' });

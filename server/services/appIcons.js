@@ -7,6 +7,7 @@ import { archiveMediaAsset } from './mediaAssets.js';
 import { applySvgSafeHeaders, isSvgBuffer, isSvgContentType, sanitizeSvgBuffer } from './svgSanitize.js';
 import { UserFacingError } from './errors.js';
 import { RASTER_ICON_TYPES, normalizeImageContentType } from './imageTypes.js';
+import { resolveFileInDir } from './textSanitize.js';
 import { MAX_RASTER_ICON_BYTES, MAX_SVG_ICON_BYTES, estimateDataUrlBytes } from '../../shared/iconLimits.js';
 
 function assertIconSize(bytes, { svg }) {
@@ -32,8 +33,9 @@ function ensureCacheDir() {
 
 ensureCacheDir();
 
+// Null when the stored name is not a plain file name inside the cache directory.
 function iconPath(cacheDir, fileName) {
-  return path.join(cacheDir, fileName);
+  return resolveFileInDir(cacheDir, fileName);
 }
 
 function extensionFromContentType(contentType) {
@@ -114,6 +116,7 @@ export async function findLargeAppIcons({ thresholdBytes = LARGE_ICON_THRESHOLD_
   const large = [];
   for (const app of apps) {
     const filePath = iconPath(cacheDir, app.icon_file_name);
+    if (!filePath) continue;
     const stats = await fsp.stat(filePath).catch(() => null);
     if (!stats || stats.size <= thresholdBytes) continue;
     const head = Buffer.alloc(32);
@@ -148,6 +151,7 @@ export async function saveAppIconAsset(appId, source, appMeta = null, { cacheDir
   const extension = extensionFromContentType(source.contentType);
   const fileName = `${appId}.${Date.now()}.${uuidv4().slice(0, 8)}.${extension}`;
   const absolutePath = iconPath(cacheDir, fileName);
+  if (!absolutePath) throw new Error('Invalid app icon file name');
 
   await fsp.writeFile(absolutePath, source.buffer);
   await archiveMediaAsset({
