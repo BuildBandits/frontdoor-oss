@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+## [1.5.1] — 2026-10-29
+
+First public release. Docker images are published to GitHub Container Registry (`ghcr.io/buildbandits/frontdoor-oss`) for every release, the app links its admin pages and dialogs to the matching page of the web documentation, the README becomes a short entry point to that documentation, and dependencies get their latest patch and minor updates.
+
+**Upgrading:** nothing to change. Instead of building the image, a Docker deployment can now pull `ghcr.io/buildbandits/frontdoor-oss:1.5.1` (or `:latest`).
+
 ### Added
 - **Help links to the web documentation**: admin pages (Backup, Groups, Logs, Audit, Customize, Plugin docs), the Microsoft Entra group import and app dialogs, the personal menu and the browser homepage guide show a *Help* link to the matching page of the [web documentation](https://frontdoor.buildbandits.com/docs/), in the user's language. It opens in a new tab; `APP_DOCS_URL` in `src/config/appInfo.js` holds the base URL, and an empty value hides the links. ([#152](https://github.com/BuildBandits/frontdoor-oss/issues/152))
 - **Docker images on GitHub Container Registry**: a published GitHub Release pushes `ghcr.io/buildbandits/frontdoor-oss` tagged `X.Y.Z`, `X.Y` and `latest`; every push to `main` updates `dev`.
