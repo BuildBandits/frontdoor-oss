@@ -43,6 +43,10 @@ services:
       - RBAC_RATE_LIMIT_WINDOW_MS=${RBAC_RATE_LIMIT_WINDOW_MS:-}
       - API_RATE_LIMIT_MAX=${API_RATE_LIMIT_MAX:-}
       - API_RATE_LIMIT_WINDOW_MS=${API_RATE_LIMIT_WINDOW_MS:-}
+      # AI assistants (MCP), off until the owner turns it on (see docs/mcp.md)
+      - MCP_IP_RATE_LIMIT_MAX=${MCP_IP_RATE_LIMIT_MAX:-}
+      - MCP_RATE_LIMIT_MAX=${MCP_RATE_LIMIT_MAX:-}
+      - MCP_TOKEN_RATE_LIMIT_MAX=${MCP_TOKEN_RATE_LIMIT_MAX:-}
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
