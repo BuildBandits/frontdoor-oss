@@ -2,17 +2,19 @@
 
 Branch: `feat/mcp-server` (fork `amargiovanni/frontdoor-oss`).
 Spec: `docs/design/mcp/02-phase1-spec.md`. ADRs 0002–0004.
-Status: **awaiting confirmation** — no code until this plan is approved.
+Status: approved 2026-11-03 (plan and the M1 `npm install`). M0 done.
 
 Each milestone ends with lint, tests, i18n check and build green, a commit, a
 push, and this file updated.
 
 ## M0 — Prerequisite refactor (no behaviour change)
-- [ ] Characterisation tests for app visibility through `GET /api/apps`,
+- [x] Characterisation tests for app visibility through `GET /api/apps`,
       `sso-redirect`, `entra-redirect`, `track-access` (direct, nested, Entra, inactive app)
-- [ ] Extract `server/services/appCatalog.js` (`listAppsForUser`, `userCanAccessApp`,
-      `launchUrlFor`) and switch the three duplicated `hasAccess` queries to it
-- [ ] Tests green with no route test modified
+- [x] Extract `server/services/appCatalog.js` (`listAccessibleAppsForUser`, `userCanAccessApp`;
+      the MCP launch URL lands with the tools in M3) and switch the three duplicated `hasAccess` queries to it
+- [x] Tests green with no route test modified (284 tests, 283 pass, 1 skip: frontend not built)
+- Note: `GET /api/users/:id` keeps its own query on purpose: it lists inactive
+  apps too (admin view), so it is a different question, not a duplicate.
 
 ## M1 — Dependencies and data model
 - [ ] `npm install @modelcontextprotocol/server@^2.4.0 @modelcontextprotocol/express@^2.0.2`
