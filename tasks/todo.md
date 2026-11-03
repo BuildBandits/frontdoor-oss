@@ -77,6 +77,8 @@ push, and this file updated.
       or accepted — `docs/design/mcp/reviews/2026-11-03-security-review.md`
 - [x] PR description drafted: `tasks/pr-mcp-phase1.md`
 - [x] Draft PR opened 2026-11-03: https://github.com/BuildBandits/frontdoor-oss/pull/167
+- [ ] Not mergeable until the `networkGuard.js` overlap with #168 is decided (see the PR description):
+      merge #168 first, rebase, reuse its helper; decide where the extra IPv6 ranges go
 
 ## Flagged, not in scope
 - `frontdoor_token` is set on `.${BASE_DOMAIN}` and accepted as a bearer on
@@ -85,7 +87,8 @@ push, and this file updated.
   report separately.
 - Pre-existing (review 7g): `trust proxy 1` lets a directly reachable instance spoof
   `X-Forwarded-For` and bypass IP rate limits.
-- **Confirmed vulnerability (low):** plugin webhook delivery (`server/services/plugins.js:590`)
+- **Confirmed vulnerability (low), fixed in #168** (branch `fix/plugin-webhook-dns-rebinding`, from `main`):
+  plugin webhook delivery (`server/services/plugins.js:590`)
   checks the destination with `isPublicDestination` and then calls `fetch`, which resolves
   DNS again: a DNS-rebinding host can pass the check and be reached on a private address,
   with the plugin secret header. Exposure is limited (plugin platform locked, admin-chosen

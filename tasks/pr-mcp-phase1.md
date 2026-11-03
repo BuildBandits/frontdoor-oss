@@ -1,5 +1,24 @@
 <!-- Draft PR description for feat/mcp-server → BuildBandits/frontdoor-oss main. -->
 
+## ⚠️ Not mergeable yet: a decision is needed first
+
+This PR overlaps with **#168** (security fix for plugin webhooks) in `server/services/networkGuard.js`, and the two cannot both land as they are. Before merging, the maintainers need to decide what to keep:
+
+| | #167 (this PR) | #168 |
+| --- | --- | --- |
+| Connect-time address check | adds `publicOnlyLookup` | adds the same `publicOnlyLookup` |
+| Outbound request helper | `fetchPublicJson` (GET, JSON, size cap) for client metadata documents | `requestPublic` (any method, status only) for webhooks |
+| `isPublicDestination` | kept (still used by `plugins.js` here) | removed (no longer used) |
+| Extra blocked IPv6 ranges (NAT64 `64:ff9b::/96`, `64:ff9b:1::/48`, `100::/64`, 6to4 `2002::/16`, `fec0::/10`, `::/96`) | added (security review, finding 7c) | not included |
+
+**Proposed resolution:**
+
+1. Merge #168 first: it is small, fixes a vulnerability on its own and has no dependency on this PR.
+2. Rebase this PR on `main`: keep #168's `publicOnlyLookup`, build `fetchPublicJson` on the same guarded core as `requestPublic` instead of a second copy, drop `isPublicDestination` as #168 does.
+3. Decide where the extra IPv6 ranges go: they protect webhooks as much as the MCP metadata fetch, so they arguably belong in their own small security PR rather than in this feature.
+
+Also before leaving draft: a check with a commercial assistant (Claude, ChatGPT or Copilot Studio) against a public https staging instance, and the web docs page in BuildBandits/frontdoor.buildbandits.com.
+
 ## Summary
 
 Adds an optional MCP server so people use Frontdoor from the AI assistant they
