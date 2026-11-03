@@ -4,7 +4,7 @@ import db, { logRbacAudit } from '../db.js';
 import { v4 as uuidv4 } from 'uuid';
 import { extractPluginPackageZip } from '../../shared/packageZip.js';
 import { isPluginSystemEnabled } from './branding.js';
-import { isPublicDestination } from './networkGuard.js';
+import { requestPublic } from './networkGuard.js';
 import { trimDashes } from './textSanitize.js';
 const PLUGIN_ASSET_DIR = path.resolve(process.env.PLUGIN_ASSET_DIR || path.join(process.cwd(), 'data', 'plugins'));
 
@@ -586,45 +586,40 @@ export async function dispatchPluginEvent(eventName, payload = {}, context = {})
 
     summary.attempted += 1;
 
-    // Resolved at delivery time: a host that resolves to a private address is refused.
-    if (!(await isPublicDestination(row.backend_url))) {
-      summary.failed += 1;
-      summary.errors.push({ pluginId: row.id, message: 'Backend webhook destination is not allowed' });
-      continue;
-    }
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
     try {
-      const response = await fetch(row.backend_url, {
-        redirect: 'manual',
+      // The destination is checked inside the connection's own DNS lookup
+      // (requestPublic), not by a separate resolution before it, so a host
+      // rebinding to a private address after the check cannot be reached.
+      const body = JSON.stringify({
+        event: eventName,
+        deliveryId,
+        plugin: {
+          id: row.id,
+          name: row.name,
+          version: row.version,
+          source: row.source,
+        },
+        payload,
+        context,
+        timestamp: new Date().toISOString(),
+      });
+      const response = await requestPublic(row.backend_url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
           'User-Agent': 'frontdoor-plugin-dispatch/1.0',
           'X-Frontdoor-Plugin-Id': row.id,
           'X-Frontdoor-Plugin-Event': eventName,
           'X-Frontdoor-Delivery-Id': deliveryId,
           ...(row.backend_secret ? { 'X-Frontdoor-Plugin-Secret': row.backend_secret } : {}),
         },
-        body: JSON.stringify({
-          event: eventName,
-          deliveryId,
-          plugin: {
-            id: row.id,
-            name: row.name,
-            version: row.version,
-            source: row.source,
-          },
-          payload,
-          context,
-          timestamp: new Date().toISOString(),
-        }),
-        signal: controller.signal,
+        body,
+        timeoutMs: 5000,
       });
 
       // Redirects are not followed: a 3xx counts as a failed delivery.
-      if (!response.ok) {
+      if (response.status < 200 || response.status >= 300) {
         summary.failed += 1;
         summary.errors.push({
           pluginId: row.id,
@@ -638,10 +633,10 @@ export async function dispatchPluginEvent(eventName, payload = {}, context = {})
       summary.failed += 1;
       summary.errors.push({
         pluginId: row.id,
-        message: error instanceof Error ? error.message : String(error),
+        message: error?.code === 'destination_not_public'
+          ? 'Backend webhook destination is not allowed'
+          : (error instanceof Error ? error.message : String(error)),
       });
-    } finally {
-      clearTimeout(timeout);
     }
   }
 
