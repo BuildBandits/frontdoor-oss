@@ -1,12 +1,54 @@
 <!-- Draft PR description for feat/mcp-server → BuildBandits/frontdoor-oss main. -->
 
-## Where this is going
+## The goal
 
-Phase 1 looks small: "where is the holiday portal?", "add Jira to my favourites". It is the foundation for phase 2, which is the point:
+**Frontdoor administration by conversation, with a human always applying the change in Frontdoor.**
 
-> An admin asks their assistant *"remove Figma from the Interns group and give Payroll to HR Milan"*. Frontdoor does not apply it: it prepares the change, the assistant answers with a link, the admin opens Frontdoor, reviews the exact diff with real names, and clicks **Apply**. The assistant proposes, Frontdoor decides, the human confirms with their own session; a prompt injection can at worst produce a proposal nobody applies.
+An admin asks their AI assistant:
 
-Everything that flow needs on the security side ships here: the authorization server with per-admin grants and owner-approved assistants, RBAC shared with the routes, fail-closed output filtering, a browser-bound and unframeable confirmation page pattern, audit by assistant, and immediate revocation. Phase 2 adds the pending-change model and its confirmation page on top. Roadmap: `docs/design/mcp/03-roadmap.md`; full proposal: `docs/design/mcp/01-proposal.md`.
+> *"Remove Figma from the Interns group and give Payroll to HR Milan."*
+
+Frontdoor does **not** apply it. It prepares the change and the assistant answers with a link. The admin opens Frontdoor, sees the exact diff with real names (who gains and who loses access to what), and clicks **Apply**. Work that takes dozens of clicks across Apps, Groups and Users becomes one sentence and one review.
+
+The assistant proposes, Frontdoor decides, the human confirms with their own Entra session. A prompt injection (a malicious app description or group name read by the model) can at worst produce a proposal nobody applies. Identity stays with Microsoft Entra, and nothing reaches the AI provider that would let it into the tenant.
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant AI as AI assistant
+    participant FD as Frontdoor
+    Admin->>AI: "Remove Figma from Interns, give Payroll to HR Milan"
+    AI->>FD: propose change (MCP, admin's own grant)
+    FD->>FD: same RBAC as the UI, store pending change
+    FD-->>AI: link + summary (names and counts, no identities)
+    AI-->>Admin: "Review it here: /changes/…"
+    Admin->>FD: opens the link with the Entra session
+    FD-->>Admin: full diff with real names
+    Admin->>FD: Apply
+    FD->>FD: re-check permissions and state, apply, audit "via MCP, assistant X"
+```
+
+## The plan: three phases, this PR is phase 1
+
+| Phase | What users get | Status |
+| --- | --- | --- |
+| **1. Foundation: read and own preferences** | "Where is the holiday portal?", "which tools do I have for accounting?", "who can open Payroll, and through which group?" (admins, counts only), "add Jira to my favourites" | **This PR** |
+| **2. Admin write proposals** | The flow above: the assistant proposes group ↔ app visibility changes, then app creation and edits, then Entra import and resync; the admin reviews the diff and applies it with one click in Frontdoor | Next, once phase 1 holds in production. Roadmap: [`03-roadmap.md`](https://github.com/amargiovanni/frontdoor-oss/blob/feat/mcp-server/docs/design/mcp/03-roadmap.md) |
+| **3. Log answers for owners** | "Which apps has nobody opened in 90 days?", "top 5 apps this month" — aggregates only, never rows, behind a separate owner switch | After phase 2, with a DPIA screening first |
+
+Phase 1 looks small from the outside, but it carries the hard part. Everything phase 2 needs on the security side ships here and is already reviewed and tested:
+
+| Phase 2 needs | Phase 1 delivers |
+| --- | --- |
+| The assistant acts as one specific admin, never as itself | OAuth 2.1 authorization server, per-user grants, Entra sign-in (ADR 0003) |
+| Only assistants the organisation approved | Owner allowlist, kill switch (ADR 0004) |
+| No authorization path parallel to the UI | Visibility and admin queries moved into services shared by routes and tools |
+| Nothing leaks to the provider | Fail-closed output projections, tested per tool |
+| A Frontdoor page to confirm on that cannot be framed or driven cross-site | The consent page pattern: browser-bound, `frame-ancestors 'none'`, strict same-origin API |
+| Traceability | Audit entries name the assistant behind each action |
+| Revocation that works at once | Per connection, per assistant, on user deactivation, global |
+
+Phase 2 then adds the pending-change model and its `/changes/:id` confirmation page on top. The full proposal, with its principles and non-goals (no other IdP, no owner functions via MCP, no generic tools, no AI model inside Frontdoor), is in [`01-proposal.md`](https://github.com/amargiovanni/frontdoor-oss/blob/feat/mcp-server/docs/design/mcp/01-proposal.md).
 
 ## ⚠️ Not mergeable yet: a decision is needed first
 
@@ -27,13 +69,13 @@ This PR overlaps with **#168** (security fix for plugin webhooks) in `server/ser
 
 Also before leaving draft: a check with a commercial assistant (Claude, ChatGPT or Copilot Studio) against a public https staging instance, and the web docs page in BuildBandits/frontdoor.buildbandits.com.
 
-## Summary
+## Summary of this PR (phase 1)
 
 Adds an optional MCP server so people use Frontdoor from the AI assistant they
 already have (Claude, ChatGPT, Copilot Studio, VS Code): find the apps they can
-open, and set their favourites, colour scheme and language. It is phase 1 (read
-and own preferences) of the proposal in `docs/design/mcp/01-proposal.md`, and
-ships **off**.
+open, and set their favourites, colour scheme and language; admins get
+read-only answers about apps and groups (counts, never identities). It ships
+**off**: the owner turns it on and approves each assistant.
 
 ## Related issue
 
