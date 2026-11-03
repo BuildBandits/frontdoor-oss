@@ -59,6 +59,13 @@ Out of scope:
 - Vulnerabilities in third-party dependencies that are already publicly tracked and pending an upstream fix — we still want to know, but they will be handled as regular dependency updates.
 - Findings limited to the development environment (e.g. dev-only npm dependencies flagged by `npm audit` with no production exposure).
 
+## AI assistants (MCP)
+
+When the owner turns it on, Frontdoor is also an OAuth 2.1 authorization server
+for AI assistants and serves `/mcp`. Its security model, what reaches the AI
+provider and the declared limits are in [docs/mcp.md](docs/mcp.md); reports
+about it follow the process above.
+
 ## Security audit log
 
 Substantial security work on Frontdoor — formal audits, large hardening passes, post-incident reviews — is recorded in the [`security/`](security/) folder as a dated markdown file (`security-audit-YYYYMMDD.md` or `security-incident-YYYYMMDD-<slug>.md`). Each file should capture, at minimum:
