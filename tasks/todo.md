@@ -76,7 +76,7 @@ push, and this file updated.
 - [x] Security review of the branch: no critical/high; 1 medium and 5 low fixed, info items fixed
       or accepted — `docs/design/mcp/reviews/2026-11-03-security-review.md`
 - [x] PR description drafted: `tasks/pr-mcp-phase1.md`
-- [ ] Open the PR against `BuildBandits/frontdoor-oss` `main` (approved 2026-11-03, draft)
+- [x] Draft PR opened 2026-11-03: https://github.com/BuildBandits/frontdoor-oss/pull/167
 
 ## Flagged, not in scope
 - `frontdoor_token` is set on `.${BASE_DOMAIN}` and accepted as a bearer on
