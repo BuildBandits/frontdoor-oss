@@ -59,7 +59,8 @@ before(async () => {
   }
   run("INSERT INTO user_groups (id, name) VALUES ('eg-staff', 'Staff'), ('eg-child', 'Interns'), ('eg-empty', 'Nobody')");
   run("INSERT INTO group_group_memberships (parent_group_id, child_group_id) VALUES ('eg-staff', 'eg-child')");
-  run("INSERT INTO group_entra_group_memberships (parent_group_id, entra_group_id) VALUES ('eg-staff', 'entra-sales')");
+  run("INSERT INTO group_entra_group_memberships (parent_group_id, entra_group_id) VALUES ('eg-staff', 'entra-sales'), ('eg-staff', 'entra-unnamed-0000')");
+  run("INSERT INTO entra_group_cache (entra_group_id, display_name) VALUES ('entra-sales', 'Sales EMEA')");
   run("INSERT INTO user_group_members (user_id, group_id) VALUES ('e-user', 'eg-staff'), ('e-viewer', 'eg-staff'), ('e-nested', 'eg-child'), ('e-off', 'eg-staff')");
   run("INSERT INTO entra_user_group_memberships (user_id, entra_group_id, synced_at) VALUES ('e-entra', 'entra-sales', '2026-11-03 08:00:00')");
   run(`INSERT INTO apps (id, name, slug, description, target_url, mode, tags, sort_order) VALUES
@@ -154,7 +155,8 @@ test('admin tools answer with counts and group names, never identities', async (
   const access = (await callTool(tokens['e-viewer'], 'get_app_access', { slug: 'payroll' })).structuredContent;
   // e-user, e-viewer (direct), e-nested (child group), e-entra (Entra link); e-off is inactive.
   assert.equal(access.totalUsers, 4);
-  assert.deepEqual(access.groups, [{ name: 'Staff', source: 'local', nestedGroups: ['Interns', 'entra-sales'], userCount: 4 }]);
+  // An Entra group without a cached display name is counted, never named by its object ID.
+  assert.deepEqual(access.groups, [{ name: 'Staff', source: 'local', nestedGroups: ['Interns', 'Sales EMEA'], unnamedNestedGroups: 1, userCount: 4 }]);
 
   const groups = (await callTool(tokens['e-viewer'], 'list_groups', { query: 'staff' })).structuredContent.groups;
   assert.deepEqual(groups, [{ name: 'Staff', source: 'local', memberCount: 3, appCount: 2 }]);
@@ -186,7 +188,7 @@ test('fail closed: every tool result carries only projected fields and no person
   for (const [userId, name, args] of calls) {
     const out = await callTool(tokens[userId], name, args);
     walk(out.structuredContent, name);
-    for (const secret of ['@secret-mail.test', 'Name e-', 'e-user', 'e-viewer', 'ea-payroll', 'eg-staff', 'payroll.example.com', '10.20.30.40']) {
+    for (const secret of ['@secret-mail.test', 'Name e-', 'e-user', 'e-viewer', 'ea-payroll', 'eg-staff', 'payroll.example.com', '10.20.30.40', 'entra-sales', 'entra-unnamed-0000']) {
       assert.ok(!out.content[0].text.includes(secret), `${name} leaked ${secret}`);
     }
   }
@@ -204,4 +206,15 @@ test('a disabled MCP answers 404 on /mcp', async () => {
   db.prepare('UPDATE mcp_settings SET enabled = 0').run();
   assert.equal((await rpc(tokens['e-user'], 'tools/list')).status, 404);
   db.prepare('UPDATE mcp_settings SET enabled = 1').run();
+});
+
+test('JSON-RPC batches are refused, so the rate limit counts tool calls', async () => {
+  const batch = Array.from({ length: 5 }, (_, index) => ({ jsonrpc: '2.0', id: index, method: 'tools/call', params: { name: 'list_groups', arguments: {} } }));
+  const res = await fetch(`${base}/mcp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': '2025-11-25', Authorization: `Bearer ${tokens['e-viewer']}` },
+    body: JSON.stringify(batch),
+  });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error.code, -32600);
 });

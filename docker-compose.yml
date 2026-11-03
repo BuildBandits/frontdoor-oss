@@ -47,6 +47,7 @@ services:
       - MCP_IP_RATE_LIMIT_MAX=${MCP_IP_RATE_LIMIT_MAX:-}
       - MCP_RATE_LIMIT_MAX=${MCP_RATE_LIMIT_MAX:-}
       - MCP_TOKEN_RATE_LIMIT_MAX=${MCP_TOKEN_RATE_LIMIT_MAX:-}
+      - MCP_AUTHORIZE_RATE_LIMIT_MAX=${MCP_AUTHORIZE_RATE_LIMIT_MAX:-}
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true

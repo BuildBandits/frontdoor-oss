@@ -2,7 +2,7 @@
 
 Branch: `feat/mcp-server` (fork `amargiovanni/frontdoor-oss`).
 Spec: `docs/design/mcp/02-phase1-spec.md`. ADRs 0002–0004.
-Status: approved 2026-11-03 (plan and the M1 `npm install`). M0–M4 done.
+Status: approved 2026-11-03 (plan and the M1 `npm install`). M0–M5 done; PR ready to open.
 
 Each milestone ends with lint, tests, i18n check and build green, a commit, a
 push, and this file updated.
@@ -67,18 +67,24 @@ push, and this file updated.
 - [x] Local end-to-end check with a real browser: `docs/design/mcp/reviews/2026-11-03-e2e-local.md`
 
 ## M5 — Documentation and review
-- [ ] SECURITY.md: MCP data flow, what leaves Frontdoor, declared limit
-- [ ] Operator docs: enabling, client setup per assistant (Claude, ChatGPT, VS Code, Copilot Studio manual)
-- [ ] CHANGELOG `[Unreleased]` → Added
-- [ ] End-to-end check with a real client; `curl` evidence of disabled 404s
-- [ ] Security review of the branch; findings recorded in `docs/design/mcp/reviews/`
-- [ ] Open draft PR against `BuildBandits/frontdoor-oss` `main` only when asked
+- [x] SECURITY.md pointer to `docs/mcp.md` (data flow, what leaves Frontdoor, declared limit)
+- [x] Operator docs `docs/mcp.md`: enabling, client setup per assistant, personal data, config; FEATURES.md
+- [ ] Web docs page in BuildBandits/frontdoor.buildbandits.com (follow-up PR there)
+- [x] CHANGELOG `[Unreleased]` → Added, Changed
+- [x] End-to-end check: real browser + `curl` client, disabled 404s (`reviews/2026-11-03-e2e-local.md`);
+      a commercial assistant against a public https staging instance is still to do
+- [x] Security review of the branch: no critical/high; 1 medium and 5 low fixed, info items fixed
+      or accepted — `docs/design/mcp/reviews/2026-11-03-security-review.md`
+- [x] PR description drafted: `tasks/pr-mcp-phase1.md`
+- [ ] Open the PR against `BuildBandits/frontdoor-oss` `main` — waiting for the go-ahead
 
 ## Flagged, not in scope
 - `frontdoor_token` is set on `.${BASE_DOMAIN}` and accepted as a bearer on
   `/api`: every satellite subdomain receives a 7-day, non-revocable Frontdoor
   session. To verify whether this is intended for `shared-cookie` mode and
   report separately.
+- Pre-existing (review 7g): `trust proxy 1` lets a directly reachable instance spoof
+  `X-Forwarded-For` and bypass IP rate limits.
 - **Confirmed vulnerability (low):** plugin webhook delivery (`server/services/plugins.js:590`)
   checks the destination with `isPublicDestination` and then calls `fetch`, which resolves
   DNS again: a DNS-rebinding host can pass the check and be reached on a private address,

@@ -10,7 +10,10 @@ for (const [address, prefix] of [
 ]) {
   blocked.addSubnet(address, prefix, 'ipv4');
 }
-for (const [address, prefix] of [['::', 128], ['::1', 128], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8]]) {
+for (const [address, prefix] of [
+  ['::', 128], ['::1', 128], ['::', 96], ['64:ff9b::', 96], ['64:ff9b:1::', 48], ['100::', 64], ['2002::', 16],
+  ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8],
+]) {
   blocked.addSubnet(address, prefix, 'ipv6');
 }
 
@@ -132,6 +135,11 @@ export async function fetchPublicJson(url, { maxBytes = 64 * 1024, timeoutMs = 5
       });
       res.on('error', reject);
     });
+    // `timeout` is an idle timer reset by every byte; this caps the whole
+    // exchange, so a host dripping bytes cannot hold the request open.
+    const deadline = setTimeout(() => req.destroy(guardError('timeout', 'Request timed out')), timeoutMs);
+    deadline.unref?.();
+    req.on('close', () => clearTimeout(deadline));
     req.on('timeout', () => req.destroy(guardError('timeout', 'Request timed out')));
     req.on('error', reject);
     req.end();

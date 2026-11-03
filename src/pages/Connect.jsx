@@ -126,7 +126,10 @@ export default function Connect() {
       <Section icon={Pencil} title={copy.canDoTitle}>{copy.canDo}</Section>
       <Section icon={EyeOff} title={copy.neverTitle}>{copy.never}</Section>
 
-      <p className="mt-5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 p-3 text-xs text-gray-500 dark:text-gray-400">{copy.typedNote}</p>
+      <p className="mt-5 text-sm font-medium text-dark dark:text-gray-100 break-words">
+        {formatMessage(copy.signedInAs, { name: user?.displayName || '', email: user?.email || '' })}
+      </p>
+      <p className="mt-3 rounded-2xl bg-gray-50 dark:bg-gray-800/60 p-3 text-xs text-gray-500 dark:text-gray-400">{copy.typedNote}</p>
 
       <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <button

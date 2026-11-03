@@ -98,7 +98,15 @@ const tokenLimiter = rateLimit({
   },
 });
 
-oauthRouter.get('/authorize', mcpAvailable, async (req, res) => {
+// Each hit stores a pending request and sets a cookie: bounded per IP.
+const authorizeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: Number.parseInt(process.env.MCP_AUTHORIZE_RATE_LIMIT_MAX || '30', 10) || 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+oauthRouter.get('/authorize', mcpAvailable, authorizeLimiter, async (req, res) => {
   noStore(res);
   try {
     const result = await startAuthorization(db, req.query);

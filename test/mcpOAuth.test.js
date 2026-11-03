@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import jwt from 'jsonwebtoken';
 
 process.env.JWT_SECRET = 'mcp-oauth-test-secret-0123456789abcdef';
+process.env.MCP_AUTHORIZE_RATE_LIMIT_MAX = '1000';
 
 const { default: db } = await import('../server/db.js');
 const { createApp } = await import('../server/app.js');
@@ -32,6 +33,8 @@ async function api(method, path, { userId, body, headers = {}, cookie } = {}) {
       ...(userId ? { Authorization: `Bearer ${sessionFor(userId)}` } : {}),
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       ...(cookie ? { Cookie: cookie } : {}),
+      // What a browser sends for Frontdoor's own pages; tests override it.
+      'Sec-Fetch-Site': 'same-origin',
       ...headers,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -325,4 +328,28 @@ test('rule 7: the consent route is never framed', { skip: !fs.existsSync(new URL
   assert.doesNotMatch(res.headers.get('content-security-policy'), /frame-ancestors 'self'/);
   const home = await fetch(`${base}/`);
   assert.notEqual(home.headers.get('x-frame-options'), 'DENY');
+});
+
+test('rule 14: a malformed Basic header is a 401 invalid_client, not a 500', async () => {
+  const res = await form('/oauth/token', { grant_type: 'refresh_token', refresh_token: 'x' }, { Authorization: `Basic ${Buffer.from('%E0%A4%A:x').toString('base64')}` });
+  assert.equal(res.status, 401);
+  assert.equal((await res.json()).error, 'invalid_client');
+});
+
+test('the MCP API refuses requests that are not same-origin, satellites included', async () => {
+  for (const site of ['same-site', 'cross-site', undefined]) {
+    const headers = site ? { 'Sec-Fetch-Site': site } : { 'Sec-Fetch-Site': '' };
+    assert.equal((await api('GET', '/api/mcp/connections', { userId: 'o-user', headers })).status, 403, String(site));
+  }
+});
+
+test('deactivating a user revokes their connections; reactivation does not revive them', async () => {
+  const { challenge, verifier } = pkce();
+  const tokens = await (await exchange(await obtainCode('o-other', { challenge }), verifier)).json();
+  assert.ok(verifyAccessToken(db, tokens.access_token));
+  assert.equal((await api('PUT', '/api/users/o-other/active', { userId: 'o-owner', body: { is_active: false } })).status, 200);
+  assert.equal((await api('PUT', '/api/users/o-other/active', { userId: 'o-owner', body: { is_active: true } })).status, 200);
+  assert.equal(verifyAccessToken(db, tokens.access_token), null);
+  const refreshed = await form('/oauth/token', { grant_type: 'refresh_token', refresh_token: tokens.refresh_token }, { Authorization: basic(client.client_id, client.secret) });
+  assert.equal((await refreshed.json()).error, 'invalid_grant');
 });

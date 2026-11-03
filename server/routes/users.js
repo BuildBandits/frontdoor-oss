@@ -1,4 +1,5 @@
 import express from 'express';
+import { revokeGrantsOfDeactivatedUser } from '../services/mcp/settings.js';
 import db from '../db.js';
 import { createPreferenceUpdate } from '../services/userPreferences.js';
 import { logRbacAudit } from '../db.js';
@@ -314,6 +315,7 @@ router.put('/:id/active', authenticate, isAdminEditor, (req, res) => {
     SET is_active = ?, entra_missing_since = CASE WHEN ? = 1 THEN NULL ELSE entra_missing_since END, updated_at = datetime('now')
     WHERE id = ?
   `).run(activeValue, activeValue, id);
+  if (!activeValue) revokeGrantsOfDeactivatedUser(db, id);
   logRbacAudit(req.user.id, activeValue ? 'activate' : 'deactivate', 'user_status', id, { email: user.email, role: user.role });
   if (activeValue) resolveNotifications(NOTIFICATION_TYPES.USER_DEACTIVATED_ENTRA, id, req.user.id);
   res.json({ is_active: activeValue });

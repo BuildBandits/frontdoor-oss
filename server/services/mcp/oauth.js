@@ -172,10 +172,15 @@ export async function authenticateClient(db, { authorization, body }, { fetchJso
     const decoded = Buffer.from(authorization.slice(6), 'base64').toString('utf8');
     const colon = decoded.indexOf(':');
     if (colon < 0) throw new OAuthError('invalid_client', 'Malformed client credentials', 401);
-    const basicId = decodeURIComponent(decoded.slice(0, colon));
+    let basicId;
+    try {
+      basicId = decodeURIComponent(decoded.slice(0, colon));
+      secret = decodeURIComponent(decoded.slice(colon + 1));
+    } catch {
+      throw new OAuthError('invalid_client', 'Malformed client credentials', 401);
+    }
     if (clientId && clientId !== basicId) throw new OAuthError('invalid_client', 'client_id mismatch', 401);
     clientId = basicId;
-    secret = decodeURIComponent(decoded.slice(colon + 1));
   }
   if (single(body?.client_secret) !== undefined) throw new OAuthError('invalid_client', 'Send the client secret with HTTP Basic', 401);
   let client;
