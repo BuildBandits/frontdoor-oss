@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Security
 - **Node2Shell (CVE-2026-111497)**: the Brotli decoder bundled with Node.js before 24.22.1 has an out-of-bounds write that can lead to remote code execution, and Express 5 decompresses `Content-Encoding: br` request bodies by default, so any request could reach it. The published 1.5.2 image already runs Node.js 24.22.2 and is not affected. The Docker image is now pinned to `node:24.22.2-bookworm-slim` instead of the floating `node:24-bookworm-slim` tag, so a cached or stale base image can no longer slip in, and `package.json` `engines` requires Node.js `>=24.22.1`. If you run Frontdoor from source, or from an image built before 21 October 2026, update Node.js or pull the current image.
+- **Development dependencies**: `minimatch` is forced to 11.0.4 through `overrides` (GHSA-g3hv-75wg-m249, denial of service via globparts amplification, pulled in by ESLint), `follow-redirects` moves to 1.16.2 (GHSA-mrwp-f3q8-3g9p, pulled in by axios on the Node.js side) and `zod` to 4.6.7 (GHSA-mrhx-c7xc-m3w5, pulled in by `eslint-plugin-react-hooks`). None of them ships in the runtime image or runs in the browser bundle, so production deployments are not affected.
 
 ## [1.5.2] — 2026-10-29
 
