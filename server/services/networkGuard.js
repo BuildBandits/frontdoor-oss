@@ -26,23 +26,63 @@ export function isPrivateAddress(address) {
   return true;
 }
 
+function guardError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
 /**
- * Resolves the URL host and returns true only if every address it resolves to is public.
- * `lookup` can be replaced in tests.
+ * A `lookup` for node:http(s) that refuses non-public addresses. The check runs
+ * inside the connection's own DNS resolution, so there is no window between
+ * "checked" and "connected" for DNS rebinding to exploit.
  */
-export async function isPublicDestination(url, { lookup = dns.lookup } = {}) {
-  let host;
-  try {
-    host = new URL(url).hostname.replace(/^\[|\]$/g, '');
-  } catch {
-    return false;
+export function publicOnlyLookup(baseLookup = dns.lookup) {
+  return (hostname, options, callback) => {
+    const done = typeof options === 'function' ? options : callback;
+    const opts = typeof options === 'object' && options !== null ? options : {};
+    Promise.resolve(baseLookup(hostname, { ...opts, all: true, verbatim: true }))
+      .then((addresses) => {
+        const list = Array.isArray(addresses) ? addresses : [addresses];
+        if (list.length === 0 || list.some(({ address }) => isPrivateAddress(address))) {
+          return done(guardError('destination_not_public', 'Destination address is not public'));
+        }
+        if (opts.all) return done(null, list);
+        return done(null, list[0].address, list[0].family);
+      })
+      .catch((error) => done(error));
+  };
+}
+
+/**
+ * Sends one request to a public http(s) destination and resolves with its
+ * status. The address is checked at connect time (and up front for IP
+ * literals), redirects are never followed, and `timeoutMs` bounds the whole
+ * exchange. Rejects with code `destination_not_public` for private targets.
+ * `request` is injectable for tests; production uses node:http / node:https.
+ */
+export async function requestPublic(url, { method = 'POST', headers = {}, body, timeoutMs = 5000, lookup = dns.lookup, request } = {}) {
+  const target = new URL(url);
+  if (!['http:', 'https:'].includes(target.protocol)) {
+    throw guardError('protocol_not_allowed', 'Only http and https are allowed');
   }
-  if (!host) return false;
-  if (net.isIP(host)) return !isPrivateAddress(host);
-  try {
-    const addresses = await lookup(host, { all: true, verbatim: true });
-    return addresses.length > 0 && addresses.every(({ address }) => !isPrivateAddress(address));
-  } catch {
-    return false;
+  const host = target.hostname.replace(/^\[|\]$/g, '');
+  if (net.isIP(host) && isPrivateAddress(host)) {
+    throw guardError('destination_not_public', 'Destination address is not public');
   }
+  const transport = (await import(target.protocol === 'https:' ? 'node:https' : 'node:http')).default;
+  const doRequest = request || transport.request.bind(transport);
+  return new Promise((resolve, reject) => {
+    const req = doRequest(target, { method, headers, lookup: publicOnlyLookup(lookup) }, (res) => {
+      res.resume();
+      res.on('end', () => resolve({ status: res.statusCode }));
+      res.on('error', reject);
+    });
+    const deadline = setTimeout(() => req.destroy(guardError('timeout', 'Request timed out')), timeoutMs);
+    deadline.unref?.();
+    req.on('close', () => clearTimeout(deadline));
+    req.on('error', reject);
+    if (body !== undefined) req.write(body);
+    req.end();
+  });
 }

@@ -7,7 +7,7 @@ process.env.JWT_SECRET = 'plugin-hardening-secret-0123456789abcdef';
 const { default: db } = await import('../server/db.js');
 const { createApp } = await import('../server/app.js');
 const { dispatchPluginEvent, upsertPluginRegistry, approvePluginRegistry } = await import('../server/services/plugins.js');
-const { isPrivateAddress, isPublicDestination } = await import('../server/services/networkGuard.js');
+const { isPrivateAddress, publicOnlyLookup } = await import('../server/services/networkGuard.js');
 
 const ADMIN_ID = 'plugin-hardening-admin';
 let server;
@@ -70,8 +70,11 @@ test('webhooks to private destinations are refused', async () => {
   assert.equal(isPrivateAddress('fd12::1'), true);
   assert.equal(isPrivateAddress('::ffff:192.168.1.1'), true);
   assert.equal(isPrivateAddress('93.184.216.34'), false);
-  assert.equal(await isPublicDestination('https://internal.example/', { lookup: async () => [{ address: '10.0.0.8', family: 4 }] }), false);
-  assert.equal(await isPublicDestination('https://public.example/', { lookup: async () => [{ address: '93.184.216.34', family: 4 }] }), true);
+  const resolve = (address) => new Promise((done) => {
+    publicOnlyLookup(async () => [{ address, family: 4 }])('host.example', { all: true }, (error, result) => done({ error, result }));
+  });
+  assert.equal((await resolve('10.0.0.8')).error?.code, 'destination_not_public');
+  assert.deepEqual((await resolve('93.184.216.34')).result, [{ address: '93.184.216.34', family: 4 }]);
 
   upsertPluginRegistry({ id: 'cgnat-hook', name: 'CGNAT', version: '1.0.0', entry: 'https://plugins.example.com/c.mjs', backendEnabled: true, backendUrl: 'http://100.64.0.1/hook', eventSubscriptions: ['auth.login'] });
   approvePluginRegistry('cgnat-hook', 'owner-1');
