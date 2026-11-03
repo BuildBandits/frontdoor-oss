@@ -1,4 +1,4 @@
-<!-- Draft PR description for feat/mcp-server → BuildBandits/frontdoor-oss main. -->
+<!-- PR description for feat/mcp-server → BuildBandits/frontdoor-oss main (#167, in review). -->
 
 ## The goal
 
@@ -67,7 +67,10 @@ This PR overlaps with **#168** (security fix for plugin webhooks) in `server/ser
 2. Rebase this PR on `main`: keep #168's `publicOnlyLookup`, build `fetchPublicJson` on the same guarded core as `requestPublic` instead of a second copy, drop `isPublicDestination` as #168 does.
 3. Decide where the extra IPv6 ranges go: they protect webhooks as much as the MCP metadata fetch, so they arguably belong in their own small security PR rather than in this feature.
 
-Also before leaving draft: a check with a commercial assistant (Claude, ChatGPT or Copilot Studio) against a public https staging instance, and the web docs page in BuildBandits/frontdoor.buildbandits.com.
+Also required before merging:
+
+- [ ] A check with a commercial assistant (Claude, ChatGPT or Copilot Studio) against a public https staging instance (the local end-to-end check is in `docs/design/mcp/reviews/2026-11-03-e2e-local.md`).
+- [ ] The web docs page in BuildBandits/frontdoor.buildbandits.com (follow-up PR there).
 
 ## Summary of this PR (phase 1)
 

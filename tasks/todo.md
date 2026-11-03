@@ -76,7 +76,7 @@ push, and this file updated.
 - [x] Security review of the branch: no critical/high; 1 medium and 5 low fixed, info items fixed
       or accepted — `docs/design/mcp/reviews/2026-11-03-security-review.md`
 - [x] PR description drafted: `tasks/pr-mcp-phase1.md`
-- [x] Draft PR opened 2026-11-03: https://github.com/BuildBandits/frontdoor-oss/pull/167
+- [x] PR opened 2026-11-03 as draft, moved to review by the author: https://github.com/BuildBandits/frontdoor-oss/pull/167
 - [ ] Not mergeable until the `networkGuard.js` overlap with #168 is decided (see the PR description):
       merge #168 first, rebase, reuse its helper; decide where the extra IPv6 ranges go
 
