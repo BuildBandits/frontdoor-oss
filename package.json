@@ -5,7 +5,7 @@
   "description": "Self-hosted authentication gateway and app catalog with Microsoft Entra ID SSO, RBAC and per-group app visibility",
   "type": "module",
   "engines": {
-    "node": ">=24"
+    "node": ">=24.22.1"
   },
   "scripts": {
     "dev": "concurrently \"vite\" \"node --watch-path=server --watch-path=shared server/index.js\"",

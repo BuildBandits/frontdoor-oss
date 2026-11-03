@@ -20,7 +20,7 @@ docker compose -f docker-compose.demo.yml up --build
 
 Open http://localhost:3001 and use the **Dev Login** panel to sign in as `owner`, `admin`, `admin_readonly` or `user`. Dev Login lets anyone pick any role, so never expose the demo to a network. Remove it with `docker compose -f docker-compose.demo.yml down -v`.
 
-### From source with Node.js 24
+### From source with Node.js 24.22.1 or later
 
 ```bash
 npm install
@@ -43,7 +43,7 @@ See [Install with Docker](https://frontdoor.buildbandits.com/docs/operators/dock
 
 ## Stack
 
-Node.js 24 LTS and Express 5 on the backend, React 19 with React Router, Vite and Tailwind CSS 4 on the frontend, SQLite through better-sqlite3, Microsoft SSO with `@azure/msal-node` plus JWT sessions, and a multi-stage Docker image based on `node:24-bookworm-slim`.
+Node.js 24 LTS and Express 5 on the backend, React 19 with React Router, Vite and Tailwind CSS 4 on the frontend, SQLite through better-sqlite3, Microsoft SSO with `@azure/msal-node` plus JWT sessions, and a multi-stage Docker image based on `node:24-bookworm-slim` (pinned to a patched release).
 
 ## Documentation
 
