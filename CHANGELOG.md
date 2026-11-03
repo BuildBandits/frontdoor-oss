@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Security
+- **Node2Shell (CVE-2026-111497)**: the Brotli decoder bundled with Node.js before 24.22.1 has an out-of-bounds write that can lead to remote code execution, and Express 5 decompresses `Content-Encoding: br` request bodies by default, so any request could reach it. The published 1.5.2 image already runs Node.js 24.22.2 and is not affected. The Docker image is now pinned to `node:24.22.2-bookworm-slim` instead of the floating `node:24-bookworm-slim` tag, so a cached or stale base image can no longer slip in, and `package.json` `engines` requires Node.js `>=24.22.1`. If you run Frontdoor from source, or from an image built before 21 October 2026, update Node.js or pull the current image.
+
 ## [1.5.2] — 2026-10-29
 
 Fixes for the first code scanning results after the repository went public: HTML tags are stripped from group names and descriptions in linear time and can no longer be rebuilt from nested input, and app icon and media library files are always resolved inside their directory. The project now has a dedicated contact address, `frontdoor@buildbandits.com`.

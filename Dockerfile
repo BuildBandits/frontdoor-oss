@@ -1,5 +1,6 @@
 # Stage 1: Build frontend and production node_modules
-ARG NODE_IMAGE=node:24-bookworm-slim
+# Pinned to a patch release: Node2Shell (CVE-2026-111497) is fixed in 24.22.1.
+ARG NODE_IMAGE=node:24.22.2-bookworm-slim
 # Optional short commit hash recorded in backups,
 # e.g. --build-arg COMMIT_SHA=$(git rev-parse --short HEAD).
 ARG COMMIT_SHA=
