@@ -5,11 +5,11 @@
 // Every object is self-contained (no column added to an existing table), so
 // rolling back never needs a table rebuild and never touches other data.
 
-export const MCP_TABLES = ['mcp_tokens', 'mcp_auth_codes', 'mcp_grants', 'mcp_clients', 'mcp_settings'];
+export const MCP_TABLES = ['mcp_authorization_requests', 'mcp_tokens', 'mcp_auth_codes', 'mcp_grants', 'mcp_clients', 'mcp_settings'];
 
 // Short-lived credentials: never exported in backups and purged on restore, so
 // a restored archive cannot bring a revoked token back.
-export const MCP_EPHEMERAL_TABLES = ['mcp_tokens', 'mcp_auth_codes'];
+export const MCP_EPHEMERAL_TABLES = ['mcp_tokens', 'mcp_auth_codes', 'mcp_authorization_requests'];
 
 export function up(db) {
   db.exec(`
@@ -43,7 +43,7 @@ export function up(db) {
       created_at TEXT DEFAULT (datetime('now')),
       last_used_at TEXT,
       revoked_at TEXT,
-      revoke_reason TEXT CHECK(revoke_reason IN ('user', 'owner', 'kill_switch', 'refresh_reuse', 'code_replay', 'client_disabled', 'user_inactive'))
+      revoke_reason TEXT CHECK(revoke_reason IN ('user', 'owner', 'client', 'kill_switch', 'refresh_reuse', 'code_replay', 'client_disabled', 'user_inactive'))
     );
     CREATE INDEX IF NOT EXISTS idx_mcp_grants_user ON mcp_grants(user_id);
     CREATE INDEX IF NOT EXISTS idx_mcp_grants_client ON mcp_grants(client_id);
@@ -74,6 +74,24 @@ export function up(db) {
     CREATE INDEX IF NOT EXISTS idx_mcp_tokens_grant ON mcp_tokens(grant_id);
     CREATE INDEX IF NOT EXISTS idx_mcp_tokens_family ON mcp_tokens(family_id);
     CREATE INDEX IF NOT EXISTS idx_mcp_tokens_expiry ON mcp_tokens(expires_at);
+
+    -- A validated /oauth/authorize request waiting for the user's consent.
+    -- Bound to the browser that started it through browser_nonce_hash.
+    CREATE TABLE IF NOT EXISTS mcp_authorization_requests (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL,
+      client_name TEXT NOT NULL,
+      redirect_uri TEXT NOT NULL,
+      state TEXT,
+      code_challenge TEXT NOT NULL,
+      resource TEXT NOT NULL,
+      scope TEXT NOT NULL,
+      browser_nonce_hash TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL,
+      consumed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_mcp_authorization_requests_expiry ON mcp_authorization_requests(expires_at);
   `);
   db.prepare("INSERT OR IGNORE INTO mcp_settings (id, enabled) VALUES ('default', 0)").run();
 }

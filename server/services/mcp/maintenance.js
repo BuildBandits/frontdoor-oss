@@ -8,7 +8,8 @@
 export function purgeExpiredMcpCredentials(db, { retentionDays = 90 } = {}) {
   const days = Number.isFinite(retentionDays) ? Math.min(90, Math.max(0, Math.floor(retentionDays))) : 90;
   return db.transaction(() => ({
-    codesRemoved: db.prepare("DELETE FROM mcp_auth_codes WHERE expires_at < datetime('now')").run().changes,
+    codesRemoved: db.prepare("DELETE FROM mcp_auth_codes WHERE expires_at < datetime('now')").run().changes
+      + db.prepare("DELETE FROM mcp_authorization_requests WHERE expires_at < datetime('now')").run().changes,
     tokensRemoved: db.prepare("DELETE FROM mcp_tokens WHERE expires_at < datetime('now') OR (absolute_expires_at IS NOT NULL AND absolute_expires_at < datetime('now'))").run().changes,
     grantsRemoved: db.prepare("DELETE FROM mcp_grants WHERE revoked_at IS NOT NULL AND revoked_at < datetime('now', ?)").run(`-${days} days`).changes,
   }))();

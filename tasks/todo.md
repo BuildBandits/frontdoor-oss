@@ -2,7 +2,7 @@
 
 Branch: `feat/mcp-server` (fork `amargiovanni/frontdoor-oss`).
 Spec: `docs/design/mcp/02-phase1-spec.md`. ADRs 0002–0004.
-Status: approved 2026-11-03 (plan and the M1 `npm install`). M0, M1 done.
+Status: approved 2026-11-03 (plan and the M1 `npm install`). M0, M1, M2 done.
 
 Each milestone ends with lint, tests, i18n check and build green, a commit, a
 push, and this file updated.
@@ -26,18 +26,23 @@ push, and this file updated.
 - [x] Backups never carry `mcp_tokens`/`mcp_auth_codes`; restores empty them (both formats, mutation-checked)
 - [x] Hourly purge of expired codes and tokens and of revoked grants past log retention, with a test
 
-- Open before M3: mounting the SDK handler on Express needs `toNodeHandler` from
-  `@modelcontextprotocol/node` (not yet approved), and tool schemas import `zod`
-  directly, so it must become a declared dependency.
+- [x] Approved 2026-11-03 and installed: `zod@^4.2.0` (4.6.7, already in the tree) and
+      `@modelcontextprotocol/node@^2.1.2` (brings `hono` 4.13.16, `@hono/node-server` 2.1.6);
+      `npm audit --omit=dev`: 0 vulnerabilities
 
 ## M2 — Authorization server
-- [ ] Metadata endpoints (RFC 9728, RFC 8414), 404 when disabled
-- [ ] Client resolution: pre-registered and CIMD (allowlist, SSRF-safe fetch, cache)
-- [ ] `/oauth/authorize` + consent page + decision (CSRF, framing headers,
-      impersonation and inactive-user refusal)
-- [ ] `/oauth/token` (code + PKCE + resource; refresh rotation and reuse detection)
-- [ ] `/oauth/revoke`
-- [ ] Tests for every rule in spec §4, one or more each
+- [x] Metadata endpoints (RFC 9728, RFC 8414), 404 when disabled
+- [x] Client resolution: pre-registered and CIMD (allowlist, connect-time SSRF guard, 1 h cache)
+- [x] `/oauth/authorize` → pending request bound to the browser → SPA consent `/connect/:id`;
+      decision API strict same-origin; framing headers on `/connect`; impersonation and
+      inactive-user refusal
+- [x] `/oauth/token` (code + PKCE + resource; refresh rotation and reuse detection)
+- [x] `/oauth/revoke`
+- [x] Owner API (enable, clients, kill switch) and user connections API
+- [x] Tests for every rule in spec §4 (`mcpOAuth`, `mcpClients`, `mcpCrypto`, `networkGuardFetch`);
+      mutation-checked: same-origin guard, browser binding, code burning, PKCE
+- Found while building: `throw` inside `db.transaction` rolls back the code burn and the
+  replay/reuse revocations; the transactions now return the failure and throw outside.
 
 ## M3 — MCP endpoint, mediation, tools
 - [ ] Bearer middleware for `/mcp` (hash lookup, audience, user reload, Origin, limiter, body cap)
@@ -66,7 +71,10 @@ push, and this file updated.
   `/api`: every satellite subdomain receives a 7-day, non-revocable Frontdoor
   session. To verify whether this is intended for `shared-cookie` mode and
   report separately.
-- `isPublicDestination` resolves DNS separately from the fetch that follows
-  (possible rebinding TOCTOU) — check its existing callers separately.
+- **Confirmed vulnerability (low):** plugin webhook delivery (`server/services/plugins.js:590`)
+  checks the destination with `isPublicDestination` and then calls `fetch`, which resolves
+  DNS again: a DNS-rebinding host can pass the check and be reached on a private address,
+  with the plugin secret header. Exposure is limited (plugin platform locked, admin-chosen
+  URLs). Fix in a separate PR with `publicOnlyLookup` from `networkGuard.js`.
 - Removing the "additional SSO providers" roadmap entry is a maintainer
   decision, not part of this branch.

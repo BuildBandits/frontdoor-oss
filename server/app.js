@@ -16,6 +16,8 @@ import usersRoutes from './routes/users.js';
 import groupsRoutes from './routes/groups.js';
 import logsRoutes from './routes/logs.js';
 import notificationsRoutes from './routes/notifications.js';
+import mcpApiRoutes from './routes/mcp.js';
+import { oauthRouter, wellKnownRouter } from './routes/oauth.js';
 import { isPluginSystemEnabled } from './services/branding.js';
 import { PLUGIN_ASSET_DIR, isServablePluginEntry } from './services/plugins.js';
 
@@ -146,6 +148,11 @@ export function createApp() {
   app.use('/api/groups', groupsRoutes);
   app.use('/api/logs', logsRoutes);
   app.use('/api/notifications', notificationsRoutes);
+  app.use('/api/mcp', mcpApiRoutes);
+
+  // MCP authorization server (answers 404 while the MCP is off).
+  app.use('/.well-known', wellKnownRouter);
+  app.use('/oauth', oauthRouter);
 
   // Unknown API routes get a JSON 404 instead of the SPA page.
   app.use('/api', (req, res) => {
@@ -156,6 +163,15 @@ export function createApp() {
   const distPath = path.join(__dirname, '..', 'dist');
   app.use(express.static(distPath, { dotfiles: 'deny' }));
   app.get('/{*splat}', (req, res) => {
+    // The MCP consent page must never be framed (clickjacking a consent).
+    if (req.path === '/connect' || req.path.startsWith('/connect/')) {
+      res.set('X-Frame-Options', 'DENY');
+      const directives = String(res.get('Content-Security-Policy') || '')
+        .split(';')
+        .map((directive) => directive.trim())
+        .filter((directive) => directive && !directive.startsWith('frame-ancestors'));
+      res.set('Content-Security-Policy', [...directives, "frame-ancestors 'none'"].join(';'));
+    }
     res.sendFile(path.join(distPath, 'index.html'));
   });
 
