@@ -1,4 +1,4 @@
-# MCP server — phase 1 plan
+# MCP server — plan
 
 Branch: `feat/mcp-server` (fork `amargiovanni/frontdoor-oss`).
 Spec: `docs/design/mcp/02-phase1-spec.md`. ADRs 0001–0004 accepted 2026-11-03 (ledger `docs/adr/accepted.ledger`).
@@ -79,6 +79,26 @@ push, and this file updated.
 - [x] Draft PR opened 2026-11-03: https://github.com/BuildBandits/frontdoor-oss/pull/167
 - [ ] Not mergeable until the `networkGuard.js` overlap with #168 is decided (see the PR description):
       merge #168 first, rebase, reuse its helper; decide where the extra IPv6 ranges go
+
+## Phase 2 — admin write proposals (after phase 1 holds in production)
+
+Why it matters and how it builds on phase 1: `docs/design/mcp/03-roadmap.md`.
+The assistant proposes, Frontdoor computes the diff, the admin applies it with
+one click on a Frontdoor page.
+
+- [ ] Phase 2 spec and ADRs (pending-change model, diff shared with the applying route,
+      confirmation page protections, pseudonymous user references)
+- [ ] `mcp_pending_changes` table with a tested `down()`
+- [ ] Confirmation page `/changes/:id`: full diff with real names, apply/discard,
+      re-check of permissions and state on apply, 24 h expiry
+- [ ] Write tools, in order: group ↔ app visibility; app create/edit; Entra import and resync
+- [ ] Audit linking proposal ("via MCP, assistant X") and application
+- [ ] Security review and end-to-end check with a commercial assistant
+
+## Phase 3 — log answers for owners
+
+- [ ] DPIA screening for exposing access/audit aggregates to an AI provider
+- [ ] Owner switch (off by default), aggregate-only tools, documentation of what leaves
 
 ## Flagged, not in scope
 - `frontdoor_token` is set on `.${BASE_DOMAIN}` and accepted as a bearer on

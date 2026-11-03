@@ -1,5 +1,13 @@
 <!-- Draft PR description for feat/mcp-server → BuildBandits/frontdoor-oss main. -->
 
+## Where this is going
+
+Phase 1 looks small: "where is the holiday portal?", "add Jira to my favourites". It is the foundation for phase 2, which is the point:
+
+> An admin asks their assistant *"remove Figma from the Interns group and give Payroll to HR Milan"*. Frontdoor does not apply it: it prepares the change, the assistant answers with a link, the admin opens Frontdoor, reviews the exact diff with real names, and clicks **Apply**. The assistant proposes, Frontdoor decides, the human confirms with their own session; a prompt injection can at worst produce a proposal nobody applies.
+
+Everything that flow needs on the security side ships here: the authorization server with per-admin grants and owner-approved assistants, RBAC shared with the routes, fail-closed output filtering, a browser-bound and unframeable confirmation page pattern, audit by assistant, and immediate revocation. Phase 2 adds the pending-change model and its confirmation page on top. Roadmap: `docs/design/mcp/03-roadmap.md`; full proposal: `docs/design/mcp/01-proposal.md`.
+
 ## ⚠️ Not mergeable yet: a decision is needed first
 
 This PR overlaps with **#168** (security fix for plugin webhooks) in `server/services/networkGuard.js`, and the two cannot both land as they are. Before merging, the maintainers need to decide what to keep:
