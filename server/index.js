@@ -1,11 +1,12 @@
 import 'dotenv/config';
-import './db.js';
+import db from './db.js';
 import { createApp } from './app.js';
 import { purgeLogsOlderThan } from './routes/logs.js';
 import { getStartupConfig, validateStartupEnv } from './config.js';
 import { getBrandingSettings } from './services/branding.js';
 import { backfillMediaLibrary } from './services/mediaAssets.js';
 import { purgeResolvedNotifications } from './services/notifications.js';
+import { purgeExpiredMcpCredentials } from './services/mcp/maintenance.js';
 import { findLargeAppIcons, LARGE_ICON_THRESHOLD_BYTES } from './services/appIcons.js';
 import { sweepExpiredSessions } from './services/impersonation.js';
 
@@ -96,6 +97,18 @@ function runLogRetentionPurge() {
   }
 }
 
+function runMcpCredentialPurge() {
+  try {
+    const retentionDays = getBrandingSettings().logRetentionDays ?? 90;
+    const { codesRemoved, tokensRemoved, grantsRemoved } = purgeExpiredMcpCredentials(db, { retentionDays });
+    if (codesRemoved + tokensRemoved + grantsRemoved > 0) {
+      console.log(`Frontdoor MCP purge: removed ${codesRemoved} codes, ${tokensRemoved} tokens and ${grantsRemoved} revoked grants`);
+    }
+  } catch (error) {
+    console.error(`Frontdoor MCP purge failed: ${error.message}`);
+  }
+}
+
 // Closes impersonation sessions that timed out while nobody was using them, so
 // their end is always in the audit log.
 function runImpersonationSweep() {
@@ -122,6 +135,10 @@ createApp().listen(PORT, () => {
   runLogRetentionPurge();
   const dailyRetentionTimer = setInterval(runLogRetentionPurge, 24 * 60 * 60 * 1000);
   dailyRetentionTimer.unref?.();
+  // Hourly: a 10-minute access token per active connection adds up fast.
+  runMcpCredentialPurge();
+  const mcpPurgeTimer = setInterval(runMcpCredentialPurge, 60 * 60 * 1000);
+  mcpPurgeTimer.unref?.();
   runImpersonationSweep();
   const impersonationSweepTimer = setInterval(runImpersonationSweep, 60 * 1000);
   impersonationSweepTimer.unref?.();

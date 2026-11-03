@@ -23,6 +23,8 @@
   },
   "dependencies": {
     "@azure/msal-node": "^7.1.1",
+    "@modelcontextprotocol/express": "^2.0.2",
+    "@modelcontextprotocol/server": "^2.4.0",
     "better-sqlite3": "^13.0.3",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
