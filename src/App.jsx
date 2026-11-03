@@ -27,6 +27,9 @@ const AdminPluginDocs = lazy(() => import('./pages/AdminPluginDocs'));
 const AdminIcons = lazy(() => import('./pages/AdminIcons'));
 const AdminBackup = lazy(() => import('./pages/AdminBackup'));
 const AdminPlugins = lazy(() => import('./pages/AdminPlugins'));
+const Assistants = lazy(() => import('./pages/Assistants'));
+const Connect = lazy(() => import('./pages/Connect'));
+const ConnectError = lazy(() => import('./pages/Connect').then((module) => ({ default: module.ConnectError })));
 
 const ADMIN_VIEWER_ROLES = ['owner', 'admin', 'admin_readonly'];
 const ADMIN_EDITOR_ROLES = ['owner', 'admin'];
@@ -120,6 +123,9 @@ function AppRoutes() {
   const coreRoutes = [
     { path: '/login', element: <Login />, access: PLUGIN_ACCESS.PUBLIC, layout: 'none' },
     { path: '/', element: <Home />, access: PLUGIN_ACCESS.AUTHENTICATED, layout: 'app' },
+    { path: '/assistants', element: <Assistants />, access: PLUGIN_ACCESS.AUTHENTICATED, layout: 'app' },
+    { path: '/connect', element: <ConnectError />, access: PLUGIN_ACCESS.PUBLIC, layout: 'none' },
+    { path: '/connect/:id', element: <Connect />, access: PLUGIN_ACCESS.AUTHENTICATED, layout: 'none' },
     { path: '/admin', element: <Admin />, access: PLUGIN_ACCESS.ADMIN, layout: 'app' },
     { path: '/admin/customization', element: <Customization />, access: PLUGIN_ACCESS.OWNER, layout: 'app' },
     { path: '/admin/groups', element: <AdminGroups />, access: PLUGIN_ACCESS.ADMIN, layout: 'app' },

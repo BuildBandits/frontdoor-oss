@@ -113,7 +113,9 @@ export function describeAuthorization(db, { requestId, browserNonce }) {
   return {
     id: request.id,
     clientName: request.client_name,
-    clientHost: hostOf(request.client_id) || request.client_id,
+    // A CIMD client is identified by its document's host; a registered
+    // client has no host of its own, only the owner's label.
+    clientHost: hostOf(request.client_id) || null,
     redirectHost: hostOf(request.redirect_uri),
     scope: request.scope,
   };
