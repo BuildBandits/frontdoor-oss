@@ -181,6 +181,7 @@ test('rules 7, 8, 9: consent is bound to the starting browser and must be same-o
   const { authorization } = await details.json();
   assert.equal(authorization.clientName, 'Assistant');
   assert.equal(authorization.redirectHost, 'assistant.example');
+  assert.equal(authorization.clientHost, null, 'a registered client has no host to show');
   assert.ok(authorization.exposedFields.includes('launchLinks'));
   assert.ok(!authorization.exposedFields.some((field) => /email|user/i.test(field)));
 

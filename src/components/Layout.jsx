@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { ArrowUp, Activity, BookOpen, ChevronDown, Home, LogOut, Menu, Monitor, Moon, Palette, RotateCcw, Settings, Sparkles, Star, Sun, Users, UserCog, X, ShieldCheck } from 'lucide-react';
+import { ArrowUp, Activity, BookOpen, Bot, ChevronDown, Home, LogOut, Menu, Monitor, Moon, Palette, RotateCcw, Settings, Sparkles, Star, Sun, Users, UserCog, X, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import api from '../services/api';
 import ImpersonationBanner from './ImpersonationBanner';
 import { useBranding } from '../stores/brandingStore';
 import { normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
@@ -42,6 +43,7 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [assistantsAvailable, setAssistantsAvailable] = useState(false);
   const [homeViewSaving, setHomeViewSaving] = useState(false);
   const [languageSaving, setLanguageSaving] = useState(false);
   const [timeZoneSaving, setTimeZoneSaving] = useState(false);
@@ -65,6 +67,18 @@ export default function Layout({ children }) {
 
   // Wait for the server to clear the session cookie before leaving the page,
   // otherwise the navigation can cancel the request and the session survives.
+  // The "AI assistants" entry shows when the owner turned connections on (and
+  // always for the owner, who manages them).
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let cancelled = false;
+    api.get('/mcp/status')
+      .then((res) => { if (!cancelled) setAssistantsAvailable(res.data?.enabled === true); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [user?.id]);
+  const showAssistantsLink = user?.role === 'owner' || assistantsAvailable;
+
   const handleLogout = async () => {
     await logout();
     window.location.href = '/login';
@@ -688,6 +702,16 @@ export default function Layout({ children }) {
                       {ui.layout.openHomepageGuide}
                     </button>
                     <div className="my-1 h-px bg-gray-100 dark:bg-gray-800" />
+                    {showAssistantsLink && (
+                      <Link
+                        to="/assistants"
+                        onClick={() => setAccountMenuOpen(false)}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-accent/10 hover:text-dark dark:hover:text-white"
+                      >
+                        <Bot className="w-4 h-4" />
+                        {ui.assistants.menuLink}
+                      </Link>
+                    )}
                     <button
                       type="button"
                       onClick={handleTakeTour}
@@ -807,6 +831,16 @@ export default function Layout({ children }) {
                       <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user?.email}</p>
                     </div>
                   </div>
+                  {showAssistantsLink && (
+                    <Link
+                      to="/assistants"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      <Bot className="w-4 h-4" />
+                      {ui.assistants.menuLink}
+                    </Link>
+                  )}
                   {showLogoutAction && (
                     <button
                       onClick={handleLogout}

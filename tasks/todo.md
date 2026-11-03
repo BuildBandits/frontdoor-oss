@@ -2,7 +2,7 @@
 
 Branch: `feat/mcp-server` (fork `amargiovanni/frontdoor-oss`).
 Spec: `docs/design/mcp/02-phase1-spec.md`. ADRs 0002–0004.
-Status: approved 2026-11-03 (plan and the M1 `npm install`). M0–M3 done.
+Status: approved 2026-11-03 (plan and the M1 `npm install`). M0–M4 done.
 
 Each milestone ends with lint, tests, i18n check and build green, a commit, a
 push, and this file updated.
@@ -59,10 +59,12 @@ push, and this file updated.
   tokens each got a fresh budget; split into a per-IP limit before auth and a per-grant one after.
 
 ## M4 — UI and i18n
-- [ ] Owner: enable switch, CIMD allowlist, registered clients (secret shown once),
-      kill switch
-- [ ] User: connected assistants list with revoke
-- [ ] en/it strings for UI and every new error code
+- [x] One page `/assistants` (account menu): the user's connections with disconnect; for the
+      owner also the switch, endpoint, approved assistants (CIMD or registered, secret shown
+      once), removal and the kill switch
+- [x] Consent page `/connect/:id` and error page `/connect?error=`
+- [x] en/it strings for UI and every new error code
+- [x] Local end-to-end check with a real browser: `docs/design/mcp/reviews/2026-11-03-e2e-local.md`
 
 ## M5 — Documentation and review
 - [ ] SECURITY.md: MCP data flow, what leaves Frontdoor, declared limit
