@@ -8,7 +8,7 @@ import { diffAuditFields } from '../services/auditDetails.js';
 import { authenticate, isAdminViewer, isAdminEditor } from '../middleware/auth.js';
 import { getRequiredEnv } from '../config.js';
 import { restoreDefaultDemoApps } from '../services/demoApps.js';
-import { listAccessibleAppsForUser, userCanAccessApp } from '../services/appCatalog.js';
+import { listAccessibleAppsForUser, listAllAppsForAdmin, normalizeTagList, parseTags, userCanAccessApp } from '../services/appCatalog.js';
 import { iconUrlForApp, parseAppIconPayload, readAppIconAssetDataUrl, removeAppIconAsset, saveAppIconAsset, serveAppIconForApp } from '../services/appIcons.js';
 import { getBrandingSettings } from '../services/branding.js';
 import { dispatchPluginEvent } from '../services/plugins.js';
@@ -272,33 +272,8 @@ router.get('/:id/icon', (req, res) => {
 
 // List ALL apps including inactive (viewer roles only)
 router.get('/all', authenticate, isAdminViewer, (req, res) => {
-  const apps = db
-    .prepare(`
-      SELECT a.*,
-        (SELECT COUNT(*) FROM app_permissions WHERE app_id = a.id) AS group_count
-      FROM apps a
-      ORDER BY sort_order, name
-    `)
-    .all();
-  const appGroupRows = db.prepare(`
-    SELECT app_id, group_id
-    FROM app_permissions
-    ORDER BY app_id, group_id
-  `).all();
-  const groupIdsByAppId = new Map();
-  for (const row of appGroupRows) {
-    if (!groupIdsByAppId.has(row.app_id)) {
-      groupIdsByAppId.set(row.app_id, []);
-    }
-    groupIdsByAppId.get(row.app_id).push(row.group_id);
-  }
   res.json({
-    apps: apps.map((app) => ({
-      ...app,
-      tags: parseTags(app.tags),
-      iconUrl: iconUrlForApp(app),
-      groupIds: groupIdsByAppId.get(app.id) || [],
-    })),
+    apps: listAllAppsForAdmin().map((app) => ({ ...app, iconUrl: iconUrlForApp(app) })),
   });
 });
 
@@ -316,31 +291,6 @@ router.post('/restore-defaults', authenticate, isAdminEditor, (req, res) => {
 
 function normalizeEntraEndpoint(value) {
   return normalizeEntraApplicationId(value);
-}
-
-function normalizeTag(tag) {
-  return (tag ?? '').toString().trim().toLowerCase();
-}
-
-function normalizeTagList(tags) {
-  const list = Array.isArray(tags) ? tags : [];
-  const seen = new Set();
-  const normalized = [];
-  for (const tag of list) {
-    const value = normalizeTag(tag);
-    if (!value || seen.has(value)) continue;
-    seen.add(value);
-    normalized.push(value);
-  }
-  return normalized;
-}
-
-function parseTags(rawTags) {
-  try {
-    return normalizeTagList(JSON.parse(rawTags || '[]'));
-  } catch {
-    return [];
-  }
 }
 
 function isAppModeEnabled(mode, branding = getBrandingSettings()) {

@@ -1,4 +1,5 @@
 import express from 'express';
+import { listGroupsWithCounts } from '../services/groupCatalog.js';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../db.js';
 import { DEFAULT_GROUP_ID, logRbacAudit } from '../db.js';
@@ -62,34 +63,7 @@ function getLinkedEntraGroups(parentGroupId) {
 
 // List all groups (viewer roles only)
 router.get('/', authenticate, isAdminViewer, (req, res) => {
-  const groups = db.prepare(`
-    SELECT g.*,
-      (SELECT COUNT(*) FROM user_group_members WHERE group_id = g.id) AS member_count,
-      (SELECT COUNT(*) FROM app_permissions WHERE group_id = g.id) AS app_count,
-      (SELECT COUNT(*) FROM group_group_memberships WHERE parent_group_id = g.id) AS child_group_count,
-      (SELECT COUNT(*) FROM group_entra_group_memberships WHERE parent_group_id = g.id) AS entra_child_group_count,
-      (
-        SELECT GROUP_CONCAT(a.name || ' ' || a.slug, ' ')
-        FROM app_permissions p
-        JOIN apps a ON a.id = p.app_id
-        WHERE p.group_id = g.id
-      ) AS app_search_text,
-      (
-        SELECT GROUP_CONCAT(value, ' ')
-        FROM (
-          SELECT cg.name || ' ' || COALESCE(cg.entra_display_name, '') AS value
-          FROM group_group_memberships gm
-          JOIN user_groups cg ON cg.id = gm.child_group_id
-          WHERE gm.parent_group_id = g.id
-          UNION ALL
-          SELECT COALESCE(c.display_name, gem.entra_group_id) AS value
-          FROM group_entra_group_memberships gem
-          LEFT JOIN entra_group_cache c ON c.entra_group_id = gem.entra_group_id
-          WHERE gem.parent_group_id = g.id
-        ) AS linked_values
-      ) AS group_search_text
-    FROM user_groups g ORDER BY g.name
-  `).all();
+  const groups = listGroupsWithCounts();
   res.json({ groups });
 });
 

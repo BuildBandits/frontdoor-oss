@@ -1785,7 +1785,8 @@
     "mcp_client_metadata_invalid": "Il documento di metadati dell'assistente non è valido.",
     "mcp_client_auth_method_unsupported": "Questo assistente richiede un client registrato: aggiungilo con un client secret.",
     "mcp_authorization_user_inactive": "Gli account disattivati non possono collegare assistenti.",
-    "mcp_authorization_impersonating": "Non si possono collegare assistenti mentre si agisce come un altro utente."
+    "mcp_authorization_impersonating": "Non si possono collegare assistenti mentre si agisce come un altro utente.",
+    "mcp_origin_forbidden": "Le richieste all'endpoint degli assistenti da questa pagina web non sono consentite."
   },
   "notifications": {
     "title": "Notifiche",

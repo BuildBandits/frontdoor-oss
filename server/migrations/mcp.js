@@ -16,7 +16,6 @@ export function up(db) {
     CREATE TABLE IF NOT EXISTS mcp_settings (
       id TEXT PRIMARY KEY CHECK(id = 'default'),
       enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0, 1)),
-      pseudonym_key TEXT,
       updated_by TEXT,
       updated_at TEXT DEFAULT (datetime('now'))
     );
