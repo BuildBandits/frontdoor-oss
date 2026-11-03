@@ -1,7 +1,7 @@
 # MCP server — phase 1 plan
 
 Branch: `feat/mcp-server` (fork `amargiovanni/frontdoor-oss`).
-Spec: `docs/design/mcp/02-phase1-spec.md`. ADRs 0002–0004.
+Spec: `docs/design/mcp/02-phase1-spec.md`. ADRs 0001–0004 accepted 2026-11-03 (ledger `docs/adr/accepted.ledger`).
 Status: approved 2026-11-03 (plan and the M1 `npm install`). M0–M5 done; PR ready to open.
 
 Each milestone ends with lint, tests, i18n check and build green, a commit, a
@@ -76,7 +76,7 @@ push, and this file updated.
 - [x] Security review of the branch: no critical/high; 1 medium and 5 low fixed, info items fixed
       or accepted — `docs/design/mcp/reviews/2026-11-03-security-review.md`
 - [x] PR description drafted: `tasks/pr-mcp-phase1.md`
-- [ ] Open the PR against `BuildBandits/frontdoor-oss` `main` — waiting for the go-ahead
+- [ ] Open the PR against `BuildBandits/frontdoor-oss` `main` (approved 2026-11-03, draft)
 
 ## Flagged, not in scope
 - `frontdoor_token` is set on `.${BASE_DOMAIN}` and accepted as a bearer on
