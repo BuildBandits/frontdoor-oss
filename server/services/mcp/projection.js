@@ -6,7 +6,7 @@ export const PROJECTIONS = Object.freeze({
   myApp: Object.freeze(['name', 'slug', 'description', 'tags', 'launchUrl', 'favorite']),
   preferences: Object.freeze(['favorites', 'colorScheme', 'language']),
   adminApp: Object.freeze(['name', 'slug', 'tags', 'mode', 'active', 'groupCount']),
-  appAccessGroup: Object.freeze(['name', 'source', 'nestedGroups', 'userCount']),
+  appAccessGroup: Object.freeze(['name', 'source', 'nestedGroups', 'unnamedNestedGroups', 'userCount']),
   group: Object.freeze(['name', 'source', 'memberCount', 'appCount']),
 });
 

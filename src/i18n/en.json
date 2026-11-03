@@ -1904,6 +1904,7 @@
     "field_ownPreferences": "Your favourites, colour scheme and language",
     "field_groupNames": "Group names (administrators only)",
     "field_counts": "How many people can open each app (administrators only)",
-    "returnsTo": "After you approve, you return to {redirect}."
+    "returnsTo": "After you approve, you return to {redirect}.",
+    "signedInAs": "You are signed in as {name} ({email}). If you did not start this from your own assistant, cancel."
   }
 }

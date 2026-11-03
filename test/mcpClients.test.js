@@ -94,3 +94,20 @@ test('rule 6: no consent while impersonating, none for inactive users', async ()
   assert.throws(() => decideAuthorization(db, { ...base, user: { id: 'target', is_active: 0 }, actor: { id: 'target' } }), { error: 'mcp_authorization_user_inactive' });
   assert.equal(db.prepare('SELECT consumed_at FROM mcp_authorization_requests WHERE id = ?').get(pending.requestId).consumed_at, null, 'a refused attempt does not consume the request');
 });
+
+test('a failing metadata host is fetched once per minute, not once per request', async () => {
+  addCimdClient(db, { clientId: CIMD, name: 'Assistant', actorId: 'owner' });
+  let fetches = 0;
+  const failing = async () => { fetches += 1; throw Object.assign(new Error('down'), { code: 'timeout' }); };
+  await assert.rejects(resolveClient(db, CIMD, { fetchJson: failing }), { code: 'mcp_client_metadata_unavailable' });
+  await assert.rejects(resolveClient(db, CIMD, { fetchJson: failing }), { code: 'mcp_client_metadata_unavailable' });
+  assert.equal(fetches, 1);
+});
+
+test('concurrent resolutions share one metadata fetch', async () => {
+  addCimdClient(db, { clientId: CIMD, name: 'Assistant', actorId: 'owner' });
+  let fetches = 0;
+  const slow = async (url) => { fetches += 1; await new Promise((resolve) => setTimeout(resolve, 20)); return docFor()(url); };
+  await Promise.all([resolveClient(db, CIMD, { fetchJson: slow }), resolveClient(db, CIMD, { fetchJson: slow }), resolveClient(db, CIMD, { fetchJson: slow })]);
+  assert.equal(fetches, 1);
+});

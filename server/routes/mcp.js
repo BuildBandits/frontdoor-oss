@@ -19,10 +19,15 @@ function requireEnabled(req, res, next) {
 
 // Stricter than the /api cross-site guard, which trusts CORS_ALLOWED_ORIGINS:
 // a satellite app must never be able to approve a consent (spec §4 rule 9).
+// Browsers send Sec-Fetch-Site on every fetch; a request without it is refused.
 function strictSameOrigin(req, res, next) {
   if (req.get('sec-fetch-site') === 'same-origin') return next();
   return res.status(403).json({ error: 'Consent must be given on the Frontdoor page', code: 'mcp_consent_cross_site' });
 }
+
+// The whole MCP API is for Frontdoor's own pages: CORS-allowlisted satellites
+// must not list, revoke or approve connections either.
+router.use(strictSameOrigin);
 
 const browserNonce = (req) => req.cookies?.[`${AUTHORIZATION_COOKIE_PREFIX}${req.params.id}`];
 
@@ -36,7 +41,7 @@ router.get('/authorizations/:id', authenticate, requireEnabled, (req, res) => {
   return res.json({ authorization: { ...details, exposedFields: MCP_EXPOSED_FIELDS } });
 });
 
-router.post('/authorizations/:id/decision', authenticate, strictSameOrigin, (req, res) => {
+router.post('/authorizations/:id/decision', authenticate, (req, res) => {
   try {
     const { location } = decideAuthorization(db, {
       requestId: req.params.id,

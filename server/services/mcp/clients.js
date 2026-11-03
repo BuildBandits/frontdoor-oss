@@ -7,7 +7,11 @@ import { revokeGrants } from './settings.js';
 const NAME_MAX = 80;
 const MAX_REDIRECT_URIS = 10;
 const CIMD_CACHE_MS = 60 * 60 * 1000;
+const CIMD_FAILURE_CACHE_MS = 60 * 1000;
 const cimdCache = new Map();
+// One fetch per document at a time, and a failure is remembered for a minute,
+// so a slow or down vendor host is not hit once per /authorize.
+const cimdInFlight = new Map();
 
 export class ClientError extends Error {
   constructor(code, message) {
@@ -130,7 +134,23 @@ export function clearCimdCache() {
 
 async function loadCimdDocument(clientId, fetchJson) {
   const cached = cimdCache.get(clientId);
-  if (cached && Date.now() - cached.fetchedAt < CIMD_CACHE_MS) return cached.document;
+  if (cached?.error && Date.now() - cached.fetchedAt < CIMD_FAILURE_CACHE_MS) throw cached.error;
+  if (cached?.document && Date.now() - cached.fetchedAt < CIMD_CACHE_MS) return cached.document;
+  if (cimdInFlight.has(clientId)) return cimdInFlight.get(clientId);
+  const pending = fetchCimdDocument(clientId, fetchJson)
+    .then((document) => {
+      cimdCache.set(clientId, { document, fetchedAt: Date.now() });
+      return document;
+    }, (error) => {
+      cimdCache.set(clientId, { error, fetchedAt: Date.now() });
+      throw error;
+    })
+    .finally(() => cimdInFlight.delete(clientId));
+  cimdInFlight.set(clientId, pending);
+  return pending;
+}
+
+async function fetchCimdDocument(clientId, fetchJson) {
   let document;
   try {
     document = await fetchJson(clientId);
@@ -150,9 +170,7 @@ async function loadCimdDocument(clientId, fetchJson) {
   } catch {
     throw new ClientError('mcp_client_metadata_invalid', 'Client metadata has invalid redirect_uris');
   }
-  const normalized = { redirectUris, clientName: typeof document.client_name === 'string' ? document.client_name.slice(0, NAME_MAX) : null };
-  cimdCache.set(clientId, { document: normalized, fetchedAt: Date.now() });
-  return normalized;
+  return { redirectUris, clientName: typeof document.client_name === 'string' ? document.client_name.slice(0, NAME_MAX) : null };
 }
 
 /**

@@ -152,6 +152,16 @@ For CI / automation pipelines that own the app catalog:
 - `POST /api/apps/bulk` — upsert in one call.
 - `X-API-Key` authentication with a shared `requireBulkApiKey` helper; the endpoints respond `503` when `ADMIN_API_KEY` is not configured.
 
+## AI Assistants (MCP)
+
+Off until the owner turns it on. Details: [docs/mcp.md](docs/mcp.md).
+
+- **MCP endpoint** (`POST /mcp`, Streamable HTTP, protocol 2026-07-28 and 2025-11-25) for Claude, ChatGPT, Copilot Studio, VS Code and other MCP clients.
+- **Read tools** filtered by the same RBAC as the catalogue: search my apps, my preferences; for admin roles, all apps, who can open an app (counts only), groups.
+- **Own-preference tools**: favourites, colour scheme, language.
+- **OAuth 2.1 authorization server** for assistants: PKCE S256, resource-bound opaque tokens, rotating refresh tokens, client metadata documents or owner-registered clients; sign-in stays with Microsoft Entra.
+- **Consent page** per assistant and user; **AI assistants** page to see and disconnect connections. 🛡️ Owner: switch, approved assistants, disconnect everyone.
+
 ## Internationalization
 
 - Languages: **English** (default) and **Italian**.

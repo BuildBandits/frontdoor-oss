@@ -8,7 +8,7 @@ const lookupTo = (address) => async () => [{ address, family: address.includes('
 const lookupWith = (guard, host) => new Promise((resolve) => guard(host, { all: true }, (error, result) => resolve({ error, result })));
 
 test('the connect-time lookup refuses private, loopback and link-local answers', async () => {
-  for (const address of ['10.1.2.3', '127.0.0.1', '169.254.169.254', '192.168.1.1', '::1', 'fe80::1', '::ffff:10.0.0.1']) {
+  for (const address of ['10.1.2.3', '127.0.0.1', '169.254.169.254', '192.168.1.1', '::1', 'fe80::1', '::ffff:10.0.0.1', '64:ff9b::a00:1', '2002:a00:1::1', 'fec0::1', '::a00:1']) {
     const { error } = await lookupWith(publicOnlyLookup(lookupTo(address)), 'rebind.example');
     assert.equal(error?.code, 'destination_not_public', address);
   }
@@ -64,4 +64,24 @@ test('redirects, oversized bodies and non-JSON are refused; the guarded lookup i
   assert.deepEqual(await fetchPublicJson('https://c.example/m', { request: fake.request }), { client_id: 'https://c.example/m' });
   assert.equal(typeof fake.calls[0].options.lookup, 'function');
   assert.equal(fake.calls[0].options.timeout, 5000);
+});
+
+test('the deadline covers the whole exchange, not only idle time', async () => {
+  const dripping = (url, options, onResponse) => {
+    const req = new EventEmitter();
+    let timer;
+    req.end = () => setImmediate(() => {
+      const res = new EventEmitter();
+      res.statusCode = 200;
+      res.headers = {};
+      res.destroy = () => {};
+      onResponse(res);
+      timer = setInterval(() => res.emit('data', Buffer.from(' ')), 20); // a byte every 20 ms, never ends
+    });
+    req.destroy = (error) => { clearInterval(timer); req.emit('error', error); req.emit('close'); };
+    return req;
+  };
+  const started = Date.now();
+  await assert.rejects(fetchPublicJson('https://slow.example/m', { timeoutMs: 150, request: dripping }), { code: 'timeout' });
+  assert.ok(Date.now() - started < 1000);
 });

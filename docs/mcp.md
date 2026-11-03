@@ -40,7 +40,7 @@ Only what the user could already see in Frontdoor, through narrow tools:
 | `search_my_apps` | everyone | name, slug, description, tags of the apps the user can open, a Frontdoor launch link, favourite flag |
 | `get_my_preferences`, `set_favorite_app`, `set_color_scheme`, `set_language` | everyone | the user's own favourites (by slug), colour scheme, language |
 | `list_apps` | admin roles | name, slug, tags, mode, active flag, number of groups |
-| `get_app_access` | admin roles | group names, nested group names and the **number** of users reaching an app |
+| `get_app_access` | admin roles | group names, nested group names (an Entra group without a known name is only counted) and the **number** of users reaching an app |
 | `list_groups` | admin roles | group names, source, member and app counts |
 
 Never: target URLs (internal-link addresses included — launch links go
@@ -75,7 +75,11 @@ the audit log as `mcp.preference_changed` with the assistant's name.
   MCP off stops access on the next request.
 - **Backups** never contain MCP tokens or codes, and a restore removes any that
   exist, so an old archive cannot bring back a revoked token. Users reconnect
-  after a restore.
+  after a restore. A restore does bring back the approved assistants and the
+  on/off switch as they were in the archive: check *AI assistants* after
+  restoring an older backup.
+- **Deactivated users** lose their connections; reactivating them does not
+  bring the connections back.
 
 ## Personal data
 
@@ -97,6 +101,7 @@ tools), as is the processing agreement with the assistant's provider.
 | `MCP_IP_RATE_LIMIT_MAX` | 300 | `/mcp` requests per minute per client IP, before authentication |
 | `MCP_RATE_LIMIT_MAX` | 60 | `/mcp` requests per minute per connection |
 | `MCP_TOKEN_RATE_LIMIT_MAX` | 60 | token and revocation requests per minute per IP |
+| `MCP_AUTHORIZE_RATE_LIMIT_MAX` | 30 | authorization requests per minute per IP |
 
 With the MCP off, `/mcp`, `/oauth/*` and the `/.well-known/oauth-*` documents
 answer 404. Behind a reverse proxy, forward `/mcp`, `/oauth/` and

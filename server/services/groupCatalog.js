@@ -69,15 +69,19 @@ export function describeAppAccess(appId) {
     const nestedLocal = descendants.length > 1
       ? db.prepare(`SELECT name FROM user_groups WHERE id IN (${placeholders(descendants)}) AND id <> ? ORDER BY name`).all(...descendants, group.id).map((row) => row.name)
       : [];
-    const nestedEntra = db.prepare(`
-      SELECT DISTINCT COALESCE(c.display_name, gem.entra_group_id) AS name
+    // Entra groups are named by their display name only; one Frontdoor has
+    // not cached yet is counted, never identified by its object ID.
+    const entraLinks = db.prepare(`
+      SELECT DISTINCT gem.entra_group_id, c.display_name
       FROM group_entra_group_memberships gem
       LEFT JOIN entra_group_cache c ON c.entra_group_id = gem.entra_group_id
-      WHERE gem.parent_group_id IN (${placeholders(descendants)}) ORDER BY name
-    `).all(...descendants).map((row) => row.name);
+      WHERE gem.parent_group_id IN (${placeholders(descendants)})
+    `).all(...descendants);
+    const nestedEntra = entraLinks.map((row) => row.display_name).filter(Boolean).sort();
+    const unnamedNestedGroups = entraLinks.filter((row) => !row.display_name).length;
     const users = activeUsersReaching(descendants);
     for (const userId of users) everyone.add(userId);
-    return { name: group.name, source: group.source || 'local', nestedGroups: [...nestedLocal, ...nestedEntra], userCount: users.length };
+    return { name: group.name, source: group.source || 'local', nestedGroups: [...nestedLocal, ...nestedEntra], unnamedNestedGroups, userCount: users.length };
   });
   return { groups, totalUsers: everyone.size };
 }

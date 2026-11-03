@@ -1904,6 +1904,7 @@
     "field_ownPreferences": "I tuoi preferiti, il tuo tema e la tua lingua",
     "field_groupNames": "I nomi dei gruppi (solo amministratori)",
     "field_counts": "Quante persone possono aprire ciascuna app (solo amministratori)",
-    "returnsTo": "Dopo l'approvazione tornerai su {redirect}."
+    "returnsTo": "Dopo l'approvazione tornerai su {redirect}.",
+    "signedInAs": "Hai effettuato l'accesso come {name} ({email}). Se non l'hai avviato tu dal tuo assistente, annulla."
   }
 }

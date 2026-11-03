@@ -86,6 +86,28 @@ const nodeHandler = toNodeHandler(handler, {
   onerror: (error) => console.error('MCP adapter failed:', error?.message),
 });
 
-router.all('/', (req, res) => nodeHandler(req, res));
+const jsonBody = express.json({ limit: MCP_MAX_BODY_BYTES, strict: false });
+
+// JSON-RPC batches are not part of MCP since 2025-06-18; refusing them keeps
+// the per-connection limit a limit on tool calls, not on HTTP requests.
+function refuseBatches(req, res, next) {
+  if (Array.isArray(req.body)) {
+    return res.status(400).json({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Batch requests are not supported' } });
+  }
+  return next();
+}
+
+router.all('/', jsonBody, refuseBatches, (req, res) => nodeHandler(req, res, req.body));
+
+// Body errors (too large, malformed JSON) answer as JSON-RPC, never as HTML.
+router.use((error, req, res, next) => {
+  if (error?.type === 'entity.too.large') {
+    return res.status(413).json({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Request body too large' } });
+  }
+  if (error?.type === 'entity.parse.failed') {
+    return res.status(400).json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
+  }
+  return next(error);
+});
 
 export default router;

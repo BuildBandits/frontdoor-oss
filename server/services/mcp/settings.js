@@ -32,6 +32,12 @@ export function revokeGrants(db, { where, params = [], reason }) {
   })();
 }
 
+// A deactivated user's assistants stay disconnected if the user comes back:
+// reactivation needs a new consent, not a silently revived grant.
+export function revokeGrantsOfDeactivatedUser(db, userId) {
+  return revokeGrants(db, { where: 'user_id = ?', params: [userId], reason: 'user_inactive' });
+}
+
 // Every connection is cut at once: grants revoked, all credentials and
 // pending requests dropped.
 export function killSwitch(db, { actorId }) {
