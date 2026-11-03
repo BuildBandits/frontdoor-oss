@@ -1785,7 +1785,8 @@
     "mcp_client_metadata_invalid": "The assistant's metadata document is not valid.",
     "mcp_client_auth_method_unsupported": "This assistant needs a registered client: add it with a client secret instead.",
     "mcp_authorization_user_inactive": "Inactive accounts cannot connect assistants.",
-    "mcp_authorization_impersonating": "Assistants cannot be connected while acting as another user."
+    "mcp_authorization_impersonating": "Assistants cannot be connected while acting as another user.",
+    "mcp_origin_forbidden": "Requests to the assistant endpoint from this web page are not allowed."
   },
   "notifications": {
     "title": "Notifications",

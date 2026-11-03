@@ -181,7 +181,8 @@ test('rules 7, 8, 9: consent is bound to the starting browser and must be same-o
   const { authorization } = await details.json();
   assert.equal(authorization.clientName, 'Assistant');
   assert.equal(authorization.redirectHost, 'assistant.example');
-  assert.ok(authorization.exposedFields.includes('pseudonymousUsers'));
+  assert.ok(authorization.exposedFields.includes('launchLinks'));
+  assert.ok(!authorization.exposedFields.some((field) => /email|user/i.test(field)));
 
   // Someone else opening the link (no cookie) sees nothing and cannot approve.
   assert.equal((await api('GET', `/api/mcp/authorizations/${requestId}`, { userId: 'o-other' })).status, 404);

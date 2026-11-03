@@ -36,3 +36,44 @@ export function userCanAccessApp(userId, appId) {
   `).get(appId, ...groupIds);
   return Boolean(row);
 }
+
+// Every app, active or not, with the groups it is granted to (admin views).
+export function listAllAppsForAdmin() {
+  const apps = db.prepare(`
+    SELECT a.*,
+      (SELECT COUNT(*) FROM app_permissions WHERE app_id = a.id) AS group_count
+    FROM apps a
+    ORDER BY sort_order, name
+  `).all();
+  const groupIdsByAppId = new Map();
+  for (const row of db.prepare('SELECT app_id, group_id FROM app_permissions ORDER BY app_id, group_id').all()) {
+    if (!groupIdsByAppId.has(row.app_id)) groupIdsByAppId.set(row.app_id, []);
+    groupIdsByAppId.get(row.app_id).push(row.group_id);
+  }
+  return apps.map((app) => ({ ...app, tags: parseTags(app.tags), groupIds: groupIdsByAppId.get(app.id) || [] }));
+}
+
+function normalizeTag(tag) {
+  return (tag ?? '').toString().trim().toLowerCase();
+}
+
+export function normalizeTagList(tags) {
+  const list = Array.isArray(tags) ? tags : [];
+  const seen = new Set();
+  const normalized = [];
+  for (const tag of list) {
+    const value = normalizeTag(tag);
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    normalized.push(value);
+  }
+  return normalized;
+}
+
+export function parseTags(rawTags) {
+  try {
+    return normalizeTagList(JSON.parse(rawTags || '[]'));
+  } catch {
+    return [];
+  }
+}

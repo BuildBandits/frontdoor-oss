@@ -18,6 +18,7 @@ import logsRoutes from './routes/logs.js';
 import notificationsRoutes from './routes/notifications.js';
 import mcpApiRoutes from './routes/mcp.js';
 import { oauthRouter, wellKnownRouter } from './routes/oauth.js';
+import mcpEndpointRoutes from './routes/mcpEndpoint.js';
 import { isPluginSystemEnabled } from './services/branding.js';
 import { PLUGIN_ASSET_DIR, isServablePluginEntry } from './services/plugins.js';
 
@@ -73,6 +74,9 @@ export function createApp() {
     if (origin ? trustedOrigins.has(origin) : !fetchSite) return next();
     return res.status(403).json({ error: 'Cross-site request refused', code: 'cross_site_request' });
   });
+
+  // MCP endpoint: before the global JSON parser, it reads its own body (64 KiB cap).
+  app.use('/mcp', mcpEndpointRoutes);
 
   // Keep a slightly larger body limit because branding/image uploads are sent as data URLs.
   app.use(express.json({ limit: '5mb' }));

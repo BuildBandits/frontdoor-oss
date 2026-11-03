@@ -2,7 +2,7 @@
 
 Branch: `feat/mcp-server` (fork `amargiovanni/frontdoor-oss`).
 Spec: `docs/design/mcp/02-phase1-spec.md`. ADRs 0002–0004.
-Status: approved 2026-11-03 (plan and the M1 `npm install`). M0, M1, M2 done.
+Status: approved 2026-11-03 (plan and the M1 `npm install`). M0–M3 done.
 
 Each milestone ends with lint, tests, i18n check and build green, a commit, a
 push, and this file updated.
@@ -45,12 +45,18 @@ push, and this file updated.
   replay/reuse revocations; the transactions now return the failure and throw outside.
 
 ## M3 — MCP endpoint, mediation, tools
-- [ ] Bearer middleware for `/mcp` (hash lookup, audience, user reload, Origin, limiter, body cap)
-- [ ] Projection helper and pseudonymiser, with the fail-closed output test
-- [ ] User tools: `search_my_apps`, `get_my_preferences`, `set_favorite_app`,
+- [x] Bearer middleware for `/mcp` (hash lookup, audience, user reload, Origin, IP and
+      per-grant limiters, 64 KiB body cap), mounted before the global JSON parser
+- [x] Projection helper with the fail-closed output test (mutation-checked); pseudonymiser
+      deferred: no phase 1 tool returns users
+- [x] User tools: `search_my_apps`, `get_my_preferences`, `set_favorite_app`,
       `set_color_scheme`, `set_language`
-- [ ] Admin read tools: `list_apps`, `get_app_access`, `list_groups`
-- [ ] RBAC tests per tool and role; session JWT rejected as bearer
+- [x] Admin read tools: `list_apps`, `get_app_access`, `list_groups`; the admin group and
+      app list queries moved into `groupCatalog`/`appCatalog` and the routes use them;
+      `get_app_access` checked against `userCanAccessApp` for every user
+- [x] RBAC tests per tool and role; session JWT rejected as bearer; MCP token rejected on `/api`
+- Found while building: the first rate limiter keyed on the unverified bearer, so random
+  tokens each got a fresh budget; split into a per-IP limit before auth and a per-grant one after.
 
 ## M4 — UI and i18n
 - [ ] Owner: enable switch, CIMD allowlist, registered clients (secret shown once),

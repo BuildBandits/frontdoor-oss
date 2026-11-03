@@ -21,7 +21,7 @@ function seedMcpRows() {
 
 test('startup creates the MCP tables with the MCP switched off', () => {
   for (const table of MCP_TABLES) assert.ok(tableNames().includes(table), table);
-  assert.deepEqual(db.prepare('SELECT id, enabled, pseudonym_key FROM mcp_settings').all(), [{ id: 'default', enabled: 0, pseudonym_key: null }]);
+  assert.deepEqual(db.prepare('SELECT id, enabled FROM mcp_settings').all(), [{ id: 'default', enabled: 0 }]);
 });
 
 test('deleting a user removes their grants and tokens', () => {
