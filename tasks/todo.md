@@ -2,7 +2,7 @@
 
 Branch: `feat/mcp-server` (fork `amargiovanni/frontdoor-oss`).
 Spec: `docs/design/mcp/02-phase1-spec.md`. ADRs 0002–0004.
-Status: approved 2026-11-03 (plan and the M1 `npm install`). M0 done.
+Status: approved 2026-11-03 (plan and the M1 `npm install`). M0, M1 done.
 
 Each milestone ends with lint, tests, i18n check and build green, a commit, a
 push, and this file updated.
@@ -17,12 +17,18 @@ push, and this file updated.
   apps too (admin view), so it is a different question, not a duplicate.
 
 ## M1 — Dependencies and data model
-- [ ] `npm install @modelcontextprotocol/server@^2.4.0 @modelcontextprotocol/express@^2.0.2`
-      (needs explicit permission); record versions, licence and `npm audit` output
-- [ ] Reversible migration module for the `mcp_*` tables and the
-      `branding_settings` columns; `target_type` gains `mcp`
-- [ ] Test: up, down, up again on a populated DB; run `down()` and show it
-- [ ] Daily purge of expired codes and tokens, with a test
+- [x] `npm install @modelcontextprotocol/server@^2.4.0 @modelcontextprotocol/express@^2.0.2`
+      → server 2.4.0, express 2.0.2, core 2.4.0 (Apache-2.0, Node >= 20), zod 4.6.7
+      already in the lockfile; 3 packages added; `npm audit --omit=dev`: 0 vulnerabilities
+- [x] Reversible migration `server/migrations/mcp.js` (own `mcp_settings` table instead of
+      `branding_settings` columns; audit uses existing target types — see spec §8)
+- [x] Test: up, down, up again on a populated DB; `down()` run on a real DB file and shown
+- [x] Backups never carry `mcp_tokens`/`mcp_auth_codes`; restores empty them (both formats, mutation-checked)
+- [x] Hourly purge of expired codes and tokens and of revoked grants past log retention, with a test
+
+- Open before M3: mounting the SDK handler on Express needs `toNodeHandler` from
+  `@modelcontextprotocol/node` (not yet approved), and tool schemas import `zod`
+  directly, so it must become a declared dependency.
 
 ## M2 — Authorization server
 - [ ] Metadata endpoints (RFC 9728, RFC 8414), 404 when disabled

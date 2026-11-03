@@ -5,6 +5,7 @@ import { restoreDefaultDemoApps } from './services/demoApps.js';
 import { withAuditRefs } from './services/auditDetails.js';
 import { DEFAULT_LANGUAGE } from '../shared/languages.js';
 import { DEFAULT_GROUP_ID } from '../shared/groups.js';
+import { up as applyMcpSchema } from './migrations/mcp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'frontdoor.db');
@@ -624,6 +625,9 @@ ensureColumn('auth_pending_states', 'browser_nonce_hash', 'browser_nonce_hash TE
 
 // Created here, not in the schema block: legacy audit tables only get the column above.
 db.exec('CREATE INDEX IF NOT EXISTS idx_rbac_audit_impersonation ON rbac_audit_logs(impersonation_session_id)');
+
+// MCP server schema: reversible, self-contained (server/migrations/mcp.js).
+applyMcpSchema(db);
 
 // --- RBAC Bootstrap: "default" group + backfill ---
 

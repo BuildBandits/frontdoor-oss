@@ -12,6 +12,7 @@ import { BRANDING_ASSET_DIR } from './branding.js';
 import { APP_ICON_CACHE_DIR } from './appIcons.js';
 import { PLUGIN_ASSET_DIR } from './plugins.js';
 import { UserFacingError } from './errors.js';
+import { MCP_EPHEMERAL_TABLES } from '../migrations/mcp.js';
 import {
   assertValidPassphrase,
   createEncryptStream,
@@ -29,6 +30,15 @@ const BACKUP_PROGRESS_STAGES = ['database', 'app-icons', 'branding', 'avatars', 
 
 // Tables left out when an export is made with excludeLogs.
 const LOG_TABLES = ['access_logs', 'rbac_audit_logs', 'impersonation_sessions'];
+
+// MCP access tokens and authorization codes are never archived, and a restore
+// empties them: an old archive must not bring back a token revoked since.
+function purgeEphemeralMcpCredentials(dbHandle) {
+  const present = new Set(listTables(dbHandle));
+  for (const tableName of MCP_EPHEMERAL_TABLES) {
+    if (present.has(tableName)) dbHandle.exec(`DELETE FROM ${quoteIdentifier(tableName)}`);
+  }
+}
 const APP_VERSION = (() => {
   try {
     return JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version || null;
@@ -190,7 +200,7 @@ export async function buildBackupSnapshot({
   excludeLogs = false,
   onProgress,
 } = {}) {
-  const excludedTables = excludeLogs ? [...LOG_TABLES] : [];
+  const excludedTables = [...MCP_EPHEMERAL_TABLES, ...(excludeLogs ? LOG_TABLES : [])];
   const database = collectDatabaseSnapshot(dbHandle, { excludeTables: excludedTables });
   const buckets = [];
   const bucketDefinitions = resolveBackupBuckets({ appIconDir, brandingDir, avatarCacheDir, pluginAssetDir });
@@ -495,7 +505,7 @@ export async function restoreBackupArchive(buffer, {
 
   const dbTables = new Map(snapshot.database.tables.map((table) => [table.name, table]));
   const currentTables = listTables(dbHandle);
-  const restoreOrder = currentTables.filter((tableName) => dbTables.has(tableName));
+  const restoreOrder = currentTables.filter((tableName) => dbTables.has(tableName) && !MCP_EPHEMERAL_TABLES.includes(tableName));
   const ignoredTables = [...dbTables.keys()].filter((tableName) => !currentTables.includes(tableName)).sort();
   const tablesNotInArchive = currentTables.filter((tableName) => !dbTables.has(tableName));
   const restoreCounts = { tables: 0, rows: 0, files: 0 };
@@ -529,6 +539,7 @@ export async function restoreBackupArchive(buffer, {
         restoreCounts.tables += 1;
         if (dropped.length > 0) droppedColumns[tableName] = dropped;
       }
+      purgeEphemeralMcpCredentials(dbHandle);
       dbHandle.exec('COMMIT');
     } catch (error) {
       dbHandle.exec('ROLLBACK');
@@ -660,7 +671,7 @@ export async function createBackupFile({
   onProgress,
 } = {}) {
   if (passphrase) assertValidPassphrase(passphrase);
-  const excludedTables = excludeLogs ? [...LOG_TABLES] : [];
+  const excludedTables = [...MCP_EPHEMERAL_TABLES, ...(excludeLogs ? LOG_TABLES : [])];
   const createdAt = new Date().toISOString();
   const completed = [];
   const { manifest } = await withReadSnapshot(dbHandle, (source) => writeBackupV2({
@@ -797,7 +808,7 @@ export async function restoreBackupFile(filePath, {
 
   const archiveTables = manifest.tables || [];
   const currentTables = listTables(dbHandle);
-  const restoreOrder = currentTables.filter((tableName) => archiveTables.some((table) => table.name === tableName));
+  const restoreOrder = currentTables.filter((tableName) => archiveTables.some((table) => table.name === tableName) && !MCP_EPHEMERAL_TABLES.includes(tableName));
   const ignoredTables = archiveTables.map((table) => table.name).filter((name) => !currentTables.includes(name)).sort();
   const tablesNotInArchive = currentTables.filter((name) => !archiveTables.some((table) => table.name === name));
   const droppedColumns = {};
@@ -831,6 +842,7 @@ export async function restoreBackupFile(filePath, {
             counts.rows += 1;
           }
         }
+        purgeEphemeralMcpCredentials(dbHandle);
         dbHandle.exec('COMMIT');
       } catch (error) {
         dbHandle.exec('ROLLBACK');
