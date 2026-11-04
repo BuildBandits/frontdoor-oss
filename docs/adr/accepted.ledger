@@ -1,0 +1,14 @@
+# Accepted ADRs and the hash of the sections that may not change.
+#
+# One line per record: <id> accepted=<date> sha256=<hex over ## Context and
+# ## Decision, whitespace-folded>. Written by
+# the adr-management skill's check_adr_immutability.py --accept.
+# Never edit this file by hand.
+#
+# A line here is what freezes a record. Removing one unfreezes it, deliberately
+# and visibly; changing one re-blesses a record that changed, which is what
+# --force is for and what a reviewer should ask about.
+0001 accepted=2026-11-03 sha256=78ec23d62f0cfd3055ceedecaa60dd57d7735e80031dcc5c586dae83c72de246
+0002 accepted=2026-11-03 sha256=db4ef29f07c78b2305c6ceaec99353ee7e1a697444126cfd56ca669ffc6a97f5
+0003 accepted=2026-11-03 sha256=c74b8c6d43493b8b048e2da0d300d9d20d6620da49afc1b24d32e5eb0e3c7e98
+0004 accepted=2026-11-03 sha256=a4aac6d02a9059f4397176e56f0dca9cc747b2e9ab698a797252c6c9e35a94f2
