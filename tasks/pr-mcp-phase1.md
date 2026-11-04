@@ -1,4 +1,6 @@
-<!-- PR description for feat/mcp-server → BuildBandits/frontdoor-oss main (#167, in review). -->
+<!-- PR description for feat/mcp-server → BuildBandits/frontdoor-oss main (#167, in review, stacked on #172). -->
+
+> **Merge after #172** (design and ADRs, documentation only). This PR is stacked on it: until #172 merges, the diff here also shows its documents. To review only the implementation, use [this comparison](https://github.com/amargiovanni/frontdoor-oss/compare/docs/mcp-design...feat/mcp-server). To judge the direction first, start from #172.
 
 ## The goal
 
@@ -35,7 +37,7 @@ Tracked in #171, which holds the plan, the alternatives considered and the check
 | Phase | What users get | Status |
 | --- | --- | --- |
 | **1. Foundation: read and own preferences** | "Where is the holiday portal?", "which tools do I have for accounting?", "who can open Payroll, and through which group?" (admins, counts only), "add Jira to my favourites" | **This PR** |
-| **2. Admin write proposals** | The flow above: the assistant proposes group ↔ app visibility changes, then app creation and edits, then Entra import and resync; the admin reviews the diff and applies it with one click in Frontdoor | Next, once phase 1 holds in production. Roadmap: [`03-roadmap.md`](https://github.com/amargiovanni/frontdoor-oss/blob/feat/mcp-server/docs/design/mcp/03-roadmap.md) |
+| **2. Admin write proposals** | The flow above: the assistant proposes group ↔ app visibility changes, then app creation and edits, then Entra import and resync; the admin reviews the diff and applies it with one click in Frontdoor | Next, once phase 1 holds in production. Spec of the first step: [`04-phase2-spec.md`](https://github.com/amargiovanni/frontdoor-oss/blob/feat/mcp-server/docs/design/mcp/04-phase2-spec.md) (in #172); roadmap: [`03-roadmap.md`](https://github.com/amargiovanni/frontdoor-oss/blob/feat/mcp-server/docs/design/mcp/03-roadmap.md) |
 | **3. Log answers for owners** | "Which apps has nobody opened in 90 days?", "top 5 apps this month" — aggregates only, never rows, behind a separate owner switch | After phase 2, with a DPIA screening first |
 
 Phase 1 looks small from the outside, but it carries the hard part. Everything phase 2 needs on the security side ships here and is already reviewed and tested:
@@ -71,6 +73,7 @@ This PR overlaps with **#168** (security fix for plugin webhooks) in `server/ser
 
 Also required before merging (tracked in #171):
 
+- [ ] #172 merged (design and ADRs this PR is stacked on).
 - [ ] A check with a commercial assistant (Claude, ChatGPT or Copilot Studio) against a public https staging instance (the local end-to-end check is in `docs/design/mcp/reviews/2026-11-03-e2e-local.md`).
 - [ ] The web docs page in BuildBandits/frontdoor.buildbandits.com (follow-up PR there).
 
@@ -138,23 +141,23 @@ Local instance with demo data (`DEV_LOGIN`). Files are in `docs/design/mcp/scree
 
 **Consent page** — what the assistant will and will never see, the signed-in account, and where the user returns. Generated from VS Code's real client metadata document.
 
-<img src="https://github.com/amargiovanni/frontdoor-oss/raw/88faa487a6a937abd817ddf13b54265d6204859c/docs/design/mcp/screenshots/consent.png" alt="Consent page: Connect VS Code to Frontdoor?" width="420">
+<img src="https://github.com/amargiovanni/frontdoor-oss/raw/fe30109/docs/design/mcp/screenshots/consent.png" alt="Consent page: Connect VS Code to Frontdoor?" width="420">
 
 **AI assistants page** (account menu) — the user's connections with *Disconnect*; for the owner, the on/off switch and the MCP endpoint.
 
-<img src="https://github.com/amargiovanni/frontdoor-oss/raw/88faa487a6a937abd817ddf13b54265d6204859c/docs/design/mcp/screenshots/assistants-connections.png" alt="AI assistants page: connected assistants and organization settings" width="640">
+<img src="https://github.com/amargiovanni/frontdoor-oss/raw/fe30109/docs/design/mcp/screenshots/assistants-connections.png" alt="AI assistants page: connected assistants and organization settings" width="640">
 
 **Approved assistants** (owner) — client metadata documents and registered clients, with active connections.
 
-<img src="https://github.com/amargiovanni/frontdoor-oss/raw/88faa487a6a937abd817ddf13b54265d6204859c/docs/design/mcp/screenshots/assistants-approved.png" alt="Approved assistants list" width="640">
+<img src="https://github.com/amargiovanni/frontdoor-oss/raw/fe30109/docs/design/mcp/screenshots/assistants-approved.png" alt="Approved assistants list" width="640">
 
 **Adding an assistant and disconnecting everyone** (owner).
 
-<img src="https://github.com/amargiovanni/frontdoor-oss/raw/88faa487a6a937abd817ddf13b54265d6204859c/docs/design/mcp/screenshots/assistants-add-and-kill-switch.png" alt="Add an assistant form and Disconnect everyone" width="640">
+<img src="https://github.com/amargiovanni/frontdoor-oss/raw/fe30109/docs/design/mcp/screenshots/assistants-add-and-kill-switch.png" alt="Add an assistant form and Disconnect everyone" width="640">
 
 **Unknown assistant** — Frontdoor shows its own error page and never redirects to the `redirect_uri` it was given.
 
-<img src="https://github.com/amargiovanni/frontdoor-oss/raw/88faa487a6a937abd817ddf13b54265d6204859c/docs/design/mcp/screenshots/consent-error.png" alt="Error page: This connection cannot be completed" width="520">
+<img src="https://github.com/amargiovanni/frontdoor-oss/raw/fe30109/docs/design/mcp/screenshots/consent-error.png" alt="Error page: This connection cannot be completed" width="520">
 
 ## Checklist
 
