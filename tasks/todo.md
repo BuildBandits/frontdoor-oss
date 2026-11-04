@@ -83,7 +83,7 @@ push, and this file updated.
       `docs/mcp-design`); `feat/mcp-server` rewritten to stack on it (tree verified identical to the
       pre-split state, all commits signed off) and force-pushed. #167 merges after #172.
 - [x] Phase 2 first-step spec (`docs/design/mcp/04-phase2-spec.md`), review page mockup and ADR 0005
-      (Proposed) added to #172.
+      added to #172; ADR 0005 accepted by the author on 2026-11-04.
 - [ ] Not mergeable until the `networkGuard.js` overlap with #168 is decided (see the PR description):
       merge #168 first, rebase, reuse its helper; decide where the extra IPv6 ranges go
 
