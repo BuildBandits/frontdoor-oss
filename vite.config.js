@@ -37,6 +37,10 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
+      // MCP authorization server and endpoint, served by the same backend.
+      '/oauth': { target: 'http://localhost:3001' },
+      '/.well-known/oauth-': { target: 'http://localhost:3001' },
+      '/mcp': { target: 'http://localhost:3001' },
     },
   },
 });

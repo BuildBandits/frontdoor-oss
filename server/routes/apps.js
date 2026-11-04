@@ -8,7 +8,7 @@ import { diffAuditFields } from '../services/auditDetails.js';
 import { authenticate, isAdminViewer, isAdminEditor } from '../middleware/auth.js';
 import { getRequiredEnv } from '../config.js';
 import { restoreDefaultDemoApps } from '../services/demoApps.js';
-import { getAccessibleGroupIdsForUser } from '../services/groupHierarchy.js';
+import { listAccessibleAppsForUser, listAllAppsForAdmin, normalizeTagList, parseTags, userCanAccessApp } from '../services/appCatalog.js';
 import { iconUrlForApp, parseAppIconPayload, readAppIconAssetDataUrl, removeAppIconAsset, saveAppIconAsset, serveAppIconForApp } from '../services/appIcons.js';
 import { getBrandingSettings } from '../services/branding.js';
 import { dispatchPluginEvent } from '../services/plugins.js';
@@ -19,14 +19,6 @@ import { TARGET_URL_ERROR_CODES, validateTargetUrl } from '../../shared/targetUr
 
 const router = express.Router();
 
-function buildGroupFilterClause(groupIds) {
-  const placeholders = groupIds.map(() => '?').join(', ');
-  return {
-    clause: `IN (${placeholders})`,
-    params: groupIds,
-  };
-}
-
 // Admins acting as a user must never reach an app as that user: no token, no redirect.
 function refuseLaunchWhileImpersonating(req, res, app) {
   logRbacAudit(req.actor.id, 'app_launch_blocked', 'impersonation', req.user.id, { appId: app.id, slug: app.slug }, req.impersonation.sessionId);
@@ -35,20 +27,7 @@ function refuseLaunchWhileImpersonating(req, res, app) {
 
 // List active apps visible to current user (RBAC applies to all, including admins)
 router.get('/', authenticate, (req, res) => {
-  const accessibleGroupIds = getAccessibleGroupIdsForUser(req.user.id);
-  if (accessibleGroupIds.length === 0) {
-    return res.json({ apps: [] });
-  }
-
-  const { clause, params } = buildGroupFilterClause(accessibleGroupIds);
-  const apps = db.prepare(`
-    SELECT DISTINCT a.id, a.name, a.slug, a.description, a.long_description, a.icon, a.icon_file_name, a.target_url,
-      a.is_active, a.sort_order, a.mode, a.sso_endpoint, a.sso_method, a.tags, a.updated_at
-    FROM apps a
-    JOIN app_permissions p ON a.id = p.app_id
-    WHERE a.is_active = 1 AND p.group_id ${clause}
-    ORDER BY a.sort_order, a.name
-  `).all(...params);
+  const apps = listAccessibleAppsForUser(req.user.id);
 
   const appsWithUrls = apps.map((app) => {
     const url = app.mode === 'redirect'
@@ -75,14 +54,7 @@ router.get('/:slug/sso-redirect', authenticate, (req, res) => {
   if (req.impersonation) return refuseLaunchWhileImpersonating(req, res, app);
 
   // RBAC check: user must have group permission (applies to every mode)
-  const accessibleGroupIds = getAccessibleGroupIdsForUser(req.user.id);
-  const hasAccess = accessibleGroupIds.length > 0
-    ? db.prepare(`
-      SELECT 1 FROM app_permissions
-      WHERE app_id = ? AND group_id IN (${accessibleGroupIds.map(() => '?').join(', ')})
-    `).get(app.id, ...accessibleGroupIds)
-    : null;
-  if (!hasAccess) return res.status(403).json({ error: 'Access denied', code: 'access_denied' });
+  if (!userCanAccessApp(req.user.id, app.id)) return res.status(403).json({ error: 'Access denied', code: 'access_denied' });
 
   // Log access (every mode)
   try {
@@ -186,14 +158,7 @@ router.get('/:slug/entra-redirect', authenticate, (req, res) => {
   if (req.impersonation) return refuseLaunchWhileImpersonating(req, res, app);
 
   // RBAC check: user must have group permission
-  const accessibleGroupIds = getAccessibleGroupIdsForUser(req.user.id);
-  const hasAccess = accessibleGroupIds.length > 0
-    ? db.prepare(`
-      SELECT 1 FROM app_permissions
-      WHERE app_id = ? AND group_id IN (${accessibleGroupIds.map(() => '?').join(', ')})
-    `).get(app.id, ...accessibleGroupIds)
-    : null;
-  if (!hasAccess) return res.status(403).json({ error: 'Access denied', code: 'access_denied' });
+  if (!userCanAccessApp(req.user.id, app.id)) return res.status(403).json({ error: 'Access denied', code: 'access_denied' });
 
   // Log access
   try {
@@ -240,14 +205,7 @@ router.post('/:slug/track-access', authenticate, (req, res) => {
   if (!app) return res.status(404).json({ error: 'App not found', code: 'app_not_found' });
 
   // RBAC check: user must have group permission on this app
-  const accessibleGroupIds = getAccessibleGroupIdsForUser(req.user.id);
-  const hasAccess = accessibleGroupIds.length > 0
-    ? db.prepare(`
-      SELECT 1 FROM app_permissions
-      WHERE app_id = ? AND group_id IN (${accessibleGroupIds.map(() => '?').join(', ')})
-    `).get(app.id, ...accessibleGroupIds)
-    : null;
-  if (!hasAccess) return res.status(403).json({ error: 'Access denied', code: 'access_denied' });
+  if (!userCanAccessApp(req.user.id, app.id)) return res.status(403).json({ error: 'Access denied', code: 'access_denied' });
 
   try {
     db.prepare(
@@ -314,33 +272,8 @@ router.get('/:id/icon', (req, res) => {
 
 // List ALL apps including inactive (viewer roles only)
 router.get('/all', authenticate, isAdminViewer, (req, res) => {
-  const apps = db
-    .prepare(`
-      SELECT a.*,
-        (SELECT COUNT(*) FROM app_permissions WHERE app_id = a.id) AS group_count
-      FROM apps a
-      ORDER BY sort_order, name
-    `)
-    .all();
-  const appGroupRows = db.prepare(`
-    SELECT app_id, group_id
-    FROM app_permissions
-    ORDER BY app_id, group_id
-  `).all();
-  const groupIdsByAppId = new Map();
-  for (const row of appGroupRows) {
-    if (!groupIdsByAppId.has(row.app_id)) {
-      groupIdsByAppId.set(row.app_id, []);
-    }
-    groupIdsByAppId.get(row.app_id).push(row.group_id);
-  }
   res.json({
-    apps: apps.map((app) => ({
-      ...app,
-      tags: parseTags(app.tags),
-      iconUrl: iconUrlForApp(app),
-      groupIds: groupIdsByAppId.get(app.id) || [],
-    })),
+    apps: listAllAppsForAdmin().map((app) => ({ ...app, iconUrl: iconUrlForApp(app) })),
   });
 });
 
@@ -358,31 +291,6 @@ router.post('/restore-defaults', authenticate, isAdminEditor, (req, res) => {
 
 function normalizeEntraEndpoint(value) {
   return normalizeEntraApplicationId(value);
-}
-
-function normalizeTag(tag) {
-  return (tag ?? '').toString().trim().toLowerCase();
-}
-
-function normalizeTagList(tags) {
-  const list = Array.isArray(tags) ? tags : [];
-  const seen = new Set();
-  const normalized = [];
-  for (const tag of list) {
-    const value = normalizeTag(tag);
-    if (!value || seen.has(value)) continue;
-    seen.add(value);
-    normalized.push(value);
-  }
-  return normalized;
-}
-
-function parseTags(rawTags) {
-  try {
-    return normalizeTagList(JSON.parse(rawTags || '[]'));
-  } catch {
-    return [];
-  }
 }
 
 function isAppModeEnabled(mode, branding = getBrandingSettings()) {

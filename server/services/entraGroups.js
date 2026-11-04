@@ -1,4 +1,5 @@
 import { ConfidentialClientApplication } from '@azure/msal-node';
+import { revokeGrantsOfDeactivatedUser } from './mcp/settings.js';
 import db from '../db.js';
 import { UserFacingError } from './errors.js';
 import { NOTIFICATION_TYPES, raiseNotification, resolveNotifications } from './notifications.js';
@@ -840,6 +841,7 @@ function handleUserMissingFromEntra(user) {
     SET is_active = 0, entra_missing_since = COALESCE(entra_missing_since, datetime('now')), updated_at = datetime('now')
     WHERE id = ?
   `).run(user.id);
+  revokeGrantsOfDeactivatedUser(db, user.id);
   return true;
 }
 

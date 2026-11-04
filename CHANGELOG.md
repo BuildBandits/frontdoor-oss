@@ -6,6 +6,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+- **AI assistants (MCP)**: Frontdoor can expose an MCP server at `<FRONTEND_URL>/mcp`, so people find their apps and set their favourites, colour scheme and language from the AI assistant they already use (Claude, ChatGPT, Copilot Studio, VS Code). It is off until the owner turns it on under *AI assistants* in the account menu and approves each assistant. Users sign in with Microsoft Entra as today and approve the connection on a Frontdoor page; the assistant sees only what the user sees, never target URLs, emails, names or logs, and administrators get group names and counts. Frontdoor acts as the OAuth 2.1 authorization server for assistants (PKCE, resource-bound opaque tokens, rotating refresh tokens, client metadata documents or owner-registered clients) and never hands out Microsoft tokens. Users disconnect their assistants from the same page; the owner can remove an assistant or disconnect everyone. See `docs/mcp.md`.
+
+### Changed
+- **Dependencies**: `@modelcontextprotocol/server` 2.4.0, `@modelcontextprotocol/express` 2.0.2 and `@modelcontextprotocol/node` 2.1.2 (Apache-2.0) and `zod` 4.6.7 are runtime dependencies for the MCP server.
+- **Backups** never include MCP tokens, authorization codes or pending consent requests, and a restore removes any that exist, so restoring an older archive cannot revive a revoked token.
+
 ### Security
 - **Node2Shell (CVE-2026-111497)**: the Brotli decoder bundled with Node.js before 24.22.1 has an out-of-bounds write that can lead to remote code execution, and Express 5 decompresses `Content-Encoding: br` request bodies by default, so any request could reach it. The published 1.5.2 image already runs Node.js 24.22.2 and is not affected. The Docker image is now pinned to `node:24.22.2-bookworm-slim` instead of the floating `node:24-bookworm-slim` tag, so a cached or stale base image can no longer slip in, and `package.json` `engines` requires Node.js `>=24.22.1`. If you run Frontdoor from source, or from an image built before 21 October 2026, update Node.js or pull the current image.
 - **Development dependencies**: `minimatch` is forced to 11.0.4 through `overrides` (GHSA-g3hv-75wg-m249, denial of service via globparts amplification, pulled in by ESLint), `follow-redirects` moves to 1.16.2 (GHSA-mrwp-f3q8-3g9p, pulled in by axios on the Node.js side) and `zod` to 4.6.7 (GHSA-mrhx-c7xc-m3w5, pulled in by `eslint-plugin-react-hooks`). None of them ships in the runtime image or runs in the browser bundle, so production deployments are not affected.
