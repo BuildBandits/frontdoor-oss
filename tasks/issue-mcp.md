@@ -45,7 +45,7 @@ All of these are proposed for `main`, documentation only, in #172.
 
 ### Later
 
-- [x] Phase 2 spec for its first step (group ↔ app access) and ADR 0005, proposed in #172.
+- [x] Phase 2 spec for its first step (group ↔ app access) and ADR 0005 (accepted by the author), in #172.
 - [ ] Phase 2 specs for app creation and edits, Entra import, local group membership.
 - [ ] Phase 3 spec and DPIA screening.
 
