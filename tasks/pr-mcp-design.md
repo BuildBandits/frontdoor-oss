@@ -45,9 +45,9 @@ Part of #171.
 - `docs/design/mcp/03-roadmap.md`: what phase 1 delivers for phase 2, and the plan for phases 2 and 3.
 - `docs/design/mcp/04-phase2-spec.md` and `mockups/`: the first step of phase 2, covering the `propose_access_change` tool, pending changes, the review page, apply with an effect digest, the audit and the threat model.
 - `docs/design/mcp/research/`: the codebase survey and the MCP spec and SDK research behind the decisions.
-- `docs/adr/`: the ADR process (0001), SDK v2 (0002), Frontdoor as a minimal OAuth authorization server (0003), client registration via metadata documents and pre-registration without DCR (0004), all **Accepted by the author**; and writes only as confirmed proposals (0005), **Proposed**. `accepted.ledger` freezes the Context and Decision of accepted ADRs, and `check_adr_immutability.py` verifies it. Wiring that check into CI can be a small follow-up PR.
+- `docs/adr/`: the ADR process (0001), SDK v2 (0002), Frontdoor as a minimal OAuth authorization server (0003), client registration via metadata documents and pre-registration without DCR (0004), and writes only as confirmed proposals (0005), all **Accepted by the author**. `accepted.ledger` freezes the Context and Decision of accepted ADRs, and `check_adr_immutability.py` verifies it. Wiring that check into CI can be a small follow-up PR.
 
-ADRs 0001–0004 say "Accepted" for decisions whose code is still in review in #167. That is normal for ADRs: they record the decision, not the merge. If the maintainers disagree with one, it is superseded, not edited.
+ADRs 0001–0005 say "Accepted" for decisions whose code is still in review in #167 or not written yet (0005). That is normal for ADRs: they record the decision, not the merge. If the maintainers disagree with one, it is superseded, not edited.
 
 ## Breaking changes
 

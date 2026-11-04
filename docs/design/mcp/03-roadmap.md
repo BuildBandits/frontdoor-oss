@@ -2,7 +2,7 @@
 
 - Status: roadmap. Each phase gets its own spec and ADRs before it is built;
   phase 2 starts only once phase 1 has held in production. The first step of
-  phase 2 is specified in `04-phase2-spec.md` (ADR 0005, proposed).
+  phase 2 is specified in `04-phase2-spec.md` (ADR 0005).
 - Date: 2026-11-03
 - Builds on: `01-proposal.md` (the full proposal), `02-phase1-spec.md`
 

@@ -1,7 +1,8 @@
 # 0005. Apply admin writes from AI assistants only as proposals confirmed in Frontdoor
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-11-04
+**Accepted**: 2026-11-04
 **Deciders**: Andrea Margiovanni (Claude: drafter)
 
 ## Context
