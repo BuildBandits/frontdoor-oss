@@ -30,6 +30,8 @@ sequenceDiagram
 
 ## The plan: three phases, this PR is phase 1
 
+Tracked in #171, which holds the plan, the alternatives considered and the checklist for each phase.
+
 | Phase | What users get | Status |
 | --- | --- | --- |
 | **1. Foundation: read and own preferences** | "Where is the holiday portal?", "which tools do I have for accounting?", "who can open Payroll, and through which group?" (admins, counts only), "add Jira to my favourites" | **This PR** |
@@ -67,7 +69,7 @@ This PR overlaps with **#168** (security fix for plugin webhooks) in `server/ser
 2. Rebase this PR on `main`: keep #168's `publicOnlyLookup`, build `fetchPublicJson` on the same guarded core as `requestPublic` instead of a second copy, drop `isPublicDestination` as #168 does.
 3. Decide where the extra IPv6 ranges go: they protect webhooks as much as the MCP metadata fetch, so they arguably belong in their own small security PR rather than in this feature.
 
-Also required before merging:
+Also required before merging (tracked in #171):
 
 - [ ] A check with a commercial assistant (Claude, ChatGPT or Copilot Studio) against a public https staging instance (the local end-to-end check is in `docs/design/mcp/reviews/2026-11-03-e2e-local.md`).
 - [ ] The web docs page in BuildBandits/frontdoor.buildbandits.com (follow-up PR there).
@@ -82,7 +84,7 @@ read-only answers about apps and groups (counts, never identities). It ships
 
 ## Related issue
 
-N/A — proposal and decisions in `docs/design/mcp/` and ADRs 0001–0004.
+Part of #171 (phase 1 of 3; the issue stays open for phases 2 and 3). Proposal and decisions in `docs/design/mcp/` and ADRs 0001–0004.
 
 ## Type of change
 

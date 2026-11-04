@@ -1,4 +1,4 @@
-<!-- Issue text for BuildBandits/frontdoor-oss (Feature request template). Title: "[feat] AI assistants (MCP): administration by conversation, confirmed in Frontdoor" -->
+<!-- Opened 2026-11-04 as https://github.com/BuildBandits/frontdoor-oss/issues/171 (Feature request template). Title: "[feat] AI assistants (MCP): administration by conversation, confirmed in Frontdoor" -->
 
 ## Problem
 
@@ -32,7 +32,7 @@ Design documents:
 
 ### Phase 1 checklist
 
-- [ ] Merge #168 (plugin webhook DNS rebinding fix). It overlaps with #167 in `server/services/networkGuard.js`.
+- [ ] Merge #168 first. It overlaps with #167 in `server/services/networkGuard.js`.
 - [ ] Rebase #167 on `main`: reuse #168's guarded request core for the client metadata fetch, and drop `isPublicDestination`.
 - [ ] Decide where the extra blocked IPv6 ranges go: a small security PR of their own, or #167.
 - [ ] Check with a commercial assistant against a public https staging instance.
