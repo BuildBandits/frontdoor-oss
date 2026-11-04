@@ -1,7 +1,8 @@
 # Frontdoor MCP — where phase 1 leads (phases 2 and 3)
 
-- Status: roadmap, not yet a spec. Each phase gets its own spec and ADRs before
-  it is built; phase 2 starts only once phase 1 has held in production.
+- Status: roadmap. Each phase gets its own spec and ADRs before it is built;
+  phase 2 starts only once phase 1 has held in production. The first step of
+  phase 2 is specified in `04-phase2-spec.md` (ADR 0005, proposed).
 - Date: 2026-11-03
 - Builds on: `01-proposal.md` (the full proposal), `02-phase1-spec.md`
 
@@ -21,7 +22,7 @@ name read by the model) can at worst produce a wrong proposal nobody applies.
 
 ## What phase 1 already provides for this
 
-| Needed by phase 2 | Built in phase 1 |
+| Needed by phase 2 | Built in phase 1 (#167) |
 | --- | --- |
 | The assistant acts as a specific admin, never as itself | OAuth 2.1 authorization server, per-user grants, Entra sign-in (ADR 0003) |
 | The owner decides which assistants exist at all | Owner allowlist of assistants, kill switch (ADR 0004) |
@@ -32,7 +33,7 @@ name read by the model) can at worst produce a wrong proposal nobody applies.
 | Revocation that works at once | Per connection, per assistant, per user deactivation, global |
 
 Phase 2 adds the proposal model and its confirmation page; the security
-plumbing it needs is already reviewed and tested.
+plumbing it needs is built, tested and reviewed in #167.
 
 ## Phase 2 — admin write proposals
 
