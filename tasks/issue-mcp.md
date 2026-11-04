@@ -28,10 +28,14 @@ Design documents:
 - [proposal](https://github.com/amargiovanni/frontdoor-oss/blob/feat/mcp-server/docs/design/mcp/01-proposal.md)
 - [phase 1 spec and threat model](https://github.com/amargiovanni/frontdoor-oss/blob/feat/mcp-server/docs/design/mcp/02-phase1-spec.md)
 - [roadmap for phases 2 and 3](https://github.com/amargiovanni/frontdoor-oss/blob/feat/mcp-server/docs/design/mcp/03-roadmap.md)
-- [ADRs 0001–0004](https://github.com/amargiovanni/frontdoor-oss/tree/feat/mcp-server/docs/adr)
+- [phase 2 spec, first step](https://github.com/amargiovanni/frontdoor-oss/blob/feat/mcp-server/docs/design/mcp/04-phase2-spec.md)
+- [ADRs 0001–0005](https://github.com/amargiovanni/frontdoor-oss/tree/feat/mcp-server/docs/adr)
+
+All of these are proposed for `main`, documentation only, in #172.
 
 ### Phase 1 checklist
 
+- [ ] Merge #172 (design documents and ADRs, documentation only).
 - [ ] Merge #168 first. It overlaps with #167 in `server/services/networkGuard.js`.
 - [ ] Rebase #167 on `main`: reuse #168's guarded request core for the client metadata fetch, and drop `isPublicDestination`.
 - [ ] Decide where the extra blocked IPv6 ranges go: a small security PR of their own, or #167.
@@ -41,7 +45,8 @@ Design documents:
 
 ### Later
 
-- [ ] Phase 2 spec and ADRs: pending-change model, `/changes/:id` page, diff shared with the route that applies it.
+- [x] Phase 2 spec for its first step (group ↔ app access) and ADR 0005, proposed in #172.
+- [ ] Phase 2 specs for app creation and edits, Entra import, local group membership.
 - [ ] Phase 3 spec and DPIA screening.
 
 ## Alternatives considered

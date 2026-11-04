@@ -78,6 +78,12 @@ push, and this file updated.
 - [x] PR description drafted: `tasks/pr-mcp-phase1.md`
 - [x] PR opened 2026-11-03 as draft, moved to review by the author: https://github.com/BuildBandits/frontdoor-oss/pull/167
 - [x] Tracking issue opened 2026-11-04: https://github.com/BuildBandits/frontdoor-oss/issues/171 (#167 is "Part of #171")
+- [x] Split 2026-11-04, before any review had started: design docs and ADRs moved to their own
+      documentation-only PR, https://github.com/BuildBandits/frontdoor-oss/pull/172 (branch
+      `docs/mcp-design`); `feat/mcp-server` rewritten to stack on it (tree verified identical to the
+      pre-split state, all commits signed off) and force-pushed. #167 merges after #172.
+- [x] Phase 2 first-step spec (`docs/design/mcp/04-phase2-spec.md`), review page mockup and ADR 0005
+      (Proposed) added to #172.
 - [ ] Not mergeable until the `networkGuard.js` overlap with #168 is decided (see the PR description):
       merge #168 first, rebase, reuse its helper; decide where the extra IPv6 ranges go
 
