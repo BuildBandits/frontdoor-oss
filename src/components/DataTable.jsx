@@ -64,7 +64,9 @@ function readStoredVisibility(storageKey) {
  *
  * Optional: `columnFilters` + `onColumnFiltersChange` to control the filters from outside
  * (e.g. a shortcut that applies one); `rowClassName` may be a function of the row;
- * `onRowClick`, `isRowExpanded` and `renderExpandedRow` add a full-width detail row under a row.
+ * `onRowClick`, `isRowExpanded` and `renderExpandedRow` add a full-width detail row under a row;
+ * `getRowRef(row)` returns a ref callback for the row (e.g. to scroll to it);
+ * `onFilteredRowsChange(rows)` reports every row left after the column filters, across pages.
  */
 export default function DataTable({
   columns,
@@ -76,6 +78,8 @@ export default function DataTable({
   storageKey,
   labels,
   onFilteredCountChange,
+  onFilteredRowsChange,
+  getRowRef,
   rowClassName,
   columnFilters: controlledFilters,
   onColumnFiltersChange,
@@ -147,10 +151,17 @@ export default function DataTable({
     enableSortingRemoval: false,
   });
 
-  const filteredCount = table.getPrePaginatedRowModel().rows.length;
+  const filteredRowModel = table.getPrePaginatedRowModel();
+  const filteredCount = filteredRowModel.rows.length;
   useEffect(() => {
     onFilteredCountChange?.(filteredCount);
   }, [filteredCount, onFilteredCountChange]);
+  // Keyed on the filtered ids and the data, so a parent that stores the rows does not loop.
+  const filteredIds = filteredRowModel.rows.map((row) => row.id).join(',');
+  useEffect(() => {
+    onFilteredRowsChange?.(filteredRowModel.rows.map((row) => row.original));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredIds, rows, onFilteredRowsChange]);
 
   const pages = Math.max(1, table.getPageCount());
   // Rows removed from the last page (delete, filter) must not leave an empty page behind.
@@ -253,6 +264,7 @@ export default function DataTable({
           {table.getRowModel().rows.map((row) => (
             <Fragment key={row.id}>
               <tr
+                ref={getRowRef?.(row.original)}
                 className={typeof rowClassName === 'function' ? rowClassName(row.original) : rowClassName}
                 onClick={onRowClick ? () => onRowClick(row.original) : undefined}
               >

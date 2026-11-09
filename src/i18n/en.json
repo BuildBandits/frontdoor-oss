@@ -1168,7 +1168,6 @@
       },
       "pageSummary": "Page {page} of {pages} · {total} groups",
       "sourceFilter": "Source",
-      "sourceAll": "All",
       "sourceLocal": "Local",
       "sourceEntra": "Microsoft Entra",
       "deletedInEntraBadge": "Deleted in Entra",
@@ -1184,7 +1183,12 @@
       "convertedToLocal": "{name} is now a local group",
       "moveAppsToAnotherGroup": "Move apps to another group",
       "deletedInEntraLinked": "This Entra group was deleted in Microsoft Entra. Its members keep the access it gave through this group for now. Convert it to a local group to keep it, or unlink it to end it.",
-      "convertLinkedToLocalMessage": "A local group with the same members is created and linked here (and in every other group that linked the Entra group) instead of the Entra group."
+      "convertLinkedToLocalMessage": "A local group with the same members is created and linked here (and in every other group that linked the Entra group) instead of the Entra group.",
+      "selectColumn": "Select",
+      "membersColumn": "Members",
+      "linkedGroupsColumn": "Linked groups",
+      "withItems": "At least one",
+      "withoutItems": "None"
     },
     "users": {
       "title": "Users",

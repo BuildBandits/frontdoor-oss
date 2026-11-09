@@ -1168,7 +1168,6 @@
       },
       "pageSummary": "Pagina {page} di {pages} · {total} gruppi",
       "sourceFilter": "Origine",
-      "sourceAll": "Tutti",
       "sourceLocal": "Locali",
       "sourceEntra": "Microsoft Entra",
       "deletedInEntraBadge": "Eliminato in Entra",
@@ -1184,7 +1183,12 @@
       "convertedToLocal": "{name} ora è un gruppo locale",
       "moveAppsToAnotherGroup": "Sposta le app su un altro gruppo",
       "deletedInEntraLinked": "Questo gruppo Entra è stato eliminato in Microsoft Entra. Per ora i suoi membri mantengono l'accesso che dava tramite questo gruppo. Convertilo in gruppo locale per mantenerlo, o scollegalo per chiuderlo.",
-      "convertLinkedToLocalMessage": "Viene creato un gruppo locale con gli stessi membri e collegato qui (e in ogni altro gruppo che collegava il gruppo Entra) al posto del gruppo Entra."
+      "convertLinkedToLocalMessage": "Viene creato un gruppo locale con gli stessi membri e collegato qui (e in ogni altro gruppo che collegava il gruppo Entra) al posto del gruppo Entra.",
+      "selectColumn": "Seleziona",
+      "membersColumn": "Membri",
+      "linkedGroupsColumn": "Gruppi collegati",
+      "withItems": "Almeno uno",
+      "withoutItems": "Nessuno"
     },
     "users": {
       "title": "Utenti",

@@ -1,6 +1,6 @@
 import { useState, useEffect, useEffectEvent, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { Plus, Trash2, Users, ChevronDown, ChevronRight, AppWindow, RefreshCw, Layers3, ArrowRightLeft, Filter } from 'lucide-react';
+import { Plus, Users, ChevronDown, RefreshCw, ArrowRightLeft, Filter } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { useLatestRequest } from '../hooks/useLatestRequest';
@@ -18,9 +18,8 @@ import GroupDetailPanel from './groups/GroupDetailPanel';
 import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
-import SegmentedControl from '../components/SegmentedControl';
-import PaginationControls from '../components/PaginationControls';
-import { formatMessage, getUiStrings, resolveAppLanguage } from '../i18n';
+import GroupsTable from './groups/GroupsTable';
+import { getUiStrings, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
 import DocsHelpLink from '../components/DocsHelpLink';
 
@@ -41,7 +40,10 @@ export default function AdminGroups() {
   const [pageNotice, setPageNotice] = useState(null);
   const { dialog: confirmDialog, open: openConfirm, dialogProps: confirmDialogProps } = useConfirmDialog();
   const [groupSearch, setGroupSearch] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('all');
+  // Column filters of the groups table (source, members, apps, ...), held here for "select filtered".
+  const [groupColumnFilters, setGroupColumnFilters] = useState([]);
+  // Groups left after search, problem toggle and column filters, across pages.
+  const [tableGroups, setTableGroups] = useState([]);
 
   const showToast = (message, type = 'success') => setPageNotice({ message, type });
 
@@ -73,7 +75,6 @@ export default function AdminGroups() {
   const [appSearch, setAppSearch] = useState('');
   const [selectedGroupIds, setSelectedGroupIds] = useState([]);
   const [showOnlyProblemGroups, setShowOnlyProblemGroups] = useState(false);
-  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
   // Entra import modal
@@ -86,7 +87,8 @@ export default function AdminGroups() {
   const [forceSyncing, setForceSyncing] = useState(false);
   const brandingLanguage = useBrandingLanguage();
   const canEdit = user?.role !== 'admin_readonly';
-  const ui = getUiStrings(resolveAppLanguage(user?.preferredLanguage, brandingLanguage));
+  const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
+  const ui = getUiStrings(language);
   const t = ui.admin.common;
   const g = ui.admin.groups;
 
@@ -264,11 +266,11 @@ export default function AdminGroups() {
   };
 
   const openGroupAndScroll = async (groupId, preserveSearch = false) => {
-    // Filter the list to the group: otherwise it may sit on another page or behind the source filter.
+    // Filter the list to the group: otherwise it may sit on another page or behind a column filter.
     const target = groups.find((group) => group.id === groupId);
     if (!preserveSearch && target) {
       setGroupSearch(groupLabel(target));
-      setSourceFilter('all');
+      setGroupColumnFilters([]);
     }
     setScrollTargetGroupId(groupId);
     if (expandedGroup !== groupId) {
@@ -479,7 +481,7 @@ export default function AdminGroups() {
   };
 
   const selectVisibleGroups = () => {
-    const visibleIds = visibleGroups
+    const visibleIds = tableGroups
       .filter((group) => group.id !== DEFAULT_GROUP_ID)
       .map((group) => group.id);
     setSelectedGroupIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
@@ -834,10 +836,9 @@ export default function AdminGroups() {
     return counts;
   }, { local: 0, entra: 0 }), [groups]);
   const filteredGroups = useMemo(() => {
-    const bySource = sourceFilter === 'all' ? groups : groups.filter((group) => groupSource(group) === sourceFilter);
-    if (!groupSearch.trim()) return bySource;
+    if (!groupSearch.trim()) return groups;
     const q = groupSearch.toLowerCase();
-    return bySource.filter((group) => {
+    return groups.filter((group) => {
       const searchable = [
         groupLabel(group),
         group.description || '',
@@ -847,7 +848,7 @@ export default function AdminGroups() {
       ].join(' ').toLowerCase();
       return searchable.includes(q);
     });
-  }, [groups, groupSearch, sourceFilter]);
+  }, [groups, groupSearch]);
   const groupsWithoutApps = useMemo(
     () => groups.filter((group) => Number(group.app_count || 0) === 0 && Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) === 0),
     [groups],
@@ -864,31 +865,50 @@ export default function AdminGroups() {
   const visibleGroups = showOnlyProblemGroups
     ? filteredGroups.filter((group) => Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) === 0 && (Number(group.app_count || 0) === 0 || Number(group.member_count || 0) === 0))
     : filteredGroups;
-  const hasGroupFilter = groupSearch.trim().length > 0 || showOnlyProblemGroups || sourceFilter !== 'all';
-  const pagination = useMemo(() => ({
-    page,
-    pages: Math.max(1, Math.ceil(visibleGroups.length / pageSize)),
-    total: visibleGroups.length,
-  }), [page, pageSize, visibleGroups.length]);
-  const paginatedGroups = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return visibleGroups.slice(start, start + pageSize);
-  }, [page, pageSize, visibleGroups]);
-
+  const hasGroupFilter = groupSearch.trim().length > 0 || showOnlyProblemGroups || groupColumnFilters.length > 0;
   useEffect(() => {
     if (showOnlyProblemGroups && problemGroups.length === 0) {
       setShowOnlyProblemGroups(false);
     }
   }, [showOnlyProblemGroups, problemGroups.length]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [groupSearch, showOnlyProblemGroups, pageSize, sourceFilter]);
-  useEffect(() => {
-    if (page > pagination.pages) {
-      setPage(pagination.pages);
-    }
-  }, [page, pagination.pages]);
+  // Detail panel under an expanded row.
+  const renderGroupDetail = (group) => (
+    <GroupDetailPanel
+      group={group}
+      ui={ui}
+      expandedGroup={expandedGroup}
+      t={t}
+      detailLoading={detailLoading}
+      groupDetail={groupDetail}
+      editingGroup={editingGroup}
+      g={g}
+      editName={editName}
+      setEditName={setEditName}
+      isEntraGroup={isEntraGroup}
+      editDesc={editDesc}
+      setEditDesc={setEditDesc}
+      saveEdit={saveEdit}
+      setEditingGroup={setEditingGroup}
+      startEdit={startEdit}
+      canEdit={canEdit}
+      totalLinkedGroupCount={totalLinkedGroupCount}
+      openAddGroups={openAddGroups}
+      linkedGroups={linkedGroups}
+      groupLabel={groupLabel}
+      removeLinkedGroup={removeLinkedGroup}
+      linkedEntraGroups={linkedEntraGroups}
+      removeLinkedEntraGroup={removeLinkedEntraGroup}
+      openAddMembers={openAddMembers}
+      removeMember={removeMember}
+      openAddApps={openAddApps}
+      removeApp={removeApp}
+      convertToLocal={convertToLocal}
+      convertLinkedToLocal={convertLinkedToLocal}
+      deleteGroup={handleDelete}
+      moveApps={(sourceGroupId) => navigate('/admin/group-transfer', { state: { sourceGroupId } })}
+    />
+  );
 
   return (
     <div>
@@ -1061,17 +1081,6 @@ export default function AdminGroups() {
               searchShortcutLabel={ui.common.searchShortcut}
             />
           </div>
-          <SegmentedControl
-            size="lg"
-            label={g.sourceFilter}
-            value={sourceFilter}
-            onChange={setSourceFilter}
-            options={[
-              { value: 'all', label: g.sourceAll, count: groups.length },
-              { value: 'local', label: g.sourceLocal, count: sourceCounts.local },
-              { value: 'entra', label: g.sourceEntra, count: sourceCounts.entra },
-            ]}
-          />
           <DropdownSelect
             value={pageSize}
             onChange={(next) => setPageSize(parseInt(next, 10))}
@@ -1086,7 +1095,7 @@ export default function AdminGroups() {
             className="min-w-[140px]"
           />
           <div className="text-xs text-gray-400 dark:text-gray-500">
-            {visibleGroups.length} {ui.nav.groups.toLowerCase()} {t.of} {groups.length}
+            {tableGroups.length} {ui.nav.groups.toLowerCase()} {t.of} {groups.length}
           </div>
         </div>
       </div>
@@ -1120,7 +1129,7 @@ export default function AdminGroups() {
                 <button
                   type="button"
                   onClick={selectVisibleGroups}
-                  disabled={!canEdit || visibleGroups.filter((group) => group.id !== DEFAULT_GROUP_ID).length === 0}
+                  disabled={!canEdit || tableGroups.filter((group) => group.id !== DEFAULT_GROUP_ID).length === 0}
                   className="font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {g.selectAllFiltered}
@@ -1161,145 +1170,29 @@ export default function AdminGroups() {
             </div>
           </div>
 
-          <PaginationControls
-            page={pagination.page}
-            pages={pagination.pages}
-            total={pagination.total}
-            summary={formatMessage(ui.admin.groups.pageSummary, pagination)}
-            previousLabel={ui.common.previous}
-            nextLabel={ui.common.next}
-            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
-            onNext={() => setPage((current) => Math.min(pagination.pages, current + 1))}
-            className="mt-0"
+          <GroupsTable
+            groups={visibleGroups}
+            sourceCounts={sourceCounts}
+            pageSize={pageSize}
+            pageResetKey={JSON.stringify([groupSearch, showOnlyProblemGroups])}
+            columnFilters={groupColumnFilters}
+            onColumnFiltersChange={setGroupColumnFilters}
+            onFilteredRowsChange={setTableGroups}
+            expandedGroup={expandedGroup}
+            toggleExpand={toggleExpand}
+            renderGroupDetail={renderGroupDetail}
+            getRowRef={(group) => setGroupRowRef(group.id)}
+            selectedGroupIds={selectedGroupIds}
+            toggleGroupSelection={toggleGroupSelection}
+            handleDelete={handleDelete}
+            canEdit={canEdit}
+            language={language}
+            ui={ui}
+            t={t}
+            g={g}
           />
-
-          {paginatedGroups.map((group) => (
-            <div key={group.id} ref={setGroupRowRef(group.id)} className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden transition-colors">
-              {/* Group row */}
-              <div
-                className={`flex items-center justify-between px-5 py-3.5 cursor-pointer transition-colors ${
-                  expandedGroup === group.id
-                    ? 'dark:hover:bg-gray-800/70'
-                    : 'hover:bg-gray-50/90 dark:hover:bg-gray-800/50'
-                }`}
-                onClick={() => toggleExpand(group.id)}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  {group.id !== DEFAULT_GROUP_ID && (
-                    <input
-                      type="checkbox"
-                      checked={selectedGroupIds.includes(group.id)}
-                      disabled={!canEdit}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        toggleGroupSelection(group.id);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="rounded-sm border-gray-300 dark:border-gray-600 text-dark dark:text-gray-100 focus:ring-accent"
-                    />
-                  )}
-                  {expandedGroup === group.id
-                    ? <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-                    : <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate font-semibold text-sm text-dark dark:text-gray-100">{groupLabel(group)}</span>
-                      {group.source !== 'entra' && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-sm font-medium">{g.localBadge}</span>
-                      )}
-                      {group.source === 'entra' && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-950/55 dark:text-sky-300 px-1.5 py-0.5 rounded-sm font-medium">{g.entraBadge}</span>
-                      )}
-                      {group.entra_deleted_at && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-red-100 text-red-700 dark:bg-red-950/55 dark:text-red-300 px-1.5 py-0.5 rounded-sm font-medium">{g.deletedInEntraBadge}</span>
-                      )}
-                      {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) > 0 && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-accent/10 dark:bg-accent-dark/20 text-accent-dark dark:text-gray-100 px-1.5 py-0.5 rounded-sm font-medium">
-                          <Layers3 className="w-3 h-3" />
-                          {g.compositeBadge}
-                        </span>
-                      )}
-                      {group.id === DEFAULT_GROUP_ID && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-accent/30 text-dark dark:text-gray-100 px-1.5 py-0.5 rounded-full font-medium">{g.defaultBadge}</span>
-                      )}
-                    </div>
-                    {group.description && <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">{group.description}</p>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
-                    <Users className="w-3.5 h-3.5 shrink-0" /> {group.member_count}
-                  </span>
-                  <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
-                    <AppWindow className="w-3.5 h-3.5 shrink-0" /> {group.app_count}
-                  </span>
-                  {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) > 0 && (
-                    <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
-                      <Layers3 className="w-3.5 h-3.5 shrink-0" /> {Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0)}
-                    </span>
-                  )}
-                  {group.id !== DEFAULT_GROUP_ID && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(group); }}
-                      disabled={!canEdit}
-                      className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/35 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      title={g.deleteGroupTooltip}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <GroupDetailPanel
-                group={group}
-                ui={ui}
-                expandedGroup={expandedGroup}
-                t={t}
-                detailLoading={detailLoading}
-                groupDetail={groupDetail}
-                editingGroup={editingGroup}
-                g={g}
-                editName={editName}
-                setEditName={setEditName}
-                isEntraGroup={isEntraGroup}
-                editDesc={editDesc}
-                setEditDesc={setEditDesc}
-                saveEdit={saveEdit}
-                setEditingGroup={setEditingGroup}
-                startEdit={startEdit}
-                canEdit={canEdit}
-                totalLinkedGroupCount={totalLinkedGroupCount}
-                openAddGroups={openAddGroups}
-                linkedGroups={linkedGroups}
-                groupLabel={groupLabel}
-                removeLinkedGroup={removeLinkedGroup}
-                linkedEntraGroups={linkedEntraGroups}
-                removeLinkedEntraGroup={removeLinkedEntraGroup}
-                openAddMembers={openAddMembers}
-                removeMember={removeMember}
-                openAddApps={openAddApps}
-                removeApp={removeApp}
-                convertToLocal={convertToLocal}
-                convertLinkedToLocal={convertLinkedToLocal}
-                deleteGroup={handleDelete}
-                moveApps={(sourceGroupId) => navigate('/admin/group-transfer', { state: { sourceGroupId } })}
-              />
-            </div>
-          ))}
         </div>
       )}
-
-      <PaginationControls
-        page={pagination.page}
-        pages={pagination.pages}
-        total={pagination.total}
-        summary={formatMessage(ui.admin.groups.pageSummary, pagination)}
-        previousLabel={ui.common.previous}
-        nextLabel={ui.common.next}
-        onPrevious={() => setPage((current) => Math.max(1, current - 1))}
-        onNext={() => setPage((current) => Math.min(pagination.pages, current + 1))}
-      />
 
       <CreateGroupModal
         showCreate={showCreate}
