@@ -1,16 +1,29 @@
 import { useMemo } from 'react';
 import { Pencil, Trash2, Copy, Users } from 'lucide-react';
 import AppIcon from '../../components/AppIcon';
-import DataTable from '../../components/DataTable';
+import DataTable, { EMPTY_FILTER_VALUE } from '../../components/DataTable';
 import { formatMessage } from '../../i18n';
 
 const CELL = 'px-6 py-4';
+
+const appTags = (app) => (Array.isArray(app.tags) ? app.tags : [])
+  .map((tag) => (tag ?? '').toString().trim().toLowerCase())
+  .filter(Boolean);
+// Filter value getters: module level so the table's column definitions stay stable.
+const getName = (app) => app.name;
+const getSlug = (app) => app.slug;
+const getTargetUrl = (app) => app.target_url;
+const getDescription = (app) => app.description;
+const getMode = (app) => app.mode;
+const getActive = (app) => (app.is_active ? 'active' : 'inactive');
+const getGroups = (app) => (Number(app.group_count || 0) > 0 ? 'with' : 'without');
 
 export default function AppsTable({
   loading,
   apps,
   pageSize,
   pageResetKey,
+  onFilteredCountChange,
   language,
   a,
   ui,
@@ -33,7 +46,10 @@ export default function AppsTable({
       slug: thenName(text('slug')),
       target_url: thenName(text('target_url')),
       mode: thenName(text('mode')),
+      description: thenName(text('description')),
       is_active: thenName((x, y) => Number(Boolean(x.is_active)) - Number(Boolean(y.is_active))),
+      group_count: thenName((x, y) => Number(x.group_count || 0) - Number(y.group_count || 0)),
+      sort_order: thenName((x, y) => Number(x.sort_order || 0) - Number(y.sort_order || 0)),
     };
   }, [language]);
   // Default order, shown until a header is clicked: sort order, then name.
@@ -41,6 +57,19 @@ export default function AppsTable({
     () => [...apps].sort((x, y) => (Number(x?.sort_order || 0) - Number(y?.sort_order || 0)) || sortFns.name(x, y)),
     [apps, sortFns],
   );
+
+  const modeLabel = (mode) => (mode === 'redirect' ? t.redirectSso : mode === 'internal-link' ? t.internalLink : mode === 'shared-cookie' ? t.sharedCookie : mode === 'entra-app' ? t.entraApp : t.link);
+  // Checklist options come from the values present in the catalog.
+  const modeValues = [...new Set(apps.map(getMode))].sort();
+  const tagValues = [...new Set(apps.flatMap(appTags))].sort();
+  const tt = ui.common.table;
+  const labels = {
+    ...tt,
+    filterColumn: (column) => formatMessage(tt.filterColumn, { column }),
+    pageSummary: (pagination) => formatMessage(a.pageSummary, pagination),
+    previous: ui.common.previous,
+    next: ui.common.next,
+  };
 
   if (loading) {
     return (
@@ -56,6 +85,8 @@ export default function AppsTable({
     {
       id: 'name',
       header: ui.nav.apps,
+      hideable: false,
+      filter: { type: 'text', getValue: getName },
       cellClassName: CELL,
       cell: (app) => (
         <div className="flex items-center gap-3">
@@ -67,18 +98,29 @@ export default function AppsTable({
     {
       id: 'slug',
       header: a.sortBySlug,
+      filter: { type: 'text', getValue: getSlug },
       cellClassName: `${CELL} text-sm text-gray-500 dark:text-gray-400 font-mono`,
       cell: (app) => app.slug,
     },
     {
       id: 'target_url',
       header: a.sortByTargetUrl,
+      filter: { type: 'text', getValue: getTargetUrl },
       cellClassName: `${CELL} text-sm text-gray-500 dark:text-gray-400 truncate max-w-[200px]`,
       cell: (app) => app.target_url,
     },
     {
+      id: 'description',
+      header: a.descriptionLabel,
+      hiddenByDefault: true,
+      filter: { type: 'text', getValue: getDescription },
+      cellClassName: `${CELL} text-sm text-gray-500 dark:text-gray-400 truncate max-w-[260px]`,
+      cell: (app) => app.description,
+    },
+    {
       id: 'mode',
       header: ui.admin.common.appMode,
+      filter: { type: 'values', getValue: getMode, options: modeValues.map((mode) => ({ value: mode, label: modeLabel(mode) })) },
       headerClassName: 'text-center whitespace-nowrap',
       cellClassName: `${CELL} text-center whitespace-nowrap`,
       cell: (app) => (
@@ -89,13 +131,53 @@ export default function AppsTable({
             : app.mode === 'entra-app' ? 'bg-violet-100 text-violet-700'
             : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
         }`}>
-          {app.mode === 'redirect' ? t.redirectSso : app.mode === 'internal-link' ? t.internalLink : app.mode === 'shared-cookie' ? t.sharedCookie : app.mode === 'entra-app' ? t.entraApp : t.link}
+          {modeLabel(app.mode)}
         </span>
       ),
     },
     {
+      id: 'tags',
+      header: a.tagsLabel,
+      hiddenByDefault: true,
+      filter: {
+        type: 'values',
+        getValue: appTags,
+        options: [{ value: EMPTY_FILTER_VALUE, label: a.appsWithoutTags }, ...tagValues.map((tag) => ({ value: tag, label: tag }))],
+      },
+      cellClassName: CELL,
+      cell: (app) => (
+        <div className="flex flex-wrap gap-1">
+          {appTags(app).map((tag) => (
+            <span key={tag} className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs text-gray-600 dark:text-gray-300">{tag}</span>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: 'group_count',
+      header: a.columnGroups,
+      hiddenByDefault: true,
+      headerClassName: 'text-center',
+      filter: {
+        type: 'values',
+        getValue: getGroups,
+        options: [{ value: 'with', label: a.withGroups }, { value: 'without', label: a.withoutGroups }],
+      },
+      cellClassName: `${CELL} text-center text-sm text-gray-500 dark:text-gray-400`,
+      cell: (app) => Number(app.group_count || 0),
+    },
+    {
+      id: 'sort_order',
+      header: a.sortOrderLabel,
+      hiddenByDefault: true,
+      headerClassName: 'text-center',
+      cellClassName: `${CELL} text-center text-sm text-gray-500 dark:text-gray-400`,
+      cell: (app) => Number(app.sort_order || 0),
+    },
+    {
       id: 'is_active',
       header: ui.admin.common.active,
+      filter: { type: 'values', getValue: getActive, options: [{ value: 'active', label: a.statusActive }, { value: 'inactive', label: a.statusInactive }] },
       headerClassName: 'text-center',
       cellClassName: `${CELL} text-center`,
       cell: (app) => (
@@ -123,6 +205,7 @@ export default function AppsTable({
     {
       id: 'actions',
       header: t.actions,
+      hideable: false,
       headerClassName: 'text-center',
       cellClassName: CELL,
       cell: (app) => (
@@ -175,9 +258,9 @@ export default function AppsTable({
       getRowId={(app) => app.id}
       pageSize={pageSize}
       pageResetKey={pageResetKey}
-      pageSummary={(pagination) => formatMessage(a.pageSummary, pagination)}
-      previousLabel={ui.common.previous}
-      nextLabel={ui.common.next}
+      storageKey="frontdoor.admin.apps.columns"
+      labels={labels}
+      onFilteredCountChange={onFilteredCountChange}
       rowClassName="border-b border-gray-100 dark:border-gray-800 transition-colors hover:bg-gray-50/90 dark:hover:bg-gray-800/55"
     />
   );

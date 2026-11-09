@@ -11,7 +11,6 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
-import { sortOptionsByLabel } from '../utils/sortOptions';
 import { normalizeEntraApplicationId } from '../../shared/entra.js';
 import { normalizeAppSlug, suggestAppSlug } from '../../shared/appSlug.js';
 import PluginSurface from '../pluginHost/PluginSurface';
@@ -54,9 +53,7 @@ export default function Admin() {
   const [groupAssignAllowNoChanges, setGroupAssignAllowNoChanges] = useState(false);
   const [assigningGroups, setAssigningGroups] = useState(false);
   const [appSearch, setAppSearch] = useState('');
-  const [appModeFilter, setAppModeFilter] = useState('all');
   const [showOnlyOrphanApps, setShowOnlyOrphanApps] = useState(false);
-  const [modeFilterOpen, setModeFilterOpen] = useState(false);
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [selectedTagFilters, setSelectedTagFilters] = useState([]);
   const [tagFilterSearch, setTagFilterSearch] = useState('');
@@ -67,24 +64,12 @@ export default function Admin() {
   const [cloning, setCloning] = useState(false);
   const iconFileInputRef = useRef(null);
   const slugAutoFillRef = useRef(false);
-  const modeFilterRef = useRef(null);
   const tagFilterRef = useRef(null);
   const tagFilterSearchRef = useRef(null);
   const tagFilterItemRefs = useRef([]);
   const canEdit = user?.role !== 'admin_readonly';
   const brandingLanguage = normalizeLanguage(branding?.defaultLanguage);
   const filterButtonMinWidth = 'min-w-[260px]';
-
-  useEffect(() => {
-    if (!modeFilterOpen) return undefined;
-    const onMouseDown = (event) => {
-      if (modeFilterRef.current && !modeFilterRef.current.contains(event.target)) {
-        setModeFilterOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
-  }, [modeFilterOpen]);
 
   useEffect(() => {
     if (!tagFilterOpen) return undefined;
@@ -645,15 +630,12 @@ export default function Admin() {
     { value: 'entra-app', label: a.entraApp, active: 'bg-violet-600 text-white border-violet-600', visible: modeVisibility.showEntraAppMode !== false },
   ];
   const visibleModeOptions = modeOptions.filter((opt) => opt.alwaysVisible || opt.visible);
-  const visibleModeFilterOptions = sortOptionsByLabel([
-    { value: 'all', label: a.allConnections, active: 'bg-gray-900 dark:bg-gray-100 text-white border-gray-900' },
-    ...visibleModeOptions,
-  ], language);
-  const currentModeFilterOption = visibleModeFilterOptions.find((opt) => opt.value === appModeFilter) || visibleModeFilterOptions[0];
   const hasTagFilters = selectedTagFilters.length > 0;
   const currentModeOption = modeOptions.find((opt) => opt.value === form.mode);
   // Any filter change sends the apps table back to page 1 (sorting and page size do it inside the table).
-  const appsPageResetKey = JSON.stringify([appSearch, appModeFilter, showOnlyOrphanApps, selectedTagFilters]);
+  const appsPageResetKey = JSON.stringify([appSearch, showOnlyOrphanApps, selectedTagFilters]);
+  // Apps left after the column filters inside the table, for the "X of Y" count.
+  const [tableAppCount, setTableAppCount] = useState(0);
   const handleModeChange = (nextMode) => {
     if (nextMode === 'entra-app') {
       setForm((prev) => ({
@@ -735,7 +717,6 @@ export default function Admin() {
     const q = appSearch.toLowerCase().trim();
     const filtered = apps.filter((app) => {
       if (showOnlyOrphanApps && Number(app.group_count || 0) !== 0) return false;
-      if (appModeFilter !== 'all' && app.mode !== appModeFilter) return false;
       const tags = Array.isArray(app.tags)
         ? app.tags.map((tag) => (tag ?? '').toString().trim().toLowerCase()).filter(Boolean)
         : [];
@@ -759,7 +740,7 @@ export default function Admin() {
     });
 
     return filtered;
-  }, [apps, appSearch, appModeFilter, showOnlyOrphanApps, selectedTagFilters]);
+  }, [apps, appSearch, showOnlyOrphanApps, selectedTagFilters]);
   const orphanApps = useMemo(
     () => apps.filter((app) => Number(app.group_count || 0) === 0),
     [apps],
@@ -903,15 +884,8 @@ export default function Admin() {
         appSearch={appSearch}
         setAppSearch={setAppSearch}
         ui={ui}
-        modeFilterRef={modeFilterRef}
-        setModeFilterOpen={setModeFilterOpen}
         filterButtonMinWidth={filterButtonMinWidth}
         a={a}
-        currentModeFilterOption={currentModeFilterOption}
-        modeFilterOpen={modeFilterOpen}
-        visibleModeFilterOptions={visibleModeFilterOptions}
-        appModeFilter={appModeFilter}
-        setAppModeFilter={setAppModeFilter}
         tagFilterRef={tagFilterRef}
         setTagFilterOpen={setTagFilterOpen}
         hasTagFilters={hasTagFilters}
@@ -929,7 +903,7 @@ export default function Admin() {
         filteredTags={filteredTags}
         pageSize={pageSize}
         setPageSize={setPageSize}
-        filteredApps={filteredApps}
+        tableAppCount={tableAppCount}
         apps={apps}
       />
 
@@ -938,6 +912,7 @@ export default function Admin() {
         apps={filteredApps}
         pageSize={pageSize}
         pageResetKey={appsPageResetKey}
+        onFilteredCountChange={setTableAppCount}
         language={language}
         a={a}
         ui={ui}

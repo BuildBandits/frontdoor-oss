@@ -1,4 +1,4 @@
-import { ChevronDown, Check, Filter, Settings, Tag } from 'lucide-react';
+import { ChevronDown, Check, Filter, Tag } from 'lucide-react';
 import ClearableSearchField from '../../components/ClearableSearchField';
 import DropdownSelect from '../../components/DropdownSelect';
 import { UNLABELED_TAG_FILTER } from './constants';
@@ -7,15 +7,8 @@ export default function AppsFilterBar({
   appSearch,
   setAppSearch,
   ui,
-  modeFilterRef,
-  setModeFilterOpen,
   filterButtonMinWidth,
   a,
-  currentModeFilterOption,
-  modeFilterOpen,
-  visibleModeFilterOptions,
-  appModeFilter,
-  setAppModeFilter,
   tagFilterRef,
   setTagFilterOpen,
   hasTagFilters,
@@ -33,7 +26,7 @@ export default function AppsFilterBar({
   filteredTags,
   pageSize,
   setPageSize,
-  filteredApps,
+  tableAppCount,
   apps,
 }) {
   return (
@@ -49,46 +42,6 @@ export default function AppsFilterBar({
               searchShortcutTarget="primary"
               searchShortcutLabel={ui.common.searchShortcut}
             />
-          </div>
-          <div className="relative" ref={modeFilterRef}>
-            <button
-              type="button"
-              onClick={() => setModeFilterOpen((prev) => !prev)}
-            className={`relative inline-flex h-12 items-center w-full ${filterButtonMinWidth} pl-10 pr-10 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-left text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-gray-500 dark:focus-visible:ring-offset-gray-900`}
-            >
-              <Settings className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-              <span className="flex min-w-0 flex-1 items-center gap-1">
-                <span className="shrink-0 text-gray-400 dark:text-gray-500">{a.modeFilterShort}:</span>
-                <span className="truncate">{currentModeFilterOption.label}</span>
-              </span>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-            </button>
-
-            {modeFilterOpen && (
-              <div className="absolute right-0 z-20 mt-2 w-full overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
-                <div className="py-1">
-                  {visibleModeFilterOptions.map((opt) => {
-                    const selected = appModeFilter === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => {
-                          setAppModeFilter(opt.value);
-                          setModeFilterOpen(false);
-                        }}
-                        className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                          selected ? 'bg-gray-50 dark:bg-gray-900 text-dark dark:text-gray-100' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                        }`}
-                      >
-                        <span className="flex-1">{opt.label}</span>
-                        {selected && <Check className="h-4 w-4 text-dark dark:text-gray-100" aria-hidden="true" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
           <div className="relative" ref={tagFilterRef}>
             <button
@@ -247,7 +200,7 @@ export default function AppsFilterBar({
             className="min-w-[150px]"
           />
           <div className="text-xs text-gray-400 dark:text-gray-500">
-            {filteredApps.length} {ui.nav.apps.toLowerCase()} {t.of} {apps.length}
+            {tableAppCount} {ui.nav.apps.toLowerCase()} {t.of} {apps.length}
           </div>
         </div>
       </div>
