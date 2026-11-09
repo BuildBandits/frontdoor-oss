@@ -3,10 +3,34 @@ import { createPortal } from 'react-dom';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+// Open modals sharing the page scroll lock, so nested modals restore it only when the last one closes.
+let scrollLocks = 0;
+let savedScrollStyles = null;
+
+function lockPageScroll() {
+  if (scrollLocks++ > 0) return;
+  const { documentElement: html, body } = document;
+  const scrollbarWidth = window.innerWidth - html.clientWidth;
+  savedScrollStyles = { overflow: html.style.overflow, paddingRight: body.style.paddingRight };
+  html.style.overflow = 'hidden';
+  // Keep the page from shifting when its scrollbar disappears.
+  if (scrollbarWidth > 0) {
+    body.style.paddingRight = `${(parseFloat(getComputedStyle(body).paddingRight) || 0) + scrollbarWidth}px`;
+  }
+}
+
+function unlockPageScroll() {
+  if (--scrollLocks > 0 || !savedScrollStyles) return;
+  document.documentElement.style.overflow = savedScrollStyles.overflow;
+  document.body.style.paddingRight = savedScrollStyles.paddingRight;
+  savedScrollStyles = null;
+}
+
 /**
  * Shared dialog shell: dialog semantics, Escape and backdrop close (both through
  * onClose, so callers can check for unsaved changes), focus moved into the dialog,
- * kept inside it while open and given back to the opener on close.
+ * kept inside it while open and given back to the opener on close. The page behind
+ * does not scroll while any modal is open.
  */
 export default function Modal({
   onClose,
@@ -26,6 +50,11 @@ export default function Modal({
     onCloseRef.current = onClose;
   });
   const requestClose = () => onCloseRef.current?.();
+
+  useLayoutEffect(() => {
+    lockPageScroll();
+    return unlockPageScroll;
+  }, []);
 
   useEffect(() => {
     const opener = document.activeElement;

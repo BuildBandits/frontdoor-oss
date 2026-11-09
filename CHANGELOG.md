@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Fixed
 - **Ctrl+K in modals**: with a modal open, `Ctrl+K` (`Cmd+K` on macOS) focuses the modal's own search field instead of the search field of the page behind it. This covers the Microsoft Entra group import, add members, add apps and linked groups modals, the pre-onboarding modal and the visible apps list in Users. A modal without a search field leaves the page search alone.
+- **Page scrolling behind modals**: while a modal is open, the page behind it no longer scrolls when you scroll inside the modal or past its end. The page keeps its scroll position and does not shift when its scrollbar is hidden. Nested modals (for example a confirmation over a form) restore scrolling only when the last one closes.
 
 ### Security
 - **Node2Shell (CVE-2026-111497)**: the Brotli decoder bundled with Node.js before 24.22.1 has an out-of-bounds write that can lead to remote code execution, and Express 5 decompresses `Content-Encoding: br` request bodies by default, so any request could reach it. The published 1.5.2 image already runs Node.js 24.22.2 and is not affected. The Docker image is now pinned to `node:24.22.2-bookworm-slim` instead of the floating `node:24-bookworm-slim` tag, so a cached or stale base image can no longer slip in, and `package.json` `engines` requires Node.js `>=24.22.1`. If you run Frontdoor from source, or from an image built before 21 October 2026, update Node.js or pull the current image.
