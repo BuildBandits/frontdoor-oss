@@ -29,7 +29,6 @@ export default function PaginationControls({
     <div className={`${variantClassName} ${className}`.trim()}>
       <p className="text-sm text-gray-500 dark:text-gray-400">{summary || `${page} / ${pages} · ${total}`}</p>
       <div className="flex flex-wrap items-center gap-2">
-        {actions}
         {paged && (
           <>
             <button type="button" onClick={onPrevious} disabled={page <= 1} className={BUTTON_CLASS}>
@@ -42,6 +41,7 @@ export default function PaginationControls({
             </button>
           </>
         )}
+        {actions}
       </div>
     </div>
   );
