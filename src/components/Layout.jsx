@@ -126,7 +126,9 @@ export default function Layout({ children }) {
         || activeElement.isContentEditable
       );
 
-      const targets = Array.from(document.querySelectorAll('[data-frontdoor-search-target="primary"]'));
+      // With a modal open, only its own search field qualifies, never the page behind it.
+      const scope = [...document.querySelectorAll('[aria-modal="true"]')].pop() || document;
+      const targets = Array.from(scope.querySelectorAll('[data-frontdoor-search-target="primary"]'));
       const target = [...targets].reverse().find((element) => (
         element instanceof HTMLElement && element.getClientRects().length > 0
       ));
