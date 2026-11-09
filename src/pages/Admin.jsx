@@ -17,7 +17,7 @@ import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
 import { MAX_RASTER_ICON_BYTES, MAX_SVG_ICON_BYTES, estimateDataUrlBytes } from '../../shared/iconLimits.js';
 import { MAX_ICON_SOURCE_BYTES, downscaleIconDataUrl, isResizableIconType } from '../utils/iconImages';
-import { UNLABELED_TAG_FILTER, emptyApp } from './apps/constants';
+import { emptyApp } from './apps/constants';
 import { DEFAULT_GROUP_ID } from '../../shared/groups.js';
 import AppsFilterBar from './apps/AppsFilterBar';
 import AppsTable from './apps/AppsTable';
@@ -54,9 +54,6 @@ export default function Admin() {
   const [assigningGroups, setAssigningGroups] = useState(false);
   const [appSearch, setAppSearch] = useState('');
   const [showOnlyOrphanApps, setShowOnlyOrphanApps] = useState(false);
-  const [tagFilterOpen, setTagFilterOpen] = useState(false);
-  const [selectedTagFilters, setSelectedTagFilters] = useState([]);
-  const [tagFilterSearch, setTagFilterSearch] = useState('');
   const [pageSize, setPageSize] = useState(25);
   const [pageNotice, setPageNotice] = useState(null);
   const [appSaveNotice, setAppSaveNotice] = useState(null);
@@ -64,28 +61,8 @@ export default function Admin() {
   const [cloning, setCloning] = useState(false);
   const iconFileInputRef = useRef(null);
   const slugAutoFillRef = useRef(false);
-  const tagFilterRef = useRef(null);
-  const tagFilterSearchRef = useRef(null);
-  const tagFilterItemRefs = useRef([]);
   const canEdit = user?.role !== 'admin_readonly';
   const brandingLanguage = normalizeLanguage(branding?.defaultLanguage);
-  const filterButtonMinWidth = 'min-w-[260px]';
-
-  useEffect(() => {
-    if (!tagFilterOpen) return undefined;
-    const onMouseDown = (event) => {
-      if (tagFilterRef.current && !tagFilterRef.current.contains(event.target)) {
-        setTagFilterOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
-  }, [tagFilterOpen]);
-
-  useEffect(() => {
-    if (tagFilterOpen) return;
-    setTagFilterSearch('');
-  }, [tagFilterOpen]);
 
   const pushNotice = useCallback((type, message) => setPageNotice({ type, message }), []);
   const pushAppSaveNotice = (type, message) => {
@@ -602,14 +579,6 @@ export default function Admin() {
     });
     return [...tagSet].sort();
   }, [apps]);
-  useEffect(() => {
-    // Keep the same array when no tag disappeared: a new array would count as a
-    // filter change and send the list back to page 1 after every reload (e.g. a save).
-    setSelectedTagFilters((prev) => {
-      const next = prev.filter((tag) => tag === UNLABELED_TAG_FILTER || allTags.includes(tag));
-      return next.length === prev.length ? prev : next;
-    });
-  }, [allTags]);
   const toggleGroupAssignment = (groupId) => {
     setGroupAssignSelection((prev) => (
       prev.includes(groupId)
@@ -630,10 +599,9 @@ export default function Admin() {
     { value: 'entra-app', label: a.entraApp, active: 'bg-violet-600 text-white border-violet-600', visible: modeVisibility.showEntraAppMode !== false },
   ];
   const visibleModeOptions = modeOptions.filter((opt) => opt.alwaysVisible || opt.visible);
-  const hasTagFilters = selectedTagFilters.length > 0;
   const currentModeOption = modeOptions.find((opt) => opt.value === form.mode);
   // Any filter change sends the apps table back to page 1 (sorting and page size do it inside the table).
-  const appsPageResetKey = JSON.stringify([appSearch, showOnlyOrphanApps, selectedTagFilters]);
+  const appsPageResetKey = JSON.stringify([appSearch, showOnlyOrphanApps]);
   // Apps left after the column filters inside the table, for the "X of Y" count.
   const [tableAppCount, setTableAppCount] = useState(0);
   const handleModeChange = (nextMode) => {
@@ -651,68 +619,6 @@ export default function Admin() {
     }
     setForm((prev) => ({ ...prev, mode: nextMode }));
   };
-  const toggleTagFilter = (tag) => {
-    const normalizedTag = tag === UNLABELED_TAG_FILTER ? UNLABELED_TAG_FILTER : (tag ?? '').toString().trim().toLowerCase();
-    if (!normalizedTag) return;
-    setSelectedTagFilters((prev) => (
-      prev.includes(normalizedTag)
-        ? prev.filter((value) => value !== normalizedTag)
-        : [...prev, normalizedTag]
-    ));
-  };
-  const filteredTags = useMemo(() => {
-    const q = tagFilterSearch.trim().toLowerCase();
-    if (!q) return allTags;
-    return allTags.filter((tag) => tag.includes(q));
-  }, [allTags, tagFilterSearch]);
-  const tagFilterOptionCount = (hasTagFilters ? 1 : 0) + 2 + filteredTags.length;
-  const focusTagFilterItem = (index) => {
-    tagFilterItemRefs.current[index]?.focus?.();
-  };
-  const handleTagFilterSearchKeyDown = (event) => {
-    if (tagFilterOptionCount === 0) return;
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      focusTagFilterItem(0);
-      return;
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      focusTagFilterItem(Math.max(0, tagFilterOptionCount - 1));
-      return;
-    }
-    if (event.key === 'Home') {
-      event.preventDefault();
-      focusTagFilterItem(0);
-      return;
-    }
-    if (event.key === 'End') {
-      event.preventDefault();
-      focusTagFilterItem(Math.max(0, tagFilterOptionCount - 1));
-    }
-  };
-  const handleTagFilterItemKeyDown = (event, index) => {
-    if (tagFilterOptionCount === 0) return;
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      focusTagFilterItem((index + 1) % tagFilterOptionCount);
-      return;
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      focusTagFilterItem((index - 1 + tagFilterOptionCount) % tagFilterOptionCount);
-      return;
-    }
-    if (event.key === 'Home') {
-      event.preventDefault();
-      focusTagFilterItem(0);
-      return;
-    }
-    if (event.key === 'End') {
-      event.preventDefault();
-      focusTagFilterItem(Math.max(0, tagFilterOptionCount - 1));
-    }
-  };
   const filteredApps = useMemo(() => {
     const q = appSearch.toLowerCase().trim();
     const filtered = apps.filter((app) => {
@@ -720,14 +626,6 @@ export default function Admin() {
       const tags = Array.isArray(app.tags)
         ? app.tags.map((tag) => (tag ?? '').toString().trim().toLowerCase()).filter(Boolean)
         : [];
-      if (selectedTagFilters.length > 0) {
-        const matchesTagFilter = selectedTagFilters.some((selectedTag) => (
-          selectedTag === UNLABELED_TAG_FILTER
-            ? tags.length === 0
-            : tags.includes(selectedTag)
-        ));
-        if (!matchesTagFilter) return false;
-      }
       if (!q) return true;
       return (
         app.name?.toLowerCase().includes(q) ||
@@ -740,7 +638,7 @@ export default function Admin() {
     });
 
     return filtered;
-  }, [apps, appSearch, showOnlyOrphanApps, selectedTagFilters]);
+  }, [apps, appSearch, showOnlyOrphanApps]);
   const orphanApps = useMemo(
     () => apps.filter((app) => Number(app.group_count || 0) === 0),
     [apps],
@@ -884,23 +782,8 @@ export default function Admin() {
         appSearch={appSearch}
         setAppSearch={setAppSearch}
         ui={ui}
-        filterButtonMinWidth={filterButtonMinWidth}
         a={a}
-        tagFilterRef={tagFilterRef}
-        setTagFilterOpen={setTagFilterOpen}
-        hasTagFilters={hasTagFilters}
-        tagFilterOpen={tagFilterOpen}
-        selectedTagFilters={selectedTagFilters}
-        tagFilterSearch={tagFilterSearch}
-        setTagFilterSearch={setTagFilterSearch}
-        tagFilterSearchRef={tagFilterSearchRef}
-        handleTagFilterSearchKeyDown={handleTagFilterSearchKeyDown}
-        setSelectedTagFilters={setSelectedTagFilters}
-        tagFilterItemRefs={tagFilterItemRefs}
-        handleTagFilterItemKeyDown={handleTagFilterItemKeyDown}
-        toggleTagFilter={toggleTagFilter}
         t={t}
-        filteredTags={filteredTags}
         pageSize={pageSize}
         setPageSize={setPageSize}
         tableAppCount={tableAppCount}

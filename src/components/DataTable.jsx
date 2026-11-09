@@ -161,42 +161,45 @@ export default function DataTable({
     className: 'mt-0 bg-white dark:bg-gray-900',
   };
   const hideableColumns = table.getAllLeafColumns().filter((column) => column.getCanHide());
+  // Shown next to Previous / Next, above and below the table.
+  const actions = (
+    <>
+      {columnFilters.length > 0 && (
+        <button type="button" onClick={() => table.resetColumnFilters()} className="px-2 text-sm font-semibold text-accent-dark hover:underline">
+          {labels.clearAllFilters}
+        </button>
+      )}
+      {hideableColumns.length > 0 && (
+        <TablePopover
+          label={labels.columns}
+          align="right"
+          width={220}
+          buttonClassName="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
+          buttonContent={<><Columns3 className="w-4 h-4" aria-hidden="true" />{labels.columns}</>}
+        >
+          <div className="space-y-1">
+            {hideableColumns.map((column) => (
+              <label key={column.id} className="flex items-center gap-2 px-1 py-1 cursor-pointer">
+                <input type="checkbox" checked={column.getIsVisible()} onChange={(event) => column.toggleVisibility(event.target.checked)} />
+                <span className="truncate">{columnsById.get(column.id).header}</span>
+              </label>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setColumnVisibility(defaultVisibility)}
+            className="mt-2 text-xs font-semibold text-accent-dark hover:underline"
+          >
+            {labels.resetColumns}
+          </button>
+        </TablePopover>
+      )}
+    </>
+  );
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-      <div className="flex items-center justify-end gap-3 border-b border-gray-100 dark:border-gray-800 px-4 py-2">
-        {columnFilters.length > 0 && (
-          <button type="button" onClick={() => table.resetColumnFilters()} className="text-xs font-semibold text-accent-dark hover:underline">
-            {labels.clearAllFilters}
-          </button>
-        )}
-        {hideableColumns.length > 0 && (
-          <TablePopover
-            label={labels.columns}
-            align="right"
-            width={220}
-            buttonClassName="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
-            buttonContent={<><Columns3 className="w-3.5 h-3.5" aria-hidden="true" />{labels.columns}</>}
-          >
-            <div className="space-y-1">
-              {hideableColumns.map((column) => (
-                <label key={column.id} className="flex items-center gap-2 px-1 py-1 cursor-pointer">
-                  <input type="checkbox" checked={column.getIsVisible()} onChange={(event) => column.toggleVisibility(event.target.checked)} />
-                  <span className="truncate">{columnsById.get(column.id).header}</span>
-                </label>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setColumnVisibility(defaultVisibility)}
-              className="mt-2 text-xs font-semibold text-accent-dark hover:underline"
-            >
-              {labels.resetColumns}
-            </button>
-          </TablePopover>
-        )}
-      </div>
-      <PaginationControls {...paginationProps} variant="attached-top" />
+      <PaginationControls {...paginationProps} actions={actions} variant="attached-top" />
       <table className="w-full">
         <thead>
           {table.getHeaderGroups().map((group) => (
@@ -252,7 +255,7 @@ export default function DataTable({
           )}
         </tbody>
       </table>
-      <PaginationControls {...paginationProps} variant="attached-bottom" />
+      <PaginationControls {...paginationProps} actions={actions} variant="attached-bottom" />
     </div>
   );
 }
