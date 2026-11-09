@@ -383,10 +383,13 @@ export function listMediaAssets({
     ${whereSql}
     ORDER BY created_at DESC, id DESC
   `).all(...params);
-  const referencedAppFiles = new Set(
-    dbHandle.prepare("SELECT icon_file_name FROM apps WHERE icon_file_name IS NOT NULL AND TRIM(icon_file_name) <> ''").all()
-      .map((row) => row.icon_file_name)
-  );
+  // Apps using each icon file now: the uploader plus any app that reuses it from the library.
+  const appsByIconFile = new Map();
+  for (const app of dbHandle.prepare("SELECT id, name, slug, target_url, mode, icon_file_name FROM apps WHERE icon_file_name IS NOT NULL AND TRIM(icon_file_name) <> ''").all()) {
+    const { icon_file_name: fileName, ...linked } = app;
+    appsByIconFile.set(fileName, [...(appsByIconFile.get(fileName) || []), linked]);
+  }
+  const referencedAppFiles = new Set(appsByIconFile.keys());
   const referencedBrandingFiles = new Set(
     dbHandle.prepare("SELECT logo_file_name FROM branding_settings WHERE logo_file_name IS NOT NULL AND TRIM(logo_file_name) <> ''").all()
       .map((row) => row.logo_file_name)
@@ -397,7 +400,8 @@ export function listMediaAssets({
     const asset = toPublicMediaAsset(row, { appIconDir, brandingDir });
     const groupKey = asset.sha256 ? `${asset.kind}:${asset.sha256}` : `${asset.kind}:${asset.id}`;
     const existing = grouped.get(groupKey);
-    const linkedApp = buildLinkedApp(asset);
+    const linkedApps = [buildLinkedApp(asset), ...(asset.kind === 'app-icon' ? appsByIconFile.get(asset.stored_file_name) || [] : [])]
+      .filter(Boolean);
     const fileExists = asset.fileExists !== false;
     const currentUsage = asset.kind === 'app-icon'
       ? referencedAppFiles.has(asset.stored_file_name)
@@ -411,7 +415,7 @@ export function listMediaAssets({
         duplicateCount: 1,
         duplicateAssetIds: [asset.id],
         duplicateAssets: [asset],
-        linkedApps: linkedApp ? [linkedApp] : [],
+        linkedApps: linkedApps.reduce(mergeLinkedApps, []),
         inUse: currentUsage,
         liveCount: fileExists ? 1 : 0,
         orphanCount: fileExists ? 0 : 1,
@@ -425,7 +429,7 @@ export function listMediaAssets({
     existing.duplicateCount += 1;
     existing.duplicateAssetIds.push(asset.id);
     existing.duplicateAssets.push(asset);
-    existing.linkedApps = mergeLinkedApps(existing.linkedApps, linkedApp);
+    existing.linkedApps = linkedApps.reduce(mergeLinkedApps, existing.linkedApps);
     if (fileExists) {
       existing.liveCount = (existing.liveCount || 0) + 1;
       existing.hasLiveMembers = true;
@@ -501,7 +505,8 @@ export function getMediaAssetById(assetId, {
 export function getLinkableAppIconFileName(assetId, options = {}) {
   const asset = typeof assetId === 'string' && assetId.trim() ? getMediaAssetById(assetId.trim(), options) : null;
   if (!asset || asset.kind !== 'app-icon' || !asset.fileExists) {
-    throw new UserFacingError('Media file not found', { statusCode: 404, code: 'media_asset_not_found' });
+    // 400, not 404: on PUT /apps/:id a 404 would read as "app not found".
+    throw new UserFacingError('Media file not found', { statusCode: 400, code: 'media_asset_not_found' });
   }
   return asset.stored_file_name;
 }

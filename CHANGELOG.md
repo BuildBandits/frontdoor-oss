@@ -7,7 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
-- **Media Library icons in the app form**: in image mode, **Pick from Media Library** opens a searchable grid of the app icons already stored in the Media Library. The app links to the picked file instead of uploading a copy, so the same icon can be reused without duplicates. The Media Library already refuses to delete an icon that an app uses, and that check now covers every app linked to it. The API accepts the new `iconAssetId` field on app create and update.
+- **Media Library icons in the app form**: in image mode, **Pick from Media Library** opens a searchable grid of the app icons already stored in the Media Library. The app links to the picked file instead of uploading a copy, so the same icon can be reused without duplicates. The Media Library lists every app that uses an icon, not only the app that uploaded it, and still refuses to delete an icon while any app uses it. The API accepts the new `iconAssetId` field on app create and update.
 
 ### Fixed
 - **Ctrl+K in modals**: with a modal open, `Ctrl+K` (`Cmd+K` on macOS) focuses the modal's own search field instead of the search field of the page behind it. This covers the Microsoft Entra group import, add members, add apps and linked groups modals, the pre-onboarding modal and the visible apps list in Users. A modal without a search field leaves the page search alone.

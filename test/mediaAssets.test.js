@@ -161,7 +161,15 @@ describe('mediaAssets service', () => {
       const options = { dbHandle: db, appIconDir, brandingDir };
       assert.equal(getLinkableAppIconFileName(getAssetIdByStoredFileName('app-1.svg'), options), 'app-1.svg');
 
-      const notFound = { statusCode: 404, code: 'media_asset_not_found' };
+      // A second app reusing the file shows up next to the uploader in the library.
+      db.prepare('INSERT INTO apps (id, name, slug, target_url, mode, icon_file_name) VALUES (?, ?, ?, ?, ?, ?)').run(
+        'app-2', 'App Two', 'app-two', 'https://app-two.example.com', 'redirect', 'app-1.svg'
+      );
+      const icon = listMediaAssets(options).assets.find((asset) => asset.kind === 'app-icon');
+      assert.deepEqual(icon.linkedApps.map((app) => app.slug).sort(), ['app-one', 'app-two']);
+      assert.equal(icon.inUse, true);
+
+      const notFound = { statusCode: 400, code: 'media_asset_not_found' };
       assert.throws(() => getLinkableAppIconFileName(getAssetIdByStoredFileName('company-logo.svg'), options), notFound);
       assert.throws(() => getLinkableAppIconFileName('missing-id', options), notFound);
       assert.throws(() => getLinkableAppIconFileName(null, options), notFound);

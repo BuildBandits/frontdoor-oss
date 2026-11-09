@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import api from '../../services/api';
 import Modal from '../../components/Modal';
@@ -17,6 +17,7 @@ export default function MediaIconPicker({ onClose, onPick, ui, a }) {
   const [failed, setFailed] = useState(false);
   const debouncedSearch = useDebouncedValue(search);
   const { begin } = useLatestRequest();
+  const searchInputRef = useRef(null);
 
   useEffect(() => {
     const isLatest = begin();
@@ -40,7 +41,7 @@ export default function MediaIconPicker({ onClose, onPick, ui, a }) {
   }, [debouncedSearch, begin]);
 
   return (
-    <Modal onClose={onClose} labelledBy="media-icon-picker-title" panelClassName="w-full max-w-3xl rounded-2xl bg-white dark:bg-gray-900 p-6 shadow-xl max-h-[85vh] flex flex-col">
+    <Modal onClose={onClose} initialFocusRef={searchInputRef} labelledBy="media-icon-picker-title" panelClassName="w-full max-w-3xl rounded-2xl bg-white dark:bg-gray-900 p-6 shadow-xl max-h-[85vh] flex flex-col">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h2 id="media-icon-picker-title" className="text-xl font-bold text-dark dark:text-gray-100">{a.libraryPickerTitle}</h2>
@@ -57,19 +58,17 @@ export default function MediaIconPicker({ onClose, onPick, ui, a }) {
         placeholder={a.librarySearchPlaceholder}
         clearLabel={ui.common.clearSearch}
         className="mb-4"
-        autoFocus
+        inputRef={searchInputRef}
         searchShortcutTarget="primary"
         searchShortcutLabel={ui.common.searchShortcut}
       />
 
-      <div className="min-h-[10rem] overflow-y-auto" aria-live="polite" aria-busy={loading}>
-        {failed ? (
-          <p className="text-sm text-red-600 dark:text-red-400">{a.libraryLoadFailed}</p>
-        ) : loading && assets.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-gray-500">{ui.common.loading}</p>
-        ) : assets.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-gray-500">{a.libraryEmpty}</p>
-        ) : (
+      <div className="min-h-[10rem] overflow-y-auto" aria-busy={loading}>
+        {/* Only the status line is announced, not the whole grid on every search. */}
+        <p role="status" className={`text-sm ${failed ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>
+          {failed ? a.libraryLoadFailed : loading && assets.length === 0 ? ui.common.loading : !loading && assets.length === 0 ? a.libraryEmpty : ''}
+        </p>
+        {!failed && assets.length > 0 && (
           <ul className="grid grid-cols-3 sm:grid-cols-5 gap-3">
             {assets.map((asset) => {
               const label = asset.app_name || asset.original_name || asset.stored_file_name;
