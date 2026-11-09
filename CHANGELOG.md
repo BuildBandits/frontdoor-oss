@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+- **Media Library icons in the app form**: in image mode, **Pick from Media Library** opens a searchable grid of the app icons already stored in the Media Library. The app links to the picked file instead of uploading a copy, so the same icon can be reused without duplicates. The Media Library already refuses to delete an icon that an app uses, and that check now covers every app linked to it. The API accepts the new `iconAssetId` field on app create and update.
+
 ### Fixed
 - **Ctrl+K in modals**: with a modal open, `Ctrl+K` (`Cmd+K` on macOS) focuses the modal's own search field instead of the search field of the page behind it. This covers the Microsoft Entra group import, add members, add apps and linked groups modals, the pre-onboarding modal and the visible apps list in Users. A modal without a search field leaves the page search alone.
 - **Page scrolling behind modals**: while a modal is open, the page behind it no longer scrolls when you scroll inside the modal or past its end. The page keeps its scroll position and does not shift when its scrollbar is hidden. Nested modals (for example a confirmation over a form) restore scrolling only when the last one closes.

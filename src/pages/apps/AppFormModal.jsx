@@ -1,8 +1,10 @@
-import { X, Save, Copy, Users } from 'lucide-react';
+import { useState } from 'react';
+import { X, Save, Copy, Users, Images } from 'lucide-react';
 import TagInput from '../../components/TagInput';
 import AppIcon from '../../components/AppIcon';
 import Modal from '../../components/Modal';
 import DocsHelpLink from '../../components/DocsHelpLink';
+import MediaIconPicker from './MediaIconPicker';
 import { normalizeEntraApplicationId } from '../../../shared/entra.js';
 
 export default function AppFormModal({
@@ -16,6 +18,7 @@ export default function AppFormModal({
   setIconAssetPreview,
   setIconSvgText,
   setRemoveIconAsset,
+  setIconAssetId,
   iconMode,
   form,
   setForm,
@@ -40,6 +43,8 @@ export default function AppFormModal({
   canEdit,
   handleSave,
 }) {
+  const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
+
   return (
     <>
       {editing !== null && (
@@ -71,6 +76,7 @@ export default function AppFormModal({
                         setIconAssetDataUrl('');
                         setIconAssetPreview('');
                         setIconSvgText('');
+                        setIconAssetId('');
                         setRemoveIconAsset(Boolean(editing && editing !== 'new' && editing.iconUrl));
                       }}
                       className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
@@ -161,6 +167,7 @@ export default function AppFormModal({
                               ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.trim())}`
                               : '');
                             setIconAssetDataUrl('');
+                            setIconAssetId('');
                             setRemoveIconAsset(false);
                           }}
                           placeholder={a.svgPlaceholder}
@@ -178,6 +185,7 @@ export default function AppFormModal({
                               setIconAssetDataUrl('');
                               setIconAssetPreview('');
                               setIconSvgText('');
+                              setIconAssetId('');
                               setRemoveIconAsset(true);
                             }}
                             className="text-red-600 hover:text-red-700 font-semibold"
@@ -189,6 +197,14 @@ export default function AppFormModal({
                       <p className="text-xs text-gray-400 dark:text-gray-500">
                         {a.iconPasteHint}
                       </p>
+                      <button
+                        type="button"
+                        onClick={() => setLibraryPickerOpen(true)}
+                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl border border-gray-200 dark:border-gray-700 text-dark dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      >
+                        <Images className="w-4 h-4" />
+                        {a.pickFromLibrary}
+                      </button>
                     </div>
                   </div>
                 )}
@@ -438,6 +454,21 @@ export default function AppFormModal({
                 </div>
             </div>
         </Modal>
+      )}
+      {editing !== null && libraryPickerOpen && (
+        <MediaIconPicker
+          ui={ui}
+          a={a}
+          onClose={() => setLibraryPickerOpen(false)}
+          onPick={(asset) => {
+            setIconAssetId(asset.id);
+            setIconAssetPreview(asset.assetUrl);
+            setIconAssetDataUrl('');
+            setIconSvgText('');
+            setRemoveIconAsset(false);
+            setLibraryPickerOpen(false);
+          }}
+        />
       )}
     </>
   );

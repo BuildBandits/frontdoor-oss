@@ -43,6 +43,8 @@ export default function Admin() {
   const [iconAssetPreview, setIconAssetPreview] = useState('');
   const [iconSvgText, setIconSvgText] = useState('');
   const [removeIconAsset, setRemoveIconAsset] = useState(false);
+  // Media Library asset picked for the icon: linked on save, not uploaded again.
+  const [iconAssetId, setIconAssetId] = useState('');
   const [includeDefaultGroup, setIncludeDefaultGroup] = useState(true);
   const [clonedGroupIds, setClonedGroupIds] = useState([]);
   const [pendingGroupAssignApp, setPendingGroupAssignApp] = useState(null);
@@ -162,6 +164,7 @@ export default function Admin() {
     setIconAssetPreview('');
     setIconSvgText('');
     setRemoveIconAsset(false);
+    setIconAssetId('');
     setIncludeDefaultGroup(true);
     setClonedGroupIds([]);
     setEditing('new');
@@ -191,6 +194,7 @@ export default function Admin() {
     setIconAssetDataUrl('');
     setIconSvgText('');
     setRemoveIconAsset(false);
+    setIconAssetId('');
     setIncludeDefaultGroup(true);
     setClonedGroupIds([]);
     setEditing(app);
@@ -220,6 +224,7 @@ export default function Admin() {
     setIconAssetPreview(cloned.iconDataUrl || cloned.iconUrl || '');
     setIconSvgText(cloned.iconSvgText || '');
     setRemoveIconAsset(false);
+    setIconAssetId('');
     setIncludeDefaultGroup(includeDefaultGroupDefault);
     setClonedGroupIds(Array.isArray(cloned.groupIds) ? cloned.groupIds : []);
   };
@@ -281,6 +286,7 @@ export default function Admin() {
     setIconAssetPreview('');
     setIconSvgText('');
     setRemoveIconAsset(false);
+    setIconAssetId('');
     setIncludeDefaultGroup(true);
     setClonedGroupIds([]);
   };
@@ -310,12 +316,12 @@ export default function Admin() {
 
     const iconDirty = isNew
       ? (
-          (iconMode === 'asset' && Boolean(iconAssetDataUrl || iconSvgText || iconAssetPreview || removeIconAsset)) ||
+          (iconMode === 'asset' && Boolean(iconAssetDataUrl || iconSvgText || iconAssetId || iconAssetPreview || removeIconAsset)) ||
           (iconMode === 'emoji' && form.icon !== emptyApp.icon)
         )
       : (
           (iconMode === 'emoji' && Boolean(existingIconUrl)) ||
-          (iconMode === 'asset' && Boolean(iconAssetDataUrl || iconSvgText || removeIconAsset || (iconAssetPreview && iconAssetPreview !== existingIconUrl)))
+          (iconMode === 'asset' && Boolean(iconAssetDataUrl || iconSvgText || iconAssetId || removeIconAsset || (iconAssetPreview && iconAssetPreview !== existingIconUrl)))
         );
 
     return (
@@ -332,7 +338,7 @@ export default function Admin() {
       !equalTags ||
       iconDirty
     );
-  }, [editing, form, iconMode, iconAssetDataUrl, iconSvgText, iconAssetPreview, removeIconAsset]);
+  }, [editing, form, iconMode, iconAssetDataUrl, iconSvgText, iconAssetId, iconAssetPreview, removeIconAsset]);
 
   useEffect(() => {
     if (editing !== 'new' || slugAutoFillRef.current) return;
@@ -415,6 +421,7 @@ export default function Admin() {
       setIconAssetPreview(dataUrl);
       setIconSvgText('');
       setRemoveIconAsset(false);
+      setIconAssetId('');
     };
     reader.readAsDataURL(file);
   };
@@ -450,6 +457,7 @@ export default function Admin() {
       setIconAssetDataUrl(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
       setIconAssetPreview(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
       setRemoveIconAsset(false);
+      setIconAssetId('');
       event.preventDefault();
     }
   };
@@ -481,6 +489,7 @@ export default function Admin() {
         ? {
             iconDataUrl: iconAssetDataUrl || undefined,
             iconSvgText: iconSvgText || undefined,
+            iconAssetId: iconAssetId || undefined,
             removeIconAsset: removeIconAsset || undefined,
           }
         : {
@@ -1021,6 +1030,7 @@ export default function Admin() {
         setIconAssetPreview={setIconAssetPreview}
         setIconSvgText={setIconSvgText}
         setRemoveIconAsset={setRemoveIconAsset}
+        setIconAssetId={setIconAssetId}
         iconMode={iconMode}
         form={form}
         setForm={setForm}

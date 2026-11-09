@@ -13,6 +13,7 @@ import { iconUrlForApp, parseAppIconPayload, readAppIconAssetDataUrl, removeAppI
 import { getBrandingSettings } from '../services/branding.js';
 import { dispatchPluginEvent } from '../services/plugins.js';
 import { respondWithError } from '../services/errors.js';
+import { getLinkableAppIconFileName } from '../services/mediaAssets.js';
 import { isValidEntraApplicationId, normalizeEntraApplicationId } from '../../shared/entra.js';
 import { APP_SLUG_ERROR_CODES, normalizeAppSlug, validateAppSlug } from '../../shared/appSlug.js';
 import { TARGET_URL_ERROR_CODES, validateTargetUrl } from '../../shared/targetUrl.js';
@@ -394,7 +395,7 @@ function isAppModeEnabled(mode, branding = getBrandingSettings()) {
   return false;
 }
 
-async function applyAppIconChange(appId, existingApp, { icon, iconDataUrl, iconSvgText, removeIconAsset, appMeta = null }) {
+async function applyAppIconChange(appId, existingApp, { icon, iconDataUrl, iconSvgText, iconAssetId, removeIconAsset, appMeta = null }) {
   const payload = parseAppIconPayload({ iconDataUrl, iconSvgText });
 
   if (removeIconAsset) {
@@ -402,6 +403,15 @@ async function applyAppIconChange(appId, existingApp, { icon, iconDataUrl, iconS
     return {
       icon: icon || existingApp?.icon || '📦',
       icon_file_name: null,
+    };
+  }
+
+  // Reusing a Media Library icon points the app at the stored file instead of copying it;
+  // the library refuses to delete a file that an app still uses.
+  if (!payload && iconAssetId) {
+    return {
+      icon: icon || existingApp?.icon || '📦',
+      icon_file_name: getLinkableAppIconFileName(iconAssetId),
     };
   }
 
@@ -480,7 +490,7 @@ function buildCloneSlug(originalSlug) {
 router.post('/', authenticate, isAdminEditor, async (req, res) => {
   let createdAppId = null;
   try {
-    const { name, slug, description, long_description, icon, iconDataUrl, iconSvgText, target_url, sort_order, mode, sso_endpoint, sso_method, tags, removeIconAsset, groupIds } = req.body;
+    const { name, slug, description, long_description, icon, iconDataUrl, iconSvgText, iconAssetId, target_url, sort_order, mode, sso_endpoint, sso_method, tags, removeIconAsset, groupIds } = req.body;
     const normalizedGroupIds = Array.isArray(groupIds)
       ? [...new Set(groupIds.filter((groupId) => typeof groupId === 'string' && groupId.trim()))]
       : [];
@@ -533,6 +543,7 @@ router.post('/', authenticate, isAdminEditor, async (req, res) => {
       icon,
       iconDataUrl,
       iconSvgText,
+      iconAssetId,
       removeIconAsset,
       appMeta: {
         name,
@@ -572,7 +583,7 @@ router.post('/', authenticate, isAdminEditor, async (req, res) => {
 router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, slug, description, long_description, icon, iconDataUrl, iconSvgText, removeIconAsset, target_url, is_active, sort_order, mode, sso_endpoint, sso_method, tags } = req.body;
+    const { name, slug, description, long_description, icon, iconDataUrl, iconSvgText, iconAssetId, removeIconAsset, target_url, is_active, sort_order, mode, sso_endpoint, sso_method, tags } = req.body;
 
     const existing = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
     if (!existing) {
@@ -627,6 +638,7 @@ router.put('/:id', authenticate, isAdminEditor, async (req, res) => {
       icon,
       iconDataUrl,
       iconSvgText,
+      iconAssetId,
       removeIconAsset,
       appMeta: {
         name: name !== undefined ? name : existing.name,

@@ -7,6 +7,7 @@ import db from '../db.js';
 import { applySvgSafeHeaders, isSvgBuffer, isSvgContentType, sanitizeSvgBuffer } from './svgSanitize.js';
 import { RASTER_ICON_TYPES, normalizeImageContentType } from './imageTypes.js';
 import { resolveFileInDir } from './textSanitize.js';
+import { UserFacingError } from './errors.js';
 
 // path.resolve() ensures the configured dir is absolute even when the env var
 // uses a relative form like "./data/branding" — required by res.sendFile().
@@ -493,6 +494,16 @@ export function getMediaAssetById(assetId, {
   if (!assetId) return null;
   const row = dbHandle.prepare('SELECT * FROM media_assets WHERE id = ?').get(assetId);
   return toPublicMediaAsset(row, { appIconDir, brandingDir });
+}
+
+// File name an app can point at to reuse a Media Library icon. Only app icons qualify
+// (branding logos live in another directory) and the file must still be on disk.
+export function getLinkableAppIconFileName(assetId, options = {}) {
+  const asset = typeof assetId === 'string' && assetId.trim() ? getMediaAssetById(assetId.trim(), options) : null;
+  if (!asset || asset.kind !== 'app-icon' || !asset.fileExists) {
+    throw new UserFacingError('Media file not found', { statusCode: 404, code: 'media_asset_not_found' });
+  }
+  return asset.stored_file_name;
 }
 
 export async function serveMediaAsset(asset, res, {
