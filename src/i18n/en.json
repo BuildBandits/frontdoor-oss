@@ -721,7 +721,6 @@
       "subtitle": "Review approvals, revocations and other plugin-related privileged actions. The target type is fixed to plugin so you can focus on third-party integrations.",
       "pageTitle": "Plugin audit trail",
       "searchPlaceholder": "Search actor, plugin ID or details...",
-      "allActions": "All actions",
       "actionLabels": {
         "approve": "Approved",
         "revoke": "Revoked"
@@ -731,7 +730,6 @@
       "notice": "This view is filtered to audit rows where the target type is plugin.",
       "backToPlugins": "Back to plugins",
       "emptyTitle": "No plugin audit logs",
-      "emptyBody": "Plugin approval and revocation events will appear here once an owner reviews plugins from the admin area.",
       "pageSummary": "Page {page} of {pages} · {total} total events"
     },
     "backup": {
@@ -1318,7 +1316,6 @@
       "statsUsers": "Unique users",
       "statsApps": "Apps accessed",
       "emptyTitle": "No access logs",
-      "emptyBody": "Logs are generated when users access apps via redirect SSO",
       "removedUser": "Removed user",
       "removedApp": "Removed app",
       "accessSummary": "accesses",
@@ -1335,12 +1332,10 @@
       "period": "Period",
       "rows": "Rows",
       "admin": "Admin",
-      "allAdmins": "All",
       "action": "Action",
       "target": "Target",
       "details": "Details",
       "emptyTitle": "No audit logs",
-      "emptyBody": "Audit rows are written when privileged users perform admin actions",
       "loadFailed": "The audit log could not be loaded.",
       "removedUser": "Removed user",
       "pageSummary": "Page {page} of {pages} · {total} total events",

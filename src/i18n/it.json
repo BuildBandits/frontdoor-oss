@@ -721,7 +721,6 @@
       "subtitle": "Controlla approvazioni, revoche e altre azioni privilegiate legate ai plugin. Il target è fissato su plugin, così puoi concentrarti sulle integrazioni di terze parti.",
       "pageTitle": "Registro audit dei plugin",
       "searchPlaceholder": "Cerca admin, ID plugin o dettagli...",
-      "allActions": "Tutte le azioni",
       "actionLabels": {
         "approve": "Approvato",
         "revoke": "Revocato"
@@ -731,7 +730,6 @@
       "notice": "Questa vista mostra solo le righe audit con target_type impostato a plugin.",
       "backToPlugins": "Torna ai plugin",
       "emptyTitle": "Nessun audit dei plugin",
-      "emptyBody": "Le approvazioni e le revoche dei plugin compariranno qui quando un owner le gestirà dall'area admin.",
       "pageSummary": "Pagina {page} di {pages} · {total} eventi totali"
     },
     "backup": {
@@ -1318,7 +1316,6 @@
       "statsUsers": "Utenti unici",
       "statsApps": "App accedute",
       "emptyTitle": "Nessun log di accesso",
-      "emptyBody": "I log vengono generati quando gli utenti accedono alle app via SSO redirect",
       "removedUser": "Utente rimosso",
       "removedApp": "App rimossa",
       "accessSummary": "accessi",
@@ -1335,12 +1332,10 @@
       "period": "Periodo",
       "rows": "Righe",
       "admin": "Admin",
-      "allAdmins": "Tutti",
       "action": "Azione",
       "target": "Target",
       "details": "Dettagli",
       "emptyTitle": "Nessun log audit",
-      "emptyBody": "Le righe audit vengono scritte quando gli utenti privilegiati eseguono azioni amministrative",
       "loadFailed": "Impossibile caricare il registro di audit.",
       "removedUser": "Utente rimosso",
       "pageSummary": "Pagina {page} di {pages} · {total} eventi totali",

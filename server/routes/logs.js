@@ -109,6 +109,39 @@ function buildLikeSearchClause(search, aliases) {
   };
 }
 
+// Column filters and sorting for the admin tables. Sort keys map to fixed SQL expressions,
+// so nothing from the request reaches the ORDER BY clause.
+const ACCESS_SORTS = {
+  date: 'l.created_at',
+  user: "LOWER(COALESCE(u.display_name, u.email, ''))",
+  app: "LOWER(COALESCE(a.name, ''))",
+  ip: "COALESCE(l.ip_address, '')",
+};
+const AUDIT_SORTS = {
+  date: 'a.created_at',
+  admin: "LOWER(COALESCE(u.display_name, u.email, ''))",
+  action: 'a.action',
+  target: 'a.target_type',
+};
+
+function buildOrderBy(sorts, sort, dir, idColumn) {
+  const column = typeof sort === 'string' && Object.hasOwn(sorts, sort) ? sorts[sort] : sorts.date;
+  const direction = dir === 'asc' ? 'ASC' : 'DESC';
+  return `${column} ${direction}, ${idColumn} ${direction}`;
+}
+
+function addInFilter(clause, column, values) {
+  if (values.length === 0) return;
+  clause.where += ` AND ${column} IN (${values.map(() => '?').join(', ')})`;
+  clause.params.push(...values);
+}
+
+function addLikeFilter(clause, value, columns) {
+  const search = buildLikeSearchClause(parseSearch(value), columns);
+  clause.where += search.sql;
+  clause.params.push(...search.params);
+}
+
 function buildAccessWhere({ app_id, user_id, from, to, retentionDays, q }) {
   let where = `l.created_at >= datetime('now', ?)`;
   const params = [`-${retentionDays} days`];
@@ -207,7 +240,12 @@ function loadAccessLogs(req, res) {
   const { app_id, user_id, from, to } = req.query;
   const q = parseSearch(req.query.q);
 
-  const { where, params } = buildAccessWhere({ app_id, user_id, from, to, retentionDays, q });
+  const clause = buildAccessWhere({ app_id, user_id, from, to, retentionDays, q });
+  addLikeFilter(clause, req.query.user_q, ['u.display_name', 'u.email']);
+  addLikeFilter(clause, req.query.app_q, ['a.name', 'a.slug']);
+  addLikeFilter(clause, req.query.ip_q, ['l.ip_address']);
+  const { where, params } = clause;
+  const orderBy = buildOrderBy(ACCESS_SORTS, req.query.sort, req.query.dir, 'l.id');
 
   const total = db.prepare(`SELECT COUNT(*) AS count FROM access_logs l LEFT JOIN users u ON l.user_id = u.id LEFT JOIN apps a ON l.app_id = a.id WHERE ${where}`).get(...params).count;
 
@@ -219,7 +257,7 @@ function loadAccessLogs(req, res) {
     LEFT JOIN users u ON l.user_id = u.id
     LEFT JOIN apps a ON l.app_id = a.id
     WHERE ${where}
-    ORDER BY l.created_at DESC
+    ORDER BY ${orderBy}
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset).map((log) => ({
     ...log,
@@ -263,7 +301,13 @@ function loadAuditLogs(req, res) {
   const parsedSessionId = Number.parseInt(req.query.impersonation_session_id ?? '', 10);
   const impersonationSessionId = Number.isInteger(parsedSessionId) && parsedSessionId > 0 ? parsedSessionId : null;
 
-  const { where, params } = buildAuditWhere({ action, target_type, excludeTargetTypes, actorIds: parsedActorIds, impersonationSessionId, from, to, retentionDays, q });
+  const scope = { target_type, excludeTargetTypes, impersonationSessionId, from, to, retentionDays };
+  const clause = buildAuditWhere({ ...scope, action, actorIds: parsedActorIds, q });
+  addInFilter(clause, 'a.action', parseCsvList(req.query.actions));
+  addInFilter(clause, 'a.target_type', parseCsvList(req.query.target_types));
+  addLikeFilter(clause, req.query.target_q, ['a.target_id', 'a.details']);
+  const { where, params } = clause;
+  const orderBy = buildOrderBy(AUDIT_SORTS, req.query.sort, req.query.dir, 'a.id');
 
   const total = db.prepare(`SELECT COUNT(*) AS count FROM rbac_audit_logs a LEFT JOIN users u ON a.actor_id = u.id WHERE ${where}`).get(...params).count;
 
@@ -276,7 +320,7 @@ function loadAuditLogs(req, res) {
     LEFT JOIN impersonation_sessions s ON a.impersonation_session_id = s.id
     LEFT JOIN users tu ON s.target_user_id = tu.id
     WHERE ${where}
-    ORDER BY a.created_at DESC, a.id DESC
+    ORDER BY ${orderBy}
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset).map((log) => ({
     ...log,
@@ -294,9 +338,19 @@ function loadAuditLogs(req, res) {
   }, sets), undefined);
   const refs = idSets ? lookupAuditNames(db, idSets) : {};
 
+  // Values present in the period and event scope, for the table's action and target filters.
+  let facets;
+  if (req.query.facets === '1') {
+    const base = buildAuditWhere(scope);
+    const distinct = (column) => db.prepare(`SELECT DISTINCT ${column} AS value FROM rbac_audit_logs a WHERE ${base.where} ORDER BY value`)
+      .all(...base.params).map((row) => row.value).filter(Boolean);
+    facets = { actions: distinct('a.action'), targetTypes: distinct('a.target_type') };
+  }
+
   res.json({
     logs,
     refs,
+    facets,
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     retentionDays,
     availablePageSizes: PAGE_SIZES,

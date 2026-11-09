@@ -244,3 +244,47 @@ test('impersonation rows read as sentences about the user', () => {
   }, { ui });
   assert.equal(end.facts.find((fact) => fact.key === 'endReason').value, 'Timed out');
 });
+
+test('the audit API sorts by whitelisted columns and filters by action and target type', async () => {
+  const insert = db.prepare('INSERT INTO rbac_audit_logs (actor_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)');
+  insert.run(OWNER_ID, 'update', 'group', GROUP_ID, null);
+  insert.run(OWNER_ID, 'create', 'app', APP_ID, null);
+  insert.run(MEMBER_ID, 'delete', 'app', 'gone-app', null);
+
+  const byAction = await (await request('/api/logs/audit?sort=action&dir=asc')).json();
+  assert.deepEqual(byAction.logs.map((log) => log.action), ['create', 'delete', 'update']);
+
+  // Unknown sort keys and directions fall back to newest first, never to raw SQL.
+  const fallback = await request('/api/logs/audit?sort=a.id;DROP%20TABLE%20users&dir=sideways');
+  assert.equal(fallback.status, 200);
+  assert.equal((await fallback.json()).pagination.total, 3);
+
+  const someActions = await (await request('/api/logs/audit?actions=create,delete')).json();
+  assert.deepEqual(someActions.logs.map((log) => log.action).sort(), ['create', 'delete']);
+
+  const apps = await (await request('/api/logs/audit?target_types=app&target_q=gone')).json();
+  assert.deepEqual(apps.logs.map((log) => log.target_id), ['gone-app']);
+
+  const none = await (await request('/api/logs/audit?actions=__none__')).json();
+  assert.equal(none.pagination.total, 0);
+
+  // Facets list every value in the period, whatever the column filters.
+  const withFacets = await (await request('/api/logs/audit?facets=1&actions=create')).json();
+  assert.deepEqual(withFacets.facets, { actions: ['create', 'delete', 'update'], targetTypes: ['app', 'group'] });
+});
+
+test('the access log API sorts and filters by user, app and IP', async () => {
+  db.prepare('DELETE FROM access_logs').run();
+  const insert = db.prepare('INSERT INTO access_logs (user_id, app_id, ip_address) VALUES (?, ?, ?)');
+  insert.run(MEMBER_ID, APP_ID, '192.0.2.10');
+  insert.run(OWNER_ID, APP_ID, '198.51.100.7');
+  insert.run(OWNER_ID, null, '192.0.2.99');
+
+  const byUser = await (await request('/api/logs?sort=user&dir=asc')).json();
+  assert.deepEqual(byUser.logs.map((log) => log.user_name), ['Alice Member', 'Audit Owner', 'Audit Owner']);
+
+  const filtered = await (await request('/api/logs?user_q=owner&app_q=wiki&ip_q=198.51')).json();
+  assert.equal(filtered.pagination.total, 1);
+  assert.equal(filtered.logs[0].ip_address, '198.51.100.7');
+  db.prepare('DELETE FROM access_logs').run();
+});
