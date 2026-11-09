@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect, useEffectEvent, useRef, useMemo } from 'react';
-import { Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
@@ -60,8 +60,6 @@ export default function Admin() {
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [selectedTagFilters, setSelectedTagFilters] = useState([]);
   const [tagFilterSearch, setTagFilterSearch] = useState('');
-  const [appSort, setAppSort] = useState({ key: 'sort_order', direction: 'asc' });
-  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [pageNotice, setPageNotice] = useState(null);
   const [appSaveNotice, setAppSaveNotice] = useState(null);
@@ -654,9 +652,8 @@ export default function Admin() {
   const currentModeFilterOption = visibleModeFilterOptions.find((opt) => opt.value === appModeFilter) || visibleModeFilterOptions[0];
   const hasTagFilters = selectedTagFilters.length > 0;
   const currentModeOption = modeOptions.find((opt) => opt.value === form.mode);
-  useEffect(() => {
-    setPage(1);
-  }, [appSearch, appModeFilter, showOnlyOrphanApps, selectedTagFilters, appSort, pageSize]);
+  // Any filter change sends the apps table back to page 1 (sorting and page size do it inside the table).
+  const appsPageResetKey = JSON.stringify([appSearch, appModeFilter, showOnlyOrphanApps, selectedTagFilters]);
   const handleModeChange = (nextMode) => {
     if (nextMode === 'entra-app') {
       setForm((prev) => ({
@@ -761,49 +758,8 @@ export default function Admin() {
       );
     });
 
-    const compareText = (a, b, key) => (a?.[key] || '').toString().localeCompare((b?.[key] || '').toString(), language, { sensitivity: 'base' });
-    const compareNumber = (a, b, key) => (Number(a?.[key] || 0) - Number(b?.[key] || 0));
-    const direction = appSort.direction === 'asc' ? 1 : -1;
-
-    return [...filtered].sort((a, b) => {
-      let result;
-      switch (appSort.key) {
-        case 'name':
-          result = compareText(a, b, 'name');
-          break;
-        case 'slug':
-          result = compareText(a, b, 'slug');
-          break;
-        case 'target_url':
-          result = compareText(a, b, 'target_url');
-          break;
-        case 'mode':
-          result = compareText(a, b, 'mode');
-          break;
-        case 'is_active':
-          result = Number(Boolean(a.is_active)) - Number(Boolean(b.is_active));
-          break;
-        case 'sort_order':
-        default:
-          result = compareNumber(a, b, 'sort_order') || compareText(a, b, 'name');
-          break;
-      }
-
-      if (result === 0 && appSort.key !== 'name') {
-        result = compareText(a, b, 'name');
-      }
-      return result * direction;
-    });
-  }, [apps, appSearch, appModeFilter, appSort, showOnlyOrphanApps, selectedTagFilters, language]);
-  const pagination = useMemo(() => ({
-    page,
-    pages: Math.max(1, Math.ceil(filteredApps.length / pageSize)),
-    total: filteredApps.length,
-  }), [filteredApps.length, page, pageSize]);
-  const paginatedApps = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredApps.slice(start, start + pageSize);
-  }, [filteredApps, page, pageSize]);
+    return filtered;
+  }, [apps, appSearch, appModeFilter, showOnlyOrphanApps, selectedTagFilters]);
   const orphanApps = useMemo(
     () => apps.filter((app) => Number(app.group_count || 0) === 0),
     [apps],
@@ -814,12 +770,6 @@ export default function Admin() {
       setShowOnlyOrphanApps(false);
     }
   }, [showOnlyOrphanApps, orphanApps.length]);
-
-  useEffect(() => {
-    if (page > pagination.pages) {
-      setPage(pagination.pages);
-    }
-  }, [page, pagination.pages]);
 
   const openGroupAssignmentModal = (app, selectedIds = [], defaultIncluded = false, allowNoChanges = false) => {
     const normalizedSelectedIds = [...new Set(selectedIds.filter(Boolean))];
@@ -837,20 +787,6 @@ export default function Admin() {
         groupSearch: query,
       },
     });
-  };
-
-  const toggleSort = (key) => {
-    setAppSort((prev) => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
-    }));
-  };
-
-  const sortIndicator = (key) => {
-    if (appSort.key !== key) return null;
-    return appSort.direction === 'asc'
-      ? <ChevronUp className="w-3.5 h-3.5" />
-      : <ChevronDown className="w-3.5 h-3.5" />;
   };
 
   const closeGroupAssignmentModal = () => {
@@ -999,14 +935,13 @@ export default function Admin() {
 
       <AppsTable
         loading={loading}
-        pagination={pagination}
+        apps={filteredApps}
+        pageSize={pageSize}
+        pageResetKey={appsPageResetKey}
+        language={language}
         a={a}
         ui={ui}
-        setPage={setPage}
-        toggleSort={toggleSort}
-        sortIndicator={sortIndicator}
         t={t}
-        paginatedApps={paginatedApps}
         handleToggle={handleToggle}
         canEdit={canEdit}
         jumpToGroupsForApp={jumpToGroupsForApp}

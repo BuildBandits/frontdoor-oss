@@ -9,6 +9,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ### Added
 - **Media Library icons in the app form**: in image mode, **Pick from Media Library** opens a searchable grid of the app icons already stored in the Media Library. The app links to the picked file instead of uploading a copy, so the same icon can be reused without duplicates. The Media Library lists every app that uses an icon, not only the app that uploaded it, and still refuses to delete an icon while any app uses it. The API accepts the new `iconAssetId` field on app create and update.
 
+### Changed
+- **Apps table sorting and paging**: the Apps table in Admin now sorts and pages through a shared `DataTable` component built on the headless TanStack Table library (`@tanstack/react-table` 9.3.1), as a pilot for the other admin tables. The table looks and works as before: same columns, same default order (sort order, then name), page size, filters and search. Sortable headers now expose `aria-sort` to screen readers. Changing an app (for example its active switch) keeps the current page, while a new search, filter, sort or page size goes back to page 1.
+
 ### Fixed
 - **Ctrl+K in modals**: with a modal open, `Ctrl+K` (`Cmd+K` on macOS) focuses the modal's own search field instead of the search field of the page behind it. This covers the Microsoft Entra group import, add members, add apps and linked groups modals, the pre-onboarding modal and the visible apps list in Users. A modal without a search field leaves the page search alone.
 - **Page scrolling behind modals**: while a modal is open, the page behind it no longer scrolls when you scroll inside the modal or past its end. The page keeps its scroll position and does not shift when its scrollbar is hidden. Nested modals (for example a confirmation over a form) restore scrolling only when the last one closes.
