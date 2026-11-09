@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Columns3 } from 'lucide-react';
 import {
   columnFilteringFeature,
@@ -61,6 +61,10 @@ function readStoredVisibility(storageKey) {
  * Column visibility is remembered per browser under `storageKey`.
  * The page goes back to 1 when `pageResetKey`, a filter, the sort or `pageSize` change,
  * not when rows reload after an edit.
+ *
+ * Optional: `columnFilters` + `onColumnFiltersChange` to control the filters from outside
+ * (e.g. a shortcut that applies one); `rowClassName` may be a function of the row;
+ * `onRowClick`, `isRowExpanded` and `renderExpandedRow` add a full-width detail row under a row.
  */
 export default function DataTable({
   columns,
@@ -73,9 +77,16 @@ export default function DataTable({
   labels,
   onFilteredCountChange,
   rowClassName,
+  columnFilters: controlledFilters,
+  onColumnFiltersChange,
+  onRowClick,
+  isRowExpanded,
+  renderExpandedRow,
 }) {
   const [sorting, setSorting] = useState([]);
-  const [columnFilters, setColumnFilters] = useState([]);
+  const [internalFilters, setInternalFilters] = useState([]);
+  const columnFilters = controlledFilters ?? internalFilters;
+  const setColumnFilters = onColumnFiltersChange ?? setInternalFilters;
   const [pageIndex, setPageIndex] = useState(0);
   // Defaults are read once; later changes come from the column picker.
   const [defaultVisibility] = useState(
@@ -200,6 +211,7 @@ export default function DataTable({
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
       <PaginationControls {...paginationProps} actions={actions} variant="attached-top" />
+      <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
           {table.getHeaderGroups().map((group) => (
@@ -239,12 +251,24 @@ export default function DataTable({
         </thead>
         <tbody>
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className={rowClassName}>
-              {row.getVisibleCells().map((cell) => {
-                const column = columnsById.get(cell.column.id);
-                return <td key={cell.id} className={column.cellClassName}>{column.cell(row.original)}</td>;
-              })}
-            </tr>
+            <Fragment key={row.id}>
+              <tr
+                className={typeof rowClassName === 'function' ? rowClassName(row.original) : rowClassName}
+                onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+              >
+                {row.getVisibleCells().map((cell) => {
+                  const column = columnsById.get(cell.column.id);
+                  return <td key={cell.id} className={column.cellClassName}>{column.cell(row.original)}</td>;
+                })}
+              </tr>
+              {isRowExpanded?.(row.original) && (
+                <tr>
+                  <td colSpan={table.getVisibleLeafColumns().length} className="border-b border-gray-100 dark:border-gray-800">
+                    {renderExpandedRow(row.original)}
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
           {filteredCount === 0 && (
             <tr>
@@ -255,6 +279,7 @@ export default function DataTable({
           )}
         </tbody>
       </table>
+      </div>
       <PaginationControls {...paginationProps} actions={actions} variant="attached-bottom" />
     </div>
   );

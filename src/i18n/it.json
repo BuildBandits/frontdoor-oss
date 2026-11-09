@@ -1295,7 +1295,12 @@
         "continue": "Continua ({count})",
         "doneSummary": "{created} utenti su {total} pronti. I loro account attendono il primo accesso.",
         "statusCreated": "Creato"
-      }
+      },
+      "withGroups": "Con gruppi",
+      "withoutGroups": "Senza gruppi",
+      "signedIn": "Almeno un accesso",
+      "entraColumn": "Microsoft Entra",
+      "entraPresent": "Presente"
     },
     "logs": {
       "title": "Log di accesso",

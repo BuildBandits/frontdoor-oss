@@ -1295,7 +1295,12 @@
         "continue": "Continue ({count})",
         "doneSummary": "{created} of {total} users pre-onboarded. Their accounts are waiting for the first sign-in.",
         "statusCreated": "Pre-onboarded"
-      }
+      },
+      "withGroups": "With groups",
+      "withoutGroups": "Without groups",
+      "signedIn": "Signed in at least once",
+      "entraColumn": "Microsoft Entra",
+      "entraPresent": "Present"
     },
     "logs": {
       "title": "Access logs",
