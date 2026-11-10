@@ -38,7 +38,17 @@
     "userAvatar": "Avatar utente",
     "userAvatarNamed": "Avatar di {name}",
     "twoSentences": "{first}. {second}",
-    "retry": "Riprova"
+    "retry": "Riprova",
+    "table": {
+      "columns": "Colonne",
+      "resetColumns": "Mostra colonne predefinite",
+      "filterColumn": "Filtro: {column}",
+      "contains": "Contiene...",
+      "selectAll": "Seleziona tutto",
+      "clearFilter": "Rimuovi filtro",
+      "clearAllFilters": "Rimuovi filtri di colonna",
+      "noRows": "Nessun risultato con i filtri attuali."
+    }
   },
   "nav": {
     "home": "Home",
@@ -809,15 +819,8 @@
       "showOnlyUnassigned": "Mostra app non assegnate",
       "showAllApps": "Mostra tutte le app",
       "showOnlyUnlabeled": "Mostra app senza etichette",
-      "tagFilterLabel": "Etichette",
-      "tagFilterAll": "Tutte",
-      "tagFilterSelected": "{count} selezionati",
-      "clearTagFilters": "Pulisci",
-      "appsWithoutTags": "Mostra app senza etichette",
-      "tagFilterSearchPlaceholder": "Cerca etichette...",
-      "noTagFilterMatches": "Nessuna etichetta corrisponde alla ricerca.",
+      "appsWithoutTags": "Senza etichette",
       "allModes": "Tutte le modalità",
-      "modeFilterShort": "Collegamenti",
       "modeFilter": "Tipo di collegamento",
       "restoreDemoApps": "Ripristina app demo",
       "newApp": "Nuova app",
@@ -915,7 +918,6 @@
       "connection": "Collegamento",
       "closeGroupSelection": "Chiudi selezione gruppi",
       "modeFilterLabel": "Filtro collegamento",
-      "allConnections": "Tutti",
       "sortByName": "Nome",
       "sortBySlug": "Slug",
       "sortByTargetUrl": "URL di destinazione",
@@ -929,7 +931,12 @@
       "pageSummary": "Pagina {page} di {pages} · {total} app",
       "skipGroupAssignment": "Salta",
       "iconTooLarge": "L'icona è troppo grande: immagini fino a 1 MB, SVG fino a 512 KB.",
-      "loadFailed": "Impossibile caricare l’elenco delle app."
+      "loadFailed": "Impossibile caricare l’elenco delle app.",
+      "columnGroups": "Gruppi",
+      "withGroups": "Con gruppi",
+      "withoutGroups": "Senza gruppi",
+      "statusActive": "Attiva",
+      "statusInactive": "Disattivata"
     },
     "icons": {
       "pageTitle": "Libreria media",

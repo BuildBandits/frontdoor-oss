@@ -38,7 +38,17 @@
     "userAvatar": "User avatar",
     "userAvatarNamed": "{name} avatar",
     "twoSentences": "{first}. {second}",
-    "retry": "Try again"
+    "retry": "Try again",
+    "table": {
+      "columns": "Columns",
+      "resetColumns": "Show default columns",
+      "filterColumn": "Filter: {column}",
+      "contains": "Contains...",
+      "selectAll": "Select all",
+      "clearFilter": "Clear filter",
+      "clearAllFilters": "Clear column filters",
+      "noRows": "No results match the current filters."
+    }
   },
   "nav": {
     "home": "Home",
@@ -809,15 +819,8 @@
       "showOnlyUnassigned": "Show unassigned apps",
       "showAllApps": "Show all apps",
       "showOnlyUnlabeled": "Show unlabeled apps",
-      "tagFilterLabel": "Tag filter",
-      "tagFilterAll": "All",
-      "tagFilterSelected": "{count} selected",
-      "clearTagFilters": "Clear",
-      "appsWithoutTags": "Show apps without tags",
-      "tagFilterSearchPlaceholder": "Search tags...",
-      "noTagFilterMatches": "No tags match your search.",
+      "appsWithoutTags": "No tags",
       "allModes": "All modes",
-      "modeFilterShort": "Connections",
       "modeFilter": "Connection type",
       "restoreDemoApps": "Restore demo apps",
       "newApp": "New app",
@@ -915,7 +918,6 @@
       "connection": "Connection",
       "closeGroupSelection": "Close group selection",
       "modeFilterLabel": "Mode filter",
-      "allConnections": "All",
       "sortByName": "Name",
       "sortBySlug": "Slug",
       "sortByTargetUrl": "Target URL",
@@ -929,7 +931,12 @@
       "pageSummary": "Page {page} of {pages} · {total} apps",
       "skipGroupAssignment": "Skip",
       "iconTooLarge": "The icon is too large: images up to 1 MB, SVG up to 512 KB.",
-      "loadFailed": "The app list could not be loaded."
+      "loadFailed": "The app list could not be loaded.",
+      "columnGroups": "Groups",
+      "withGroups": "With groups",
+      "withoutGroups": "Without groups",
+      "statusActive": "Active",
+      "statusInactive": "Inactive"
     },
     "icons": {
       "pageTitle": "Media library",

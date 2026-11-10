@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect, useEffectEvent, useRef, useMemo } from 'react';
-import { Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
@@ -11,14 +11,13 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import { getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
-import { sortOptionsByLabel } from '../utils/sortOptions';
 import { normalizeEntraApplicationId } from '../../shared/entra.js';
 import { normalizeAppSlug, suggestAppSlug } from '../../shared/appSlug.js';
 import PluginSurface from '../pluginHost/PluginSurface';
 import { PLUGIN_SURFACES } from '../pluginHost/constants';
 import { MAX_RASTER_ICON_BYTES, MAX_SVG_ICON_BYTES, estimateDataUrlBytes } from '../../shared/iconLimits.js';
 import { MAX_ICON_SOURCE_BYTES, downscaleIconDataUrl, isResizableIconType } from '../utils/iconImages';
-import { UNLABELED_TAG_FILTER, emptyApp } from './apps/constants';
+import { emptyApp } from './apps/constants';
 import { DEFAULT_GROUP_ID } from '../../shared/groups.js';
 import AppsFilterBar from './apps/AppsFilterBar';
 import AppsTable from './apps/AppsTable';
@@ -54,14 +53,7 @@ export default function Admin() {
   const [groupAssignAllowNoChanges, setGroupAssignAllowNoChanges] = useState(false);
   const [assigningGroups, setAssigningGroups] = useState(false);
   const [appSearch, setAppSearch] = useState('');
-  const [appModeFilter, setAppModeFilter] = useState('all');
   const [showOnlyOrphanApps, setShowOnlyOrphanApps] = useState(false);
-  const [modeFilterOpen, setModeFilterOpen] = useState(false);
-  const [tagFilterOpen, setTagFilterOpen] = useState(false);
-  const [selectedTagFilters, setSelectedTagFilters] = useState([]);
-  const [tagFilterSearch, setTagFilterSearch] = useState('');
-  const [appSort, setAppSort] = useState({ key: 'sort_order', direction: 'asc' });
-  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [pageNotice, setPageNotice] = useState(null);
   const [appSaveNotice, setAppSaveNotice] = useState(null);
@@ -69,40 +61,8 @@ export default function Admin() {
   const [cloning, setCloning] = useState(false);
   const iconFileInputRef = useRef(null);
   const slugAutoFillRef = useRef(false);
-  const modeFilterRef = useRef(null);
-  const tagFilterRef = useRef(null);
-  const tagFilterSearchRef = useRef(null);
-  const tagFilterItemRefs = useRef([]);
   const canEdit = user?.role !== 'admin_readonly';
   const brandingLanguage = normalizeLanguage(branding?.defaultLanguage);
-  const filterButtonMinWidth = 'min-w-[260px]';
-
-  useEffect(() => {
-    if (!modeFilterOpen) return undefined;
-    const onMouseDown = (event) => {
-      if (modeFilterRef.current && !modeFilterRef.current.contains(event.target)) {
-        setModeFilterOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
-  }, [modeFilterOpen]);
-
-  useEffect(() => {
-    if (!tagFilterOpen) return undefined;
-    const onMouseDown = (event) => {
-      if (tagFilterRef.current && !tagFilterRef.current.contains(event.target)) {
-        setTagFilterOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
-  }, [tagFilterOpen]);
-
-  useEffect(() => {
-    if (tagFilterOpen) return;
-    setTagFilterSearch('');
-  }, [tagFilterOpen]);
 
   const pushNotice = useCallback((type, message) => setPageNotice({ type, message }), []);
   const pushAppSaveNotice = (type, message) => {
@@ -619,14 +579,6 @@ export default function Admin() {
     });
     return [...tagSet].sort();
   }, [apps]);
-  useEffect(() => {
-    // Keep the same array when no tag disappeared: a new array would count as a
-    // filter change and send the list back to page 1 after every reload (e.g. a save).
-    setSelectedTagFilters((prev) => {
-      const next = prev.filter((tag) => tag === UNLABELED_TAG_FILTER || allTags.includes(tag));
-      return next.length === prev.length ? prev : next;
-    });
-  }, [allTags]);
   const toggleGroupAssignment = (groupId) => {
     setGroupAssignSelection((prev) => (
       prev.includes(groupId)
@@ -647,16 +599,11 @@ export default function Admin() {
     { value: 'entra-app', label: a.entraApp, active: 'bg-violet-600 text-white border-violet-600', visible: modeVisibility.showEntraAppMode !== false },
   ];
   const visibleModeOptions = modeOptions.filter((opt) => opt.alwaysVisible || opt.visible);
-  const visibleModeFilterOptions = sortOptionsByLabel([
-    { value: 'all', label: a.allConnections, active: 'bg-gray-900 dark:bg-gray-100 text-white border-gray-900' },
-    ...visibleModeOptions,
-  ], language);
-  const currentModeFilterOption = visibleModeFilterOptions.find((opt) => opt.value === appModeFilter) || visibleModeFilterOptions[0];
-  const hasTagFilters = selectedTagFilters.length > 0;
   const currentModeOption = modeOptions.find((opt) => opt.value === form.mode);
-  useEffect(() => {
-    setPage(1);
-  }, [appSearch, appModeFilter, showOnlyOrphanApps, selectedTagFilters, appSort, pageSize]);
+  // Any filter change sends the apps table back to page 1 (sorting and page size do it inside the table).
+  const appsPageResetKey = JSON.stringify([appSearch, showOnlyOrphanApps]);
+  // Apps left after the column filters inside the table, for the "X of Y" count.
+  const [tableAppCount, setTableAppCount] = useState(0);
   const handleModeChange = (nextMode) => {
     if (nextMode === 'entra-app') {
       setForm((prev) => ({
@@ -672,84 +619,13 @@ export default function Admin() {
     }
     setForm((prev) => ({ ...prev, mode: nextMode }));
   };
-  const toggleTagFilter = (tag) => {
-    const normalizedTag = tag === UNLABELED_TAG_FILTER ? UNLABELED_TAG_FILTER : (tag ?? '').toString().trim().toLowerCase();
-    if (!normalizedTag) return;
-    setSelectedTagFilters((prev) => (
-      prev.includes(normalizedTag)
-        ? prev.filter((value) => value !== normalizedTag)
-        : [...prev, normalizedTag]
-    ));
-  };
-  const filteredTags = useMemo(() => {
-    const q = tagFilterSearch.trim().toLowerCase();
-    if (!q) return allTags;
-    return allTags.filter((tag) => tag.includes(q));
-  }, [allTags, tagFilterSearch]);
-  const tagFilterOptionCount = (hasTagFilters ? 1 : 0) + 2 + filteredTags.length;
-  const focusTagFilterItem = (index) => {
-    tagFilterItemRefs.current[index]?.focus?.();
-  };
-  const handleTagFilterSearchKeyDown = (event) => {
-    if (tagFilterOptionCount === 0) return;
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      focusTagFilterItem(0);
-      return;
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      focusTagFilterItem(Math.max(0, tagFilterOptionCount - 1));
-      return;
-    }
-    if (event.key === 'Home') {
-      event.preventDefault();
-      focusTagFilterItem(0);
-      return;
-    }
-    if (event.key === 'End') {
-      event.preventDefault();
-      focusTagFilterItem(Math.max(0, tagFilterOptionCount - 1));
-    }
-  };
-  const handleTagFilterItemKeyDown = (event, index) => {
-    if (tagFilterOptionCount === 0) return;
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      focusTagFilterItem((index + 1) % tagFilterOptionCount);
-      return;
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      focusTagFilterItem((index - 1 + tagFilterOptionCount) % tagFilterOptionCount);
-      return;
-    }
-    if (event.key === 'Home') {
-      event.preventDefault();
-      focusTagFilterItem(0);
-      return;
-    }
-    if (event.key === 'End') {
-      event.preventDefault();
-      focusTagFilterItem(Math.max(0, tagFilterOptionCount - 1));
-    }
-  };
   const filteredApps = useMemo(() => {
     const q = appSearch.toLowerCase().trim();
     const filtered = apps.filter((app) => {
       if (showOnlyOrphanApps && Number(app.group_count || 0) !== 0) return false;
-      if (appModeFilter !== 'all' && app.mode !== appModeFilter) return false;
       const tags = Array.isArray(app.tags)
         ? app.tags.map((tag) => (tag ?? '').toString().trim().toLowerCase()).filter(Boolean)
         : [];
-      if (selectedTagFilters.length > 0) {
-        const matchesTagFilter = selectedTagFilters.some((selectedTag) => (
-          selectedTag === UNLABELED_TAG_FILTER
-            ? tags.length === 0
-            : tags.includes(selectedTag)
-        ));
-        if (!matchesTagFilter) return false;
-      }
       if (!q) return true;
       return (
         app.name?.toLowerCase().includes(q) ||
@@ -761,49 +637,8 @@ export default function Admin() {
       );
     });
 
-    const compareText = (a, b, key) => (a?.[key] || '').toString().localeCompare((b?.[key] || '').toString(), language, { sensitivity: 'base' });
-    const compareNumber = (a, b, key) => (Number(a?.[key] || 0) - Number(b?.[key] || 0));
-    const direction = appSort.direction === 'asc' ? 1 : -1;
-
-    return [...filtered].sort((a, b) => {
-      let result;
-      switch (appSort.key) {
-        case 'name':
-          result = compareText(a, b, 'name');
-          break;
-        case 'slug':
-          result = compareText(a, b, 'slug');
-          break;
-        case 'target_url':
-          result = compareText(a, b, 'target_url');
-          break;
-        case 'mode':
-          result = compareText(a, b, 'mode');
-          break;
-        case 'is_active':
-          result = Number(Boolean(a.is_active)) - Number(Boolean(b.is_active));
-          break;
-        case 'sort_order':
-        default:
-          result = compareNumber(a, b, 'sort_order') || compareText(a, b, 'name');
-          break;
-      }
-
-      if (result === 0 && appSort.key !== 'name') {
-        result = compareText(a, b, 'name');
-      }
-      return result * direction;
-    });
-  }, [apps, appSearch, appModeFilter, appSort, showOnlyOrphanApps, selectedTagFilters, language]);
-  const pagination = useMemo(() => ({
-    page,
-    pages: Math.max(1, Math.ceil(filteredApps.length / pageSize)),
-    total: filteredApps.length,
-  }), [filteredApps.length, page, pageSize]);
-  const paginatedApps = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredApps.slice(start, start + pageSize);
-  }, [filteredApps, page, pageSize]);
+    return filtered;
+  }, [apps, appSearch, showOnlyOrphanApps]);
   const orphanApps = useMemo(
     () => apps.filter((app) => Number(app.group_count || 0) === 0),
     [apps],
@@ -814,12 +649,6 @@ export default function Admin() {
       setShowOnlyOrphanApps(false);
     }
   }, [showOnlyOrphanApps, orphanApps.length]);
-
-  useEffect(() => {
-    if (page > pagination.pages) {
-      setPage(pagination.pages);
-    }
-  }, [page, pagination.pages]);
 
   const openGroupAssignmentModal = (app, selectedIds = [], defaultIncluded = false, allowNoChanges = false) => {
     const normalizedSelectedIds = [...new Set(selectedIds.filter(Boolean))];
@@ -837,20 +666,6 @@ export default function Admin() {
         groupSearch: query,
       },
     });
-  };
-
-  const toggleSort = (key) => {
-    setAppSort((prev) => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
-    }));
-  };
-
-  const sortIndicator = (key) => {
-    if (appSort.key !== key) return null;
-    return appSort.direction === 'asc'
-      ? <ChevronUp className="w-3.5 h-3.5" />
-      : <ChevronDown className="w-3.5 h-3.5" />;
   };
 
   const closeGroupAssignmentModal = () => {
@@ -967,46 +782,25 @@ export default function Admin() {
         appSearch={appSearch}
         setAppSearch={setAppSearch}
         ui={ui}
-        modeFilterRef={modeFilterRef}
-        setModeFilterOpen={setModeFilterOpen}
-        filterButtonMinWidth={filterButtonMinWidth}
         a={a}
-        currentModeFilterOption={currentModeFilterOption}
-        modeFilterOpen={modeFilterOpen}
-        visibleModeFilterOptions={visibleModeFilterOptions}
-        appModeFilter={appModeFilter}
-        setAppModeFilter={setAppModeFilter}
-        tagFilterRef={tagFilterRef}
-        setTagFilterOpen={setTagFilterOpen}
-        hasTagFilters={hasTagFilters}
-        tagFilterOpen={tagFilterOpen}
-        selectedTagFilters={selectedTagFilters}
-        tagFilterSearch={tagFilterSearch}
-        setTagFilterSearch={setTagFilterSearch}
-        tagFilterSearchRef={tagFilterSearchRef}
-        handleTagFilterSearchKeyDown={handleTagFilterSearchKeyDown}
-        setSelectedTagFilters={setSelectedTagFilters}
-        tagFilterItemRefs={tagFilterItemRefs}
-        handleTagFilterItemKeyDown={handleTagFilterItemKeyDown}
-        toggleTagFilter={toggleTagFilter}
         t={t}
-        filteredTags={filteredTags}
         pageSize={pageSize}
         setPageSize={setPageSize}
-        filteredApps={filteredApps}
+        tableAppCount={tableAppCount}
         apps={apps}
       />
 
       <AppsTable
         loading={loading}
-        pagination={pagination}
+        apps={filteredApps}
+        catalogApps={apps}
+        pageSize={pageSize}
+        pageResetKey={appsPageResetKey}
+        onFilteredCountChange={setTableAppCount}
+        language={language}
         a={a}
         ui={ui}
-        setPage={setPage}
-        toggleSort={toggleSort}
-        sortIndicator={sortIndicator}
         t={t}
-        paginatedApps={paginatedApps}
         handleToggle={handleToggle}
         canEdit={canEdit}
         jumpToGroupsForApp={jumpToGroupsForApp}
