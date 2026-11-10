@@ -279,6 +279,7 @@ export default function AdminPluginAudit() {
         </div>
       ) : (
         <DataTable
+          headerPaddingClassName="px-5"
           server
           loading={loading}
           rows={logs}
