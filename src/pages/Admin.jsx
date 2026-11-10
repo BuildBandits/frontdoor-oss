@@ -793,6 +793,7 @@ export default function Admin() {
       <AppsTable
         loading={loading}
         apps={filteredApps}
+        catalogApps={apps}
         pageSize={pageSize}
         pageResetKey={appsPageResetKey}
         onFilteredCountChange={setTableAppCount}

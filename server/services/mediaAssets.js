@@ -372,8 +372,9 @@ export function listMediaAssets({
       OR lower(coalesce(app_mode, '')) LIKE ?
       OR lower(coalesce(content_type, '')) LIKE ?
       OR lower(coalesce(stored_file_name, '')) LIKE ?
+      OR stored_file_name IN (SELECT icon_file_name FROM apps WHERE lower(name) LIKE ? OR lower(slug) LIKE ?)
     )`);
-    params.push(like, like, like, like, like, like, like, like);
+    params.push(like, like, like, like, like, like, like, like, like, like);
   }
 
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
