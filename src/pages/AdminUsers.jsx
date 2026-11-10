@@ -1,11 +1,10 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { Eye, Shield, ShieldOff, UserCheck, UserX, UserPlus, ChevronDown, ChevronRight, Users, Trash2, Clock, X, Info, RefreshCw, AlertTriangle, Wand2, Filter, LogIn } from 'lucide-react';
+import { Eye, Shield, ShieldOff, UserCheck, UserX, UserPlus, Users, Trash2, X, Info, RefreshCw, AlertTriangle, Filter, LogIn } from 'lucide-react';
 import api from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { useLatestRequest } from '../hooks/useLatestRequest';
 import { useBranding } from '../stores/brandingStore';
-import UserAvatar from '../components/UserAvatar';
 import AppIcon from '../components/AppIcon';
 import TopToastNotice from '../components/TopToastNotice';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -14,11 +13,10 @@ import Modal from '../components/Modal';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
 import Tooltip from '../components/Tooltip';
-import PaginationControls from '../components/PaginationControls';
+import UsersTable from './users/UsersTable';
 import PreonboardUserModal from './users/PreonboardUserModal';
 import { formatMessage, getUiStrings, normalizeLanguage, resolveAppLanguage } from '../i18n';
 import { apiErrorMessage } from '../utils/apiErrors';
-import { sortOptionsByLabel } from '../utils/sortOptions';
 import { normalizeColorScheme, resolveAppColorScheme } from '../../shared/colorSchemes.js';
 import { formatLocalDateTime } from '../utils/dateTime';
 import { normalizeTimeZone, resolveAppTimeZone } from '../../shared/timeZones.js';
@@ -34,9 +32,8 @@ export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filterRole, setFilterRole] = useState('all'); // all | owner | admin | admin_readonly | user
-  const [filterActive, setFilterActive] = useState('all'); // all | active | inactive | entraMissing | neverSignedIn
-  const [filterPersonalization, setFilterPersonalization] = useState('all'); // all | customized | none
+  // Column filters of the users table, held here so the "awaiting first sign-in" shortcut can set one.
+  const [userColumnFilters, setUserColumnFilters] = useState([]);
   const [expandedUser, setExpandedUser] = useState(null);
   const [userDetail, setUserDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -51,7 +48,6 @@ export default function AdminUsers() {
   const brandingTimeZone = normalizeTimeZone(branding?.defaultTimeZone, 'UTC');
   const defaultHomeDesktopView = branding?.defaultHomeDesktopView === 'compact' ? 'compact' : 'cards';
   const defaultColorScheme = normalizeColorScheme(branding?.defaultColorScheme);
-  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const detailInfoRef = useRef(null);
   const [detailInfoHeight, setDetailInfoHeight] = useState(null);
@@ -125,9 +121,6 @@ export default function AdminUsers() {
     setSearch(incomingSearch);
     navigate(location.pathname, { replace: true, state: null });
   }, [location.state, location.pathname, navigate]);
-  useEffect(() => {
-    setPage(1);
-  }, [search, filterRole, filterActive, filterPersonalization, pageSize]);
 
   // Only the latest detail request may update the panel, so a slower answer for a
   // user that is no longer expanded cannot appear (and be acted on) under another one.
@@ -290,35 +283,18 @@ export default function AdminUsers() {
     });
   };
 
-  // Filtering
-  const filtered = users.filter((u) => {
-    if (filterRole !== 'all' && u.role !== filterRole) return false;
-    if (filterActive === 'active' && !u.is_active) return false;
-    if (filterActive === 'inactive' && u.is_active) return false;
-    if (filterActive === 'entraMissing' && !u.entra_missing_since) return false;
-    if (filterActive === 'neverSignedIn' && u.last_login) return false;
-    if (filterPersonalization === 'customized' && !hasAtLeastOnePersonalization(u)) return false;
-    if (filterPersonalization === 'none' && hasAtLeastOnePersonalization(u)) return false;
-    if (search.trim()) {
+  // The search box narrows the rows; role, status and the other columns are filtered inside the table.
+  // Memoized: a new array would make the table rebuild and re-sort every row on each render.
+  const filtered = useMemo(() => users
+    .filter((u) => {
+      if (!search.trim()) return true;
       const q = search.toLowerCase();
       return (u.display_name || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
-    }
-    return true;
-  });
-  const pagination = useMemo(() => ({
-    page,
-    pages: Math.max(1, Math.ceil(filtered.length / pageSize)),
-    total: filtered.length,
-  }), [filtered.length, page, pageSize]);
-  const paginatedUsers = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
-  useEffect(() => {
-    if (page > pagination.pages) {
-      setPage(pagination.pages);
-    }
-  }, [page, pagination.pages]);
+    })
+    .map((u) => ({ ...u, personalized: hasAtLeastOnePersonalization(u) })),
+  // hasAtLeastOnePersonalization only reads the branding defaults listed here.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [users, search, defaultHomeDesktopView, brandingLanguage, brandingTimeZone, defaultColorScheme]);
 
   const groupLabel = (group) => group.entra_display_name || group.name;
   const openManagedGroup = (group) => {
@@ -556,6 +532,356 @@ export default function AdminUsers() {
   // Same rule as the "Never signed in" status filter: pre-onboarded accounts waiting for their first sign-in.
   const awaitingFirstSignInCount = users.filter((u) => !u.last_login).length;
 
+  // Detail panel under an expanded row (clicks inside it do not collapse the row).
+  const renderUserDetail = (user) => (
+      <div className="px-5 py-5 cursor-default" onClick={(event) => event.stopPropagation()}>
+        {detailLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin w-6 h-6 border-2 border-gray-300 dark:border-gray-600 border-t-dark rounded-full" />
+          </div>
+        ) : userDetail ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 xl:gap-10 lg:items-start">
+            {/* Info */}
+            <div ref={detailInfoRef} className="flex flex-col self-start">
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">{t.info}</h3>
+              <dl className="flex flex-col space-y-0 text-sm">
+                {renderInfoRow(u.emailLabel, userDetail.user.email)}
+                {renderInfoRow(
+                  t.role,
+                  <span className="inline-flex items-center gap-1">{roleBadgeContent(userDetail.user.role)}</span>
+                )}
+                {renderInfoRow(
+                  t.status,
+                  userDetail.user.is_active ? t.active : t.inactive,
+                  { valueClassName: userDetail.user.is_active ? 'text-accent-dark font-medium' : 'text-red-500 font-medium' }
+                )}
+                {userDetail.user.entra_missing_since && renderInfoRow(
+                  u.entraMissingLabel,
+                  formatDate(userDetail.user.entra_missing_since),
+                  { valueClassName: 'text-amber-600 dark:text-amber-400 font-medium' }
+                )}
+                {renderInfoRow(t.registered, formatDate(userDetail.user.created_at))}
+                {renderInfoRow(t.lastLogin, formatDate(userDetail.user.last_login))}
+                {renderInfoRow(t.lastActivity, formatDate(userDetail.user.last_activity_at))}
+                {renderInfoRow(
+                  t.visibleApps,
+                  userDetail.visibleAppCount > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVisibleAppsSearch('');
+                        setShowVisibleApps(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-dark dark:text-gray-100 font-medium hover:text-accent-dark hover:underline"
+                    >
+                      {userDetail.visibleAppCount}
+                      <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                    </button>
+                  ) : '0',
+                  { noBorder: true }
+                )}
+                <div aria-hidden="true" className="block h-0 py-5" />
+                <div className="mt-16 pt-2">
+                  <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                    {u.personalSettings}
+                  </h3>
+                  <dl className="space-y-0 text-sm">
+                    {renderInfoRow(
+                      u.homeView,
+                      renderPreferenceStatus(
+                        formatStoredPreference(effectiveHomeView, {
+                        cards: ui.layout.homeViewCards,
+                        compact: ui.layout.homeViewCompact,
+                        }),
+                        {
+                          isDefault: homeViewIsDefault,
+                          resetLabel: u.resetPreferenceTooltip.replace('{label}', u.homeView),
+                          onReset: homeViewIsDefault ? null : () => openPreferenceResetConfirm(u.homeView, { homeDesktopView: null }),
+                        }
+                      )
+                    )}
+                    {renderInfoRow(
+                      u.languageSetting,
+                      renderPreferenceStatus(
+                        formatStoredPreference(effectiveLanguage, {
+                        en: ui.common.english,
+                        it: ui.common.italian,
+                        }),
+                        {
+                          isDefault: languageIsDefault,
+                          resetLabel: u.resetPreferenceTooltip.replace('{label}', u.languageSetting),
+                          onReset: languageIsDefault ? null : () => openPreferenceResetConfirm(u.languageSetting, { preferredLanguage: null }),
+                        }
+                      )
+                    )}
+                    {renderInfoRow(
+                      u.timeZoneSetting,
+                      renderPreferenceStatus(
+                        effectiveTimeZone,
+                        {
+                          isDefault: timeZoneIsDefault,
+                          resetLabel: u.resetPreferenceTooltip.replace('{label}', u.timeZoneSetting),
+                          onReset: timeZoneIsDefault ? null : () => openPreferenceResetConfirm(u.timeZoneSetting, { preferredTimeZone: null }),
+                        }
+                      )
+                    )}
+                    {renderInfoRow(
+                      u.themeSetting,
+                      renderPreferenceStatus(
+                        formatStoredPreference(effectiveColorScheme, {
+                        light: ui.layout.colorSchemeLight,
+                        dark: ui.layout.colorSchemeDark,
+                        auto: ui.layout.colorSchemeAuto,
+                        }),
+                        {
+                          isDefault: colorSchemeIsDefault,
+                          resetLabel: u.resetPreferenceTooltip.replace('{label}', u.themeSetting),
+                          onReset: colorSchemeIsDefault ? null : () => openPreferenceResetConfirm(u.themeSetting, { preferredColorScheme: null }),
+                        }
+                      )
+                    )}
+                    {renderInfoRow(
+                      u.customOrder,
+                      renderPreferenceStatus(
+                        hasCustomOrder ? ui.common.yes : ui.common.no,
+                        {
+                          isDefault: !hasCustomOrder,
+                          resetLabel: u.resetPreferenceTooltip.replace('{label}', u.customOrder),
+                          onReset: !hasCustomOrder ? null : () => openPreferenceResetConfirm(u.customOrder, { appOrder: null }),
+                        }
+                      ),
+                      {
+                        extra: userDetail.user.app_order_updated_at
+                          ? (
+                            <span className="text-gray-400 dark:text-gray-500 font-normal">
+                              {` (${formatDateTimeCompact(userDetail.user.app_order_updated_at)})`}
+                            </span>
+                          )
+                          : null,
+                      }
+                    )}
+                    {renderInfoRow(
+                      ui.home.favorites,
+                      `${parseStoredJsonArray(userDetail.user.favorite_apps).length}${userDetail.user.favorite_apps_updated_at ? ` (${formatDateTimeCompact(userDetail.user.favorite_apps_updated_at)})` : ''}`
+                    )}
+                  </dl>
+                </div>
+              </dl>
+            </div>
+
+            {/* Groups */}
+            <div
+              className="flex h-full min-h-0 flex-col overflow-hidden self-start"
+              style={detailInfoHeight ? { height: `${detailInfoHeight}px`, maxHeight: `${detailInfoHeight}px` } : undefined}
+            >
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                {t.frontdoorGroups} ({userDetail.groups.length})
+              </h3>
+
+              <div className="flex min-h-0 flex-1 flex-col space-y-5 overflow-y-auto pr-1">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+                    {t.localGroups} ({localGroups.length})
+                  </p>
+                  <p className="mb-2 text-xs text-sky-600">
+                    {t.localGroupsInfo}
+                  </p>
+                  {localGroups.length === 0 ? (
+                  <p className="text-sm text-gray-300 dark:text-gray-600 italic">{t.noLocalGroups}</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {localGroups.map((g) => (
+                        <button
+                          key={g.id}
+                          type="button"
+                          onClick={() => openManagedGroup(g)}
+                          className="w-full flex items-center gap-2 py-1 text-left rounded-lg px-2 -mx-2 hover:bg-sky-50 dark:hover:bg-sky-950/20 transition-colors cursor-pointer"
+                        >
+                          <Users className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                          <span className="text-sm text-dark dark:text-gray-100">{g.name}</span>
+                          {g.description && (
+                            <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[150px]">{g.description}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+                    {t.importedEntraGroups} ({entraGroups.length})
+                  </p>
+                  <p className="mb-2 text-xs text-sky-600">{t.entraGroupsInfo}</p>
+                  {entraGroups.length === 0 ? (
+                    <p className="text-sm text-gray-300 dark:text-gray-600 italic">{t.noImportedEntraGroups}</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {entraGroups.map((g) => (
+                        <button
+                          key={g.id}
+                          type="button"
+                          onClick={() => openManagedGroup(g)}
+                          className="w-full flex items-center gap-2 py-1 text-left rounded-lg px-2 -mx-2 hover:bg-sky-50 dark:hover:bg-sky-950/20 transition-colors cursor-pointer"
+                        >
+                          <Users className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                          <span className="text-sm text-dark dark:text-gray-100">{groupLabel(g)}</span>
+                          <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-sm font-medium">
+                            {u.entraBadge}
+                          </span>
+                          {g.description && (
+                            <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[150px]">{g.description}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="flex h-full min-h-0 flex-col overflow-hidden self-start"
+              style={detailInfoHeight ? { height: `${detailInfoHeight}px`, maxHeight: `${detailInfoHeight}px` } : undefined}
+            >
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                {t.detectedEntraGroups} ({detectedEntraGroups.length})
+              </h3>
+              <p className="mb-2 text-xs text-sky-600">
+                {t.detectedGroupsInfo}
+              </p>
+              {detectedEntraGroups.length === 0 ? (
+                <p className="text-sm text-gray-300 dark:text-gray-600 italic">{t.noDetectedEntraGroups}</p>
+              ) : (
+                <div className="flex min-h-0 flex-1 flex-col space-y-1.5 overflow-y-auto pr-1">
+                  {detectedEntraGroups.map((group) => (
+                    <button
+                      key={group.entra_group_id}
+                      type="button"
+                      disabled={group.is_imported}
+                      onClick={() => {
+                        if (group.is_imported) return;
+                        navigate('/admin/groups', {
+                          state: {
+                            openEntraImport: group.entra_group_id,
+                            entraSearch: group.display_name,
+                          },
+                        });
+                      }}
+                      className={`w-full flex items-center gap-2 py-1 text-left ${
+                        group.is_imported ? 'cursor-default opacity-80' : 'rounded-lg px-2 -mx-2 hover:bg-sky-50 transition-colors'
+                      }`}
+                    >
+                      <Users className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" />
+                      <span className="text-sm text-dark dark:text-gray-100">{group.display_name}</span>
+                      {group.is_imported ? (
+                        <span className="text-[10px] bg-accent/10 text-accent-dark px-1.5 py-0.5 rounded-sm font-medium">
+                          {u.importedBadge}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm font-medium dark:bg-amber-950/40 dark:text-amber-300">
+                          {u.detectedBadge}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {(canEditUsers || canImpersonate(user)) && (
+              <div className="col-span-full border-t border-gray-100 dark:border-gray-800 pt-5 mt-1">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">{t.actions}</h3>
+                <div className="flex flex-wrap gap-2">
+                  {canImpersonate(user) && (
+                    <Tooltip content={u.impersonate}>
+                      <button
+                        type="button"
+                        onClick={() => openImpersonation(user)}
+                        aria-label={u.impersonate}
+                        className="inline-flex min-w-0 items-center gap-2 rounded-full bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-100 dark:bg-violet-950/45 dark:text-violet-300 dark:hover:bg-violet-900/50"
+                      >
+                        <LogIn className="h-4 w-4 shrink-0" />
+                        <span className="min-w-0 truncate">{u.impersonate}</span>
+                      </button>
+                    </Tooltip>
+                  )}
+                  {canEditUsers && (
+                    <>
+                      {getRoleActions(user).map((action) => {
+                        const Icon = action.icon;
+                        return (
+                          <Tooltip key={action.role} content={action.label}>
+                            <button
+                              type="button"
+                              onClick={() => updateRole(user, action.role)}
+                              aria-label={action.label}
+                              className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${action.className}`}
+                            >
+                              <Icon className="h-4 w-4 shrink-0" />
+                              <span className="min-w-0 truncate">{getCompactActionLabel(action)}</span>
+                            </button>
+                          </Tooltip>
+                        );
+                      })}
+
+                      <Tooltip content={isComposeLockedAdmin(user) ? u.deactivateBlocked : (user.is_active ? u.deactivateUser : u.reactivateUser)}>
+                        <button
+                          type="button"
+                          onClick={isComposeLockedAdmin(user) ? undefined : () => toggleActive(user)}
+                          disabled={isComposeLockedAdmin(user)}
+                          aria-label={isComposeLockedAdmin(user) ? u.deactivateBlocked : (user.is_active ? u.deactivateUser : u.reactivateUser)}
+                          className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+                            isComposeLockedAdmin(user)
+                              ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                              : user.is_active
+                                ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/45'
+                                : 'bg-accent/10 text-accent-dark hover:bg-accent/20 dark:bg-accent-dark/25 dark:text-gray-100 dark:hover:bg-accent-dark/35'
+                          }`}
+                        >
+                          {isComposeLockedAdmin(user) ? (
+                            <><UserX className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deactivateBlocked}</span></>
+                          ) : user.is_active ? (
+                            <><UserX className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deactivateUser}</span></>
+                          ) : (
+                            <><UserCheck className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.reactivateUser}</span></>
+                          )}
+                        </button>
+                      </Tooltip>
+                      <Tooltip content={isComposeLockedAdmin(user) ? u.deleteBlocked : u.deleteUser}>
+                        <button
+                          type="button"
+                          onClick={isComposeLockedAdmin(user) ? undefined : () => deleteUser(user)}
+                          disabled={isComposeLockedAdmin(user)}
+                          aria-label={isComposeLockedAdmin(user) ? u.deleteBlocked : u.deleteUser}
+                          className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+                            isComposeLockedAdmin(user)
+                              ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                              : 'bg-red-50 text-red-700 hover:bg-red-200 dark:bg-red-950/45 dark:text-red-300 dark:hover:bg-red-900/55'
+                          }`}
+                        >
+                          <Trash2 className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deleteUser}</span>
+                        </button>
+                      </Tooltip>
+                    </>
+                  )}
+                </div>
+                {canEditUsers && (
+                  <div className="mt-3 flex flex-wrap items-center gap-3 px-1 text-[11px] text-gray-400 dark:text-gray-500">
+                    <span>{u.removeUserSummary}</span>
+                    {isComposeLockedAdmin(user) && (
+                      <span>{u.composeWarning}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+          </div>
+        ) : null}
+      </div>
+  );
+
   return (
     <div>
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -568,7 +894,7 @@ export default function AdminUsers() {
                 {' '}&middot;{' '}
                 <button
                   type="button"
-                  onClick={() => setFilterActive('neverSignedIn')}
+                  onClick={() => setUserColumnFilters((current) => [...current.filter((entry) => entry.id !== 'last_login'), { id: 'last_login', value: ['never'] }])}
                   title={u.showAwaitingFirstSignIn}
                   className="hover:text-dark dark:hover:text-white hover:underline"
                 >
@@ -638,46 +964,6 @@ export default function AdminUsers() {
             />
           </div>
           <DropdownSelect
-            value={filterRole}
-            onChange={setFilterRole}
-            label={t.role}
-            icon={Shield}
-            options={sortOptionsByLabel([
-              { value: 'all', label: t.allRoles },
-              { value: 'owner', label: u.ownerBadge },
-              { value: 'admin', label: u.adminBadge },
-              { value: 'admin_readonly', label: t.readOnlyRole },
-              { value: 'user', label: t.usersOnly },
-            ], language)}
-            className="min-w-[190px]"
-          />
-          <DropdownSelect
-            value={filterActive}
-            onChange={setFilterActive}
-            label={t.status}
-            icon={Clock}
-            options={sortOptionsByLabel([
-              { value: 'all', label: t.allStatuses },
-              { value: 'active', label: t.activeOnly },
-              { value: 'inactive', label: t.inactiveOnly },
-              { value: 'entraMissing', label: u.entraMissingOnly },
-              { value: 'neverSignedIn', label: u.neverSignedInOnly },
-            ], language)}
-            className="min-w-[190px]"
-          />
-          <DropdownSelect
-            value={filterPersonalization}
-            onChange={setFilterPersonalization}
-            label={u.personalizationFilterLabel}
-            icon={Wand2}
-            options={sortOptionsByLabel([
-              { value: 'all', label: u.allPersonalizationStates },
-              { value: 'customized', label: u.personalizedOnly },
-              { value: 'none', label: u.noPersonalizations },
-            ], language)}
-            className="min-w-[260px]"
-          />
-          <DropdownSelect
             value={pageSize}
             onChange={(next) => setPageSize(parseInt(next, 10))}
             label={ui.admin.logs.rows}
@@ -699,450 +985,32 @@ export default function AdminUsers() {
             <div key={i} className="h-16 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : users.length === 0 ? (
         <div className="text-center py-16 text-gray-400 dark:text-gray-500">
           <Users className="w-12 h-12 mx-auto mb-3 opacity-40" />
           <p className="text-lg font-medium">{t.noUsersFound}</p>
-          {search && <p className="text-sm mt-1">{ui.admin.users.noUsersFoundHelp}</p>}
         </div>
       ) : (
-        <div className="space-y-2">
-          <PaginationControls
-            page={pagination.page}
-            pages={pagination.pages}
-            total={pagination.total}
-            summary={formatMessage(ui.admin.users.pageSummary, pagination)}
-            previousLabel={ui.common.previous}
-            nextLabel={ui.common.next}
-            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
-            onNext={() => setPage((current) => Math.min(pagination.pages, current + 1))}
-            className="mt-0"
-          />
-          {paginatedUsers.map((user) => (
-            <div key={user.id} className={`bg-white dark:bg-gray-900 rounded-2xl border overflow-hidden transition-colors ${
-              user.is_active ? 'border-gray-100 dark:border-gray-800' : 'border-red-100 dark:border-red-900/50 bg-red-50/30 dark:bg-red-950/25'
-            }`}>
-              {/* User row */}
-              <div
-                className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50/90 dark:hover:bg-gray-800/50 transition-colors"
-                onClick={() => toggleExpand(user.id)}
-              >
-                <div className="flex items-center gap-3">
-                  {expandedUser === user.id
-                    ? <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-                    : <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />}
-                  <UserAvatar
-                    userId={user.id}
-                    displayName={user.display_name}
-                    email={user.email}
-                    avatarColor={user.avatar_color}
-                    className={`w-9 h-9 ${!user.is_active ? 'opacity-40' : ''}`}
-                    initialsClassName="text-xs"
-                  />
-                  <div className="min-w-0 flex-1 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`font-semibold text-sm ${user.is_active ? 'text-dark dark:text-gray-100' : 'text-gray-400 dark:text-gray-500 line-through'}`}>
-                          {user.display_name || user.email}
-                        </span>
-                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium ${roleBadgeClass(user.role)}`}>
-                          {roleBadgeContent(user.role)}
-                        </span>
-                        {isComposeLockedAdmin(user) && (
-                          <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-sm font-medium">{u.composeBadge}</span>
-                        )}
-                        {!user.last_login && (
-                          <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-sm font-medium flex items-center gap-0.5 dark:bg-purple-900/40">
-                            <Clock className="w-3 h-3" />{t.noLogin}
-                          </span>
-                        )}
-                        {!user.is_active && (
-                          <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-sm font-medium">{t.inactive}</span>
-                        )}
-                        {user.entra_missing_since && (
-                          <Tooltip content={u.entraMissingSince.replace('{date}', formatDate(user.entra_missing_since))}>
-                            <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 px-1.5 py-0.5 rounded-sm font-medium">{u.entraMissingBadge}</span>
-                          </Tooltip>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user.email}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">
-                    {user.group_count} {t.groups}
-                  </span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500 hidden md:block">
-                    {t.lastLogin}: {formatDate(user.last_login)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Expanded detail */}
-              {expandedUser === user.id && (
-                <div className="border-t border-gray-100 dark:border-gray-800 px-5 py-5">
-                  {detailLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin w-6 h-6 border-2 border-gray-300 dark:border-gray-600 border-t-dark rounded-full" />
-                    </div>
-                  ) : userDetail ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 xl:gap-10 lg:items-start">
-                      {/* Info */}
-                      <div ref={detailInfoRef} className="flex flex-col self-start">
-                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">{t.info}</h3>
-                        <dl className="flex flex-col space-y-0 text-sm">
-                          {renderInfoRow(u.emailLabel, userDetail.user.email)}
-                          {renderInfoRow(
-                            t.role,
-                            <span className="inline-flex items-center gap-1">{roleBadgeContent(userDetail.user.role)}</span>
-                          )}
-                          {renderInfoRow(
-                            t.status,
-                            userDetail.user.is_active ? t.active : t.inactive,
-                            { valueClassName: userDetail.user.is_active ? 'text-accent-dark font-medium' : 'text-red-500 font-medium' }
-                          )}
-                          {userDetail.user.entra_missing_since && renderInfoRow(
-                            u.entraMissingLabel,
-                            formatDate(userDetail.user.entra_missing_since),
-                            { valueClassName: 'text-amber-600 dark:text-amber-400 font-medium' }
-                          )}
-                          {renderInfoRow(t.registered, formatDate(userDetail.user.created_at))}
-                          {renderInfoRow(t.lastLogin, formatDate(userDetail.user.last_login))}
-                          {renderInfoRow(t.lastActivity, formatDate(userDetail.user.last_activity_at))}
-                          {renderInfoRow(
-                            t.visibleApps,
-                            userDetail.visibleAppCount > 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setVisibleAppsSearch('');
-                                  setShowVisibleApps(true);
-                                }}
-                                className="inline-flex items-center gap-1 text-dark dark:text-gray-100 font-medium hover:text-accent-dark hover:underline"
-                              >
-                                {userDetail.visibleAppCount}
-                                <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
-                              </button>
-                            ) : '0',
-                            { noBorder: true }
-                          )}
-                          <div aria-hidden="true" className="block h-0 py-5" />
-                          <div className="mt-16 pt-2">
-                            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
-                              {u.personalSettings}
-                            </h3>
-                            <dl className="space-y-0 text-sm">
-                              {renderInfoRow(
-                                u.homeView,
-                                renderPreferenceStatus(
-                                  formatStoredPreference(effectiveHomeView, {
-                                  cards: ui.layout.homeViewCards,
-                                  compact: ui.layout.homeViewCompact,
-                                  }),
-                                  {
-                                    isDefault: homeViewIsDefault,
-                                    resetLabel: u.resetPreferenceTooltip.replace('{label}', u.homeView),
-                                    onReset: homeViewIsDefault ? null : () => openPreferenceResetConfirm(u.homeView, { homeDesktopView: null }),
-                                  }
-                                )
-                              )}
-                              {renderInfoRow(
-                                u.languageSetting,
-                                renderPreferenceStatus(
-                                  formatStoredPreference(effectiveLanguage, {
-                                  en: ui.common.english,
-                                  it: ui.common.italian,
-                                  }),
-                                  {
-                                    isDefault: languageIsDefault,
-                                    resetLabel: u.resetPreferenceTooltip.replace('{label}', u.languageSetting),
-                                    onReset: languageIsDefault ? null : () => openPreferenceResetConfirm(u.languageSetting, { preferredLanguage: null }),
-                                  }
-                                )
-                              )}
-                              {renderInfoRow(
-                                u.timeZoneSetting,
-                                renderPreferenceStatus(
-                                  effectiveTimeZone,
-                                  {
-                                    isDefault: timeZoneIsDefault,
-                                    resetLabel: u.resetPreferenceTooltip.replace('{label}', u.timeZoneSetting),
-                                    onReset: timeZoneIsDefault ? null : () => openPreferenceResetConfirm(u.timeZoneSetting, { preferredTimeZone: null }),
-                                  }
-                                )
-                              )}
-                              {renderInfoRow(
-                                u.themeSetting,
-                                renderPreferenceStatus(
-                                  formatStoredPreference(effectiveColorScheme, {
-                                  light: ui.layout.colorSchemeLight,
-                                  dark: ui.layout.colorSchemeDark,
-                                  auto: ui.layout.colorSchemeAuto,
-                                  }),
-                                  {
-                                    isDefault: colorSchemeIsDefault,
-                                    resetLabel: u.resetPreferenceTooltip.replace('{label}', u.themeSetting),
-                                    onReset: colorSchemeIsDefault ? null : () => openPreferenceResetConfirm(u.themeSetting, { preferredColorScheme: null }),
-                                  }
-                                )
-                              )}
-                              {renderInfoRow(
-                                u.customOrder,
-                                renderPreferenceStatus(
-                                  hasCustomOrder ? ui.common.yes : ui.common.no,
-                                  {
-                                    isDefault: !hasCustomOrder,
-                                    resetLabel: u.resetPreferenceTooltip.replace('{label}', u.customOrder),
-                                    onReset: !hasCustomOrder ? null : () => openPreferenceResetConfirm(u.customOrder, { appOrder: null }),
-                                  }
-                                ),
-                                {
-                                  extra: userDetail.user.app_order_updated_at
-                                    ? (
-                                      <span className="text-gray-400 dark:text-gray-500 font-normal">
-                                        {` (${formatDateTimeCompact(userDetail.user.app_order_updated_at)})`}
-                                      </span>
-                                    )
-                                    : null,
-                                }
-                              )}
-                              {renderInfoRow(
-                                ui.home.favorites,
-                                `${parseStoredJsonArray(userDetail.user.favorite_apps).length}${userDetail.user.favorite_apps_updated_at ? ` (${formatDateTimeCompact(userDetail.user.favorite_apps_updated_at)})` : ''}`
-                              )}
-                            </dl>
-                          </div>
-                        </dl>
-                      </div>
-
-                      {/* Groups */}
-                      <div
-                        className="flex h-full min-h-0 flex-col overflow-hidden self-start"
-                        style={detailInfoHeight ? { height: `${detailInfoHeight}px`, maxHeight: `${detailInfoHeight}px` } : undefined}
-                      >
-                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
-                          {t.frontdoorGroups} ({userDetail.groups.length})
-                        </h3>
-
-                        <div className="flex min-h-0 flex-1 flex-col space-y-5 overflow-y-auto pr-1">
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
-                              {t.localGroups} ({localGroups.length})
-                            </p>
-                            <p className="mb-2 text-xs text-sky-600">
-                              {t.localGroupsInfo}
-                            </p>
-                            {localGroups.length === 0 ? (
-                            <p className="text-sm text-gray-300 dark:text-gray-600 italic">{t.noLocalGroups}</p>
-                            ) : (
-                              <div className="space-y-1.5">
-                                {localGroups.map((g) => (
-                                  <button
-                                    key={g.id}
-                                    type="button"
-                                    onClick={() => openManagedGroup(g)}
-                                    className="w-full flex items-center gap-2 py-1 text-left rounded-lg px-2 -mx-2 hover:bg-sky-50 dark:hover:bg-sky-950/20 transition-colors cursor-pointer"
-                                  >
-                                    <Users className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
-                                    <span className="text-sm text-dark dark:text-gray-100">{g.name}</span>
-                                    {g.description && (
-                                      <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[150px]">{g.description}</span>
-                                    )}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
-                              {t.importedEntraGroups} ({entraGroups.length})
-                            </p>
-                            <p className="mb-2 text-xs text-sky-600">{t.entraGroupsInfo}</p>
-                            {entraGroups.length === 0 ? (
-                              <p className="text-sm text-gray-300 dark:text-gray-600 italic">{t.noImportedEntraGroups}</p>
-                            ) : (
-                              <div className="space-y-1.5">
-                                {entraGroups.map((g) => (
-                                  <button
-                                    key={g.id}
-                                    type="button"
-                                    onClick={() => openManagedGroup(g)}
-                                    className="w-full flex items-center gap-2 py-1 text-left rounded-lg px-2 -mx-2 hover:bg-sky-50 dark:hover:bg-sky-950/20 transition-colors cursor-pointer"
-                                  >
-                                    <Users className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
-                                    <span className="text-sm text-dark dark:text-gray-100">{groupLabel(g)}</span>
-                                    <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-sm font-medium">
-                                      {u.entraBadge}
-                                    </span>
-                                    {g.description && (
-                                      <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[150px]">{g.description}</span>
-                                    )}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        className="flex h-full min-h-0 flex-col overflow-hidden self-start"
-                        style={detailInfoHeight ? { height: `${detailInfoHeight}px`, maxHeight: `${detailInfoHeight}px` } : undefined}
-                      >
-                        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
-                          {t.detectedEntraGroups} ({detectedEntraGroups.length})
-                        </h3>
-                        <p className="mb-2 text-xs text-sky-600">
-                          {t.detectedGroupsInfo}
-                        </p>
-                        {detectedEntraGroups.length === 0 ? (
-                          <p className="text-sm text-gray-300 dark:text-gray-600 italic">{t.noDetectedEntraGroups}</p>
-                        ) : (
-                          <div className="flex min-h-0 flex-1 flex-col space-y-1.5 overflow-y-auto pr-1">
-                            {detectedEntraGroups.map((group) => (
-                              <button
-                                key={group.entra_group_id}
-                                type="button"
-                                disabled={group.is_imported}
-                                onClick={() => {
-                                  if (group.is_imported) return;
-                                  navigate('/admin/groups', {
-                                    state: {
-                                      openEntraImport: group.entra_group_id,
-                                      entraSearch: group.display_name,
-                                    },
-                                  });
-                                }}
-                                className={`w-full flex items-center gap-2 py-1 text-left ${
-                                  group.is_imported ? 'cursor-default opacity-80' : 'rounded-lg px-2 -mx-2 hover:bg-sky-50 transition-colors'
-                                }`}
-                              >
-                                <Users className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" />
-                                <span className="text-sm text-dark dark:text-gray-100">{group.display_name}</span>
-                                {group.is_imported ? (
-                                  <span className="text-[10px] bg-accent/10 text-accent-dark px-1.5 py-0.5 rounded-sm font-medium">
-                                    {u.importedBadge}
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-sm font-medium dark:bg-amber-950/40 dark:text-amber-300">
-                                    {u.detectedBadge}
-                                  </span>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {(canEditUsers || canImpersonate(user)) && (
-                        <div className="col-span-full border-t border-gray-100 dark:border-gray-800 pt-5 mt-1">
-                          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">{t.actions}</h3>
-                          <div className="flex flex-wrap gap-2">
-                            {canImpersonate(user) && (
-                              <Tooltip content={u.impersonate}>
-                                <button
-                                  type="button"
-                                  onClick={() => openImpersonation(user)}
-                                  aria-label={u.impersonate}
-                                  className="inline-flex min-w-0 items-center gap-2 rounded-full bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-100 dark:bg-violet-950/45 dark:text-violet-300 dark:hover:bg-violet-900/50"
-                                >
-                                  <LogIn className="h-4 w-4 shrink-0" />
-                                  <span className="min-w-0 truncate">{u.impersonate}</span>
-                                </button>
-                              </Tooltip>
-                            )}
-                            {canEditUsers && (
-                              <>
-                                {getRoleActions(user).map((action) => {
-                                  const Icon = action.icon;
-                                  return (
-                                    <Tooltip key={action.role} content={action.label}>
-                                      <button
-                                        type="button"
-                                        onClick={() => updateRole(user, action.role)}
-                                        aria-label={action.label}
-                                        className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${action.className}`}
-                                      >
-                                        <Icon className="h-4 w-4 shrink-0" />
-                                        <span className="min-w-0 truncate">{getCompactActionLabel(action)}</span>
-                                      </button>
-                                    </Tooltip>
-                                  );
-                                })}
-
-                                <Tooltip content={isComposeLockedAdmin(user) ? u.deactivateBlocked : (user.is_active ? u.deactivateUser : u.reactivateUser)}>
-                                  <button
-                                    type="button"
-                                    onClick={isComposeLockedAdmin(user) ? undefined : () => toggleActive(user)}
-                                    disabled={isComposeLockedAdmin(user)}
-                                    aria-label={isComposeLockedAdmin(user) ? u.deactivateBlocked : (user.is_active ? u.deactivateUser : u.reactivateUser)}
-                                    className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
-                                      isComposeLockedAdmin(user)
-                                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                                        : user.is_active
-                                          ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/45'
-                                          : 'bg-accent/10 text-accent-dark hover:bg-accent/20 dark:bg-accent-dark/25 dark:text-gray-100 dark:hover:bg-accent-dark/35'
-                                    }`}
-                                  >
-                                    {isComposeLockedAdmin(user) ? (
-                                      <><UserX className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deactivateBlocked}</span></>
-                                    ) : user.is_active ? (
-                                      <><UserX className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deactivateUser}</span></>
-                                    ) : (
-                                      <><UserCheck className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.reactivateUser}</span></>
-                                    )}
-                                  </button>
-                                </Tooltip>
-                                <Tooltip content={isComposeLockedAdmin(user) ? u.deleteBlocked : u.deleteUser}>
-                                  <button
-                                    type="button"
-                                    onClick={isComposeLockedAdmin(user) ? undefined : () => deleteUser(user)}
-                                    disabled={isComposeLockedAdmin(user)}
-                                    aria-label={isComposeLockedAdmin(user) ? u.deleteBlocked : u.deleteUser}
-                                    className={`inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
-                                      isComposeLockedAdmin(user)
-                                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                                        : 'bg-red-50 text-red-700 hover:bg-red-200 dark:bg-red-950/45 dark:text-red-300 dark:hover:bg-red-900/55'
-                                    }`}
-                                  >
-                                    <Trash2 className="h-4 w-4 shrink-0" /> <span className="min-w-0 truncate">{u.deleteUser}</span>
-                                  </button>
-                                </Tooltip>
-                              </>
-                            )}
-                          </div>
-                          {canEditUsers && (
-                            <div className="mt-3 flex flex-wrap items-center gap-3 px-1 text-[11px] text-gray-400 dark:text-gray-500">
-                              <span>{u.removeUserSummary}</span>
-                              {isComposeLockedAdmin(user) && (
-                                <span>{u.composeWarning}</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                    </div>
-                  ) : null}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        <UsersTable
+          users={filtered}
+          pageSize={pageSize}
+          pageResetKey={search}
+          columnFilters={userColumnFilters}
+          onColumnFiltersChange={setUserColumnFilters}
+          expandedUser={expandedUser}
+          toggleExpand={toggleExpand}
+          renderUserDetail={renderUserDetail}
+          roleBadgeClass={roleBadgeClass}
+          roleBadgeContent={roleBadgeContent}
+          roleLabel={roleLabel}
+          isComposeLockedAdmin={isComposeLockedAdmin}
+          formatDate={formatDate}
+          language={language}
+          ui={ui}
+          t={t}
+          u={u}
+        />
       )}
-
-      <PaginationControls
-        page={pagination.page}
-        pages={pagination.pages}
-        total={pagination.total}
-        summary={formatMessage(ui.admin.users.pageSummary, pagination)}
-        previousLabel={ui.common.previous}
-        nextLabel={ui.common.next}
-        onPrevious={() => setPage((current) => Math.max(1, current - 1))}
-        onNext={() => setPage((current) => Math.min(pagination.pages, current + 1))}
-      />
 
       {impersonationTarget && (
         <Modal onClose={() => !impersonationStarting && setImpersonationTarget(null)} labelledBy="impersonation-dialog-title">

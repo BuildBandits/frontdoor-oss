@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Columns3 } from 'lucide-react';
 import {
   columnFilteringFeature,
@@ -28,7 +28,7 @@ const features = tableFeatures({
 // Option value for "no value" in a checklist filter (e.g. an app without tags).
 export const EMPTY_FILTER_VALUE = '__empty__';
 
-const HEADER_CLASS = 'px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider';
+const HEADER_CLASS = 'py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider';
 const SORT_BUTTON_CLASS = 'inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark dark:hover:text-white';
 
 const textFilterFn = (getValue) => (row, _columnId, filterValue) => (
@@ -61,6 +61,10 @@ function readStoredVisibility(storageKey) {
  * Column visibility is remembered per browser under `storageKey`.
  * The page goes back to 1 when `pageResetKey`, a filter, the sort or `pageSize` change,
  * not when rows reload after an edit.
+ *
+ * Optional: `columnFilters` + `onColumnFiltersChange` to control the filters from outside
+ * (e.g. a shortcut that applies one); `rowClassName` may be a function of the row;
+ * `onRowClick`, `isRowExpanded` and `renderExpandedRow` add a full-width detail row under a row.
  */
 export default function DataTable({
   columns,
@@ -71,11 +75,20 @@ export default function DataTable({
   pageResetKey,
   storageKey,
   labels,
+  // Horizontal padding of the header cells: the same as the table's body cells, so titles line up.
+  headerPaddingClassName = 'px-6',
   onFilteredCountChange,
   rowClassName,
+  columnFilters: controlledFilters,
+  onColumnFiltersChange,
+  onRowClick,
+  isRowExpanded,
+  renderExpandedRow,
 }) {
   const [sorting, setSorting] = useState([]);
-  const [columnFilters, setColumnFilters] = useState([]);
+  const [internalFilters, setInternalFilters] = useState([]);
+  const columnFilters = controlledFilters ?? internalFilters;
+  const setColumnFilters = onColumnFiltersChange ?? setInternalFilters;
   const [pageIndex, setPageIndex] = useState(0);
   // Defaults are read once; later changes come from the column picker.
   const [defaultVisibility] = useState(
@@ -95,7 +108,7 @@ export default function DataTable({
     const isHidden = ({ id }) => columnVisibility[id] === false;
     setColumnFilters((current) => (current.some(isHidden) ? current.filter((entry) => !isHidden(entry)) : current));
     setSorting((current) => (current.some(isHidden) ? current.filter((entry) => !isHidden(entry)) : current));
-  }, [columnVisibility]);
+  }, [columnVisibility, setColumnFilters]);
 
   useEffect(() => {
     if (!storageKey) return;
@@ -214,6 +227,7 @@ export default function DataTable({
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
       <PaginationControls {...paginationProps} actions={actions} variant="attached-top" />
+      <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
           {table.getHeaderGroups().map((group) => (
@@ -224,7 +238,7 @@ export default function DataTable({
                 return (
                   <th
                     key={header.id}
-                    className={`${HEADER_CLASS} ${column.headerClassName || 'text-left'}`}
+                    className={`${HEADER_CLASS} ${headerPaddingClassName} ${column.headerClassName || 'text-left'}`}
                     aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : undefined}
                   >
                     <span className="inline-flex items-center gap-1.5">
@@ -253,12 +267,24 @@ export default function DataTable({
         </thead>
         <tbody>
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className={rowClassName}>
-              {row.getVisibleCells().map((cell) => {
-                const column = columnsById.get(cell.column.id);
-                return <td key={cell.id} className={column.cellClassName}>{column.cell(row.original)}</td>;
-              })}
-            </tr>
+            <Fragment key={row.id}>
+              <tr
+                className={typeof rowClassName === 'function' ? rowClassName(row.original) : rowClassName}
+                onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+              >
+                {row.getVisibleCells().map((cell) => {
+                  const column = columnsById.get(cell.column.id);
+                  return <td key={cell.id} className={column.cellClassName}>{column.cell(row.original)}</td>;
+                })}
+              </tr>
+              {isRowExpanded?.(row.original) && (
+                <tr>
+                  <td colSpan={table.getVisibleLeafColumns().length} className="border-b border-gray-100 dark:border-gray-800">
+                    {renderExpandedRow(row.original)}
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
           {filteredCount === 0 && (
             <tr>
@@ -269,6 +295,7 @@ export default function DataTable({
           )}
         </tbody>
       </table>
+      </div>
       <PaginationControls {...paginationProps} actions={actions} variant="attached-bottom" />
     </div>
   );
