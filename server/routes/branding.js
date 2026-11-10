@@ -4,6 +4,7 @@ import { logRbacAudit } from '../db.js';
 import { clearAvatarCache, getAvatarCacheStats } from '../services/avatars.js';
 import { cleanupAppIconCache, getAppIconCacheStats } from '../services/appIcons.js';
 import { compactDatabaseStorage, getDatabaseFootprint } from '../services/databaseMaintenance.js';
+import { listMediaAssets } from '../services/mediaAssets.js';
 import { getBrandingSettings, serveBrandingLogo, updateBrandingSettings } from '../services/branding.js';
 import { respondWithError } from '../services/errors.js';
 
@@ -49,6 +50,7 @@ router.get('/cache', authenticate, isOwner, async (req, res) => {
       database,
       avatarCache,
       appIconCache,
+      mediaLibrary: listMediaAssets().summary,
       totalBytes: database.bytes + avatarCache.bytes + appIconCache.totalBytes,
     });
   } catch (error) {

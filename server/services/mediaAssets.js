@@ -478,6 +478,11 @@ export function listMediaAssets({
     assets,
     summary: {
       total,
+      // Files on disk: identical uploads are grouped in the list but each one is a file.
+      totalFiles: visibleAssets.reduce((sum, asset) => sum + (asset.liveCount || 0), 0),
+      totalBytes: visibleAssets.reduce((sum, asset) => sum + asset.duplicateAssets
+        .filter((member) => member.fileExists !== false)
+        .reduce((groupSum, member) => groupSum + (member.size_bytes || 0), 0), 0),
       appIcon: visibleAssets.filter((asset) => asset.kind === 'app-icon').length,
       brandingLogo: visibleAssets.filter((asset) => asset.kind === 'branding-logo').length,
       orphanAssets: groupedAssets.filter((asset) => asset.hasOrphanMembers).length,

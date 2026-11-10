@@ -229,6 +229,9 @@ describe('mediaAssets service', () => {
       const result = listMediaAssets({ dbHandle: db, appIconDir });
       const assets = result.assets;
       assert.equal(assets.length, 2);
+      assert.equal(result.summary.totalBytes, assets.reduce((sum, asset) => sum + asset.size_bytes, 0));
+      assert.ok(result.summary.totalBytes > 0);
+      assert.equal(result.summary.totalFiles, 2);
       assert.equal(fs.existsSync(path.join(appIconDir, first.fileName)), true);
       assert.equal(fs.existsSync(path.join(appIconDir, second.fileName)), true);
 

@@ -980,15 +980,16 @@ export default function Layout({ children }) {
       <AppFooter language={effectiveLanguage} />
 
       {showBackToTop && (
-        <button
-          type="button"
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full bg-dark px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-black/20 transition-transform hover:-translate-y-0.5 hover:bg-gray-800"
-          aria-label={ui.common.backToTop}
-        >
-          <ArrowUp className="h-4 w-4" />
-          {ui.common.backToTop}
-        </button>
+        <Tooltip content={ui.common.backToTop} placement="left">
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="fixed bottom-6 right-6 z-40 inline-flex items-center justify-center rounded-full bg-dark p-3 text-white shadow-lg shadow-black/20 transition-transform hover:-translate-y-0.5 hover:bg-gray-800"
+            aria-label={ui.common.backToTop}
+          >
+            <ArrowUp className="h-5 w-5" />
+          </button>
+        </Tooltip>
       )}
     </div>
   );
