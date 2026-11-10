@@ -190,6 +190,7 @@ export default function GroupsTable({
 
   return (
     <DataTable
+      headerPaddingClassName="px-4"
       columns={columns}
       sortFns={sortFns}
       rows={groups}
