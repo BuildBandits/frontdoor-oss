@@ -126,7 +126,7 @@ export default function DataTable({
     const isHidden = ({ id }) => columnVisibility[id] === false;
     setColumnFilters((current) => (current.some(isHidden) ? current.filter((entry) => !isHidden(entry)) : current));
     setSorting((current) => (current.some(isHidden) ? current.filter((entry) => !isHidden(entry)) : current));
-  }, [columnVisibility, setColumnFilters]);
+  }, [columnVisibility, setColumnFilters, setSorting]);
 
   useEffect(() => {
     if (!storageKey) return;
