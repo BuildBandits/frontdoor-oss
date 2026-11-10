@@ -270,7 +270,16 @@ test('the audit API sorts by whitelisted columns and filters by action and targe
 
   // Facets list every value in the period, whatever the column filters.
   const withFacets = await (await request('/api/logs/audit?facets=1&actions=create')).json();
-  assert.deepEqual(withFacets.facets, { actions: ['create', 'delete', 'update'], targetTypes: ['app', 'group'] });
+  assert.deepEqual(withFacets.facets.actions, ['create', 'delete', 'update']);
+  assert.deepEqual(withFacets.facets.targetTypes, ['app', 'group']);
+  assert.deepEqual(withFacets.facets.actors.map((actor) => actor.name).sort(), ['Alice Member', 'Audit Owner']);
+
+  // Admins come from the log itself, so a removed user can still be picked or left out.
+  insert.run('removed-admin', 'update', 'app', APP_ID, null);
+  const afterRemoval = await (await request('/api/logs/audit?facets=1')).json();
+  assert.deepEqual(afterRemoval.facets.actors.find((actor) => actor.id === 'removed-admin'), { id: 'removed-admin', name: null, email: null });
+  const others = await (await request(`/api/logs/audit?actor_ids=${OWNER_ID},removed-admin`)).json();
+  assert.equal(others.pagination.total, 3);
 });
 
 test('the access log API sorts and filters by user, app and IP', async () => {
@@ -286,5 +295,10 @@ test('the access log API sorts and filters by user, app and IP', async () => {
   const filtered = await (await request('/api/logs?user_q=owner&app_q=wiki&ip_q=198.51')).json();
   assert.equal(filtered.pagination.total, 1);
   assert.equal(filtered.logs[0].ip_address, '198.51.100.7');
+
+  // % and _ are matched literally, not as wildcards.
+  assert.equal((await (await request('/api/logs?ip_q=192.0.2.1_')).json()).pagination.total, 0);
+  assert.equal((await (await request('/api/logs?ip_q=%25')).json()).pagination.total, 0);
+  assert.equal((await (await request('/api/logs?ip_q=192.0.2.1')).json()).pagination.total, 1);
   db.prepare('DELETE FROM access_logs').run();
 });

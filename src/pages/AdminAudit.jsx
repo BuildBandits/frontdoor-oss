@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertCircle, Filter, ListFilter, UserRound, X } from 'lucide-react';
 import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
@@ -18,7 +18,6 @@ import { sortOptionsByLabel } from '../utils/sortOptions';
 import { resolveAppTimeZone } from '../../shared/timeZones.js';
 import DocsHelpLink from '../components/DocsHelpLink';
 
-const PRIVILEGED_ROLES = new Set(['owner', 'admin', 'admin_readonly']);
 const SIGN_IN_TARGET_TYPE = 'auth';
 const SHOW_SIGN_INS_KEY = 'frontdoor.audit.showSignIns';
 // Which events to list: 'changes' hides sign-ins (default), 'all' includes them,
@@ -59,12 +58,15 @@ export default function AdminAudit() {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [adminUsers, setAdminUsers] = useState([]);
+  // The skeleton is shown only before the first answer: later reloads keep the table (and an open filter) mounted.
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
-  // Actions and target types present in the period, for the column filters.
-  const [facets, setFacets] = useState({ actions: [], targetTypes: [] });
+  // Admins, actions and target types present in the period, for the column filters. They are
+  // requested again only when the period or the event scope changes.
+  const [facets, setFacets] = useState({ actions: [], targetTypes: [], actors: [] });
+  const facetsKeyRef = useRef(null);
   const [search, setSearch] = useState('');
   const [retentionDays, setRetentionDays] = useState(30);
   const [pageSize, setPageSize] = useState(50);
@@ -81,31 +83,11 @@ export default function AdminAudit() {
   const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
   const ui = getUiStrings(language);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadAdmins = async () => {
-      try {
-        const res = await api.get('/users');
-        if (cancelled) return;
-        const admins = (res.data.users || []).filter((user) => PRIVILEGED_ROLES.has(user.role));
-        setAdminUsers(admins);
-      } catch {
-        if (!cancelled) setAdminUsers([]);
-      }
-    };
-
-    loadAdmins();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const debouncedSearch = useDebouncedValue(search);
   const { begin: beginLogsRequest } = useLatestRequest();
   const loadLogs = useCallback(async (p = 1) => {
     const isLatest = beginLogsRequest();
+    const facetsKey = JSON.stringify([retentionDays, showSignIns, onlyImpersonation, sessionFilter]);
     setLoading(true);
     try {
       const res = await api.get('/logs/audit', {
@@ -117,16 +99,20 @@ export default function AdminAudit() {
           target_type: onlyImpersonation || sessionFilter ? 'impersonation' : undefined,
           impersonation_session_id: sessionFilter || undefined,
           exclude_target_types: showSignIns || onlyImpersonation || sessionFilter ? undefined : SIGN_IN_TARGET_TYPE,
-          facets: '1',
+          facets: facetsKeyRef.current === facetsKey ? undefined : '1',
           ...tableQueryParams({ sorting, columnFilters, columns: QUERY_COLUMNS }),
         },
       });
       if (!isLatest()) return;
       setLogs(res.data.logs);
-      setFacets(res.data.facets || { actions: [], targetTypes: [] });
+      if (res.data.facets) {
+        setFacets(res.data.facets);
+        facetsKeyRef.current = facetsKey;
+      }
       setRefs(res.data.refs || {});
       setPagination(res.data.pagination);
       setLoadFailed(false);
+      setHasLoaded(true);
     } catch {
       if (!isLatest()) return;
       setLoadFailed(true);
@@ -167,7 +153,10 @@ export default function AdminAudit() {
       header: a.admin,
       filter: {
         type: 'values',
-        options: sortOptionsByLabel(adminUsers.map((admin) => ({ value: admin.id, label: admin.display_name || admin.email })), language),
+        options: sortOptionsByLabel(facets.actors.map((actor) => ({
+          value: actor.id,
+          label: actor.name || actor.email || a.actorLabels?.[actor.id] || `${a.removedUser} (${actor.id})`,
+        })), language),
       },
       cellClassName: CELL,
       cell: (log) => (
@@ -317,7 +306,7 @@ export default function AdminAudit() {
         </div>
       </div>
 
-      {loading && logs.length === 0 && !loadFailed ? (
+      {!hasLoaded && !loadFailed ? (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 animate-pulse p-6 space-y-3">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="h-10 bg-gray-50 dark:bg-gray-900 rounded-lg" />

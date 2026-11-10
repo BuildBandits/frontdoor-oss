@@ -101,8 +101,9 @@ export function purgeAccessLogs() {
 
 function buildLikeSearchClause(search, aliases) {
   if (!search) return { sql: '', params: [] };
-  const like = `%${search.toLowerCase()}%`;
-  const parts = aliases.map((alias) => `LOWER(COALESCE(${alias}, '')) LIKE ?`);
+  // % and _ typed by the user are literal characters, not wildcards.
+  const like = `%${search.toLowerCase().replace(/[\\%_]/g, '\\$&')}%`;
+  const parts = aliases.map((alias) => `LOWER(COALESCE(${alias}, '')) LIKE ? ESCAPE '\\'`);
   return {
     sql: ` AND (${parts.join(' OR ')})`,
     params: aliases.map(() => like),
@@ -338,13 +339,18 @@ function loadAuditLogs(req, res) {
   }, sets), undefined);
   const refs = idSets ? lookupAuditNames(db, idSets) : {};
 
-  // Values present in the period and event scope, for the table's action and target filters.
+  // Values present in the period and event scope, for the table's admin, action and target filters.
   let facets;
   if (req.query.facets === '1') {
     const base = buildAuditWhere(scope);
     const distinct = (column) => db.prepare(`SELECT DISTINCT ${column} AS value FROM rbac_audit_logs a WHERE ${base.where} ORDER BY value`)
       .all(...base.params).map((row) => row.value).filter(Boolean);
-    facets = { actions: distinct('a.action'), targetTypes: distinct('a.target_type') };
+    const actors = db.prepare(`
+      SELECT DISTINCT a.actor_id AS id, u.display_name AS name, u.email
+      FROM rbac_audit_logs a LEFT JOIN users u ON a.actor_id = u.id
+      WHERE ${base.where}
+    `).all(...base.params);
+    facets = { actions: distinct('a.action'), targetTypes: distinct('a.target_type'), actors };
   }
 
   res.json({

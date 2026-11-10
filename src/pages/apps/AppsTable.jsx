@@ -21,6 +21,7 @@ const getGroups = (app) => (Number(app.group_count || 0) > 0 ? 'with' : 'without
 export default function AppsTable({
   loading,
   apps,
+  catalogApps = apps,
   pageSize,
   pageResetKey,
   onFilteredCountChange,
@@ -59,9 +60,10 @@ export default function AppsTable({
   );
 
   const modeLabel = (mode) => (mode === 'redirect' ? t.redirectSso : mode === 'internal-link' ? t.internalLink : mode === 'shared-cookie' ? t.sharedCookie : mode === 'entra-app' ? t.entraApp : t.link);
-  // Checklist options come from the values present in the catalog.
-  const modeValues = [...new Set(apps.map(getMode))].sort();
-  const tagValues = [...new Set(apps.flatMap(appTags))].sort();
+  // Checklist options come from the whole catalog, not the searched rows: a checklist keeps
+  // the checked values, so a value missing from the options would be filtered out unseen.
+  const modeValues = [...new Set(catalogApps.map(getMode))].sort();
+  const tagValues = [...new Set(catalogApps.flatMap(appTags))].sort();
   const tt = ui.common.table;
   const labels = {
     ...tt,

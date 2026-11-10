@@ -1388,7 +1388,7 @@ export default function Customization() {
                     <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
                       {cacheStatsLoading
                         ? ui.common.loading
-                        : `${cacheStats?.mediaLibrary?.total || 0} ${ui.customization.maintenance.cacheFiles} · ${formatBytes(cacheStats?.mediaLibrary?.totalBytes || 0)} · ${cacheStats?.mediaLibrary?.orphanAssets || 0} ${ui.customization.maintenance.cacheOrphans}`}
+                        : `${cacheStats?.mediaLibrary?.totalFiles || 0} ${ui.customization.maintenance.cacheFiles} · ${formatBytes(cacheStats?.mediaLibrary?.totalBytes || 0)} · ${cacheStats?.mediaLibrary?.orphanAssets || 0} ${ui.customization.maintenance.cacheOrphans}`}
                     </p>
                   </div>
                   <RouterLink

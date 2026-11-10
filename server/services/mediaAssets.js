@@ -372,8 +372,9 @@ export function listMediaAssets({
       OR lower(coalesce(app_mode, '')) LIKE ?
       OR lower(coalesce(content_type, '')) LIKE ?
       OR lower(coalesce(stored_file_name, '')) LIKE ?
+      OR stored_file_name IN (SELECT icon_file_name FROM apps WHERE lower(name) LIKE ? OR lower(slug) LIKE ?)
     )`);
-    params.push(like, like, like, like, like, like, like, like);
+    params.push(like, like, like, like, like, like, like, like, like, like);
   }
 
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -477,7 +478,11 @@ export function listMediaAssets({
     assets,
     summary: {
       total,
-      totalBytes: visibleAssets.reduce((sum, asset) => sum + (asset.size_bytes || 0), 0),
+      // Files on disk: identical uploads are grouped in the list but each one is a file.
+      totalFiles: visibleAssets.reduce((sum, asset) => sum + (asset.liveCount || 0), 0),
+      totalBytes: visibleAssets.reduce((sum, asset) => sum + asset.duplicateAssets
+        .filter((member) => member.fileExists !== false)
+        .reduce((groupSum, member) => groupSum + (member.size_bytes || 0), 0), 0),
       appIcon: visibleAssets.filter((asset) => asset.kind === 'app-icon').length,
       brandingLogo: visibleAssets.filter((asset) => asset.kind === 'branding-logo').length,
       orphanAssets: groupedAssets.filter((asset) => asset.hasOrphanMembers).length,

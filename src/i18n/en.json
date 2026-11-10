@@ -327,7 +327,7 @@
       "appIconCacheHelp": "Current and historical app icons stay in cache until you manually clean unreferenced files.",
       "openMediaLibrary": "Open media library",
       "mediaLibraryTitle": "Media Library",
-      "mediaLibraryHelp": "Icons uploaded once and reusable across apps. Open the library to manage them and see which apps use them.",
+      "mediaLibraryHelp": "App icons and logos uploaded once and reusable across apps. Open the library to manage them and see which apps use them.",
       "refreshAppIconCache": "Clean icon cache",
       "refreshAppIconCacheBusy": "Cleaning...",
       "refreshAppIconCacheConfirmTitle": "Clean the app icon cache?",

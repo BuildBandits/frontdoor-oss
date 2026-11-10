@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { AlertCircle, Filter, PlugZap, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router';
 import api from '../services/api';
@@ -17,7 +17,6 @@ import { formatIsoDateTime } from '../utils/dateTime';
 import { sortOptionsByLabel } from '../utils/sortOptions';
 import { resolveAppTimeZone } from '../../shared/timeZones.js';
 
-const PRIVILEGED_ROLES = new Set(['owner', 'admin', 'admin_readonly']);
 const ACTION_OPTIONS = ['approve', 'revoke'];
 // Columns the audit API can filter on, and the parameter each one uses.
 const QUERY_COLUMNS = {
@@ -36,7 +35,11 @@ export default function AdminPluginAudit() {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [adminUsers, setAdminUsers] = useState([]);
+  // The skeleton is shown only before the first answer: later reloads keep the table (and an open filter) mounted.
+  const [hasLoaded, setHasLoaded] = useState(false);
+  // Admins present in the period, for the admin filter; requested again when the period changes.
+  const [facets, setFacets] = useState({ actors: [] });
+  const facetsKeyRef = useRef(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
@@ -50,32 +53,12 @@ export default function AdminPluginAudit() {
   const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
   const ui = getUiStrings(language);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadAdmins = async () => {
-      try {
-        const res = await api.get('/users');
-        if (cancelled) return;
-        const admins = (res.data.users || []).filter((currentUser) => PRIVILEGED_ROLES.has(currentUser.role));
-        setAdminUsers(admins);
-      } catch {
-        if (!cancelled) setAdminUsers([]);
-      }
-    };
-
-    loadAdmins();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const debouncedSearch = useDebouncedValue(search);
   const debouncedFilters = useDebouncedValue(columnFilters);
   const { begin: beginLogsRequest } = useLatestRequest();
   const loadLogs = useCallback(async (p = 1) => {
     const isLatest = beginLogsRequest();
+    const facetsKey = String(retentionDays);
     setLoading(true);
     try {
       const res = await api.get('/logs/audit', {
@@ -85,14 +68,20 @@ export default function AdminPluginAudit() {
           retention_days: retentionDays,
           q: debouncedSearch,
           target_type: 'plugin',
+          facets: facetsKeyRef.current === facetsKey ? undefined : '1',
           ...tableQueryParams({ sorting, columnFilters: debouncedFilters, columns: QUERY_COLUMNS }),
         },
       });
       if (!isLatest()) return;
       setLogs(res.data.logs);
+      if (res.data.facets) {
+        setFacets(res.data.facets);
+        facetsKeyRef.current = facetsKey;
+      }
       setRefs(res.data.refs || {});
       setPagination(res.data.pagination);
       setLoadFailed(false);
+      setHasLoaded(true);
     } catch {
       if (!isLatest()) return;
       setLoadFailed(true);
@@ -128,7 +117,10 @@ export default function AdminPluginAudit() {
       header: ui.admin.audit.admin,
       filter: {
         type: 'values',
-        options: sortOptionsByLabel(adminUsers.map((admin) => ({ value: admin.id, label: admin.display_name || admin.email })), language),
+        options: sortOptionsByLabel(facets.actors.map((actor) => ({
+          value: actor.id,
+          label: actor.name || actor.email || ui.admin.audit.actorLabels?.[actor.id] || `${ui.admin.audit.removedUser} (${actor.id})`,
+        })), language),
       },
       cellClassName: CELL,
       cell: (log) => (
@@ -267,7 +259,7 @@ export default function AdminPluginAudit() {
         </div>
       </div>
 
-      {loading && logs.length === 0 && !loadFailed ? (
+      {!hasLoaded && !loadFailed ? (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 animate-pulse p-6 space-y-3">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="h-10 bg-gray-50 dark:bg-gray-900 rounded-lg" />

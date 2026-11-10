@@ -327,7 +327,7 @@
       "appIconCacheHelp": "Le icone app correnti e storiche restano in cache finché non pulisci manualmente i file non referenziati.",
       "openMediaLibrary": "Apri libreria media",
       "mediaLibraryTitle": "Media Library",
-      "mediaLibraryHelp": "Icone caricate una volta e riutilizzabili su più app. Apri la libreria per gestirle e vedere quali app le usano.",
+      "mediaLibraryHelp": "Icone delle app e loghi caricati una volta e riutilizzabili su più app. Apri la libreria per gestirli e vedere quali app li usano.",
       "refreshAppIconCache": "Pulisci cache icone",
       "refreshAppIconCacheBusy": "Pulizia...",
       "refreshAppIconCacheConfirmTitle": "Pulire la cache delle icone app?",
