@@ -167,6 +167,8 @@ describe('mediaAssets service', () => {
       );
       const icon = listMediaAssets(options).assets.find((asset) => asset.kind === 'app-icon');
       assert.deepEqual(icon.linkedApps.map((app) => app.slug).sort(), ['app-one', 'app-two']);
+      // The app that reuses the icon finds it by its own name.
+      assert.equal(listMediaAssets({ ...options, kind: 'app-icon', query: 'App Two' }).assets.length, 1);
       assert.equal(icon.inUse, true);
 
       const notFound = { statusCode: 400, code: 'media_asset_not_found' };
