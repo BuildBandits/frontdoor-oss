@@ -47,7 +47,10 @@
       "selectAll": "Select all",
       "clearFilter": "Clear filter",
       "clearAllFilters": "Clear column filters",
-      "noRows": "No results match the current filters."
+      "noRows": "No results match the current filters.",
+      "searchValues": "Search values...",
+      "noValues": "No values match.",
+      "filtered": "filtered"
     }
   },
   "nav": {
