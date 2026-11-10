@@ -47,7 +47,10 @@
       "selectAll": "Seleziona tutto",
       "clearFilter": "Rimuovi filtro",
       "clearAllFilters": "Rimuovi filtri di colonna",
-      "noRows": "Nessun risultato con i filtri attuali."
+      "noRows": "Nessun risultato con i filtri attuali.",
+      "searchValues": "Cerca valori...",
+      "noValues": "Nessun valore trovato.",
+      "filtered": "filtrato"
     }
   },
   "nav": {

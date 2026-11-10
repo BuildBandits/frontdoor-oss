@@ -8,8 +8,10 @@ const ESTIMATED_HEIGHT = 320;
  * Button with a small dialog under it, for table header controls (column filters,
  * column picker). The dialog is portaled with fixed positioning so the table's
  * overflow does not clip it; outside click, Escape, scroll and resize close it.
+ * Tab past the last control (or Shift+Tab before the first) closes it and returns focus
+ * to the button, so keyboard users never land outside the page with it still open.
  */
-export default function TablePopover({ label, buttonClassName, buttonContent, pressed, width = 240, align = 'left', children }) {
+export default function TablePopover({ label, buttonClassName, buttonContent, width = 240, align = 'left', children }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const buttonRef = useRef(null);
@@ -39,11 +41,24 @@ export default function TablePopover({ label, buttonClassName, buttonContent, pr
     const onMouseDown = (event) => {
       if (!popoverRef.current?.contains(event.target) && !buttonRef.current?.contains(event.target)) close();
     };
-    const onKeyDown = (event) => {
-      if (event.key !== 'Escape') return;
-      event.stopPropagation();
+    const closeToButton = () => {
       close();
       buttonRef.current?.focus();
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        closeToButton();
+        return;
+      }
+      if (event.key !== 'Tab' || !popoverRef.current?.contains(event.target)) return;
+      const focusable = [...popoverRef.current.querySelectorAll('input, button, select, textarea, [href], [tabindex]:not([tabindex="-1"])')]
+        .filter((element) => !element.disabled);
+      const edge = event.shiftKey ? focusable[0] : focusable[focusable.length - 1];
+      if (event.target === edge) {
+        event.preventDefault();
+        closeToButton();
+      }
     };
     // A fixed dialog would drift away from its button, so scrolling the page closes it.
     const onScroll = (event) => {
@@ -71,7 +86,6 @@ export default function TablePopover({ label, buttonClassName, buttonContent, pr
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? popoverId : undefined}
-        aria-pressed={pressed}
         className={buttonClassName}
       >
         {buttonContent}
