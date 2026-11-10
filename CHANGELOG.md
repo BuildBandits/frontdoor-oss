@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-11-10
+
+Admin tables with Excel-style column filters: Apps, Users, Groups, the access log and the audit trail now share one table component with a funnel on each column, sorting, a **Columns** picker remembered per browser, and search inside long checklists; the log tables sort and filter in the database, across the whole period. App icons can be picked from the Media Library and shared between apps without copies, and the Media Library gets its own box in Maintenance. Modals keep `Ctrl+K` and scrolling to themselves, and the Docker image is pinned to a Node.js release that is not affected by Node2Shell.
+
+**Upgrading:** no database or configuration change. Running from source needs Node.js 24.22.1 or later (`engines`). The Connection and Tags filters above the Apps table, the Role, Status and Personalization dropdowns in Users, the source switch in Groups and the Admin and Action dropdowns in the audit pages are replaced by column filters; the API keeps accepting the old single-value parameters. Each browser starts with the default columns.
+
 ### Added
 - **Media Library icons in the app form**: in image mode, **Pick from Media Library** opens a searchable grid of the app icons already stored in the Media Library. The app links to the picked file instead of uploading a copy, so the same icon can be reused without duplicates. The Media Library lists every app that uses an icon, not only the app that uploaded it (the picker search finds an icon by any of those apps), and still refuses to delete an icon while any app uses it. The API accepts the new `iconAssetId` field on app create and update.
 

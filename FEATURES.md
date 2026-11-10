@@ -35,7 +35,7 @@ Four role tiers with distinct scopes:
 - **Favorites** pinned to the top, persisted per user.
 - **Drag-and-drop reordering** with timestamped per-user persistence.
 - **Live app counter** next to the search field.
-- **App icon variants**: emoji, uploaded image, pasted SVG (versioned URLs, disk-cached).
+- **App icon variants**: emoji, uploaded image, pasted SVG, or an icon picked from the Media Library and shared without a copy (versioned URLs, disk-cached).
 - **App mode badges** on cards (ext / SSO / Entra), toggleable globally.
 - **Long Markdown descriptions** in app detail.
 
@@ -55,7 +55,7 @@ How Frontdoor hands the user off to a target application:
 - Auto-suggested slug from name (until manually edited).
 - Per-app: name, slug, description, long description, target URL, icon, tags, mode, SSO endpoint & method, sort order, group assignments, active flag.
 - `internal-link` mode for rare private-IP targets that must stay reachable through Frontdoor.
-- Unlabeled-apps quick filter with live count, surfaced as a discreet badge.
+- Apps table with a filter on each column (contains text or checklist, with search in long checklists), sorting, paging and a **Columns** picker for optional columns, remembered per browser. Apps without tags are one pick away in the Tags filter.
 - Orphan-app warning with direct edit links for apps without group assignments.
 - Deactivate via `is_active` (hidden from the catalog, history kept); deleting an app removes it together with its permissions and access logs.
 - **Restore demo apps** — one-click reset to a seeded showcase set.
@@ -99,13 +99,13 @@ The `/admin/customization` page covers:
 - **Connection-mode availability** toggles in the admin editor (Shared Cookie / Redirect SSO / Entra App).
 - **SSO login-page bypass** — skip the welcome page and go straight to Microsoft.
 - **Log retention** slider (0–90 days; `0` = logless mode).
-- **Cache maintenance** — refresh avatar cache, clear app-icon cache, with size and file count stats.
+- **Cache maintenance** — refresh avatar cache, clear app-icon cache, with size and file count stats; Media Library box with its own file, size and orphan counts.
 - **Access log clear** — one-shot purge of access logs (audit log untouched).
 
 ## Access Logs & Analytics 🛡️
 
 - Access events are recorded on every app open across all connection modes (`access_logs` table).
-- `/admin/logs` viewer: paginated (50–250/page), search by email / app / IP, period filter (1 to 90 days), timezone-aware rendering.
+- `/admin/logs` viewer: paginated (50–250/page), search by email / app / IP, sortable columns and contains filters on user, app and IP applied in the database, period filter (1 to 90 days), timezone-aware rendering.
 - **Top apps** analytics — most-accessed apps in the selected period with click counts.
 - Unique-users metric per period.
 
@@ -120,7 +120,7 @@ The `/admin/customization` page covers:
 
 - `rbac_audit_logs` captures privileged mutations: role changes, user activation, group/app edits, branding updates, cache refresh, backup operations.
 - Stored fields: actor, action, target type & id, JSON details, timestamp. Updates store only the fields that changed (`changes: [{ field, from, to }]`); saves that change nothing are not logged. Details keep a snapshot of the names of the users, groups and apps involved (`refs`), so rows stay readable after deletions.
-- `/admin/audit` page with actor filter, period filter, and pagination matching the access-log UI. Each row reads as a sentence (who did what to which entity, by name), with changed fields as `old → new`; the raw JSON can be copied or expanded.
+- `/admin/audit` page with sortable columns, admin / action / target column filters listing the values present in the period, period filter, and pagination matching the access-log UI. Each row reads as a sentence (who did what to which entity, by name), with changed fields as `old → new`; the raw JSON can be copied or expanded.
 
 ## Retention 🛡️
 
@@ -190,8 +190,8 @@ SQLite (better-sqlite3) in WAL mode with foreign-key enforcement. Schema covers 
 
 | Path | Audience | Purpose |
 |------|----------|---------|
-| `/admin` | 🔧 admin | App CRUD, search, filters, group assignments |
-| `/admin/groups` | 🔧 admin | Local and Entra groups (source filter), Entra import / force-sync, linked groups |
+| `/admin` | 🔧 admin | App CRUD, search, column filters, group assignments |
+| `/admin/groups` | 🔧 admin | Local and Entra groups (column filters, source included), Entra import / force-sync, linked groups |
 | `/admin/group-transfer` | 🕶️ 🔧 admin (editors) | Copy or move all app permissions from one group to another |
 | `/admin/users` | 🔧 admin | Users, roles, activation, group membership, visible-apps view |
 | `/admin/logs` | 🛡️ owner | Access log + top apps analytics |
