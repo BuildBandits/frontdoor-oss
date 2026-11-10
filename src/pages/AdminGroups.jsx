@@ -862,9 +862,13 @@ export default function AdminGroups() {
     [groups],
   );
   const hasIncompleteGroupsNotice = problemGroups.length > 0;
-  const visibleGroups = showOnlyProblemGroups
-    ? filteredGroups.filter((group) => Number(group.child_group_count || 0) + Number(group.entra_child_group_count || 0) === 0 && (Number(group.app_count || 0) === 0 || Number(group.member_count || 0) === 0))
-    : filteredGroups;
+  // Memoized: the table reports its filtered rows back to this page, so a new array on every
+  // render would loop.
+  const visibleGroups = useMemo(() => {
+    if (!showOnlyProblemGroups) return filteredGroups;
+    const problemIds = new Set(problemGroups.map((group) => group.id));
+    return filteredGroups.filter((group) => problemIds.has(group.id));
+  }, [filteredGroups, problemGroups, showOnlyProblemGroups]);
   const hasGroupFilter = groupSearch.trim().length > 0 || showOnlyProblemGroups || groupColumnFilters.length > 0;
   useEffect(() => {
     if (showOnlyProblemGroups && problemGroups.length === 0) {
