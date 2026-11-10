@@ -34,6 +34,8 @@ export default function AdminLogs() {
   const [topApps, setTopApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  // The skeleton is shown only before the first answer: later reloads keep the table (and an open filter) mounted.
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
@@ -69,6 +71,7 @@ export default function AdminLogs() {
       setPagination(res.data.pagination);
       setStats(res.data.stats);
       setLoadFailed(false);
+      setHasLoaded(true);
     } catch {
       if (!isLatest()) return;
       setLoadFailed(true);
@@ -273,7 +276,7 @@ export default function AdminLogs() {
       )}
 
       {/* Log table */}
-      {loading && logs.length === 0 && !loadFailed ? (
+      {!hasLoaded && !loadFailed ? (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 animate-pulse p-6 space-y-3">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="h-10 bg-gray-50 dark:bg-gray-900 rounded-lg" />
