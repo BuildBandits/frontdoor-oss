@@ -10,6 +10,7 @@ import { cleanupAppIconCache, getAppIconCacheStats, saveAppIconAsset } from '../
 import {
   backfillMediaLibrary,
   deleteMediaAssetById,
+  getLinkableAppIconFileName,
   getMediaAssetById,
   listMediaAssets,
   parseMediaAssetPayload,
@@ -135,6 +136,48 @@ describe('mediaAssets service', () => {
       assert.equal(res.statusCode, 200);
       assert.equal(res.sentFilePath, path.join(appIconDir, 'app-1.svg'));
       assert.equal(res.headers['Content-Type'], 'image/svg+xml');
+    } finally {
+      fs.rmSync(appIconDir, { recursive: true, force: true });
+      fs.rmSync(brandingDir, { recursive: true, force: true });
+    }
+  });
+
+  it('links only existing app icons from the library', async () => {
+    const appIconDir = fs.mkdtempSync(path.join(os.tmpdir(), 'frontdoor-app-icons-link-'));
+    const brandingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'frontdoor-branding-link-'));
+
+    try {
+      resetTables();
+      db.prepare('INSERT INTO apps (id, name, slug, target_url, mode, icon_file_name) VALUES (?, ?, ?, ?, ?, ?)').run(
+        'app-1', 'App One', 'app-one', 'https://app-one.example.com', 'redirect', 'app-1.svg'
+      );
+      db.prepare('INSERT INTO branding_settings (id, logo_file_name, logo_content_type) VALUES (?, ?, ?)').run(
+        'default', 'company-logo.svg', 'image/svg+xml'
+      );
+      fs.writeFileSync(path.join(appIconDir, 'app-1.svg'), '<svg viewBox="0 0 24 24"/>', 'utf8');
+      fs.writeFileSync(path.join(brandingDir, 'company-logo.svg'), '<svg viewBox="0 0 24 24"/>', 'utf8');
+      await backfillMediaLibrary({ dbHandle: db, appIconDir, brandingDir });
+
+      const options = { dbHandle: db, appIconDir, brandingDir };
+      assert.equal(getLinkableAppIconFileName(getAssetIdByStoredFileName('app-1.svg'), options), 'app-1.svg');
+
+      // A second app reusing the file shows up next to the uploader in the library.
+      db.prepare('INSERT INTO apps (id, name, slug, target_url, mode, icon_file_name) VALUES (?, ?, ?, ?, ?, ?)').run(
+        'app-2', 'App Two', 'app-two', 'https://app-two.example.com', 'redirect', 'app-1.svg'
+      );
+      const icon = listMediaAssets(options).assets.find((asset) => asset.kind === 'app-icon');
+      assert.deepEqual(icon.linkedApps.map((app) => app.slug).sort(), ['app-one', 'app-two']);
+      // The app that reuses the icon finds it by its own name.
+      assert.equal(listMediaAssets({ ...options, kind: 'app-icon', query: 'App Two' }).assets.length, 1);
+      assert.equal(icon.inUse, true);
+
+      const notFound = { statusCode: 400, code: 'media_asset_not_found' };
+      assert.throws(() => getLinkableAppIconFileName(getAssetIdByStoredFileName('company-logo.svg'), options), notFound);
+      assert.throws(() => getLinkableAppIconFileName('missing-id', options), notFound);
+      assert.throws(() => getLinkableAppIconFileName(null, options), notFound);
+
+      fs.rmSync(path.join(appIconDir, 'app-1.svg'));
+      assert.throws(() => getLinkableAppIconFileName(getAssetIdByStoredFileName('app-1.svg'), options), notFound);
     } finally {
       fs.rmSync(appIconDir, { recursive: true, force: true });
       fs.rmSync(brandingDir, { recursive: true, force: true });

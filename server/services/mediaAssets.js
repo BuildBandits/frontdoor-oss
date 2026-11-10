@@ -7,6 +7,7 @@ import db from '../db.js';
 import { applySvgSafeHeaders, isSvgBuffer, isSvgContentType, sanitizeSvgBuffer } from './svgSanitize.js';
 import { RASTER_ICON_TYPES, normalizeImageContentType } from './imageTypes.js';
 import { resolveFileInDir } from './textSanitize.js';
+import { UserFacingError } from './errors.js';
 
 // path.resolve() ensures the configured dir is absolute even when the env var
 // uses a relative form like "./data/branding" — required by res.sendFile().
@@ -371,8 +372,9 @@ export function listMediaAssets({
       OR lower(coalesce(app_mode, '')) LIKE ?
       OR lower(coalesce(content_type, '')) LIKE ?
       OR lower(coalesce(stored_file_name, '')) LIKE ?
+      OR stored_file_name IN (SELECT icon_file_name FROM apps WHERE lower(name) LIKE ? OR lower(slug) LIKE ?)
     )`);
-    params.push(like, like, like, like, like, like, like, like);
+    params.push(like, like, like, like, like, like, like, like, like, like);
   }
 
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -382,10 +384,13 @@ export function listMediaAssets({
     ${whereSql}
     ORDER BY created_at DESC, id DESC
   `).all(...params);
-  const referencedAppFiles = new Set(
-    dbHandle.prepare("SELECT icon_file_name FROM apps WHERE icon_file_name IS NOT NULL AND TRIM(icon_file_name) <> ''").all()
-      .map((row) => row.icon_file_name)
-  );
+  // Apps using each icon file now: the uploader plus any app that reuses it from the library.
+  const appsByIconFile = new Map();
+  for (const app of dbHandle.prepare("SELECT id, name, slug, target_url, mode, icon_file_name FROM apps WHERE icon_file_name IS NOT NULL AND TRIM(icon_file_name) <> ''").all()) {
+    const { icon_file_name: fileName, ...linked } = app;
+    appsByIconFile.set(fileName, [...(appsByIconFile.get(fileName) || []), linked]);
+  }
+  const referencedAppFiles = new Set(appsByIconFile.keys());
   const referencedBrandingFiles = new Set(
     dbHandle.prepare("SELECT logo_file_name FROM branding_settings WHERE logo_file_name IS NOT NULL AND TRIM(logo_file_name) <> ''").all()
       .map((row) => row.logo_file_name)
@@ -396,7 +401,8 @@ export function listMediaAssets({
     const asset = toPublicMediaAsset(row, { appIconDir, brandingDir });
     const groupKey = asset.sha256 ? `${asset.kind}:${asset.sha256}` : `${asset.kind}:${asset.id}`;
     const existing = grouped.get(groupKey);
-    const linkedApp = buildLinkedApp(asset);
+    const linkedApps = [buildLinkedApp(asset), ...(asset.kind === 'app-icon' ? appsByIconFile.get(asset.stored_file_name) || [] : [])]
+      .filter(Boolean);
     const fileExists = asset.fileExists !== false;
     const currentUsage = asset.kind === 'app-icon'
       ? referencedAppFiles.has(asset.stored_file_name)
@@ -410,7 +416,7 @@ export function listMediaAssets({
         duplicateCount: 1,
         duplicateAssetIds: [asset.id],
         duplicateAssets: [asset],
-        linkedApps: linkedApp ? [linkedApp] : [],
+        linkedApps: linkedApps.reduce(mergeLinkedApps, []),
         inUse: currentUsage,
         liveCount: fileExists ? 1 : 0,
         orphanCount: fileExists ? 0 : 1,
@@ -424,7 +430,7 @@ export function listMediaAssets({
     existing.duplicateCount += 1;
     existing.duplicateAssetIds.push(asset.id);
     existing.duplicateAssets.push(asset);
-    existing.linkedApps = mergeLinkedApps(existing.linkedApps, linkedApp);
+    existing.linkedApps = linkedApps.reduce(mergeLinkedApps, existing.linkedApps);
     if (fileExists) {
       existing.liveCount = (existing.liveCount || 0) + 1;
       existing.hasLiveMembers = true;
@@ -493,6 +499,17 @@ export function getMediaAssetById(assetId, {
   if (!assetId) return null;
   const row = dbHandle.prepare('SELECT * FROM media_assets WHERE id = ?').get(assetId);
   return toPublicMediaAsset(row, { appIconDir, brandingDir });
+}
+
+// File name an app can point at to reuse a Media Library icon. Only app icons qualify
+// (branding logos live in another directory) and the file must still be on disk.
+export function getLinkableAppIconFileName(assetId, options = {}) {
+  const asset = typeof assetId === 'string' && assetId.trim() ? getMediaAssetById(assetId.trim(), options) : null;
+  if (!asset || asset.kind !== 'app-icon' || !asset.fileExists) {
+    // 400, not 404: on PUT /apps/:id a 404 would read as "app not found".
+    throw new UserFacingError('Media file not found', { statusCode: 400, code: 'media_asset_not_found' });
+  }
+  return asset.stored_file_name;
 }
 
 export async function serveMediaAsset(asset, res, {
