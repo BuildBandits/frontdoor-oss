@@ -1,10 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, AlertCircle, Filter, PlugZap, ShieldCheck } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { AlertCircle, Filter, PlugZap, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router';
 import api from '../services/api';
 import UserAvatar from '../components/UserAvatar';
 import AuditDetails from '../components/AuditDetails';
 import ClearableSearchField from '../components/ClearableSearchField';
+import DataTable from '../components/DataTable';
+import { tableQueryParams } from '../utils/tableQuery';
 import { useAuthStore } from '../stores/authStore';
 import useDebouncedValue from '../hooks/useDebouncedValue';
 import { useLatestRequest } from '../hooks/useLatestRequest';
@@ -15,8 +17,15 @@ import { formatIsoDateTime } from '../utils/dateTime';
 import { sortOptionsByLabel } from '../utils/sortOptions';
 import { resolveAppTimeZone } from '../../shared/timeZones.js';
 
-const PRIVILEGED_ROLES = new Set(['owner', 'admin', 'admin_readonly']);
 const ACTION_OPTIONS = ['approve', 'revoke'];
+// Columns the audit API can filter on, and the parameter each one uses.
+const QUERY_COLUMNS = {
+  admin: { param: 'actor_ids', type: 'values' },
+  action: { param: 'actions', type: 'values' },
+  plugin: { param: 'target_q', type: 'text' },
+};
+// Server-side sorting: any truthy value marks the column as sortable.
+const SORTABLE = { date: true, admin: true, action: true };
 
 export default function AdminPluginAudit() {
   const { user } = useAuthStore();
@@ -26,13 +35,17 @@ export default function AdminPluginAudit() {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [adminUsers, setAdminUsers] = useState([]);
-  const [page, setPage] = useState(1);
+  // The skeleton is shown only before the first answer: later reloads keep the table (and an open filter) mounted.
+  const [hasLoaded, setHasLoaded] = useState(false);
+  // Admins present in the period, for the admin filter; requested again when the period changes.
+  const [facets, setFacets] = useState({ actors: [] });
+  const facetsKeyRef = useRef(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [sorting, setSorting] = useState([]);
+  const [columnFilters, setColumnFilters] = useState([]);
   const [search, setSearch] = useState('');
-  const [action, setAction] = useState('');
   const [retentionDays, setRetentionDays] = useState(30);
   const [pageSize, setPageSize] = useState(50);
-  const [selectedActorId, setSelectedActorId] = useState('');
   const brandingLanguage = useBrandingLanguage();
   const brandingTimeZone = useBrandingTimeZone();
   const timeZone = resolveAppTimeZone(user?.preferredTimeZone, brandingTimeZone);
@@ -40,31 +53,12 @@ export default function AdminPluginAudit() {
   const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
   const ui = getUiStrings(language);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadAdmins = async () => {
-      try {
-        const res = await api.get('/users');
-        if (cancelled) return;
-        const admins = (res.data.users || []).filter((currentUser) => PRIVILEGED_ROLES.has(currentUser.role));
-        setAdminUsers(admins);
-      } catch {
-        if (!cancelled) setAdminUsers([]);
-      }
-    };
-
-    loadAdmins();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const debouncedSearch = useDebouncedValue(search);
+  const debouncedFilters = useDebouncedValue(columnFilters);
   const { begin: beginLogsRequest } = useLatestRequest();
   const loadLogs = useCallback(async (p = 1) => {
     const isLatest = beginLogsRequest();
+    const facetsKey = String(retentionDays);
     setLoading(true);
     try {
       const res = await api.get('/logs/audit', {
@@ -74,29 +68,115 @@ export default function AdminPluginAudit() {
           retention_days: retentionDays,
           q: debouncedSearch,
           target_type: 'plugin',
-          action: action || undefined,
-          actor_id: selectedActorId || undefined,
+          facets: facetsKeyRef.current === facetsKey ? undefined : '1',
+          ...tableQueryParams({ sorting, columnFilters: debouncedFilters, columns: QUERY_COLUMNS }),
         },
       });
       if (!isLatest()) return;
       setLogs(res.data.logs);
+      if (res.data.facets) {
+        setFacets(res.data.facets);
+        facetsKeyRef.current = facetsKey;
+      }
       setRefs(res.data.refs || {});
       setPagination(res.data.pagination);
       setLoadFailed(false);
+      setHasLoaded(true);
     } catch {
       if (!isLatest()) return;
       setLoadFailed(true);
     }
     setLoading(false);
-  }, [beginLogsRequest, action, pageSize, retentionDays, debouncedSearch, selectedActorId]);
+  }, [beginLogsRequest, pageSize, retentionDays, debouncedSearch, sorting, debouncedFilters]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [action, debouncedSearch, retentionDays, pageSize, selectedActorId]);
-
-  useEffect(() => { loadLogs(page); }, [loadLogs, page]);
+  useEffect(() => { loadLogs(pageIndex + 1); }, [loadLogs, pageIndex]);
 
   const formatDate = (iso) => formatIsoDateTime(iso, timeZone) || iso || '-';
+
+  const pa = ui.admin.pluginAudit;
+  const tt = ui.common.table;
+  const tableLabels = {
+    ...tt,
+    filterColumn: (column) => formatMessage(tt.filterColumn, { column }),
+    pageSummary: (summary) => formatMessage(pa.pageSummary, summary),
+    previous: ui.common.previous,
+    next: ui.common.next,
+    noRows: pa.emptyTitle,
+  };
+  const CELL = 'px-5 py-3';
+  const columns = [
+    {
+      id: 'date',
+      header: ui.common.date,
+      hideable: false,
+      cellClassName: `${CELL} text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap`,
+      cell: (log) => formatDate(log.created_at),
+    },
+    {
+      id: 'admin',
+      header: ui.admin.audit.admin,
+      filter: {
+        type: 'values',
+        options: sortOptionsByLabel(facets.actors.map((actor) => ({
+          value: actor.id,
+          label: actor.name || actor.email || ui.admin.audit.actorLabels?.[actor.id] || `${ui.admin.audit.removedUser} (${actor.id})`,
+        })), language),
+      },
+      cellClassName: CELL,
+      cell: (log) => (
+        <div className="flex items-center gap-2">
+          <UserAvatar
+            userId={log.actor_id}
+            displayName={log.actor_name}
+            email={log.actor_email}
+            avatarColor={null}
+            className="w-6 h-6"
+            initialsClassName="text-[10px]"
+          />
+          <div className="min-w-0">
+            <p className="text-dark dark:text-gray-100 font-medium truncate text-xs">{log.actor_name || ui.admin.audit.actorLabels?.[log.actor_id] || ui.admin.audit.removedUser}</p>
+            <p className="text-gray-400 dark:text-gray-500 truncate text-[11px]">{log.actor_email || '-'}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'action',
+      header: ui.admin.audit.action,
+      filter: {
+        type: 'values',
+        options: sortOptionsByLabel(ACTION_OPTIONS.map((value) => ({ value, label: pa.actionLabels[value] || value })), language),
+      },
+      cellClassName: CELL,
+      cell: (log) => (
+        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+          log.action === 'approve'
+            ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+            : 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300'
+        }`}>
+          {pa.actionLabels[log.action] || log.action}
+        </span>
+      ),
+    },
+    {
+      id: 'plugin',
+      header: pa.plugin,
+      filter: { type: 'text' },
+      cellClassName: CELL,
+      cell: (log) => (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-dark dark:text-gray-100">{log.target_id || '-'}</span>
+          <span className="text-[11px] text-gray-400 dark:text-gray-500">{log.details?.name || log.details?.version || pa.pluginFallback}</span>
+        </div>
+      ),
+    },
+    {
+      id: 'details',
+      header: ui.admin.audit.details,
+      cellClassName: `${CELL} min-w-[280px]`,
+      cell: (log) => <AuditDetails event={describeAuditLog(log, { ui, refs })} ui={ui} />,
+    },
+  ];
 
   return (
     <div>
@@ -148,39 +228,6 @@ export default function AdminPluginAudit() {
             />
           </div>
           <div className="inline-flex h-12 items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 text-sm text-gray-600 dark:text-gray-300">
-            <span className="text-gray-400 dark:text-gray-500">{ui.admin.audit.admin}</span>
-            <select
-              value={selectedActorId}
-              onChange={(e) => setSelectedActorId(e.target.value)}
-              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-hidden max-w-[220px]"
-            >
-              <option value="">{ui.admin.audit.allAdmins}</option>
-              {sortOptionsByLabel(adminUsers.map((currentUser) => ({
-                value: currentUser.id,
-                label: currentUser.display_name || currentUser.email,
-              })), language).map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="inline-flex h-12 items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 text-sm text-gray-600 dark:text-gray-300">
-            <Filter className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-            <span>{ui.admin.audit.action}</span>
-            <select
-              value={action}
-              onChange={(e) => setAction(e.target.value)}
-              className="h-12 bg-transparent text-sm font-medium text-dark dark:text-gray-100 focus:outline-hidden"
-            >
-              <option value="">{ui.admin.pluginAudit.allActions}</option>
-              {sortOptionsByLabel(ACTION_OPTIONS.map((value) => ({
-                value,
-                label: ui.admin.pluginAudit.actionLabels[value] || value,
-              })), language).map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="inline-flex h-12 items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 text-sm text-gray-600 dark:text-gray-300">
             <Filter className="w-4 h-4 text-gray-400 dark:text-gray-500" />
             <span>{ui.admin.audit.period}</span>
             <select
@@ -212,114 +259,47 @@ export default function AdminPluginAudit() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-        {loading ? (
-          <div className="animate-pulse p-6 space-y-3">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-10 bg-gray-50 dark:bg-gray-900 rounded-lg" />
-            ))}
-          </div>
-        ) : loadFailed ? (
-          <div className="text-center py-16 text-gray-500 dark:text-gray-400" role="alert">
-            <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-40" />
-            <p className="text-lg font-medium">{ui.admin.audit.loadFailed}</p>
-            <button
-              type="button"
-              onClick={() => loadLogs(page)}
-              className="mt-4 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-semibold text-dark dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
-            >
-              {ui.common.retry}
-            </button>
-          </div>
-        ) : logs.length === 0 ? (
-          <div className="text-center py-16 text-gray-400 dark:text-gray-500">
-            <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-40" />
-            <p className="text-lg font-medium">{ui.admin.pluginAudit.emptyTitle}</p>
-            <p className="text-sm mt-1">{ui.admin.pluginAudit.emptyBody}</p>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 dark:border-gray-800">
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.common.date}</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.audit.admin}</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.audit.action}</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.pluginAudit.plugin}</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{ui.admin.audit.details}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((log) => (
-                    <tr key={log.id} className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 align-top">
-                      <td className="px-5 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDate(log.created_at)}</td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <UserAvatar
-                            userId={log.actor_id}
-                            displayName={log.actor_name}
-                            email={log.actor_email}
-                            avatarColor={null}
-                            className="w-6 h-6"
-                            initialsClassName="text-[10px]"
-                          />
-                          <div className="min-w-0">
-                            <p className="text-dark dark:text-gray-100 font-medium truncate text-xs">{log.actor_name || ui.admin.audit.actorLabels?.[log.actor_id] || ui.admin.audit.removedUser}</p>
-                            <p className="text-gray-400 dark:text-gray-500 truncate text-[11px]">{log.actor_email || '-'}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          log.action === 'approve'
-                            ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
-                            : 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300'
-                        }`}>
-                          {ui.admin.pluginAudit.actionLabels[log.action] || log.action}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-dark dark:text-gray-100">{log.target_id || '-'}</span>
-                          <span className="text-[11px] text-gray-400 dark:text-gray-500">{log.details?.name || log.details?.version || ui.admin.pluginAudit.pluginFallback}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3 min-w-[280px]">
-                        <AuditDetails event={describeAuditLog(log, { ui, refs })} ui={ui} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-gray-800">
-                <p className="text-xs text-gray-400 dark:text-gray-500">
-                  {formatMessage(ui.admin.pluginAudit.pageSummary, { page: pagination.page, pages: pagination.pages, total: pagination.total })}
-                </p>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
-                    disabled={pagination.page <= 1}
-                    className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setPage((current) => Math.min(pagination.pages, current + 1))}
-                    disabled={pagination.page >= pagination.pages}
-                    className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-dark dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      {!hasLoaded && !loadFailed ? (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 animate-pulse p-6 space-y-3">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="h-10 bg-gray-50 dark:bg-gray-900 rounded-lg" />
+          ))}
+        </div>
+      ) : loadFailed ? (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 text-center py-16 text-gray-500 dark:text-gray-400" role="alert">
+          <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-40" />
+          <p className="text-lg font-medium">{ui.admin.audit.loadFailed}</p>
+          <button
+            type="button"
+            onClick={() => loadLogs(pageIndex + 1)}
+            className="mt-4 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-semibold text-dark dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            {ui.common.retry}
+          </button>
+        </div>
+      ) : (
+        <DataTable
+          headerPaddingClassName="px-5"
+          server
+          loading={loading}
+          rows={logs}
+          rowCount={pagination.total}
+          getRowId={(log) => String(log.id)}
+          columns={columns}
+          sortFns={SORTABLE}
+          sorting={sorting}
+          onSortingChange={setSorting}
+          columnFilters={columnFilters}
+          onColumnFiltersChange={setColumnFilters}
+          pageIndex={pageIndex}
+          onPageIndexChange={setPageIndex}
+          pageSize={pageSize}
+          pageResetKey={JSON.stringify([debouncedSearch, retentionDays])}
+          storageKey="frontdoor.admin.pluginAudit.columns"
+          labels={tableLabels}
+          rowClassName="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 align-top text-sm"
+        />
+      )}
     </div>
   );
 }

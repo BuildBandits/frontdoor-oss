@@ -67,6 +67,11 @@ function readStoredVisibility(storageKey) {
  * `onRowClick`, `isRowExpanded` and `renderExpandedRow` add a full-width detail row under a row;
  * `getRowRef(row)` returns a ref callback for the row (e.g. to scroll to it);
  * `onFilteredRowsChange(rows)` reports every row left after the column filters, across pages.
+ *
+ * Server mode (`server`): `rows` is the current page as returned by the API and `rowCount` the
+ * total. Sorting, filters and page are not applied here: pass them controlled (`sorting` /
+ * `onSortingChange`, `columnFilters` / `onColumnFiltersChange`, `pageIndex` / `onPageIndexChange`)
+ * and send them with the request. Sort keys are column ids; `loading` dims the rows meanwhile.
  */
 export default function DataTable({
   columns,
@@ -83,17 +88,28 @@ export default function DataTable({
   onFilteredRowsChange,
   getRowRef,
   rowClassName,
+  server = false,
+  rowCount,
+  loading = false,
+  sorting: controlledSorting,
+  onSortingChange,
+  pageIndex: controlledPageIndex,
+  onPageIndexChange,
   columnFilters: controlledFilters,
   onColumnFiltersChange,
   onRowClick,
   isRowExpanded,
   renderExpandedRow,
 }) {
-  const [sorting, setSorting] = useState([]);
+  const [internalSorting, setInternalSorting] = useState([]);
+  const sorting = controlledSorting ?? internalSorting;
+  const setSorting = onSortingChange ?? setInternalSorting;
   const [internalFilters, setInternalFilters] = useState([]);
   const columnFilters = controlledFilters ?? internalFilters;
   const setColumnFilters = onColumnFiltersChange ?? setInternalFilters;
-  const [pageIndex, setPageIndex] = useState(0);
+  const [internalPageIndex, setInternalPageIndex] = useState(0);
+  const pageIndex = controlledPageIndex ?? internalPageIndex;
+  const setPageIndex = onPageIndexChange ?? setInternalPageIndex;
   // Defaults are read once; later changes come from the column picker.
   const [defaultVisibility] = useState(
     () => Object.fromEntries(columns.filter((column) => column.hiddenByDefault).map((column) => [column.id, false])),
@@ -112,7 +128,7 @@ export default function DataTable({
     const isHidden = ({ id }) => columnVisibility[id] === false;
     setColumnFilters((current) => (current.some(isHidden) ? current.filter((entry) => !isHidden(entry)) : current));
     setSorting((current) => (current.some(isHidden) ? current.filter((entry) => !isHidden(entry)) : current));
-  }, [columnVisibility, setColumnFilters]);
+  }, [columnVisibility, setColumnFilters, setSorting]);
 
   useEffect(() => {
     if (!storageKey) return;
@@ -136,18 +152,21 @@ export default function DataTable({
       accessorFn: (row) => row,
       enableHiding: hideable === '1',
       enableColumnFilter: Boolean(filterType),
-      filterFn: filterType === 'text' ? textFilterFn(getValue) : filterType === 'values' ? valuesFilterFn(getValue) : undefined,
+      // In server mode the API filters; no client-side filter function is needed.
+      filterFn: server || !filterType ? undefined : filterType === 'text' ? textFilterFn(getValue) : valuesFilterFn(getValue),
+      // Server mode: `sortFns` only marks sortable columns (any truthy value).
       enableSorting: Boolean(sortFns?.[id]),
       sortDescFirst: false,
-      sortFn: sortFns?.[id] ? (rowA, rowB) => sortFns[id](rowA.original, rowB.original) : undefined,
+      sortFn: !server && sortFns?.[id] ? (rowA, rowB) => sortFns[id](rowA.original, rowB.original) : undefined,
     };
   // The getters are listed one by one so a new array of the same functions does not rebuild.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [columnShape, sortFns, ...filterGetters]);
+  }), [columnShape, sortFns, server, ...filterGetters]);
 
+  // `onPageIndexChange` must be stable (a state setter), or this would reset the page on every render.
   useEffect(() => {
     setPageIndex(0);
-  }, [pageResetKey, pageSize, sorting, columnFilters]);
+  }, [pageResetKey, pageSize, sorting, columnFilters, setPageIndex]);
 
   const table = useTable({
     features,
@@ -163,12 +182,16 @@ export default function DataTable({
       setPageIndex(next.pageIndex);
     },
     autoResetPageIndex: false,
+    manualPagination: server,
+    manualSorting: server,
+    manualFiltering: server,
+    rowCount: server ? rowCount : undefined,
     enableMultiSort: false,
     enableSortingRemoval: false,
   });
 
   const filteredRowModel = table.getPrePaginatedRowModel();
-  const filteredCount = filteredRowModel.rows.length;
+  const filteredCount = server ? (rowCount ?? 0) : filteredRowModel.rows.length;
   useEffect(() => {
     onFilteredCountChange?.(filteredCount);
   }, [filteredCount, onFilteredCountChange]);
@@ -183,7 +206,7 @@ export default function DataTable({
   // Rows removed from the last page (delete, filter) must not leave an empty page behind.
   useEffect(() => {
     if (pageIndex > pages - 1) setPageIndex(pages - 1);
-  }, [pageIndex, pages]);
+  }, [pageIndex, pages, setPageIndex]);
 
   const columnsById = new Map(columns.map((column) => [column.id, column]));
   const pagination = { page: pageIndex + 1, pages, total: filteredCount };
@@ -239,7 +262,7 @@ export default function DataTable({
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
       <PaginationControls {...paginationProps} actions={actions} variant="attached-top" />
       <div className="overflow-x-auto">
-      <table className="w-full">
+      <table className="w-full" aria-busy={loading || undefined}>
         <thead>
           {table.getHeaderGroups().map((group) => (
             <tr key={group.id} className="border-b border-gray-100 dark:border-gray-800">
@@ -276,7 +299,7 @@ export default function DataTable({
             </tr>
           ))}
         </thead>
-        <tbody>
+        <tbody className={loading ? 'opacity-50 transition-opacity' : undefined}>
           {table.getRowModel().rows.map((row) => (
             <Fragment key={row.id}>
               <tr
