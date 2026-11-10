@@ -1197,6 +1197,8 @@ export default function AdminUsers() {
                 value={visibleAppsSearch}
                 onChange={setVisibleAppsSearch}
                 placeholder={t.visibleAppsSearchPlaceholder}
+                searchShortcutTarget="primary"
+                searchShortcutLabel={ui.common.searchShortcut}
                 clearLabel={ui.common.clearSearch}
                 restoreOnEscape={false}
                 autoFocus

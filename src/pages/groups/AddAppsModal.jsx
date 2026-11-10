@@ -29,6 +29,8 @@ export default function AddAppsModal({
               value={appSearch}
               onChange={setAppSearch}
               placeholder={g.searchAppsPlaceholder}
+              searchShortcutTarget="primary"
+              searchShortcutLabel={ui.common.searchShortcut}
               className="mb-3"
               clearLabel={ui.common.clearSearch}
             />

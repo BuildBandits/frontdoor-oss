@@ -30,6 +30,8 @@ export default function AddMembersModal({
               value={memberSearch}
               onChange={setMemberSearch}
               placeholder={g.memberSearchPlaceholder}
+              searchShortcutTarget="primary"
+              searchShortcutLabel={ui.common.searchShortcut}
               className="mb-3"
               clearLabel={ui.common.clearSearch}
             />

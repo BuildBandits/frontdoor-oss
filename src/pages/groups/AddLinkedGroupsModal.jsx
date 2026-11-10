@@ -55,6 +55,8 @@ function AddLinkedGroupsDialog({
           value={groupLinkSearch}
           onChange={setGroupLinkSearch}
           placeholder={g.linkedGroupsSearchPlaceholder}
+          searchShortcutTarget="primary"
+          searchShortcutLabel={ui.common.searchShortcut}
           className="mb-3"
           clearLabel={ui.common.clearSearch}
         />

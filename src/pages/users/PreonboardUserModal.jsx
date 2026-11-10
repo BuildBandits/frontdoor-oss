@@ -150,6 +150,8 @@ export default function PreonboardUserModal({ onClose, onCompleted, ui }) {
               value={query}
               onChange={setQuery}
               placeholder={p.searchPlaceholder}
+              searchShortcutTarget="primary"
+              searchShortcutLabel={ui.common.searchShortcut}
               clearLabel={ui.common.clearSearch}
               autoFocus
             />
@@ -238,6 +240,8 @@ export default function PreonboardUserModal({ onClose, onCompleted, ui }) {
                   value={groupSearch}
                   onChange={setGroupSearch}
                   placeholder={p.groupSearchPlaceholder}
+                  searchShortcutTarget="primary"
+                  searchShortcutLabel={ui.common.searchShortcut}
                   clearLabel={ui.common.clearSearch}
                 />
                 <div className="mt-3 grid gap-2 sm:grid-cols-2 max-h-[36vh] overflow-y-auto pr-1">

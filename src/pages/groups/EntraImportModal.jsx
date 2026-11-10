@@ -54,6 +54,8 @@ function EntraImportDialog({
               value={entraSearch}
               onChange={setEntraSearch}
               placeholder={g.searchEntraPlaceholder}
+              searchShortcutTarget="primary"
+              searchShortcutLabel={ui.common.searchShortcut}
               clearLabel={ui.common.clearSearch}
               autoFocus
             />
