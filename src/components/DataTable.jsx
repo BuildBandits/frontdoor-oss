@@ -81,7 +81,21 @@ export default function DataTable({
   const [defaultVisibility] = useState(
     () => Object.fromEntries(columns.filter((column) => column.hiddenByDefault).map((column) => [column.id, false])),
   );
-  const [columnVisibility, setColumnVisibility] = useState(() => ({ ...defaultVisibility, ...readStoredVisibility(storageKey) }));
+  const [columnVisibility, setColumnVisibility] = useState(() => {
+    // Only hideable columns and boolean values: an old or edited entry must not hide the
+    // name or actions column, which the picker could not bring back.
+    const hideable = new Set(columns.filter((column) => column.hideable !== false).map((column) => column.id));
+    const stored = Object.entries(readStoredVisibility(storageKey) || {})
+      .filter(([id, visible]) => hideable.has(id) && typeof visible === 'boolean');
+    return { ...defaultVisibility, ...Object.fromEntries(stored) };
+  });
+  // A hidden column shows neither its funnel nor its sort arrow, so it must not keep filtering
+  // or sorting the rows unseen.
+  useEffect(() => {
+    const isHidden = ({ id }) => columnVisibility[id] === false;
+    setColumnFilters((current) => (current.some(isHidden) ? current.filter((entry) => !isHidden(entry)) : current));
+    setSorting((current) => (current.some(isHidden) ? current.filter((entry) => !isHidden(entry)) : current));
+  }, [columnVisibility]);
 
   useEffect(() => {
     if (!storageKey) return;
