@@ -1354,41 +1354,50 @@ export default function Customization() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.maintenance.appIconCacheTitle}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.maintenance.appIconCacheHelp}</p>
-                    <p className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs text-gray-400 dark:text-gray-500">
-                      <span>
-                        {cacheStatsLoading
-                          ? ui.common.loading
-                          : `${cacheStats?.appIconCache?.totalFiles || 0} ${ui.customization.maintenance.cacheFiles} · ${formatBytes(cacheStats?.appIconCache?.totalBytes || 0)} · ${cacheStats?.appIconCache?.orphanFiles || 0} ${ui.customization.maintenance.cacheOrphans} ·`}
-                      </span>
-                      <a
-                        href="/admin/icons"
-                        className="font-semibold text-dark dark:text-gray-100 underline decoration-accent decoration-2 underline-offset-2 transition-colors hover:text-accent-dark hover:decoration-accent-dark"
-                      >
-                        {ui.customization.maintenance.openMediaLibrary}
-                      </a>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                      {cacheStatsLoading
+                        ? ui.common.loading
+                        : `${cacheStats?.appIconCache?.totalFiles || 0} ${ui.customization.maintenance.cacheFiles} · ${formatBytes(cacheStats?.appIconCache?.totalBytes || 0)} · ${cacheStats?.appIconCache?.orphanFiles || 0} ${ui.customization.maintenance.cacheOrphans}`}
                     </p>
                   </div>
-                  <div className="flex items-start lg:shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => openConfirm({
-                        title: ui.customization.maintenance.refreshAppIconCacheConfirmTitle,
-                        message: ui.customization.maintenance.refreshAppIconCacheConfirmMessage,
-                        confirmLabel: ui.customization.maintenance.refreshAppIconCacheConfirmLabel,
-                        onConfirm: cleanupAppIconCache,
-                      })}
-                      disabled={iconCacheCleaning}
-                      className="inline-flex w-full lg:w-[240px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      {iconCacheCleaning ? ui.customization.maintenance.refreshAppIconCacheBusy : ui.customization.maintenance.refreshAppIconCache}
-                    </button>
+                  <button
+                    type="button"
+                    onClick={() => openConfirm({
+                      title: ui.customization.maintenance.refreshAppIconCacheConfirmTitle,
+                      message: ui.customization.maintenance.refreshAppIconCacheConfirmMessage,
+                      confirmLabel: ui.customization.maintenance.refreshAppIconCacheConfirmLabel,
+                      onConfirm: cleanupAppIconCache,
+                    })}
+                    disabled={iconCacheCleaning}
+                    className="mt-auto inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {iconCacheCleaning ? ui.customization.maintenance.refreshAppIconCacheBusy : ui.customization.maintenance.refreshAppIconCache}
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-dark dark:text-gray-100">{ui.customization.maintenance.mediaLibraryTitle}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{ui.customization.maintenance.mediaLibraryHelp}</p>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                      {cacheStatsLoading
+                        ? ui.common.loading
+                        : `${cacheStats?.mediaLibrary?.total || 0} ${ui.customization.maintenance.cacheFiles} · ${formatBytes(cacheStats?.mediaLibrary?.totalBytes || 0)} · ${cacheStats?.mediaLibrary?.orphanAssets || 0} ${ui.customization.maintenance.cacheOrphans}`}
+                    </p>
                   </div>
+                  <RouterLink
+                    to="/admin/icons"
+                    className="mt-auto inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+                  >
+                    <Image className="h-4 w-4" />
+                    {ui.customization.maintenance.openMediaLibrary}
+                  </RouterLink>
                 </div>
               </div>
 

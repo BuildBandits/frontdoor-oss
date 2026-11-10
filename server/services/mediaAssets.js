@@ -477,6 +477,7 @@ export function listMediaAssets({
     assets,
     summary: {
       total,
+      totalBytes: visibleAssets.reduce((sum, asset) => sum + (asset.size_bytes || 0), 0),
       appIcon: visibleAssets.filter((asset) => asset.kind === 'app-icon').length,
       brandingLogo: visibleAssets.filter((asset) => asset.kind === 'branding-logo').length,
       orphanAssets: groupedAssets.filter((asset) => asset.hasOrphanMembers).length,
