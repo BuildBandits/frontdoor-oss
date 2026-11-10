@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Eye, Shield, ShieldOff, UserCheck, UserX, UserPlus, Users, Trash2, X, Info, RefreshCw, AlertTriangle, Filter, LogIn } from 'lucide-react';
 import api from '../services/api';
@@ -284,13 +284,17 @@ export default function AdminUsers() {
   };
 
   // The search box narrows the rows; role, status and the other columns are filtered inside the table.
-  const filtered = users
+  // Memoized: a new array would make the table rebuild and re-sort every row on each render.
+  const filtered = useMemo(() => users
     .filter((u) => {
       if (!search.trim()) return true;
       const q = search.toLowerCase();
       return (u.display_name || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
     })
-    .map((u) => ({ ...u, personalized: hasAtLeastOnePersonalization(u) }));
+    .map((u) => ({ ...u, personalized: hasAtLeastOnePersonalization(u) })),
+  // hasAtLeastOnePersonalization only reads the branding defaults listed here.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [users, search, defaultHomeDesktopView, brandingLanguage, brandingTimeZone, defaultColorScheme]);
 
   const groupLabel = (group) => group.entra_display_name || group.name;
   const openManagedGroup = (group) => {
@@ -890,7 +894,7 @@ export default function AdminUsers() {
                 {' '}&middot;{' '}
                 <button
                   type="button"
-                  onClick={() => setUserColumnFilters([{ id: 'last_login', value: ['never'] }])}
+                  onClick={() => setUserColumnFilters((current) => [...current.filter((entry) => entry.id !== 'last_login'), { id: 'last_login', value: ['never'] }])}
                   title={u.showAwaitingFirstSignIn}
                   className="hover:text-dark dark:hover:text-white hover:underline"
                 >
