@@ -28,7 +28,7 @@ const features = tableFeatures({
 // Option value for "no value" in a checklist filter (e.g. an app without tags).
 export const EMPTY_FILTER_VALUE = '__empty__';
 
-const HEADER_CLASS = 'px-6 py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider';
+const HEADER_CLASS = 'py-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider';
 const SORT_BUTTON_CLASS = 'inline-flex items-center gap-1 bg-transparent border-0 p-0 m-0 text-inherit font-[inherit] leading-[inherit] uppercase hover:text-dark dark:hover:text-white';
 
 const textFilterFn = (getValue) => (row, _columnId, filterValue) => (
@@ -82,6 +82,8 @@ export default function DataTable({
   pageResetKey,
   storageKey,
   labels,
+  // Horizontal padding of the header cells: the same as the table's body cells, so titles line up.
+  headerPaddingClassName = 'px-6',
   onFilteredCountChange,
   onFilteredRowsChange,
   getRowRef,
@@ -270,7 +272,7 @@ export default function DataTable({
                 return (
                   <th
                     key={header.id}
-                    className={`${HEADER_CLASS} ${column.headerClassName || 'text-left'}`}
+                    className={`${HEADER_CLASS} ${headerPaddingClassName} ${column.headerClassName || 'text-left'}`}
                     aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : undefined}
                   >
                     <span className="inline-flex items-center gap-1.5">
