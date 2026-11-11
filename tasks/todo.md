@@ -137,23 +137,21 @@ production yet, so no grant migration is needed.
 
 ### R3 — Future of the `ADMIN_API_KEY` bulk endpoints (#172)
 
-Position to propose: agreed, deprecation is a decision to take, not a removal in #167.
-MCP is the replacement for *interactive* catalogue work only (ADR 0005: changes are
-confirmed by a person). Unattended server-to-server sync needs a different
-credential: a revocable, per-integration, scoped token on the regular API, not MCP.
+Agree with the direction, keep it light: ADRs are being introduced to the
+maintainers by #172 itself (ADR 0001), so no new ADR for a maintainer-level
+decision until the practice is adopted. Record the question, do not decide it.
 
-- [ ] ADR 0007 "Retire the shared ADMIN_API_KEY" (Proposed, not accepted: a maintainer
-      decision), with options: (a) keep as is; (b) per-integration revocable API tokens
-      with scopes and their own audit actor; (c) MCP only. Recommendation (b), plus MCP
-      for the interactive use cases
-- [ ] Roadmap `03-roadmap.md`: a migration section — use cases (export, upsert by slug,
-      tags, groups on create), which go to MCP and which to integration tokens, the
-      fields the export has that MCP results omit, migration guide, then removal in a
-      documented breaking release
-- [ ] `04-phase2-spec.md` "Never via MCP": the bulk line points to ADR 0007 instead of
-      reading as permanent
-- [ ] CHANGELOG roadmap entry: "Replace the shared admin API key with revocable
-      integration tokens" (in #167, where CHANGELOG lives)
+Position for the reply: deprecation is a decision to take later, never a removal
+in #167. MCP can replace the *interactive* catalogue work only (ADR 0005: a person
+confirms every change); unattended server-to-server sync would need its own
+revocable, per-integration credential on the regular API.
+
+- [ ] `03-roadmap.md`: a short "Open question: the shared admin API key" section —
+      the use cases (export, upsert by slug, tags, groups on create), the gaps lombax85
+      listed, and the order (decision → replacement → migration guide → removal in a
+      documented breaking release)
+- [ ] `04-phase2-spec.md` "Never via MCP": the bulk line points to that open question
+- [ ] CHANGELOG roadmap entry (in #167): "Decide the future of the shared admin API key"
 
 ### R4 — Close the round
 
