@@ -153,14 +153,23 @@ their existing tests green, before any tool uses it.
 
 | Tool | Minimum role | Input | Output (projection) |
 | --- | --- | --- | --- |
-| `search_my_apps` | user | `query?`, `tag?`, `limit≤50` | name, slug, description, tags, launch URL, favourite |
+| `search_my_apps` | user | `query?`, `tag?`, `limit≤50`, `cursor?` | name, slug, description, tags, launch URL, favourite |
 | `get_my_preferences` | user | — | favourites (slugs), colour scheme, language |
 | `set_favorite_app` | user | `slug`, `favorite: boolean` | updated favourites |
 | `set_color_scheme` | user | `light \| dark \| auto` | updated preferences |
 | `set_language` | user | `en \| it` | updated value |
-| `list_apps` | admin_readonly | `filter: all \| no_groups \| no_tags`, `limit≤200` | name, slug, tags, mode, active, group count |
+| `list_apps` | admin_readonly | `filter: all \| no_groups \| no_tags`, `limit≤200`, `cursor?` | name, slug, tags, mode, active, group count |
 | `get_app_access` | admin_readonly | `slug` | groups granting access (name, source, nested local and Entra-linked groups, active users reaching the app through it) and the distinct total |
-| `list_groups` | admin_readonly | `query?`, `limit≤200` | name, source, member count, app count |
+| `list_groups` | admin_readonly | `query?`, `limit≤200`, `cursor?` | name, source, member count, app count |
+
+List tools (`search_my_apps`, `list_apps`, `list_groups`) are paged and never
+truncate silently: each answer carries `total`, `hasMore` and, while more items
+exist, `nextCursor`. The cursor is an opaque offset bound to the tool and its
+filters; with other arguments, or malformed, it is a tool error rather than a
+restart from the first page. A cursor past the end, because items were removed
+between calls, is an empty last page. Ordering is deterministic (the routes'
+order plus a unique tie-breaker). Tool descriptions tell the assistant to follow
+`nextCursor` before calling a list complete. (Review round 1, lombax85.)
 
 Tool inputs are validated with strict schemas (unknown keys rejected, string
 lengths capped). Tools not allowed for the caller's role are not listed for
