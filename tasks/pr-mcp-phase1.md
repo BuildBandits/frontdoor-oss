@@ -81,13 +81,14 @@ Also required before merging (tracked in #171):
 
 Adds an optional MCP server so people use Frontdoor from the AI assistant they
 already have (Claude, ChatGPT, Copilot Studio, VS Code): find the apps they can
-open, and set their favourites, colour scheme and language; admins get
+open, and set their favourites, colour scheme and language (a permission the
+user can untick at consent to connect read-only); admins get
 read-only answers about apps and groups (counts, never identities). It ships
 **off**: the owner turns it on and approves each assistant.
 
 ## Related issue
 
-Part of #171 (phase 1 of 3; the issue stays open for phases 2 and 3). Proposal and decisions in `docs/design/mcp/` and ADRs 0001–0004.
+Part of #171 (phase 1 of 3; the issue stays open for phases 2 and 3). Proposal and decisions in `docs/design/mcp/` and ADRs 0001–0004, plus ADR 0006 (proposed) for the two scopes.
 
 ## Type of change
 
@@ -111,6 +112,9 @@ Part of #171 (phase 1 of 3; the issue stays open for phases 2 and 3). Proposal a
   SDK v2 handler (ADR 0002), Origin check, per-IP and per-connection rate
   limits, 64 KiB body cap; 8 tools whose results are built only from declared
   field lists (`projection.js`), with a test that fails on any other field.
+  Two scopes (ADR 0006): `frontdoor.read`, strictly read-only, and
+  `frontdoor.preferences` for the three `set_*` tools, which the user can untick
+  on the consent page. List tools are paged (`total`, `hasMore`, `nextCursor`).
 - **Shared services**: app visibility, the admin app list and the admin group
   list moved out of the routes into `appCatalog.js` / `groupCatalog.js`, so
   routes and tools use the same queries (characterisation tests first).
@@ -122,6 +126,13 @@ Part of #171 (phase 1 of 3; the issue stays open for phases 2 and 3). Proposal a
   controls (switch, approved assistants, disconnect everyone).
 - **Docs**: `docs/mcp.md` (operators, DPO), SECURITY.md pointer, FEATURES.md,
   CHANGELOG.
+
+## Review round 1 (lombax85, 2026-11-10)
+
+- **Scope naming** → two scopes chosen at consent (ADR 0006), `test/mcpScopes.test.js`,
+  browser and `curl` check in `docs/design/mcp/reviews/2026-11-11-e2e-scopes.md`.
+- **Result completeness** → paged list tools with a query-bound cursor, `test/mcpPagination.test.js`.
+- **Bulk endpoints** (#172) → open question in the roadmap; nothing removed here.
 
 ## Breaking changes
 
@@ -181,10 +192,12 @@ along the way are reported separately, not fixed here (see `tasks/todo.md`).
 
 ## How to test
 
-1. `npm ci && npm run build`, then `DEV_LOGIN=true FRONTEND_URL=http://localhost:3001 npm start`.
+1. `npm ci && npm run build`, then `DEV_LOGIN=true BASE_DOMAIN=localhost FRONTEND_URL=http://localhost:3001 npm start`.
 2. Sign in as Owner, open *AI assistants*, switch it on, add a *Registered client*
-   with redirect `http://127.0.0.1:8765/callback`; copy the ID and secret.
+   with redirect `http://127.0.0.1:8799/callback` (any port no other local site
+   has used: a service worker registered for that origin would answer it); copy the ID and secret.
 3. Follow `docs/design/mcp/reviews/2026-11-03-e2e-local.md` (authorize URL with
-   PKCE, consent, `curl` token exchange, `tools/list`, `tools/call`).
+   PKCE, consent, `curl` token exchange, `tools/list`, `tools/call`) and
+   `2026-11-11-e2e-scopes.md` (untick the preferences checkbox: `tools/list` loses the `set_*` tools).
 4. Or connect Claude Code via CIMD: add `https://claude.ai/oauth/claude-code-client-metadata`
    as a metadata document, then `claude mcp add --transport http frontdoor http://localhost:3001/mcp`.

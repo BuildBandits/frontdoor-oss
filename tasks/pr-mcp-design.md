@@ -42,12 +42,17 @@ Part of #171.
 
 - `docs/design/mcp/01-proposal.md`: the proposal, covering the principles, the outbound filter, writes as proposals, owner controls, the non-goals and the open questions.
 - `docs/design/mcp/02-phase1-spec.md`: the phase 1 specification, with the authorization server rules, the mediation layer, the data model, GDPR and the threat model.
-- `docs/design/mcp/03-roadmap.md`: what phase 1 delivers for phase 2, and the plan for phases 2 and 3.
+- `docs/design/mcp/03-roadmap.md`: what phase 1 delivers for phase 2, the plan for phases 2 and 3, and the open question on the shared admin API key of the bulk endpoints (review round 1).
 - `docs/design/mcp/04-phase2-spec.md` and `mockups/`: the first step of phase 2, covering the `propose_access_change` tool, pending changes, the review page, apply with an effect digest, the audit and the threat model.
 - `docs/design/mcp/research/`: the codebase survey and the MCP spec and SDK research behind the decisions.
-- `docs/adr/`: the ADR process (0001), SDK v2 (0002), Frontdoor as a minimal OAuth authorization server (0003), client registration via metadata documents and pre-registration without DCR (0004), and writes only as confirmed proposals (0005), all **Accepted by the author**. `accepted.ledger` freezes the Context and Decision of accepted ADRs, and `check_adr_immutability.py` verifies it. Wiring that check into CI can be a small follow-up PR.
+- `docs/adr/`: the ADR process (0001), SDK v2 (0002), Frontdoor as a minimal OAuth authorization server (0003), client registration via metadata documents and pre-registration without DCR (0004), and writes only as confirmed proposals (0005), all **Accepted by the author**. ADR 0006, which splits the scope into `frontdoor.read` and `frontdoor.preferences` chosen at consent, is **Proposed** (review round 1). `accepted.ledger` freezes the Context and Decision of accepted ADRs, and `check_adr_immutability.py` verifies it. Wiring that check into CI can be a small follow-up PR.
 
 ADRs 0001–0005 say "Accepted" for decisions whose code is still in review in #167 or not written yet (0005). That is normal for ADRs: they record the decision, not the merge. If the maintainers disagree with one, it is superseded, not edited.
+
+## Review round 1 (lombax85, 2026-11-10)
+
+- Future of the bulk endpoints: recorded as an open question in `03-roadmap.md`, not decided and nothing removed; the "Never via MCP" line in the phase 2 spec points to it.
+- From the review of #167: ADR 0006 (two scopes) and the phase 1 spec rules for scopes (§4 rule 15) and paged list results (§7).
 
 ## Breaking changes
 

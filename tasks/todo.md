@@ -90,7 +90,7 @@ push, and this file updated.
 ## Review round 1 — lombax85, 2026-11-10
 
 Three comments: two on #167 (scope naming, result completeness), one on #172
-(future of the `ADMIN_API_KEY` bulk endpoints). Status: plan awaiting confirmation.
+(future of the `ADMIN_API_KEY` bulk endpoints). Status: R1–R3 done and pushed 2026-11-11; replies posted; waiting for lombax85.
 
 Branch logistics: design documents and ADRs live in #172 (`docs/mcp-design`);
 code, tests, `docs/mcp.md` and CHANGELOG live in #167 (`feat/mcp-server`). Each
@@ -170,10 +170,12 @@ revocable, per-integration credential on the regular API.
 ### R4 — Close the round
 
 - [x] Draft the three replies to lombax85 in `tasks/review-round-1-replies.md`;
-      post them only after the author approves the text
-- [ ] PR descriptions `tasks/pr-mcp-phase1.md` and `tasks/pr-mcp-design.md` updated,
+      post them only after the author approves the text — approved and posted 2026-11-11:
+      #167 issuecomment-6791498237 and -6791498717, #172 issuecomment-6791499163
+- [x] PR descriptions `tasks/pr-mcp-phase1.md` and `tasks/pr-mcp-design.md` updated,
       then pushed to GitHub
-- [ ] Re-request review from lombax85
+- [ ] Re-request review from lombax85 — not possible from this account (the API answers 404:
+      no triage rights on BuildBandits); lombax85 is notified by the replies in the threads he started
 
 ## Phase 2 — admin write proposals (after phase 1 holds in production)
 
