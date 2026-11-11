@@ -20,7 +20,7 @@ const USER_TOOLS = ['get_my_preferences', 'search_my_apps', 'set_color_scheme', 
 const ADMIN_TOOLS = ['get_app_access', 'list_apps', 'list_groups'];
 
 function issueToken(userId) {
-  db.prepare("INSERT OR IGNORE INTO mcp_grants (id, user_id, client_id, client_name, scope) VALUES (?, ?, 'ep-client', 'Endpoint Test', 'frontdoor.read')").run(`grant-${userId}`, userId);
+  db.prepare("INSERT OR IGNORE INTO mcp_grants (id, user_id, client_id, client_name, scope) VALUES (?, ?, 'ep-client', 'Endpoint Test', 'frontdoor.read frontdoor.preferences')").run(`grant-${userId}`, userId);
   const token = randomToken();
   db.prepare("INSERT INTO mcp_tokens (token_hash, grant_id, kind, family_id, resource, expires_at) VALUES (?, ?, 'access', 'f', ?, datetime('now', '+10 minutes'))")
     .run(sha256(token), `grant-${userId}`, `${base}/mcp`);

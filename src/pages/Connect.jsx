@@ -10,6 +10,10 @@ import { apiErrorMessage } from '../utils/apiErrors';
 // MCP consent page (docs/design/mcp/02-phase1-spec.md §4 rules 7–9). The
 // server binds the request to this browser and accepts the decision only
 // from this origin; the page itself is served with frame-ancestors 'none'.
+// The user may untick frontdoor.preferences to connect read-only (ADR 0006).
+
+const SCOPE_READ = 'frontdoor.read';
+const SCOPE_PREFERENCES = 'frontdoor.preferences';
 
 function Shell({ children }) {
   return (
@@ -61,6 +65,7 @@ export default function Connect() {
   const [request, setRequest] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [keepPreferences, setKeepPreferences] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,7 +79,8 @@ export default function Connect() {
   const decide = async (approve) => {
     setBusy(true);
     try {
-      const res = await api.post(`/mcp/authorizations/${encodeURIComponent(id)}/decision`, { approve });
+      const scopes = request.scopes.filter((scope) => scope === SCOPE_READ || (scope === SCOPE_PREFERENCES && keepPreferences));
+      const res = await api.post(`/mcp/authorizations/${encodeURIComponent(id)}/decision`, approve ? { approve, scopes } : { approve });
       // The server built this URL from the redirect URI it validated (rule 4).
       window.location.assign(res.data.location);
     } catch (err) {
@@ -123,7 +129,25 @@ export default function Connect() {
           ))}
         </ul>
       </Section>
-      <Section icon={Pencil} title={copy.canDoTitle}>{copy.canDo}</Section>
+      <Section icon={Pencil} title={copy.canDoTitle}>
+        {request.scopes.includes(SCOPE_PREFERENCES) ? (
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={keepPreferences}
+              onChange={(event) => setKeepPreferences(event.target.checked)}
+              disabled={busy}
+              aria-labelledby="connect-preferences-label"
+              aria-describedby="connect-preferences-help"
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-dark focus:ring-2 focus:ring-accent"
+            />
+            <span>
+              <span id="connect-preferences-label" className="block font-medium text-dark dark:text-gray-100">{copy.canDoPreferences}</span>
+              <span id="connect-preferences-help" className="block text-xs text-gray-500 dark:text-gray-400">{copy.canDoPreferencesHelp}</span>
+            </span>
+          </label>
+        ) : copy.canDoNothing}
+      </Section>
       <Section icon={EyeOff} title={copy.neverTitle}>{copy.never}</Section>
 
       <p className="mt-5 text-sm font-medium text-dark dark:text-gray-100 break-words">

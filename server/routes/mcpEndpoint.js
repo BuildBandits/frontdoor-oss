@@ -77,6 +77,7 @@ router.use(rateLimit({
 const handler = createMcpHandler(({ authInfo }) => createFrontdoorMcpServer(db, {
   userId: authInfo?.extra?.userId,
   grantId: authInfo?.extra?.grantId,
+  scopes: authInfo?.scopes ?? [],
   clientName: authInfo?.extra?.clientName,
 }), {
   onerror: (error) => console.error('MCP request failed:', error?.message),

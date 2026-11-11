@@ -6,7 +6,7 @@
 // SQLite's datetime('now') format (UTC) and are compared inside SQL.
 import { logRbacAudit } from '../../db.js';
 import { ClientError, redirectUriMatches, resolveClient, verifyClientSecret } from './clients.js';
-import { MCP_SCOPE, getMcpUrls } from './config.js';
+import { MCP_SCOPES, MCP_SCOPE_READ, getMcpUrls, parseScopes, scopeList } from './config.js';
 import { isValidS256Challenge, randomToken, sha256, verifyPkceS256 } from './crypto.js';
 import { isMcpEnabled, revokeGrants } from './settings.js';
 
@@ -38,11 +38,16 @@ function appendParams(uri, params) {
   return url.toString();
 }
 
-function parseScope(raw) {
-  if (raw === undefined || raw === '') return MCP_SCOPE;
-  const requested = [...new Set(raw.split(' ').filter(Boolean))];
-  if (requested.length === 0 || requested.some((scope) => scope !== MCP_SCOPE)) return null;
-  return MCP_SCOPE;
+const UNKNOWN_SCOPE = `Available scopes: ${MCP_SCOPES.join(', ')}`;
+
+// The scopes the user keeps on the consent page (ADR 0006): a subset of the
+// request that still holds read. Omitted means the whole request.
+function keptScopes(requested, kept) {
+  if (kept === undefined) return requested;
+  const valid = Array.isArray(kept)
+    && kept.every((scope) => typeof scope === 'string' && requested.includes(scope))
+    && kept.includes(MCP_SCOPE_READ);
+  return valid ? requested.filter((scope) => kept.includes(scope)) : null;
 }
 
 /**
@@ -78,8 +83,9 @@ export async function startAuthorization(db, query, { fetchJson } = {}) {
   if (params.response_type !== 'code') return fail('unsupported_response_type', 'Only response_type=code is supported');
   if (params.code_challenge_method !== 'S256' || !isValidS256Challenge(params.code_challenge)) return fail('invalid_request', 'PKCE with code_challenge_method=S256 is required');
   if (params.resource !== urls.resource) return fail('invalid_target', 'resource must be the Frontdoor MCP endpoint');
-  const scope = parseScope(params.scope);
-  if (!scope) return fail('invalid_scope', `Only the ${MCP_SCOPE} scope is available`);
+  const scopes = parseScopes(params.scope);
+  if (!scopes) return fail('invalid_scope', UNKNOWN_SCOPE);
+  const scope = scopes.join(' ');
 
   const requestId = randomToken(16);
   const browserNonce = randomToken();
@@ -117,12 +123,12 @@ export function describeAuthorization(db, { requestId, browserNonce }) {
     // client has no host of its own, only the owner's label.
     clientHost: hostOf(request.client_id) || null,
     redirectHost: hostOf(request.redirect_uri),
-    scope: request.scope,
+    scopes: scopeList(request.scope),
   };
 }
 
 function findActiveGrant(db, userId, clientId) {
-  return db.prepare('SELECT id FROM mcp_grants WHERE user_id = ? AND client_id = ? AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1').get(userId, clientId);
+  return db.prepare('SELECT id, scope FROM mcp_grants WHERE user_id = ? AND client_id = ? AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1').get(userId, clientId);
 }
 
 /**
@@ -130,7 +136,7 @@ function findActiveGrant(db, userId, clientId) {
  * { location } to send the browser to, or throws OAuthError when the request
  * cannot be decided here (expired, other browser, impersonation, inactive).
  */
-export function decideAuthorization(db, { requestId, browserNonce, user, actor, approve }) {
+export function decideAuthorization(db, { requestId, browserNonce, user, actor, approve, scopes: kept }) {
   const urls = getMcpUrls();
   if (!isMcpEnabled(db)) throw new OAuthError('mcp_disabled', 'MCP is disabled', 404);
   const request = loadOpenRequest(db, requestId);
@@ -139,6 +145,10 @@ export function decideAuthorization(db, { requestId, browserNonce, user, actor, 
   }
   if (!user || user.is_active === 0) throw new OAuthError('mcp_authorization_user_inactive', 'Inactive users cannot connect assistants', 403);
   if (actor && actor.id !== user.id) throw new OAuthError('mcp_authorization_impersonating', 'Assistants cannot be connected while acting as another user', 403);
+  // Checked before the request is consumed: a malformed choice can be retried.
+  const granted = approve ? keptScopes(scopeList(request.scope), kept) : [];
+  if (!granted) throw new OAuthError('mcp_consent_invalid_scope', 'Keep frontdoor.read and only scopes the assistant requested', 400);
+  const grantedScope = granted.join(' ');
 
   return db.transaction(() => {
     const consumed = db.prepare("UPDATE mcp_authorization_requests SET consumed_at = datetime('now') WHERE id = ? AND consumed_at IS NULL").run(request.id);
@@ -150,8 +160,12 @@ export function decideAuthorization(db, { requestId, browserNonce, user, actor, 
     if (!grant) {
       grant = { id: randomToken(16) };
       db.prepare('INSERT INTO mcp_grants (id, user_id, client_id, client_name, scope) VALUES (?, ?, ?, ?, ?)')
-        .run(grant.id, user.id, request.client_id, request.client_name, request.scope);
-      logRbacAudit(user.id, 'mcp.grant_created', 'auth', grant.id, { clientName: request.client_name, clientHost: hostOf(request.client_id) || request.client_id });
+        .run(grant.id, user.id, request.client_id, request.client_name, grantedScope);
+      logRbacAudit(user.id, 'mcp.grant_created', 'auth', grant.id, { clientName: request.client_name, clientHost: hostOf(request.client_id) || request.client_id, scopes: granted });
+    } else if (grant.scope !== grantedScope) {
+      // The latest consent wins, for the grant's live tokens too (ADR 0006).
+      db.prepare('UPDATE mcp_grants SET scope = ? WHERE id = ?').run(grantedScope, grant.id);
+      logRbacAudit(user.id, 'mcp.grant_scopes_changed', 'auth', grant.id, { clientName: request.client_name, scopes: granted });
     }
     const code = randomToken();
     db.prepare(`
@@ -271,7 +285,12 @@ export function refreshAccessToken(db, { client, body }) {
   const resource = single(body?.resource);
   if (!refreshToken) throw new OAuthError('invalid_request', 'refresh_token is required');
   if (resource !== undefined && resource !== urls.resource) throw new OAuthError('invalid_target', 'resource must be the Frontdoor MCP endpoint');
-  if (single(body?.scope) !== undefined && !parseScope(body.scope)) throw new OAuthError('invalid_scope', `Only the ${MCP_SCOPE} scope is available`);
+  // RFC 6749 §6: a refresh may narrow the request but never go beyond the
+  // grant. Tokens always carry the grant's scopes, which the response states.
+  const askedScope = single(body?.scope);
+  if (body?.scope !== undefined && askedScope === undefined) throw new OAuthError('invalid_scope', UNKNOWN_SCOPE);
+  const asked = askedScope === undefined ? [] : askedScope.split(' ').filter(Boolean);
+  if (asked.some((scope) => !MCP_SCOPES.includes(scope))) throw new OAuthError('invalid_scope', UNKNOWN_SCOPE);
 
   const outcome = db.transaction(() => {
     const row = db.prepare(`
@@ -292,6 +311,7 @@ export function refreshAccessToken(db, { client, body }) {
     if (!live) return { error: new OAuthError('invalid_grant', 'Refresh token expired') };
     const grant = activeGrantFor(db, row.grant_id);
     if (!grant) return { error: new OAuthError('invalid_grant', 'Grant is no longer active') };
+    if (asked.some((scope) => !scopeList(grant.scope).includes(scope))) return { error: new OAuthError('invalid_scope', 'The requested scope exceeds the grant') };
     db.prepare("UPDATE mcp_tokens SET rotated_at = datetime('now') WHERE token_hash = ?").run(row.token_hash);
     return { tokens: issueTokens(db, { grantId: grant.id, resource: row.resource, scope: grant.scope, familyId: row.family_id, absoluteExpiresAt: row.absolute_expires_at }) };
   })();
@@ -342,7 +362,7 @@ export function verifyAccessToken(db, token) {
     userId: row.user_id,
     clientId: row.client_id,
     clientName: row.client_name,
-    scopes: row.scope.split(' '),
+    scopes: scopeList(row.scope),
     expiresAt: row.expires_at_epoch,
     resource: row.resource,
   };

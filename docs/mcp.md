@@ -62,6 +62,15 @@ types into the assistant. A name typed in a question is already at the provider.
 The only write is the user's own preferences, applied directly and recorded in
 the audit log as `mcp.preference_changed` with the assistant's name.
 
+**Scopes.** `frontdoor.read` covers every reading tool and is part of every
+connection. `frontdoor.preferences` covers `set_favorite_app`,
+`set_color_scheme` and `set_language`. On the consent page it is a checkbox,
+ticked by default: unticking it connects the assistant read-only, and the three
+tools are then not even listed. A client that sends no scope requests both. The
+token response states what was granted, and `/assistants` shows each
+connection as *read only* or *can change your preferences*. Connecting the same
+assistant again replaces the earlier choice (audit `mcp.grant_scopes_changed`).
+
 ## Security model
 
 - **Identity stays with Microsoft Entra.** Frontdoor acts as the OAuth 2.1

@@ -99,29 +99,35 @@ force-pushes both. Each block ends with lint, tests, i18n check and build green.
 
 ### R1 — Two scopes, chosen at consent (#167, decided 2026-11-11)
 
+Done 2026-11-11: `test/mcpScopes.test.js` (10 tests, red first); mutation-checked
+(read not required, a decision adding a scope, refresh widening, `set_*` always
+registered → each caught). Endpoint fixtures now grant both scopes. Browser and
+`curl` check: `docs/design/mcp/reviews/2026-11-11-e2e-scopes.md`. A refused
+decision does not consume the request; re-consent replaces the grant's scopes.
+
 Decision: `frontdoor.read` becomes strictly read-only. The three `set_*` tools
 move to a new `frontdoor.preferences` scope. On the consent page, the user can
 untick `frontdoor.preferences` even when the client requests it. Nothing is in
 production yet, so no grant migration is needed.
 
-- [ ] ADR 0006 "Split the MCP scope into read and preferences, chosen at consent"
+- [x] ADR 0006 "Split the MCP scope into read and preferences, chosen at consent"
       (Proposed, drafted with `adr-management`), in #172
-- [ ] Phase 1 spec §OAuth and §tools, and phase 2 spec (`frontdoor.propose` joins a
+- [x] Phase 1 spec §OAuth and §tools, and phase 2 spec (`frontdoor.propose` joins a
       multi-scope model), in #172
-- [ ] Tests first (red): scope parsing (subset, unknown, empty → default, order,
+- [x] Tests first (red): scope parsing (subset, unknown, empty → default, order,
       duplicates); `/oauth/token` and refresh return the granted scope, not the requested
       one; refresh cannot widen; `/mcp` lists only tools allowed by the grant; a
       `set_*` call on a read-only grant is refused; the consent decision cannot add a scope
       the client did not request; PRM and AS metadata list both scopes
-- [ ] `config.js`: scope constants and the tool → scope map; `oauth.js`: parse a set,
+- [x] `config.js`: scope constants and the tool → scope map; `oauth.js`: parse a set,
       store the granted set on the grant, downscope on consent, `scope` in the token response
-- [ ] Bearer middleware puts the granted scopes in the tool context; `tools.js` registers
+- [x] Bearer middleware puts the granted scopes in the tool context; `tools.js` registers
       the `set_*` tools only with `frontdoor.preferences`
-- [ ] Consent page `/connect/:id`: one line per requested scope, the preferences line has
+- [x] Consent page `/connect/:id`: one line per requested scope, the preferences line has
       a checkbox (checked by default), `frontdoor.read` is mandatory; en/it strings
-- [ ] `/assistants`: each connection shows its granted scopes
-- [ ] `docs/mcp.md`, CHANGELOG `[Unreleased]`
-- [ ] Browser check of the consent page with both outcomes; `curl` token response shown
+- [x] `/assistants`: each connection shows its granted scopes
+- [x] `docs/mcp.md`, CHANGELOG `[Unreleased]`
+- [x] Browser check of the consent page with both outcomes; `curl` token response shown
 
 ### R2 — Result completeness (#167)
 

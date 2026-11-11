@@ -132,7 +132,7 @@ test('metadata advertises S256, CIMD, iss and the canonical resource', async () 
   assert.equal(as.authorization_response_iss_parameter_supported, true);
   assert.equal(as.registration_endpoint, undefined);
   const prm = await (await fetch(`${base}/.well-known/oauth-protected-resource/mcp`)).json();
-  assert.deepEqual(prm, { resource: `${base}/mcp`, authorization_servers: [base], scopes_supported: ['frontdoor.read'], bearer_methods_supported: ['header'], resource_name: 'Frontdoor' });
+  assert.deepEqual(prm, { resource: `${base}/mcp`, authorization_servers: [base], scopes_supported: ['frontdoor.read', 'frontdoor.preferences'], bearer_methods_supported: ['header'], resource_name: 'Frontdoor' });
 });
 
 test('rules 3, 4: an unknown client or redirect gets an error page, never a redirect to it', async () => {

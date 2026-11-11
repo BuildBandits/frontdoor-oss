@@ -11,7 +11,7 @@ import { SUPPORTED_LANGUAGE_CODES } from '../../../shared/languages.js';
 import { listAccessibleAppsForUser, listAllAppsForAdmin, parseTags } from '../appCatalog.js';
 import { describeAppAccess, listGroupsWithCounts } from '../groupCatalog.js';
 import { createPreferenceUpdate } from '../userPreferences.js';
-import { getMcpUrls } from './config.js';
+import { MCP_SCOPE_PREFERENCES, getMcpUrls } from './config.js';
 import { CursorError, paginate } from './pagination.js';
 import { PAGING_FIELDS, PROJECTIONS, project, projectAll } from './projection.js';
 
@@ -67,7 +67,7 @@ function matches(app, query, tag) {
 
 /**
  * Builds the tool set for one caller. `context` comes from the verified
- * access token: { userId, grantId, clientName }.
+ * access token: { userId, grantId, clientName, scopes }.
  */
 export function createFrontdoorMcpServer(db, context) {
   const server = new McpServer(SERVER_INFO, {
@@ -127,32 +127,38 @@ export function createFrontdoorMcpServer(db, context) {
     return result({ preferences: preferencesOf(loadUser()) });
   };
 
-  server.registerTool('set_favorite_app', {
-    title: 'Add or remove a favourite app',
-    description: 'Mark one of the signed-in user\'s apps as favourite, or unmark it. Only changes this user\'s own preferences.',
-    inputSchema: z.object({ slug: slugSchema, favorite: z.boolean() }).strict(),
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  }, ({ slug, favorite }) => {
-    const app = myApps().find((candidate) => candidate.slug === slug);
-    if (!app) return toolError('No app with this slug is available to you.');
-    const current = parseFavoriteIds(loadUser()?.favorite_apps);
-    const next = favorite ? [...new Set([...current, app.id])] : current.filter((id) => id !== app.id);
-    return applyPreference('favorite_apps', JSON.stringify(next), 'favorite_apps_updated_at', { preference: 'favorite', slug, favorite });
-  });
+  // Without frontdoor.preferences the connection is strictly read-only: the
+  // set_* tools are not even listed (ADR 0006).
+  const canChangePreferences = context.scopes?.includes(MCP_SCOPE_PREFERENCES) === true;
 
-  server.registerTool('set_color_scheme', {
-    title: 'Set colour scheme',
-    description: 'Set the signed-in user\'s Frontdoor colour scheme: light, dark, or auto (follow the device).',
-    inputSchema: z.object({ scheme: z.enum(SUPPORTED_COLOR_SCHEMES) }).strict(),
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  }, ({ scheme }) => applyPreference('preferred_color_scheme', scheme, null, { preference: 'colorScheme', value: scheme }));
+  if (canChangePreferences) {
+    server.registerTool('set_favorite_app', {
+      title: 'Add or remove a favourite app',
+      description: 'Mark one of the signed-in user\'s apps as favourite, or unmark it. Only changes this user\'s own preferences.',
+      inputSchema: z.object({ slug: slugSchema, favorite: z.boolean() }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    }, ({ slug, favorite }) => {
+      const app = myApps().find((candidate) => candidate.slug === slug);
+      if (!app) return toolError('No app with this slug is available to you.');
+      const current = parseFavoriteIds(loadUser()?.favorite_apps);
+      const next = favorite ? [...new Set([...current, app.id])] : current.filter((id) => id !== app.id);
+      return applyPreference('favorite_apps', JSON.stringify(next), 'favorite_apps_updated_at', { preference: 'favorite', slug, favorite });
+    });
 
-  server.registerTool('set_language', {
-    title: 'Set language',
-    description: 'Set the signed-in user\'s Frontdoor interface language.',
-    inputSchema: z.object({ language: z.enum(SUPPORTED_LANGUAGE_CODES) }).strict(),
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  }, ({ language }) => applyPreference('preferred_language', language, null, { preference: 'language', value: language }));
+    server.registerTool('set_color_scheme', {
+      title: 'Set colour scheme',
+      description: 'Set the signed-in user\'s Frontdoor colour scheme: light, dark, or auto (follow the device).',
+      inputSchema: z.object({ scheme: z.enum(SUPPORTED_COLOR_SCHEMES) }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    }, ({ scheme }) => applyPreference('preferred_color_scheme', scheme, null, { preference: 'colorScheme', value: scheme }));
+
+    server.registerTool('set_language', {
+      title: 'Set language',
+      description: 'Set the signed-in user\'s Frontdoor interface language.',
+      inputSchema: z.object({ language: z.enum(SUPPORTED_LANGUAGE_CODES) }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    }, ({ language }) => applyPreference('preferred_language', language, null, { preference: 'language', value: language }));
+  }
 
   if (!isAdminViewer) return server;
 

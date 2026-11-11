@@ -295,6 +295,8 @@ export default function Assistants() {
                     {formatMessage(copy.connectedOn, { date: formatDate(connection.created_at) })}
                     {' · '}
                     {connection.last_used_at ? formatMessage(copy.lastUsed, { date: formatDate(connection.last_used_at) }) : copy.neverUsed}
+                    {' · '}
+                    {connection.scopes?.includes('frontdoor.preferences') ? copy.scopePreferences : copy.scopeReadOnly}
                   </p>
                 </div>
                 <button type="button" onClick={() => disconnect(connection)} className={`${button} border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-red-50 hover:text-red-600`}>

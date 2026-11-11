@@ -3,7 +3,7 @@
 import express from 'express';
 import db, { logRbacAudit } from '../db.js';
 import { authenticate, isOwner } from '../middleware/auth.js';
-import { getMcpUrls } from '../services/mcp/config.js';
+import { getMcpUrls, scopeList } from '../services/mcp/config.js';
 import { ClientError, addCimdClient, createRegisteredClient, disableClient, listClients } from '../services/mcp/clients.js';
 import { OAuthError, decideAuthorization, describeAuthorization } from '../services/mcp/oauth.js';
 import { getMcpSettings, isMcpEnabled, killSwitch, revokeGrants, setMcpEnabled } from '../services/mcp/settings.js';
@@ -49,6 +49,7 @@ router.post('/authorizations/:id/decision', authenticate, (req, res) => {
       user: req.user,
       actor: req.actor,
       approve: req.body?.approve === true,
+      scopes: req.body?.scopes,
     });
     res.clearCookie(`${AUTHORIZATION_COOKIE_PREFIX}${req.params.id}`, { ...authorizationCookieOptions(req.params.id), maxAge: undefined });
     return res.json({ location });
@@ -61,11 +62,11 @@ router.post('/authorizations/:id/decision', authenticate, (req, res) => {
 
 router.get('/connections', authenticate, (req, res) => {
   const connections = db.prepare(`
-    SELECT id, client_name, created_at, last_used_at
+    SELECT id, client_name, scope, created_at, last_used_at
     FROM mcp_grants WHERE user_id = ? AND revoked_at IS NULL
     ORDER BY created_at DESC
   `).all(req.user.id);
-  res.json({ connections });
+  res.json({ connections: connections.map(({ scope, ...connection }) => ({ ...connection, scopes: scopeList(scope) })) });
 });
 
 router.delete('/connections/:id', authenticate, (req, res) => {

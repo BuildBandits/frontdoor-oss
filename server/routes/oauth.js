@@ -3,7 +3,7 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import db from '../db.js';
-import { MCP_SCOPE, getMcpUrls } from '../services/mcp/config.js';
+import { MCP_SCOPES, getMcpUrls } from '../services/mcp/config.js';
 import { isMcpEnabled } from '../services/mcp/settings.js';
 import {
   AUTHORIZATION_REQUEST_TTL_SECONDS,
@@ -54,7 +54,7 @@ export function protectedResourceMetadata(urls) {
   return {
     resource: urls.resource,
     authorization_servers: [urls.issuer],
-    scopes_supported: [MCP_SCOPE],
+    scopes_supported: [...MCP_SCOPES],
     bearer_methods_supported: ['header'],
     resource_name: 'Frontdoor',
   };
@@ -72,7 +72,7 @@ export function authorizationServerMetadata(urls) {
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: ['none', 'client_secret_basic'],
     revocation_endpoint_auth_methods_supported: ['none', 'client_secret_basic'],
-    scopes_supported: [MCP_SCOPE],
+    scopes_supported: [...MCP_SCOPES],
     client_id_metadata_document_supported: true,
     authorization_response_iss_parameter_supported: true,
   };
