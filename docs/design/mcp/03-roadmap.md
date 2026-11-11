@@ -87,6 +87,35 @@ settings (non-goals in the proposal).
 - How proposals surface in the UI besides the link (a badge in the admin
   navigation, a list of pending changes).
 
+## Open question: the shared admin API key
+
+Raised by lombax85 on #172 (2026-11-10); recorded here, not decided. ADRs are
+still being introduced to the maintainers, so this becomes a decision record
+only once the practice is adopted.
+
+Today `GET /api/apps/bulk` and `POST /api/apps/bulk` are authenticated by one
+shared key, `ADMIN_API_KEY` (`X-API-Key`), audited as the actor `api-key`.
+The export includes inactive apps, `target_url` and SSO configuration. The
+upsert creates or updates apps by slug, merges tags and can assign groups to
+new apps.
+
+Direction proposed: retire the shared key in favour of more granular,
+revocable access. MCP is not a drop-in replacement:
+
+- phase 1 has no catalogue writes, and phase 2 applies them only after a
+  person confirms on a Frontdoor page (ADR 0005), which cannot serve
+  unattended server-to-server sync;
+- MCP results deliberately omit fields the export carries, such as target URLs
+  and SSO configuration;
+- the bulk endpoints are listed under "Never via MCP" in the phase 2 spec.
+
+So the question splits in two: which use cases move to MCP (interactive
+catalogue work by an admin), and which credential serves unattended automation.
+One candidate for the second is per-integration, revocable, scoped tokens on
+the regular API. Order if adopted: decision → replacement workflows → migration
+guide → removal of the routes, the guard and the `ADMIN_API_KEY`
+configuration in a documented breaking release. Nothing is removed by #167.
+
 ## Phase 3 — log answers for owners
 
 "Which apps has nobody opened in 90 days?", "top 5 apps this month". Access

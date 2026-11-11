@@ -43,7 +43,8 @@ Never via MCP, as in the proposal:
 - branding;
 - owner settings;
 - deleting apps or groups;
-- the `x-api-key` bulk endpoints.
+- the `x-api-key` bulk endpoints (their future is an open question in
+  `03-roadmap.md`: unattended sync needs a credential of its own, not MCP).
 
 ## 2. Decisions
 
