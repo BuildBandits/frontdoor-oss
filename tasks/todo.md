@@ -169,7 +169,7 @@ revocable, per-integration credential on the regular API.
 
 ### R4 — Close the round
 
-- [ ] Draft the three replies to lombax85 in `tasks/review-round-1-replies.md`;
+- [x] Draft the three replies to lombax85 in `tasks/review-round-1-replies.md`;
       post them only after the author approves the text
 - [ ] PR descriptions `tasks/pr-mcp-phase1.md` and `tasks/pr-mcp-design.md` updated,
       then pushed to GitHub
