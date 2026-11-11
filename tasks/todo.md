@@ -87,6 +87,82 @@ push, and this file updated.
 - [ ] Not mergeable until the `networkGuard.js` overlap with #168 is decided (see the PR description):
       merge #168 first, rebase, reuse its helper; decide where the extra IPv6 ranges go
 
+## Review round 1 — lombax85, 2026-11-10
+
+Three comments: two on #167 (scope naming, result completeness), one on #172
+(future of the `ADMIN_API_KEY` bulk endpoints). Status: plan awaiting confirmation.
+
+Branch logistics: design documents and ADRs live in #172 (`docs/mcp-design`);
+code, tests, `docs/mcp.md` and CHANGELOG live in #167 (`feat/mcp-server`). Each
+R-block changes #172 first, then rebases `feat/mcp-server` onto it and
+force-pushes both. Each block ends with lint, tests, i18n check and build green.
+
+### R1 — Two scopes, chosen at consent (#167, decided 2026-11-11)
+
+Decision: `frontdoor.read` becomes strictly read-only. The three `set_*` tools
+move to a new `frontdoor.preferences` scope. On the consent page, the user can
+untick `frontdoor.preferences` even when the client requests it. Nothing is in
+production yet, so no grant migration is needed.
+
+- [ ] ADR 0006 "Split the MCP scope into read and preferences, chosen at consent"
+      (Proposed, drafted with `adr-management`), in #172
+- [ ] Phase 1 spec §OAuth and §tools, and phase 2 spec (`frontdoor.propose` joins a
+      multi-scope model), in #172
+- [ ] Tests first (red): scope parsing (subset, unknown, empty → default, order,
+      duplicates); `/oauth/token` and refresh return the granted scope, not the requested
+      one; refresh cannot widen; `/mcp` lists only tools allowed by the grant; a
+      `set_*` call on a read-only grant is refused; the consent decision cannot add a scope
+      the client did not request; PRM and AS metadata list both scopes
+- [ ] `config.js`: scope constants and the tool → scope map; `oauth.js`: parse a set,
+      store the granted set on the grant, downscope on consent, `scope` in the token response
+- [ ] Bearer middleware puts the granted scopes in the tool context; `tools.js` registers
+      the `set_*` tools only with `frontdoor.preferences`
+- [ ] Consent page `/connect/:id`: one line per requested scope, the preferences line has
+      a checkbox (checked by default), `frontdoor.read` is mandatory; en/it strings
+- [ ] `/assistants`: each connection shows its granted scopes
+- [ ] `docs/mcp.md`, CHANGELOG `[Unreleased]`
+- [ ] Browser check of the consent page with both outcomes; `curl` token response shown
+
+### R2 — Result completeness (#167)
+
+- [ ] Tests first (red): 205 apps with `limit` 200 → `hasMore: true` and a cursor that
+      returns the remaining 5; default limit and maximum covered for `list_apps`,
+      `list_groups`, `search_my_apps`; a filter combined with a cursor; a malformed or
+      out-of-range cursor → tool error, never silently restarting from the first page
+- [ ] Stable ordering (name, then slug) and an opaque `nextCursor` (offset-based: the
+      lists are small and in-memory); every result carries `total`, `hasMore`, `nextCursor`
+- [ ] Tool descriptions say results are paged and that the assistant must follow
+      `nextCursor` before claiming a complete list; fix "every app in the catalogue"
+- [ ] Phase 1 spec §tools updated in #172; CHANGELOG
+
+### R3 — Future of the `ADMIN_API_KEY` bulk endpoints (#172)
+
+Position to propose: agreed, deprecation is a decision to take, not a removal in #167.
+MCP is the replacement for *interactive* catalogue work only (ADR 0005: changes are
+confirmed by a person). Unattended server-to-server sync needs a different
+credential: a revocable, per-integration, scoped token on the regular API, not MCP.
+
+- [ ] ADR 0007 "Retire the shared ADMIN_API_KEY" (Proposed, not accepted: a maintainer
+      decision), with options: (a) keep as is; (b) per-integration revocable API tokens
+      with scopes and their own audit actor; (c) MCP only. Recommendation (b), plus MCP
+      for the interactive use cases
+- [ ] Roadmap `03-roadmap.md`: a migration section — use cases (export, upsert by slug,
+      tags, groups on create), which go to MCP and which to integration tokens, the
+      fields the export has that MCP results omit, migration guide, then removal in a
+      documented breaking release
+- [ ] `04-phase2-spec.md` "Never via MCP": the bulk line points to ADR 0007 instead of
+      reading as permanent
+- [ ] CHANGELOG roadmap entry: "Replace the shared admin API key with revocable
+      integration tokens" (in #167, where CHANGELOG lives)
+
+### R4 — Close the round
+
+- [ ] Draft the three replies to lombax85 in `tasks/review-round-1-replies.md`;
+      post them only after the author approves the text
+- [ ] PR descriptions `tasks/pr-mcp-phase1.md` and `tasks/pr-mcp-design.md` updated,
+      then pushed to GitHub
+- [ ] Re-request review from lombax85
+
 ## Phase 2 — admin write proposals (after phase 1 holds in production)
 
 Why it matters and how it builds on phase 1: `docs/design/mcp/03-roadmap.md`.
