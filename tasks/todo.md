@@ -160,12 +160,12 @@ in #167. MCP can replace the *interactive* catalogue work only (ADR 0005: a pers
 confirms every change); unattended server-to-server sync would need its own
 revocable, per-integration credential on the regular API.
 
-- [ ] `03-roadmap.md`: a short "Open question: the shared admin API key" section —
+- [x] `03-roadmap.md`: a short "Open question: the shared admin API key" section —
       the use cases (export, upsert by slug, tags, groups on create), the gaps lombax85
       listed, and the order (decision → replacement → migration guide → removal in a
       documented breaking release)
-- [ ] `04-phase2-spec.md` "Never via MCP": the bulk line points to that open question
-- [ ] CHANGELOG roadmap entry (in #167): "Decide the future of the shared admin API key"
+- [x] `04-phase2-spec.md` "Never via MCP": the bulk line points to that open question
+- [x] CHANGELOG roadmap entry (in #167): "Decide the future of the shared admin API key"
 
 ### R4 — Close the round
 

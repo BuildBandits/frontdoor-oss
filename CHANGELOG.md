@@ -672,4 +672,5 @@ Covers the changes shipped as 1.2.2 through 1.2.8d (tags `v1.2.8` and `v1.2.8c` 
 - [x] Dark mode (light, dark and auto per user)
 - [x] i18n support (English and Italian)
 - [ ] Enable the plugin platform (currently locked off)
+- [ ] Decide the future of the shared admin API key for the bulk endpoints (open question in `docs/design/mcp/03-roadmap.md`)
 - [x] Backup and restore improvements (#44)
