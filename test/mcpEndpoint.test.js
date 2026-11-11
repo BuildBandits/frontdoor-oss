@@ -8,7 +8,7 @@ process.env.JWT_SECRET = 'mcp-endpoint-test-secret-0123456789abcd';
 const { default: db } = await import('../server/db.js');
 const { createApp } = await import('../server/app.js');
 const { randomToken, sha256 } = await import('../server/services/mcp/crypto.js');
-const { PROJECTIONS } = await import('../server/services/mcp/projection.js');
+const { PAGING_FIELDS, PROJECTIONS } = await import('../server/services/mcp/projection.js');
 const { describeAppAccess } = await import('../server/services/groupCatalog.js');
 const { userCanAccessApp } = await import('../server/services/appCatalog.js');
 
@@ -171,7 +171,7 @@ test('get_app_access agrees with the access check for every user', () => {
 });
 
 test('fail closed: every tool result carries only projected fields and no personal data', async () => {
-  const allowed = new Set([...Object.values(PROJECTIONS).flat(), 'apps', 'preferences', 'groups', 'app', 'totalUsers']);
+  const allowed = new Set([...Object.values(PROJECTIONS).flat(), ...PAGING_FIELDS, 'apps', 'preferences', 'groups', 'app', 'totalUsers']);
   const walk = (value, path) => {
     if (Array.isArray(value)) return value.forEach((item, index) => walk(item, `${path}[${index}]`));
     if (value && typeof value === 'object') {

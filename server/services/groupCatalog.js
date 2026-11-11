@@ -30,7 +30,7 @@ export function listGroupsWithCounts() {
           WHERE gem.parent_group_id = g.id
         ) AS linked_values
       ) AS group_search_text
-    FROM user_groups g ORDER BY g.name
+    FROM user_groups g ORDER BY g.name, g.id
   `).all();
 }
 

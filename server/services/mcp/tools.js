@@ -12,11 +12,14 @@ import { listAccessibleAppsForUser, listAllAppsForAdmin, parseTags } from '../ap
 import { describeAppAccess, listGroupsWithCounts } from '../groupCatalog.js';
 import { createPreferenceUpdate } from '../userPreferences.js';
 import { getMcpUrls } from './config.js';
-import { PROJECTIONS, project, projectAll } from './projection.js';
+import { CursorError, paginate } from './pagination.js';
+import { PAGING_FIELDS, PROJECTIONS, project, projectAll } from './projection.js';
 
 const SERVER_INFO = { name: 'frontdoor', version: '1.0.0' };
 const text = () => z.string().trim().min(1).max(100);
 const slugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]?$/).max(64);
+const cursorSchema = z.string().min(1).max(200);
+const PAGING_NOTE = 'Results are paged: each answer has total and hasMore; while hasMore is true, call again with the same arguments and cursor set to nextCursor before treating the list as complete.';
 
 function result(payload) {
   return { content: [{ type: 'text', text: JSON.stringify(payload) }], structuredContent: payload };
@@ -24,6 +27,19 @@ function result(payload) {
 
 function toolError(message) {
   return { isError: true, content: [{ type: 'text', text: message }] };
+}
+
+// One page of `items` under `key`, with the paging fields; a bad cursor is a
+// tool error, never a silent restart from the first page.
+function pagedResult(key, items, { tool, query, limit, cursor }, mapPage) {
+  let paged;
+  try {
+    paged = paginate(items, { limit, cursor, scope: `${tool}:${JSON.stringify(query)}` });
+  } catch (error) {
+    if (error instanceof CursorError) return toolError('This cursor is not valid for these arguments. Repeat the same arguments with the nextCursor of the previous answer, or omit cursor to start again.');
+    throw error;
+  }
+  return result({ [key]: mapPage(paged.page), ...project(paged, PAGING_FIELDS) });
 }
 
 function parseFavoriteIds(raw) {
@@ -67,20 +83,22 @@ export function createFrontdoorMcpServer(db, context) {
 
   server.registerTool('search_my_apps', {
     title: 'Search my apps',
-    description: 'Find the apps the signed-in user can open in Frontdoor, by words in the name, description or tags, or by one tag. Returns launch links that go through Frontdoor.',
+    description: `Find the apps the signed-in user can open in Frontdoor, by words in the name, description or tags, or by one tag. Returns launch links that go through Frontdoor. ${PAGING_NOTE}`,
     inputSchema: z.object({
       query: text().optional(),
       tag: text().optional(),
       limit: z.number().int().min(1).max(50).default(20),
+      cursor: cursorSchema.optional(),
     }).strict(),
     annotations: { readOnlyHint: true, openWorldHint: false },
-  }, ({ query, tag, limit }) => {
+  }, ({ query, tag, limit, cursor }) => {
     const current = loadUser();
     const favorites = new Set(parseFavoriteIds(current?.favorite_apps));
-    const apps = myApps().filter((app) => matches(app, query, tag)).slice(0, limit).map((app) => ({
-      ...app, launchUrl: launchUrlFor(app, base), favorite: favorites.has(app.id),
-    }));
-    return result({ apps: projectAll(apps, PROJECTIONS.myApp) });
+    const found = myApps().filter((app) => matches(app, query, tag));
+    return pagedResult('apps', found, { tool: 'search_my_apps', query: { query, tag }, limit, cursor }, (page) => projectAll(
+      page.map((app) => ({ ...app, launchUrl: launchUrlFor(app, base), favorite: favorites.has(app.id) })),
+      PROJECTIONS.myApp,
+    ));
   });
 
   const preferencesOf = (row) => {
@@ -144,19 +162,21 @@ export function createFrontdoorMcpServer(db, context) {
 
   server.registerTool('list_apps', {
     title: 'List all apps (admin)',
-    description: 'Administrators: every app in the catalogue, optionally only those granted to no group or carrying no tags.',
+    description: `Administrators: the apps in the catalogue, active or not, optionally only those granted to no group or carrying no tags. ${PAGING_NOTE}`,
     inputSchema: z.object({
       filter: z.enum(['all', 'no_groups', 'no_tags']).default('all'),
       limit: z.number().int().min(1).max(200).default(100),
+      cursor: cursorSchema.optional(),
     }).strict(),
     annotations: { readOnlyHint: true, openWorldHint: false },
-  }, ({ filter, limit }) => {
+  }, ({ filter, limit, cursor }) => {
     if (!stillAdmin()) return denied();
     const apps = listAllAppsForAdmin()
-      .filter((app) => (filter === 'no_groups' ? app.group_count === 0 : filter === 'no_tags' ? app.tags.length === 0 : true))
-      .slice(0, limit)
-      .map((app) => ({ name: app.name, slug: app.slug, tags: app.tags, mode: app.mode, active: app.is_active === 1, groupCount: app.group_count }));
-    return result({ apps: projectAll(apps, PROJECTIONS.adminApp) });
+      .filter((app) => (filter === 'no_groups' ? app.group_count === 0 : filter === 'no_tags' ? app.tags.length === 0 : true));
+    return pagedResult('apps', apps, { tool: 'list_apps', query: { filter }, limit, cursor }, (page) => projectAll(
+      page.map((app) => ({ name: app.name, slug: app.slug, tags: app.tags, mode: app.mode, active: app.is_active === 1, groupCount: app.group_count })),
+      PROJECTIONS.adminApp,
+    ));
   });
 
   server.registerTool('get_app_access', {
@@ -174,17 +194,22 @@ export function createFrontdoorMcpServer(db, context) {
 
   server.registerTool('list_groups', {
     title: 'List groups (admin)',
-    description: 'Administrators: Frontdoor groups with their member and app counts, optionally filtered by words in the name.',
-    inputSchema: z.object({ query: text().optional(), limit: z.number().int().min(1).max(200).default(100) }).strict(),
+    description: `Administrators: Frontdoor groups with their member and app counts, optionally filtered by words in the name. ${PAGING_NOTE}`,
+    inputSchema: z.object({
+      query: text().optional(),
+      limit: z.number().int().min(1).max(200).default(100),
+      cursor: cursorSchema.optional(),
+    }).strict(),
     annotations: { readOnlyHint: true, openWorldHint: false },
-  }, ({ query, limit }) => {
+  }, ({ query, limit, cursor }) => {
     if (!stillAdmin()) return denied();
     const needle = query?.toLowerCase();
     const groups = listGroupsWithCounts()
-      .filter((group) => !needle || `${group.name} ${group.entra_display_name || ''}`.toLowerCase().includes(needle))
-      .slice(0, limit)
-      .map((group) => ({ name: group.name, source: group.source || 'local', memberCount: group.member_count, appCount: group.app_count }));
-    return result({ groups: projectAll(groups, PROJECTIONS.group) });
+      .filter((group) => !needle || `${group.name} ${group.entra_display_name || ''}`.toLowerCase().includes(needle));
+    return pagedResult('groups', groups, { tool: 'list_groups', query: { query }, limit, cursor }, (page) => projectAll(
+      page.map((group) => ({ name: group.name, source: group.source || 'local', memberCount: group.member_count, appCount: group.app_count })),
+      PROJECTIONS.group,
+    ));
   });
 
   return server;

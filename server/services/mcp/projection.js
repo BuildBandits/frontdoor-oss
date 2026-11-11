@@ -10,6 +10,10 @@ export const PROJECTIONS = Object.freeze({
   group: Object.freeze(['name', 'source', 'memberCount', 'appCount']),
 });
 
+// Envelope fields of a paged list (pagination.js): counts and an opaque offset
+// cursor, never catalogue data or personal data.
+export const PAGING_FIELDS = Object.freeze(['total', 'hasMore', 'nextCursor']);
+
 // What the consent page lists as leaving Frontdoor (i18n keys on the client).
 export const MCP_EXPOSED_FIELDS = Object.freeze([
   'appNames', 'appDescriptions', 'appTags', 'launchLinks', 'ownPreferences', 'groupNames', 'counts',

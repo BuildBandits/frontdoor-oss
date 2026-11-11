@@ -21,7 +21,7 @@ export function listAccessibleAppsForUser(userId) {
     FROM apps a
     JOIN app_permissions p ON a.id = p.app_id
     WHERE a.is_active = 1 AND p.group_id IN (${placeholders(groupIds)})
-    ORDER BY a.sort_order, a.name
+    ORDER BY a.sort_order, a.name, a.slug
   `).all(...groupIds);
 }
 
@@ -43,7 +43,7 @@ export function listAllAppsForAdmin() {
     SELECT a.*,
       (SELECT COUNT(*) FROM app_permissions WHERE app_id = a.id) AS group_count
     FROM apps a
-    ORDER BY sort_order, name
+    ORDER BY sort_order, name, slug
   `).all();
   const groupIdsByAppId = new Map();
   for (const row of db.prepare('SELECT app_id, group_id FROM app_permissions ORDER BY app_id, group_id').all()) {

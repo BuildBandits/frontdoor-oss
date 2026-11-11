@@ -125,15 +125,23 @@ production yet, so no grant migration is needed.
 
 ### R2 — Result completeness (#167)
 
-- [ ] Tests first (red): 205 apps with `limit` 200 → `hasMore: true` and a cursor that
+Done 2026-11-11: `test/mcpPagination.test.js` (9 tests, red first); mutation-checked
+(dropping the cursor-scope check → 2 failures; `hasMore` always false → 8). The
+fail-closed test caught the new envelope fields: they are now `PAGING_FIELDS` in
+`projection.js`. Ordering kept as the routes have it (`sort_order, name`) plus a
+`slug`/`id` tie-breaker, so offsets are deterministic. A cursor past the end
+(items removed meanwhile) is an empty last page, not an error.
+
+- [x] Tests first (red): 205 apps with `limit` 200 → `hasMore: true` and a cursor that
       returns the remaining 5; default limit and maximum covered for `list_apps`,
       `list_groups`, `search_my_apps`; a filter combined with a cursor; a malformed or
       out-of-range cursor → tool error, never silently restarting from the first page
-- [ ] Stable ordering (name, then slug) and an opaque `nextCursor` (offset-based: the
+- [x] Stable ordering (existing order plus a slug/id tie-breaker) and an opaque `nextCursor` (offset-based: the
       lists are small and in-memory); every result carries `total`, `hasMore`, `nextCursor`
-- [ ] Tool descriptions say results are paged and that the assistant must follow
+- [x] Tool descriptions say results are paged and that the assistant must follow
       `nextCursor` before claiming a complete list; fix "every app in the catalogue"
-- [ ] Phase 1 spec §tools updated in #172; CHANGELOG
+- [x] CHANGELOG, `docs/mcp.md`
+- [ ] Phase 1 spec §7 updated in #172
 
 ### R3 — Future of the `ADMIN_API_KEY` bulk endpoints (#172)
 

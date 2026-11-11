@@ -43,6 +43,13 @@ Only what the user could already see in Frontdoor, through narrow tools:
 | `get_app_access` | admin roles | group names, nested group names (an Entra group without a known name is only counted) and the **number** of users reaching an app |
 | `list_groups` | admin roles | group names, source, member and app counts |
 
+The three list tools page their results: each answer carries `total`, `hasMore`
+and, while more items exist, a `nextCursor` to pass back with the same
+arguments. A list is never cut short silently, and the tool descriptions tell
+the assistant to follow the cursor before calling a list complete. A cursor is
+an opaque offset bound to the arguments it came from; reused with other
+arguments it is refused.
+
 Never: target URLs (internal-link addresses included — launch links go
 through Frontdoor, which applies RBAC and SSO as today), emails, names or IDs of
 people, IP addresses, access or audit logs, tenant or client IDs, secrets,
