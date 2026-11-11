@@ -50,7 +50,7 @@ Never via MCP, as in the proposal:
 | Question | Decision |
 | --- | --- |
 | Can the MCP token apply a change? | No. It can only create a proposal. Applying requires the admin's Frontdoor session on a Frontdoor page (ADR 0005). |
-| New OAuth scope? | Yes: `frontdoor.propose`. It is granted only if the user is `owner` or `admin` when consenting, and the consent page lists it as its own line. Phase 1 grants (`frontdoor.read`) do not get it silently: the user reconnects. |
+| New OAuth scope? | Yes: `frontdoor.propose`. It is granted only if the user is `owner` or `admin` when consenting, and the consent page lists it as its own line. Phase 1 grants (`frontdoor.read`, `frontdoor.preferences`, ADR 0006) do not get it silently: the user reconnects. |
 | Who applies? | Only the admin who proposed it, as the proposal says. There is no four-eyes flow, and no other admin sees another admin's pending changes. |
 | What does the page show? | The effect, computed by Frontdoor: the people who gain, lose or keep access, with real names. It shows **no free text from the assistant**, so an injected "urgent, apply now" never reaches the page. |
 | What if the state moves between review and apply? | The admin applies exactly what they saw, or nothing. The apply request carries a digest of the displayed effect. If Frontdoor's recomputed digest differs, it answers 409 and the page reloads the new diff (§7). |

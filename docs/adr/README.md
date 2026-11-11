@@ -7,3 +7,4 @@
 | [0003](0003-frontdoor-as-minimal-oauth-authorization-server.md) | Make Frontdoor a minimal OAuth 2.1 authorization server for MCP clients | Accepted | 2026-11-03 |
 | [0004](0004-register-mcp-clients-via-cimd-and-preregistration.md) | Register MCP clients via CIMD and owner pre-registration, not DCR | Accepted | 2026-11-03 |
 | [0005](0005-apply-mcp-admin-writes-only-as-confirmed-proposals.md) | Apply admin writes from AI assistants only as proposals confirmed in Frontdoor | Accepted | 2026-11-04 |
+| [0006](0006-split-mcp-scope-into-read-and-preferences.md) | Split the MCP scope into read and preferences, chosen at consent | Proposed | 2026-11-11 |

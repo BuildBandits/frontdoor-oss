@@ -49,10 +49,10 @@ disabled instance advertises nothing.
 | Method + path | Purpose |
 | --- | --- |
 | GET `/.well-known/oauth-protected-resource/mcp` | RFC 9728 metadata: `resource` = `<FRONTEND_URL>/mcp`, `authorization_servers` = [`<FRONTEND_URL>`] |
-| GET `/.well-known/oauth-authorization-server` | RFC 8414 metadata: `code_challenge_methods_supported: ["S256"]`, `response_types_supported: ["code"]`, `grant_types_supported: ["authorization_code","refresh_token"]`, `token_endpoint_auth_methods_supported: ["none","client_secret_basic"]`, `client_id_metadata_document_supported: true`, `authorization_response_iss_parameter_supported: true`, `scopes_supported: ["frontdoor.read"]` |
+| GET `/.well-known/oauth-authorization-server` | RFC 8414 metadata: `code_challenge_methods_supported: ["S256"]`, `response_types_supported: ["code"]`, `grant_types_supported: ["authorization_code","refresh_token"]`, `token_endpoint_auth_methods_supported: ["none","client_secret_basic"]`, `client_id_metadata_document_supported: true`, `authorization_response_iss_parameter_supported: true`, `scopes_supported: ["frontdoor.read","frontdoor.preferences"]` |
 | GET `/oauth/authorize` | Validates the request, stores it as a pending authorization bound to this browser, redirects to the SPA consent page `/connect/<id>` (the SPA sends signed-out users through the normal Entra login and back) |
-| GET `/api/mcp/authorizations/:id` | Consent page data: client name, client and redirect hosts, scope, fields that leave Frontdoor |
-| POST `/api/mcp/authorizations/:id/decision` | Approve or deny; strict same-origin, browser-bound; returns the client redirect URL with the code or the error |
+| GET `/api/mcp/authorizations/:id` | Consent page data: client name, client and redirect hosts, requested scopes, fields that leave Frontdoor |
+| POST `/api/mcp/authorizations/:id/decision` | Approve or deny, with the scopes the user keeps; strict same-origin, browser-bound; returns the client redirect URL with the code or the error |
 | POST `/oauth/token` | `authorization_code` and `refresh_token` grants |
 | POST `/oauth/revoke` | RFC 7009 revocation by the client |
 | POST `/mcp` | MCP Streamable HTTP; bearer required, `401` with `WWW-Authenticate: Bearer resource_metadata=…` otherwise |
@@ -81,8 +81,10 @@ Each rule below gets at least one test.
    JSON with `client_id` equal to the URL, cached for at most 1 hour.
 6. No consent while impersonating (`req.actor` ≠ `req.user`) and no consent for
    inactive users.
-7. Consent page: shows client name, client ID host and redirect host, the
-   scope in plain words, and the list of fields that leave Frontdoor. The
+7. Consent page: shows client name, client ID host and redirect host, each
+   requested scope in plain words, and the list of fields that leave Frontdoor.
+   `frontdoor.preferences` has a checkbox, checked by default; unticking it
+   grants `frontdoor.read` only (ADR 0006). The
    `/connect/*` SPA route is served with `frame-ancestors 'none'` and
    `X-Frame-Options: DENY`.
 8. A pending authorization lives 10 minutes, is single-use, and is bound to
@@ -110,6 +112,14 @@ Each rule below gets at least one test.
     logged.
 14. Confidential clients authenticate with `client_secret_basic`; secrets are
     stored as hashes, shown once at creation.
+15. Scopes (ADR 0006): `frontdoor.read` (read tools) and `frontdoor.preferences`
+    (the three `set_*` tools). No scope requested means both. `frontdoor.read` is
+    always part of a grant and is added when a request omits it; an unknown scope
+    is `invalid_scope`. The decision can only remove `frontdoor.preferences`,
+    never add a scope the client did not request. The token response states the
+    granted scopes. A refresh may not ask for a scope beyond the grant, and always
+    receives the grant's scopes. Re-consenting with the same client replaces the
+    grant's scopes.
 
 ## 5. `/mcp` request handling
 
@@ -151,16 +161,16 @@ visibility comes from a service extracted from `server/routes/apps.js` (today
 inline SQL, copied three times); the routes are switched to it first, with
 their existing tests green, before any tool uses it.
 
-| Tool | Minimum role | Input | Output (projection) |
+| Tool | Minimum role, scope | Input | Output (projection) |
 | --- | --- | --- | --- |
-| `search_my_apps` | user | `query?`, `tag?`, `limit≤50`, `cursor?` | name, slug, description, tags, launch URL, favourite |
-| `get_my_preferences` | user | — | favourites (slugs), colour scheme, language |
-| `set_favorite_app` | user | `slug`, `favorite: boolean` | updated favourites |
-| `set_color_scheme` | user | `light \| dark \| auto` | updated preferences |
-| `set_language` | user | `en \| it` | updated value |
-| `list_apps` | admin_readonly | `filter: all \| no_groups \| no_tags`, `limit≤200`, `cursor?` | name, slug, tags, mode, active, group count |
-| `get_app_access` | admin_readonly | `slug` | groups granting access (name, source, nested local and Entra-linked groups, active users reaching the app through it) and the distinct total |
-| `list_groups` | admin_readonly | `query?`, `limit≤200`, `cursor?` | name, source, member count, app count |
+| `search_my_apps` | user, read | `query?`, `tag?`, `limit≤50`, `cursor?` | name, slug, description, tags, launch URL, favourite |
+| `get_my_preferences` | user, read | — | favourites (slugs), colour scheme, language |
+| `set_favorite_app` | user, preferences | `slug`, `favorite: boolean` | updated favourites |
+| `set_color_scheme` | user, preferences | `light \| dark \| auto` | updated preferences |
+| `set_language` | user, preferences | `en \| it` | updated value |
+| `list_apps` | admin_readonly, read | `filter: all \| no_groups \| no_tags`, `limit≤200`, `cursor?` | name, slug, tags, mode, active, group count |
+| `get_app_access` | admin_readonly, read | `slug` | groups granting access (name, source, nested local and Entra-linked groups, active users reaching the app through it) and the distinct total |
+| `list_groups` | admin_readonly, read | `query?`, `limit≤200`, `cursor?` | name, source, member count, app count |
 
 List tools (`search_my_apps`, `list_apps`, `list_groups`) are paged and never
 truncate silently: each answer carries `total`, `hasMore` and, while more items
@@ -172,8 +182,8 @@ order plus a unique tie-breaker). Tool descriptions tell the assistant to follow
 `nextCursor` before calling a list complete. (Review round 1, lombax85.)
 
 Tool inputs are validated with strict schemas (unknown keys rejected, string
-lengths capped). Tools not allowed for the caller's role are not listed for
-that caller.
+lengths capped). Tools not allowed for the caller's role, or by the
+grant's scopes, are not listed for that caller.
 
 ## 8. Data model (new)
 
@@ -229,7 +239,7 @@ what the user types reaches the vendor.
 
 | Threat | Control |
 | --- | --- |
-| Stolen MCP access token | 10 min life, audience-bound, read-only scope, revocable |
+| Stolen MCP access token | 10 min life, audience-bound, revocable; at most the user's own preferences can change, and not even those when the user kept the grant read-only |
 | Stolen refresh token | Rotation with reuse detection revokes the grant |
 | Malicious client tricking a user (confused deputy) | Owner allowlist, per-client consent page naming the signed-in account, exact redirect matching |
 | Open redirect via `redirect_uri` | Errors shown as pages, never redirected |
