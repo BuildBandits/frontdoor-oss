@@ -87,3 +87,13 @@ test('webhooks to private destinations are refused', async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('plugin entries cannot climb out of the plugin asset folder', async () => {
+  const res = await adminRequest('/api/plugins', {
+    method: 'POST',
+    body: JSON.stringify({ id: 'climber', name: 'Climber', version: '1.0.0', entry: '/api/plugins/files/../x' }),
+  });
+  assert.equal(res.status, 400);
+  assert.equal(db.prepare("SELECT 1 FROM plugin_registry WHERE id = 'climber'").get(), undefined);
+  assert.throws(() => upsertPluginRegistry({ id: 'climber', name: 'Climber', version: '1.0.0', entry: '/api/plugins/files/a/%2e%2e/b/c' }));
+});

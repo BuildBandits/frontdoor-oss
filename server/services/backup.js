@@ -287,6 +287,15 @@ function resetSequenceIfPresent(dbHandle, tableName) {
   dbHandle.prepare('DELETE FROM sqlite_sequence WHERE name = ?').run(tableName);
 }
 
+// The plugin platform is locked: a crafted archive must not switch it on or pre-approve code.
+function lockPluginPlatform(dbHandle, restoredTables) {
+  for (const [tableName, column] of [['branding_settings', 'plugins_enabled'], ['plugin_registry', 'approved']]) {
+    if (restoredTables.includes(tableName) && listTableColumns(dbHandle, tableName).includes(column)) {
+      dbHandle.exec(`UPDATE ${quoteIdentifier(tableName)} SET ${quoteIdentifier(column)} = 0`);
+    }
+  }
+}
+
 function restoreTableSnapshot(dbHandle, tableSnapshot) {
   const currentColumns = new Set(listTableColumns(dbHandle, tableSnapshot.name));
   const insertColumns = tableSnapshot.columns.filter((column) => currentColumns.has(column));
@@ -529,6 +538,7 @@ export async function restoreBackupArchive(buffer, {
         restoreCounts.tables += 1;
         if (dropped.length > 0) droppedColumns[tableName] = dropped;
       }
+      lockPluginPlatform(dbHandle, restoreOrder);
       dbHandle.exec('COMMIT');
     } catch (error) {
       dbHandle.exec('ROLLBACK');
@@ -831,6 +841,7 @@ export async function restoreBackupFile(filePath, {
             counts.rows += 1;
           }
         }
+        lockPluginPlatform(dbHandle, restoreOrder);
         dbHandle.exec('COMMIT');
       } catch (error) {
         dbHandle.exec('ROLLBACK');

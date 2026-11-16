@@ -90,8 +90,8 @@ function parseDataUrl(dataUrl) {
 
 export function iconUrlForApp(app, { cacheDir = DEFAULT_CACHE_DIR } = {}) {
   if (!app?.icon_file_name || !app?.id) return null;
-  const absolutePath = path.join(cacheDir, app.icon_file_name);
-  if (!fs.existsSync(absolutePath)) return null;
+  const absolutePath = iconPath(cacheDir, app.icon_file_name);
+  if (!absolutePath || !fs.existsSync(absolutePath)) return null;
   const version = app.updated_at ? `?v=${encodeURIComponent(app.updated_at)}` : '';
   return `/api/apps/${encodeURIComponent(app.id)}/icon${version}`;
 }
@@ -199,8 +199,8 @@ export async function duplicateAppIconAsset(sourceAppId, targetAppId, { cacheDir
 export async function readAppIconAssetDataUrl(app, { cacheDir = DEFAULT_CACHE_DIR } = {}) {
   if (!app?.icon_file_name || !app?.id) return '';
 
-  const absolutePath = path.join(cacheDir, app.icon_file_name);
-  if (!fs.existsSync(absolutePath)) return '';
+  const absolutePath = iconPath(cacheDir, app.icon_file_name);
+  if (!absolutePath || !fs.existsSync(absolutePath)) return '';
 
   const buffer = await fsp.readFile(absolutePath);
   const extension = path.extname(app.icon_file_name).slice(1).toLowerCase();
@@ -252,8 +252,8 @@ export async function serveAppIconForApp(app, res, { cacheDir = DEFAULT_CACHE_DI
     return res.status(404).end();
   }
 
-  const absolutePath = path.join(cacheDir, app.icon_file_name);
-  if (!fs.existsSync(absolutePath)) {
+  const absolutePath = iconPath(cacheDir, app.icon_file_name);
+  if (!absolutePath || !fs.existsSync(absolutePath)) {
     return res.status(404).end();
   }
 

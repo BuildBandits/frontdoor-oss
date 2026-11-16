@@ -9,6 +9,7 @@ import { DEFAULT_TIME_ZONE, normalizeTimeZone } from '../../shared/timeZones.js'
 import { archiveMediaAsset } from './mediaAssets.js';
 import { applySvgSafeHeaders, isSvgContentType, sanitizeSvgBuffer } from './svgSanitize.js';
 import { UserFacingError } from './errors.js';
+import { resolveFileInDir } from './textSanitize.js';
 import { MAX_RASTER_LOGO_BYTES, MAX_SVG_ICON_BYTES, estimateDataUrlBytes } from '../../shared/iconLimits.js';
 
 const BRANDING_ID = 'default';
@@ -413,7 +414,7 @@ export async function updateBrandingSettings(input = {}) {
 export function getBrandingLogoPath() {
   const row = getStoredBrandingRow();
   if (!row?.logo_file_name) return null;
-  return path.join(BRANDING_ASSET_DIR, row.logo_file_name);
+  return resolveFileInDir(BRANDING_ASSET_DIR, row.logo_file_name);
 }
 
 export function getBrandingLogoContentType() {

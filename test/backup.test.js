@@ -346,6 +346,22 @@ describe('backup service', () => {
     const leftovers = fs.readdirSync(path.dirname(restoreDirs.appIconDir)).filter((name) => name.startsWith(`${path.basename(restoreDirs.appIconDir)}.restore-`));
     assert.deepEqual(leftovers, []);
   });
+
+  it('keeps the plugin platform switched off after restoring a crafted archive', async () => {
+    restoreDb.exec('ALTER TABLE branding_settings ADD COLUMN plugins_enabled INTEGER DEFAULT 0');
+    const archive = gzipJson({
+      version: 1,
+      createdAt: '2026-10-07T07:31:59.265Z',
+      app: { version: '1.3.0' },
+      database: { tables: [{ name: 'branding_settings', columns: ['id', 'plugins_enabled'], rows: [{ id: 'default', plugins_enabled: 1 }] }] },
+      buckets: [],
+      summary: {},
+    });
+
+    await restoreBackupArchive(archive, { dbHandle: restoreDb, ...restoreDirs, currentVersion: '1.3.0' });
+
+    assert.equal(restoreDb.prepare("SELECT plugins_enabled FROM branding_settings WHERE id = 'default'").get().plugins_enabled, 0);
+  });
 });
 
 describe('analyzeBackupArchive', () => {

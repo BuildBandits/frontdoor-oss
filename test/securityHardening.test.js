@@ -91,3 +91,42 @@ test('an Entra identity counts as deleted only when Graph says the object does n
     global.fetch = originalFetch;
   }
 });
+
+test('CORS allowlist only opens the session check, never the rest of the API or mutations', async () => {
+  const satellite = 'https://wiki.example.test';
+  process.env.CORS_ALLOWED_ORIGINS = satellite;
+  const corsServer = createApp().listen(0);
+  await new Promise((resolve) => corsServer.once('listening', resolve));
+  const corsUrl = `http://127.0.0.1:${corsServer.address().port}`;
+  const cookie = `frontdoor_token=${sessionToken()}`;
+  try {
+    let res = await fetch(`${corsUrl}/api/auth/me`, { headers: { Cookie: cookie, Origin: satellite } });
+    assert.equal(res.headers.get('access-control-allow-origin'), satellite);
+
+    res = await fetch(`${corsUrl}/api/users`, { headers: { Cookie: cookie, Origin: satellite } });
+    assert.equal(res.headers.get('access-control-allow-origin'), null);
+
+    res = await fetch(`${corsUrl}/api/logs/clear-access`, { method: 'POST', headers: { Cookie: cookie, Origin: satellite, 'Sec-Fetch-Site': 'same-site' } });
+    assert.equal(res.status, 403);
+  } finally {
+    delete process.env.CORS_ALLOWED_ORIGINS;
+    await new Promise((resolve) => corsServer.close(resolve));
+  }
+});
+
+test('TRUST_PROXY accepts hop counts, booleans and subnet names', async () => {
+  const { parseTrustProxy } = await import('../server/app.js');
+  assert.equal(parseTrustProxy(undefined), 1);
+  assert.equal(parseTrustProxy(''), 1);
+  assert.equal(parseTrustProxy('2'), 2);
+  assert.equal(parseTrustProxy('false'), false);
+  assert.equal(parseTrustProxy('TRUE'), true);
+  assert.equal(parseTrustProxy('loopback'), 'loopback');
+});
+
+test('stored icon file names cannot point outside the icon folder', async () => {
+  const { iconUrlForApp, readAppIconAssetDataUrl } = await import('../server/services/appIcons.js');
+  const app = { id: 'app-1', icon_file_name: '../../package.json' };
+  assert.equal(iconUrlForApp(app, { cacheDir: process.cwd() }), null);
+  assert.equal(await readAppIconAssetDataUrl(app, { cacheDir: process.cwd() }), '');
+});
