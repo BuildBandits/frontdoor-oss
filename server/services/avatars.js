@@ -3,6 +3,7 @@ import fsp from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import { ConfidentialClientApplication } from '@azure/msal-node';
+import { resolveFileInDir } from './textSanitize.js';
 
 // path.resolve() normalizes a relative env value to an absolute path so
 // res.sendFile() in serveAvatarForUser accepts it without throwing.
@@ -224,8 +225,8 @@ async function getAvatarFileInfo(userId) {
   const meta = await readMeta(userId);
   if (!meta?.fileName) return { meta: meta || null, fileExists: false, absolutePath: null };
 
-  const absolutePath = path.join(DEFAULT_CACHE_DIR, meta.fileName);
-  const fileExists = fs.existsSync(absolutePath);
+  const absolutePath = resolveFileInDir(DEFAULT_CACHE_DIR, meta.fileName);
+  const fileExists = Boolean(absolutePath) && fs.existsSync(absolutePath);
   return { meta, fileExists, absolutePath };
 }
 

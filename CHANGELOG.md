@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+**Upgrading:** `docker-compose.yml` now publishes port 3001 on `127.0.0.1` only. Installations reached directly on the host IP, or through a proxy on another host, set `FRONTDOOR_BIND=0.0.0.0` (and `TRUST_PROXY=false` if no proxy is in front). Satellite pages on `CORS_ALLOWED_ORIGINS` origins can still call `GET /api/auth/me`, but no longer any other endpoint.
+
+### Changed
+- **Docker port on loopback**: `docker-compose.yml` publishes port 3001 on `127.0.0.1` by default (`FRONTDOOR_BIND` to change it), so clients cannot bypass the reverse proxy.
+- **`TRUST_PROXY` setting**: the number of reverse proxies whose `X-Forwarded-For` is trusted is now configurable (default `1`, as before). Set it to `false` when clients reach Frontdoor directly, or they can fake their IP and get around the rate limits.
+
+### Security
+- **CORS limited to the session check**: `CORS_ALLOWED_ORIGINS` now opens only `GET /api/auth/me`. Before, an allowlisted origin could read and change the whole API with the user's cookie (including the database backup), and requests that change data were accepted from it.
+- **Plugin entry paths**: relative plugin entries containing `..` or encoded characters are refused, and removing a plugin bundle only deletes folders inside the plugin asset directory. Before, an admin could store an entry that made plugin deletion remove folders outside it.
+- **Stored file names stay in their folder**: app icon, company logo and avatar file names read from the database are checked to be plain names inside their folder, so a crafted backup cannot make the public icon endpoint serve other files.
+- **Restore keeps plugins locked**: restoring a backup always leaves the plugin platform switched off and every plugin unapproved, whatever the archive contains.
+
 ## [1.6.0] — 2026-11-10
 
 Admin tables with Excel-style column filters: Apps, Users, Groups, the access log and the audit trail now share one table component with a funnel on each column, sorting, a **Columns** picker remembered per browser, and search inside long checklists; the log tables sort and filter in the database, across the whole period. App icons can be picked from the Media Library and shared between apps without copies, and the Media Library gets its own box in Maintenance. Modals keep `Ctrl+K` and scrolling to themselves, and the Docker image is pinned to a Node.js release that is not affected by Node2Shell.

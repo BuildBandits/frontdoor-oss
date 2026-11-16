@@ -21,12 +21,21 @@ import { PLUGIN_ASSET_DIR, isServablePluginEntry } from './services/plugins.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// TRUST_PROXY: hop count, true/false, or an Express subnet list ('loopback'). Defaults to one proxy.
+export function parseTrustProxy(value) {
+  const raw = (value ?? '').trim().toLowerCase();
+  if (!raw) return 1;
+  if (/^\d+$/.test(raw)) return Number(raw);
+  if (raw === 'true' || raw === 'false') return raw === 'true';
+  return raw;
+}
+
 // Builds the Express app without listening or running startup jobs, so tests
 // can create a fresh instance (with fresh rate limiter state) per test.
 export function createApp() {
   const app = express();
 
-  app.set('trust proxy', 1);
+  app.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY));
 
   app.use(helmet({
     contentSecurityPolicy: {
@@ -46,18 +55,21 @@ export function createApp() {
     ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
     : [];
 
+  // Satellites only need the session check: a script on an allowlisted origin
+  // must not be able to read or change the rest of the API with the user's cookie.
   if (allowedOrigins.length > 0) {
-    app.use(cors({
+    app.use('/api/auth/me', cors({
       origin: allowedOrigins,
       credentials: true,
+      methods: ['GET', 'HEAD'],
     }));
     console.log(`Frontdoor CORS allowlist loaded: ${allowedOrigins.join(', ')}`);
   }
 
   // Requests that change data with the session cookie must come from Frontdoor
-  // itself or from an allowlisted origin. The cookie is SameSite=Lax on the parent
-  // domain, so sibling subdomains would otherwise count as same-site.
-  const trustedOrigins = new Set(allowedOrigins);
+  // itself. The cookie is SameSite=Lax on the parent domain, so sibling
+  // subdomains would otherwise count as same-site.
+  const trustedOrigins = new Set();
   try {
     if (process.env.FRONTEND_URL) trustedOrigins.add(new URL(process.env.FRONTEND_URL).origin);
   } catch {

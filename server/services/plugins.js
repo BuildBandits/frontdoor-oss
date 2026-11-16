@@ -68,6 +68,9 @@ function validateExternalUrl(value, fieldName, { allowRelative = false } = {}) {
   const codePrefix = fieldName === 'backendUrl' ? 'backend_url' : fieldName;
   if (value === undefined || value === null || value === '') return null;
   if (allowRelative && (/^[./]/.test(value) || value.startsWith('/'))) {
+    if (value.split(/[/\\]/).includes('..') || value.includes('%')) {
+      return pluginError(`plugin_${codePrefix}_invalid`, `${fieldName} must not contain '..' or encoded characters`);
+    }
     return null;
   }
   let parsed;
@@ -148,9 +151,14 @@ function isLocalPluginEntry(entry) {
   return typeof entry === 'string' && entry.startsWith('/api/plugins/files/');
 }
 
+// Null unless the entry maps to <plugin>/<version>/<release>/<file> inside PLUGIN_ASSET_DIR,
+// so a crafted entry ('..', extra or missing segments) can never point the bundle removal elsewhere.
 function localEntryToFilePath(entry) {
-  const relative = entry.replace('/api/plugins/files/', '');
-  return path.join(PLUGIN_ASSET_DIR, ...relative.split('/'));
+  const segments = entry.slice('/api/plugins/files/'.length).split('/');
+  if (segments.length !== 4 || segments.some((segment) => !segment || segment === '.' || segment === '..' || segment.includes('\\'))) return null;
+  const root = path.resolve(PLUGIN_ASSET_DIR);
+  const filePath = path.resolve(root, ...segments);
+  return path.relative(root, filePath).split(path.sep).length === 4 ? filePath : null;
 }
 
 async function writeLocalPluginBundle({ id, version, moduleSource }) {
@@ -171,6 +179,7 @@ async function writeLocalPluginBundle({ id, version, moduleSource }) {
 async function removeLocalPluginBundle(entry) {
   if (!isLocalPluginEntry(entry)) return;
   const filePath = localEntryToFilePath(entry);
+  if (!filePath) return;
   const dirPath = path.dirname(filePath);
   await fs.rm(dirPath, { recursive: true, force: true });
 }
@@ -329,6 +338,9 @@ export function upsertPluginRegistry(input = {}) {
   const roles = normalizeList(pickList(input.roles, manifest.roles));
   const source = String(input.source || manifest.source || 'local').trim() || 'local';
   const entry = String(input.entry || manifest.entry || '').trim();
+  // input.entry can differ from the manifest entry that normalizeManifest already checked.
+  const entryError = entry ? validateExternalUrl(entry, 'entry', { allowRelative: true }) : null;
+  if (entryError) throw entryError;
   const description = String(input.description || manifest.description || '').trim();
   const version = String(input.version || manifest.version || '0.0.0').trim() || '0.0.0';
   const author = String(input.author || manifest.author || '').trim();
@@ -448,7 +460,7 @@ export async function importPluginBundle(input = {}) {
   if (moduleSource) {
     // Re-importing the same module reuses the stored bundle instead of writing a new copy.
     const currentSource = existing?.entry && isLocalPluginEntry(existing.entry)
-      ? await fs.readFile(localEntryToFilePath(existing.entry), 'utf8').catch(() => null)
+      ? await fs.readFile(localEntryToFilePath(existing.entry) ?? '', 'utf8').catch(() => null)
       : null;
     if (currentSource === moduleSource) {
       entry = existing.entry;
