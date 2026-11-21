@@ -1,0 +1,85 @@
+<!doctype html>
+<!-- Static mockup of the phase 2 review page /changes/:id. Not shipped; rendered to change-review.png.
+     People and group names are fictional. Styles copy the consent page (src/pages/Connect.jsx). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review change</title>
+<style>
+  :root { --dark:#1a1a1a; --accent:#c5f467; --accent-dark:#047857; --g50:#f9fafb; --g100:#f3f4f6; --g200:#e5e7eb; --g400:#9ca3af; --g500:#6b7280; --g600:#4b5563; --g700:#374151; --red:#b91c1c; --red-bg:#fef2f2; --green:#047857; --green-bg:#ecfdf5; --amber-bg:#fffbeb; --amber:#92400e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--g50); color:var(--dark); }
+  .page { display:flex; justify-content:center; align-items:flex-start; padding:40px 16px; }
+  .card { width:100%; max-width:720px; background:#fff; border:1px solid var(--g100); border-radius:24px; padding:32px; }
+  .head { display:flex; gap:12px; align-items:flex-start; }
+  .bot { width:28px; height:28px; border-radius:8px; background:var(--accent); flex:none; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; }
+  h1 { font-size:20px; margin:0; }
+  .sub { margin:4px 0 0; font-size:14px; color:var(--g500); }
+  .summary { margin-top:20px; display:flex; gap:8px; flex-wrap:wrap; }
+  .pill { border-radius:999px; padding:4px 12px; font-size:13px; font-weight:600; }
+  .gain { background:var(--green-bg); color:var(--green); }
+  .lose { background:var(--red-bg); color:var(--red); }
+  .keep { background:var(--g100); color:var(--g600); }
+  .op { margin-top:20px; border:1px solid var(--g200); border-radius:16px; overflow:hidden; }
+  .op-head { padding:12px 16px; background:var(--g50); font-size:14px; font-weight:600; display:flex; justify-content:space-between; gap:8px; }
+  .op-head span { font-weight:400; color:var(--g500); }
+  .op-body { padding:12px 16px; font-size:14px; }
+  .row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--g100); }
+  .row:last-child { border-bottom:0; }
+  .who { font-weight:500; }
+  .why { color:var(--g500); font-size:13px; }
+  .tag { font-size:12px; font-weight:600; border-radius:6px; padding:1px 8px; }
+  .more { color:var(--accent-dark); font-weight:600; font-size:13px; padding-top:8px; }
+  .note { margin-top:20px; border-radius:16px; background:var(--g50); padding:12px; font-size:12px; color:var(--g500); line-height:1.5; }
+  .actions { margin-top:24px; display:flex; justify-content:flex-end; gap:8px; }
+  .btn { border-radius:12px; padding:10px 16px; font-size:14px; font-weight:600; border:1px solid var(--g200); background:#fff; color:var(--g700); }
+  .btn.primary { background:var(--dark); color:#fff; border-color:var(--dark); }
+</style>
+</head>
+<body>
+<div class="page"><div class="card">
+  <div class="head">
+    <div class="bot">AI</div>
+    <div>
+      <h1>Review the change Claude prepared</h1>
+      <p class="sub">Proposed for you, Laura Conti, today at 14:02 · expires in 23 h · nothing has been applied yet</p>
+    </div>
+  </div>
+
+  <div class="summary">
+    <span class="pill gain">8 people gain access</span>
+    <span class="pill lose">10 people lose access</span>
+    <span class="pill keep">2 keep access through another group</span>
+  </div>
+
+  <div class="op">
+    <div class="op-head"><b>1. Remove <em>Figma</em> from the group <em>Interns</em></b> <span>12 members</span></div>
+    <div class="op-body">
+      <div class="row"><span class="who">Marco Ferri</span><span class="tag lose">loses Figma</span></div>
+      <div class="row"><span class="who">Sara Greco</span><span class="tag lose">loses Figma</span></div>
+      <div class="row"><span class="who">Davide Rinaldi <span class="why">· still in Design</span></span><span class="tag keep">keeps Figma</span></div>
+      <div class="row"><span class="who">Elena Moretti</span><span class="tag lose">loses Figma</span></div>
+      <div class="more">Show all 12</div>
+    </div>
+  </div>
+
+  <div class="op">
+    <div class="op-head"><b>2. Give <em>Payroll</em> to the group <em>HR Milan</em></b> <span>8 members</span></div>
+    <div class="op-body">
+      <div class="row"><span class="who">Giulia Bianchi</span><span class="tag gain">gains Payroll</span></div>
+      <div class="row"><span class="who">Paolo Esposito</span><span class="tag gain">gains Payroll</span></div>
+      <div class="row"><span class="who">Chiara Lombardi</span><span class="tag gain">gains Payroll</span></div>
+      <div class="more">Show all 8</div>
+    </div>
+  </div>
+
+  <p class="note">Applied with your Frontdoor session, never by the assistant. Frontdoor checks your permissions again when you apply; if Figma, Payroll or either group changed since this was prepared, the change lapses and you can ask again. Both steps are recorded in the audit log as proposed via Claude.</p>
+
+  <div class="actions">
+    <button class="btn">Discard</button>
+    <button class="btn primary">Apply 2 changes</button>
+  </div>
+</div></div>
+</body>
+</html>
