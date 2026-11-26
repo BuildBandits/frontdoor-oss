@@ -16,7 +16,13 @@ import {
 import { getDescendantGroupIds } from '../services/groupHierarchy.js';
 import { transferGroupApps } from '../services/groupAppTransfer.js';
 import { iconUrlForApp } from '../services/appIcons.js';
-import { respondWithError } from '../services/errors.js';
+import { respondWithError, UserFacingError } from '../services/errors.js';
+import {
+  beginForceSync,
+  finishForceSync,
+  getForceSyncStatus,
+  updateForceSyncProgress,
+} from '../services/forceSyncProgress.js';
 import { recordEntraSyncOutcome, notifyUsersDeactivatedFromEntra } from '../services/syncNotifications.js';
 import { NOTIFICATION_TYPES, resolveNotifications } from '../services/notifications.js';
 import { diffAuditFields } from '../services/auditDetails.js';
@@ -118,9 +124,23 @@ router.post('/entra/import', authenticate, isAdminEditor, (req, res) => {
   }
 });
 
+// Runs to completion and answers with the summary. The page polls
+// /entra/force-sync/status meanwhile, so it can show progress and still get the
+// outcome if this request is cut off by a proxy timeout or a reload. The page
+// sends a runId so it can tell the outcome of its own run from an earlier one.
+router.get('/entra/force-sync/status', authenticate, isAdminViewer, (req, res) => {
+  res.json(getForceSyncStatus());
+});
+
 router.post('/entra/force-sync', authenticate, isAdminEditor, async (req, res) => {
+  const runId = beginForceSync(req.body?.runId);
+  if (!runId) {
+    return respondWithError(res, new UserFacingError('A group sync is already running.', { statusCode: 409, code: 'entra_sync_already_running' }));
+  }
   try {
-    const { deactivatedUsers, ...result } = await forceSyncAllEntraUsers();
+    const { deactivatedUsers, ...result } = await forceSyncAllEntraUsers({
+      onProgress: (progress) => updateForceSyncProgress(runId, progress),
+    });
     for (const user of deactivatedUsers) {
       logRbacAudit(req.user.id, 'deactivate', 'user_status', user.id, { email: user.email, role: user.role, reason: 'not_found_in_entra' });
     }
@@ -135,9 +155,13 @@ router.post('/entra/force-sync', authenticate, isAdminEditor, async (req, res) =
       discoveredGroups: result.discoveredGroups,
       errors: result.errors,
     });
-    res.json(result);
+    // Recorded after audit and notifications, so the status never reports a
+    // success that this request then answers with an error.
+    finishForceSync(runId, { result });
+    res.json({ ...result, runId });
   } catch (error) {
     console.error('Entra force-sync failed:', error.message);
+    finishForceSync(runId, { error: { code: 'failed_to_sync_entra_users', hint: error.hint || null } });
     recordEntraSyncOutcome('force-sync', [{ message: error.message, hint: error.hint || null }]);
     respondWithError(res, error, { status: 500, code: 'failed_to_sync_entra_users' });
   }

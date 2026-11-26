@@ -843,7 +843,19 @@ function handleUserMissingFromEntra(user) {
   return true;
 }
 
-export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppToken } = {}) {
+const FORCE_SYNC_TOKEN_TIMEOUT_MS = 30_000;
+
+function withTimeout(promise, ms, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+// onProgress receives { phase, processed, total, usersSynced, usersNotFound, errorCount }
+// so callers can report how far the sync got. It carries counters only, never user data.
+export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppToken, onProgress = () => {} } = {}) {
   if (!isEntraGroupSyncEnabled()) {
     return {
       usersConsidered: 0,
@@ -866,12 +878,27 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
   `).all();
 
   const errors = [];
-  const accessToken = await acquireToken();
+  let usersSynced = 0;
+  let usersNotFound = 0;
+  let processed = 0;
+  const report = (phase) => onProgress({
+    phase,
+    processed,
+    total: users.length,
+    usersSynced,
+    usersNotFound,
+    errorCount: errors.length,
+  });
+
+  report('connecting');
+  const accessToken = await withTimeout(acquireToken(), FORCE_SYNC_TOKEN_TIMEOUT_MS, 'Timed out acquiring the Microsoft Graph token.');
 
   let tenantGroupsDiscovered = 0;
   try {
+    report('tenant-groups');
     const tenantGroups = await fetchAllTenantGroups(accessToken);
     tenantGroupsDiscovered = storeTenantGroups(tenantGroups);
+    report('deleted-groups');
     await detectDeletedEntraGroups(accessToken, { catalogIds: new Set(tenantGroups.map((group) => group.id)) });
   } catch (error) {
     const hint = formatGraphAccessHint(error, 'force-sync');
@@ -898,14 +925,13 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
     };
   }
 
-  let usersSynced = 0;
-  let usersNotFound = 0;
   const deactivatedUsers = [];
   let membershipsAdded = 0;
   let membershipsRemoved = 0;
 
   const importedGroupContext = loadImportedGroupContext();
   const deletionChecks = new Map();
+  report('users');
   for (const user of users) {
     try {
       const groups = await fetchEntraGroupsForUserId(user.microsoft_id, accessToken);
@@ -932,6 +958,9 @@ export async function forceSyncAllEntraUsers({ acquireToken = acquireGraphAppTok
         message: error.message,
         ...(hint ? { hint, hintCode: 'graph_group_member_read' } : {}),
       });
+    } finally {
+      processed += 1;
+      report('users');
     }
   }
 
