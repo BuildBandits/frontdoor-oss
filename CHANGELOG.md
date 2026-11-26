@@ -10,6 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ### Changed
 - **Node.js 26 LTS**: the Docker image moves to `node:26.13.1-bookworm-slim` (Node.js 26 is Active LTS until October 2027 and supported until April 2029). Running from source still supports Node.js 24 until its end of life (April 2028), and CI tests both lines. `better-sqlite3` ships Node-API prebuilt binaries, so no native rebuild is needed (#186).
+- **Group sync progress colors**: the progress card on Groups uses the Frontdoor palette (white or dark card, lime accent bar and icon, neutral text) instead of the light-blue info style, in both light and dark themes.
 
 ### Security
 - **Node.js security releases of 10 November 2026**: the Docker image moves from Node.js 24.22.2 to 26.13.1, which includes the fixes for several High-severity issues in `http`, `tls` and `http2` (among them CVE-2026-123864, nested HTTP parser execution, and CVE-2026-126051, a remotely reachable TLS server crash). The 1.6.1 image and older do not have them. If you run from source, update to Node.js 24.22.3 or 26.13.1.
