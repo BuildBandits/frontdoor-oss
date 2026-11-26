@@ -1,6 +1,8 @@
 # Stage 1: Build frontend and production node_modules
-# Pinned to a patch release: Node2Shell (CVE-2026-111497) is fixed in 24.22.1.
-ARG NODE_IMAGE=node:24.22.2-bookworm-slim
+# Pinned to an exact patch release (Node.js 26 LTS). Check for a newer
+# security release before every build: 26.13.1 carries the 10 November 2026
+# http/tls/http2 fixes and the Node2Shell fix (CVE-2026-111497).
+ARG NODE_IMAGE=node:26.13.1-bookworm-slim
 # Optional short commit hash recorded in backups,
 # e.g. --build-arg COMMIT_SHA=$(git rev-parse --short HEAD).
 ARG COMMIT_SHA=
