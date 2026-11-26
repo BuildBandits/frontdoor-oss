@@ -15,6 +15,7 @@ import AddMembersModal from './groups/AddMembersModal';
 import AddLinkedGroupsModal from './groups/AddLinkedGroupsModal';
 import AddAppsModal from './groups/AddAppsModal';
 import GroupDetailPanel from './groups/GroupDetailPanel';
+import ForceSyncProgress from './groups/ForceSyncProgress';
 import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import ClearableSearchField from '../components/ClearableSearchField';
 import DropdownSelect from '../components/DropdownSelect';
@@ -85,6 +86,9 @@ export default function AdminGroups() {
   const [selectedEntraGroups, setSelectedEntraGroups] = useState([]);
   const [importingEntra, setImportingEntra] = useState(false);
   const [forceSyncing, setForceSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(null);
+  const [syncSummary, setSyncSummary] = useState(null);
+  const syncRunRef = useRef({ done: true, postInFlight: false, runId: null, pollFailures: 0 });
   const brandingLanguage = useBrandingLanguage();
   const canEdit = user?.role !== 'admin_readonly';
   const language = resolveAppLanguage(user?.preferredLanguage, brandingLanguage);
@@ -298,42 +302,144 @@ export default function AdminGroups() {
     setSaving(false);
   };
 
+  const syncSummaryFor = (summary) => {
+    const errorCount = summary.errors?.length || 0;
+    const firstError = summary.errors?.[0];
+    const parts = [g.forceSyncComplete
+      .replace('{usersSynced}', summary.usersSynced)
+      .replace('{usersConsidered}', summary.usersConsidered)
+      .replace('{discoveredGroups}', summary.discoveredGroups)];
+    const usersDeactivated = summary.usersDeactivated || 0;
+    const usersKeptActive = (summary.usersNotFound || 0) - usersDeactivated;
+    if (usersDeactivated > 0) {
+      parts.push(g.forceSyncUsersDeactivated.replace('{count}', usersDeactivated));
+    }
+    if (usersKeptActive > 0) {
+      parts.push(g.forceSyncUsersKeptActive.replace('{count}', usersKeptActive));
+    }
+    if (errorCount > 0) {
+      const hintText = (firstError?.hintCode && g.graphHints?.[firstError.hintCode]) || firstError?.hint;
+      const detail = `${firstError?.message ? `: ${firstError.message}` : ''}${hintText ? ` (${hintText})` : ''}`;
+      parts.push(`${g.forceSyncErrors.replace('{count}', errorCount)}${detail}`);
+    }
+    return {
+      message: parts.join('. '),
+      type: errorCount > 0 ? 'error' : summary.usersNotFound > 0 ? 'warning' : 'success',
+    };
+  };
+
+  // A run ends once, either from this page's own request or from polling the
+  // status (sync started in another tab, before a reload, or request cut off).
+  const completeForceSync = async ({ result = null, error = null } = {}) => {
+    if (syncRunRef.current.done) return;
+    syncRunRef.current.done = true;
+    setForceSyncing(false);
+    setSyncStatus(null);
+    setSyncSummary(result
+      ? syncSummaryFor(result)
+      : { type: 'error', failed: true, message: apiErrorMessage(error, ui, g.forceSyncError) });
+    if (result) {
+      await loadGroups();
+      await loadEntraCandidates();
+    }
+  };
+
+  // runId: the run this page waits for. Null means "the next run the status shows"
+  // (adopting a sync started elsewhere, or joining one after a 409).
+  const followForceSync = ({ runId = null, postInFlight = false } = {}) => {
+    syncRunRef.current = { done: false, postInFlight, runId, pollFailures: 0 };
+    setSyncSummary(null);
+    setSyncStatus(null);
+    setForceSyncing(true);
+  };
+
   const handleForceSyncGroups = async () => {
     if (!canEdit) {
       showToast(ui.admin.groups.readOnly, 'error');
       return;
     }
-    setForceSyncing(true);
+    // randomUUID needs a secure context; plain-HTTP installs get the fallback.
+    const runId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+    followForceSync({ runId, postInFlight: true });
     try {
-      const res = await api.post('/groups/entra/force-sync');
-      const summary = res.data;
-      const errorCount = summary.errors?.length || 0;
-      const firstError = summary.errors?.[0];
-      const parts = [g.forceSyncComplete
-        .replace('{usersSynced}', summary.usersSynced)
-        .replace('{usersConsidered}', summary.usersConsidered)
-        .replace('{discoveredGroups}', summary.discoveredGroups)];
-      const usersDeactivated = summary.usersDeactivated || 0;
-      const usersKeptActive = (summary.usersNotFound || 0) - usersDeactivated;
-      if (usersDeactivated > 0) {
-        parts.push(g.forceSyncUsersDeactivated.replace('{count}', usersDeactivated));
-      }
-      if (usersKeptActive > 0) {
-        parts.push(g.forceSyncUsersKeptActive.replace('{count}', usersKeptActive));
-      }
-      if (errorCount > 0) {
-        const hintText = (firstError?.hintCode && g.graphHints?.[firstError.hintCode]) || firstError?.hint;
-        const detail = `${firstError?.message ? `: ${firstError.message}` : ''}${hintText ? ` (${hintText})` : ''}`;
-        parts.push(`${g.forceSyncErrors.replace('{count}', errorCount)}${detail}`);
-      }
-      showToast(parts.join('. '), errorCount > 0 ? 'error' : summary.usersNotFound > 0 ? 'warning' : 'success');
-      await loadGroups();
-      await loadEntraCandidates();
+      const res = await api.post('/groups/entra/force-sync', { runId });
+      syncRunRef.current.postInFlight = false;
+      await completeForceSync({ result: res.data });
     } catch (err) {
-      showToast(apiErrorMessage(err, ui, g.forceSyncError), 'error');
+      syncRunRef.current.postInFlight = false;
+      const status = err.response?.status;
+      // Already running (another admin or tab): follow that run instead.
+      if (status === 409) {
+        syncRunRef.current.runId = null;
+        showToast(g.forceSyncAlreadyRunning, 'info');
+        return;
+      }
+      // Request cut off by a proxy or the network: if it reached the server the
+      // sync goes on there, and the status polling delivers its outcome.
+      if (!err.response || status === 502 || status === 503 || status === 504) return;
+      await completeForceSync({ error: err });
     }
-    setForceSyncing(false);
   };
+
+  const onForceSyncStatus = useEffectEvent((status) => {
+    const run = syncRunRef.current;
+    run.pollFailures = 0;
+    if (status.running) {
+      if (!run.runId) run.runId = status.runId;
+      setSyncStatus(status);
+      return;
+    }
+    // Until this page's own request is answered, a stopped status is the previous run.
+    if (run.postInFlight) return;
+    // Only the run this page waits for counts. Anything else means it never
+    // started (request lost before the server) or the server restarted.
+    if (run.runId && status.runId !== run.runId) {
+      void completeForceSync({ error: { code: 'entra_sync_outcome_unknown' } });
+      return;
+    }
+    if (status.result) void completeForceSync({ result: status.result });
+    else void completeForceSync({ error: status.error });
+  });
+
+  const onForceSyncPollError = useEffectEvent((err) => {
+    const run = syncRunRef.current;
+    run.pollFailures += 1;
+    const status = err.response?.status;
+    // A refused request (role changed, endpoint gone) will not get better; a
+    // server that stays unreachable is given about ten seconds.
+    if ((status >= 400 && status < 500) || run.pollFailures >= 10) {
+      void completeForceSync({ error: status >= 400 && status < 500 ? err : { code: 'entra_sync_outcome_unknown' } });
+    }
+  });
+
+  useEffect(() => {
+    if (!forceSyncing) return undefined;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await api.get('/groups/entra/force-sync/status');
+        if (!cancelled) onForceSyncStatus(res.data);
+      } catch (err) {
+        if (!cancelled) onForceSyncPollError(err);
+      }
+    };
+    void poll();
+    const timer = window.setInterval(poll, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [forceSyncing]);
+
+  // A sync started before this page opened (reload, another admin) is shown too.
+  const adoptRunningForceSync = useEffectEvent((runId) => followForceSync({ runId }));
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/groups/entra/force-sync/status')
+      .then((res) => { if (!cancelled && res.data?.running) adoptRunningForceSync(res.data.runId); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const openEntraImport = async (prefillGroupIds = [], prefillSearch = '') => {
     if (!canEdit) {
@@ -1009,6 +1115,19 @@ export default function AdminGroups() {
       {!canEdit && (
         <div className="mb-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
           {t.readOnly}
+        </div>
+      )}
+
+      {forceSyncing && <ForceSyncProgress status={syncStatus} strings={g} />}
+      {!forceSyncing && syncSummary && (
+        <div className="mb-6">
+          <PageNotice
+            type={syncSummary.type}
+            title={syncSummary.failed ? g.forceSyncFailedTitle : g.forceSyncSummaryTitle}
+            message={syncSummary.message}
+            onClose={() => setSyncSummary(null)}
+            closeLabel={ui.common.closeNotice}
+          />
         </div>
       )}
 

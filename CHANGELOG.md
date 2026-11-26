@@ -8,6 +8,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 **Upgrading:** `docker-compose.yml` now publishes port 3001 on `127.0.0.1` only. Installations reached directly on the host IP, or through a proxy on another host, set `FRONTDOOR_BIND=0.0.0.0` (and `TRUST_PROXY=false` if no proxy is in front). Satellite pages on `CORS_ALLOWED_ORIGINS` origins can still call `GET /api/auth/me`, but no longer any other endpoint.
 
+### Added
+- **Group sync progress**: while **Sync groups** runs, Groups shows the current phase, users done out of the total with a progress bar, synced / not found / error counters, the elapsed time and an estimate of the time left. The summary stays on the page until closed instead of disappearing with the toast. A sync started before a reload, in another tab or by another admin is shown too, and its outcome still arrives if a proxy cuts the request off. New `GET /api/groups/entra/force-sync/status` endpoint (admin viewers, read-only admins included, who also see the sync errors); `POST /api/groups/entra/force-sync` accepts an optional `runId`, returns it with the summary, and answers `409` (`entra_sync_already_running`) while a sync runs. A sync that reports no progress for 5 minutes is abandoned, so a hung run cannot block the button until restart, and the Graph token request now times out after 30 seconds (#193).
+
 ### Changed
 - **Docker port on loopback**: `docker-compose.yml` publishes port 3001 on `127.0.0.1` by default (`FRONTDOOR_BIND` to change it), so clients cannot bypass the reverse proxy.
 - **`TRUST_PROXY` setting**: the number of reverse proxies whose `X-Forwarded-For` is trusted is now configurable (default `1`, as before). Set it to `false` when clients reach Frontdoor directly, or they can fake their IP and get around the rate limits.
