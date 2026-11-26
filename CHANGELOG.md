@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Changed
+- **Group sync progress colors**: the progress card on Groups uses the Frontdoor palette (white or dark card, lime accent bar and icon, neutral text) instead of the light-blue info style, in both light and dark themes.
+
 ## [1.6.1] — 2026-11-26
 
 **Sync groups** now shows how far it got: phase, users done out of the total, counters, elapsed time and an estimate of the time left, with a summary that stays on the page and survives a reload. This release also restricts CORS to the session check, hardens plugin and stored asset paths, keeps plugins locked after a restore, and publishes the Docker port on loopback only.

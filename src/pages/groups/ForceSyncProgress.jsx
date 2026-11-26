@@ -21,23 +21,23 @@ export default function ForceSyncProgress({ status, strings }) {
   const hasEta = Number.isFinite(status?.etaMs);
 
   return (
-    <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-900 shadow-xs dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-100">
+    <div className="mb-6 rounded-2xl border border-gray-100 bg-white px-4 py-3 text-dark shadow-xs dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
       <div className="flex items-start gap-3">
-        <RefreshCw className="mt-0.5 h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
+        <RefreshCw className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-accent-dark dark:text-accent" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <div role="status" aria-live="polite">
               <div className="text-sm font-semibold">{strings.forceSyncRunningTitle}</div>
-              <div className="mt-1 text-sm font-medium">{phaseLabel}</div>
+              <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">{phaseLabel}</div>
             </div>
-            <div className="text-xs tabular-nums opacity-80" aria-hidden="true">
+            <div className="text-xs tabular-nums text-gray-500 dark:text-gray-400" aria-hidden="true">
               {strings.forceSyncElapsed.replace('{time}', formatDuration(status?.elapsedMs))}
               {hasEta && ` · ${strings.forceSyncEta.replace('{time}', formatDuration(status.etaMs))}`}
             </div>
           </div>
 
           <div
-            className="mt-3 h-2 w-full overflow-hidden rounded-full bg-sky-100 dark:bg-sky-900/60"
+            className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
             role="progressbar"
             aria-label={strings.forceSyncRunningTitle}
             aria-valuemin={0}
@@ -46,16 +46,16 @@ export default function ForceSyncProgress({ status, strings }) {
             aria-valuetext={inUsersPhase ? countLabel : phaseLabel}
           >
             {percent === null ? (
-              <div className="h-full w-1/3 animate-pulse rounded-full bg-sky-400 dark:bg-sky-500" />
+              <div className="h-full w-1/3 animate-pulse rounded-full bg-accent" />
             ) : (
-              <div className="h-full rounded-full bg-sky-500 transition-[width] duration-500" style={{ width: `${percent}%` }} />
+              <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${percent}%` }} />
             )}
           </div>
 
           {inUsersPhase && (
             <div className="mt-2 flex flex-wrap justify-between gap-x-4 gap-y-1 text-xs tabular-nums" aria-hidden="true">
               <span className="font-semibold">{countLabel} ({percent}%)</span>
-              <span className={status.errorCount > 0 ? 'font-semibold text-red-700 dark:text-red-300' : 'opacity-80'}>
+              <span className={status.errorCount > 0 ? 'font-semibold text-red-700 dark:text-red-300' : 'text-gray-500 dark:text-gray-400'}>
                 {strings.forceSyncProgressDetail
                   .replace('{usersSynced}', status.usersSynced)
                   .replace('{usersNotFound}', status.usersNotFound)
