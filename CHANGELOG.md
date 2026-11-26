@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-11-26
+
+Frontdoor now runs on Node.js 26 LTS: the Docker image moves to `node:26.13.1-bookworm-slim`, which also brings the Node.js security releases of 10 November 2026 (several High-severity fixes in `http`, `tls` and `http2`). Running from source keeps supporting Node.js 24. The group sync progress card now uses the Frontdoor colors.
+
 **Upgrading:** the Docker image now runs on Node.js 26 LTS: pull the new image, no configuration or database change. Running from source needs Node.js 24.22.3 or later on the 24 line, or 26.13.1 or later (`engines`).
 
 ### Changed
