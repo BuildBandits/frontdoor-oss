@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+## [1.6.1] — 2026-11-26
+
+**Sync groups** now shows how far it got: phase, users done out of the total, counters, elapsed time and an estimate of the time left, with a summary that stays on the page and survives a reload. This release also restricts CORS to the session check, hardens plugin and stored asset paths, keeps plugins locked after a restore, and publishes the Docker port on loopback only.
+
 **Upgrading:** `docker-compose.yml` now publishes port 3001 on `127.0.0.1` only. Installations reached directly on the host IP, or through a proxy on another host, set `FRONTDOOR_BIND=0.0.0.0` (and `TRUST_PROXY=false` if no proxy is in front). Satellite pages on `CORS_ALLOWED_ORIGINS` origins can still call `GET /api/auth/me`, but no longer any other endpoint.
 
 ### Added
